@@ -116,9 +116,12 @@ import { useTerrainRaster } from "@/shared/routing/useTerrainRaster";
 import type { ForceElement, GameState, Side } from "./lib/state";
 import { opposing } from "./lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "./data/commanderClient";
+import { jevConfigured, openRouterJevCall } from "./data/jevClient";
 import { createRng } from "./rules/dice";
 import { describeVerdict } from "./rules/victory";
-import { EventLog } from "./rules/events";
+import { EventLog, type DecisionEvent } from "./rules/events";
+import { jevTacticalDecider } from "./rules/jevDecider";
+import type { TacticalDecider } from "./rules/tactical";
 import {
   FORCE_LISTS,
   playablePlatforms,
@@ -387,6 +390,20 @@ export default function BgwsPlay() {
   // Different models on opposing sides is the experiment, not a gimmick.
   const [blueModel, setBlueModel] = useState<CommanderModelName>("claude-sonnet-4-6");
   const [redModel, setRedModel] = useState<CommanderModelName>("gpt-5-2");
+  /**
+   * Use Jev for decisions. A setup choice, fixed once the game starts.
+   *
+   * On, Jev makes every in-the-moment call for both sides — who snap-fires at
+   * a mover, whether a move presses on through contact, who tries to spot a
+   * concealed element, what a reserve does at the end of its move — beneath
+   * whichever commander is planning the turn. Off, the declared rules and the
+   * heuristic decide, exactly as they always did.
+   *
+   * Fixed for the game rather than toggled mid-way, because a game whose
+   * deciders changed half-way through is two half-games, and nothing read
+   * from it afterwards would be about either.
+   */
+  const [useJev, setUseJev] = useState(false);
 
   const [game, setGame] = useState<LiveGame | null>(null);
   const [index, setIndex] = useState(0);
@@ -615,26 +632,31 @@ export default function BgwsPlay() {
   // generator each turn would make every turn's luck identical.
   const runtimeRef = useRef<{ log: EventLog; rng: ReturnType<typeof createRng> } | null>(null);
 
+  // One client for the whole screen, so its answer cache is shared: the same
+  // moment asked twice — a discarded and regenerated turn — gets the same call.
+  const jevCall = useMemo(() => openRouterJevCall(), []);
+
   const commanders = useMemo((): Record<Side, OrdersCommander> => {
     const make = (
       s: Side,
       kind: CommanderKind,
       directive: string,
       model: CommanderModelName,
-    ): OrdersCommander =>
-      kind === "heuristic"
-        ? // Keep the troop together when Combined Fire is on, and only then:
-          // concentrating buys nothing mechanically without it.
-          heuristicOrdersCommander(
-            s,
-            modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
-          )
-        : llmCommander({
-            side: s,
-            call: foundryModelCall(model, directive),
-            directive,
-            name: `${model}-${s}`,
-          });
+    ): OrdersCommander => {
+      // Keep the troop together when Combined Fire is on, and only then:
+      // concentrating buys nothing mechanically without it.
+      const heuristic = heuristicOrdersCommander(
+        s,
+        modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
+      );
+      if (kind === "heuristic") return heuristic;
+      return llmCommander({
+        side: s,
+        call: foundryModelCall(model, directive),
+        directive,
+        name: `${model}-${s}`,
+      });
+    };
     return {
       blue: make("blue", blueKind, blueDirective, blueModel),
       red: make("red", redKind, redDirective, redModel),
@@ -653,6 +675,14 @@ export default function BgwsPlay() {
     modules.combinedFire,
     ruleset,
   ]);
+
+  const tactical = useMemo((): Partial<Record<Side, TacticalDecider>> => {
+    if (!useJev) return {};
+    return {
+      blue: jevTacticalDecider({ side: "blue", call: jevCall, directive: blueDirective }),
+      red: jevTacticalDecider({ side: "red", call: jevCall, directive: redDirective }),
+    };
+  }, [useJev, blueDirective, redDirective, jevCall]);
 
   const strength = placedStrength(placed, ruleset);
 
@@ -710,11 +740,12 @@ export default function BgwsPlay() {
       terrain,
       routePlanner,
       commanders,
+      tactical,
       rng: runtime.rng,
       log: runtime.log,
       maxTurns: MAX_TURNS,
     };
-  }, [commanders, routePlanner, ruleset, terrain]);
+  }, [commanders, tactical, routePlanner, ruleset, terrain]);
 
   /**
    * STEP ONE: ask both commanders what they intend, and stop.
@@ -2067,7 +2098,7 @@ export default function BgwsPlay() {
                     ))}
                   </select>
                 )}
-                {kind === "llm" && (
+                {(kind === "llm" || useJev) && (
                   <textarea
                     value={directive}
                     onChange={(e) => setDirective(e.target.value)}
@@ -2078,6 +2109,42 @@ export default function BgwsPlay() {
                 )}
               </div>
             ))}
+            <label
+              style={{
+                ...row,
+                gap: 6,
+                marginTop: 6,
+                cursor: phase === "placing" ? "pointer" : "default",
+                color: useJev ? "#e8c547" : "#8a91a8",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useJev}
+                onChange={(e) => setUseJev(e.target.checked)}
+                disabled={phase !== "placing"}
+              />
+              Use Jev for decisions
+            </label>
+            {useJev && (
+              <div
+                style={{
+                  ...subtle,
+                  lineHeight: 1.5,
+                  color: jevConfigured() ? undefined : "#e07a5f",
+                }}
+              >
+                {jevConfigured()
+                  ? "Jev (typesafe/jev-1.13, via OpenRouter) makes every in-the-moment " +
+                    "call for both sides: who fires on a unit crossing its arc, whether a " +
+                    "move presses on through contact, who tries to spot a concealed " +
+                    "element, and what a reserve does when it arrives. The commanders " +
+                    "above still plan each turn. If Jev cannot answer in time, the " +
+                    "declared rules decide and the turn says so. Fixed once the game starts."
+                  : "No OpenRouter key: set VITE_OPENROUTER_API_KEY. Until then every Jev " +
+                    "decision will fall back to the declared rules."}
+              </div>
+            )}
             {(blueKind === "llm" || redKind === "llm") && (
               <div style={{ ...subtle, lineHeight: 1.5 }}>
                 Calls the published <code>commanderTurn</code> function. Two model calls
@@ -2359,6 +2426,7 @@ export default function BgwsPlay() {
                       {turn.counteraction[s].plan && ` \u2014 ${turn.counteraction[s].plan}`}
                     </div>
                   )}
+                  <JevCalls decisions={turn.decisions} side={s} />
                 </div>
               ))}
 
@@ -2966,6 +3034,49 @@ const viewpointBar: React.CSSProperties = {
   color: "#e9ecfb",
   font: MONO,
 };
+
+/**
+ * The calls Jev made at the moment during a turn, one line each.
+ *
+ * These decisions happen INSIDE the resolution — a tank that held fire as an
+ * enemy crossed its arc leaves no order behind — so without this list the
+ * only evidence of them would be the absence of a shot. Fallbacks are shown
+ * too: "the rule decided because Jev timed out" is a different fact from
+ * "Jev decided to hold", and the two must never look the same.
+ */
+function JevCalls({ decisions, side }: { decisions: DecisionEvent[]; side: Side }) {
+  const calls = decisions.filter(
+    (d) => d.side === side && (d.chosenBy === "jev" || d.fallback != null),
+  );
+  if (calls.length === 0) return null;
+  const fell = calls.filter((d) => d.fallback != null).length;
+  const cost = calls.reduce((sum, d) => sum + (d.costUsd ?? 0), 0);
+
+  return (
+    <details style={{ ...subtle, marginTop: 3 }}>
+      <summary style={{ cursor: "pointer" }}>
+        Jev: {calls.length} call{calls.length === 1 ? "" : "s"}
+        {fell > 0 && `, ${fell} fell back to the rules`}
+        {cost > 0 && ` \u00b7 $${cost.toFixed(5)}`}
+      </summary>
+      {calls.map((d) => {
+        const p = d.probabilities?.[d.chosenId];
+        return (
+          <div
+            key={d.seq}
+            style={{ color: d.fallback ? "#e07a5f" : "#e9ecfb", lineHeight: 1.4 }}
+          >
+            {d.actorId ?? "?"} &middot; {d.question} &rarr; <b>{d.chosenId}</b>
+            {p != null && ` (${Math.round(p * 100)}%)`}
+            {d.latencyMs != null && d.latencyMs > 0 && ` \u00b7 ${d.latencyMs} ms`}
+            {d.fallback && ` \u00b7 ${d.fallback}`}
+            {d.rationale && <div style={{ color: "#6a7292" }}>{d.rationale}</div>}
+          </div>
+        );
+      })}
+    </details>
+  );
+}
 
 const subtle: React.CSSProperties = { fontSize: 10, color: "#6a7292" };
 

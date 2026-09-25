@@ -79,7 +79,7 @@ export interface ActionOption extends DecisionOption {
 }
 
 export interface Commander {
-  readonly kind: "human" | "heuristic" | "llm";
+  readonly kind: "human" | "heuristic" | "llm" | "jev";
   readonly name: string;
   /**
    * Choose one of the offered options.

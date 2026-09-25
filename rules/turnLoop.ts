@@ -43,6 +43,12 @@ import { canAdvance, canEngage } from "./resolvers";
 import type { RuleSet, StandingEngagement } from "./ruleset";
 import { judgeVictory, type Verdict } from "./victory";
 import { walkUntilContact } from "./contact";
+import type {
+  CommanderIntent,
+  ReactionCandidate,
+  TacticalDecider,
+  TacticalTrace,
+} from "./tactical";
 
 /**
  * One moment inside a turn, kept so a turn can be played back.
@@ -106,6 +112,12 @@ export interface GameConfig {
    */
   routePlanner?: RoutePlanner;
   commanders: Record<Side, Commander>;
+  /**
+   * Who makes each side's in-the-moment calls — reactive fire, pressing on
+   * through contact. Optional, per side, and absent means the declared rules
+   * decide, exactly as before. See rules/tactical.ts.
+   */
+  tactical?: Partial<Record<Side, TacticalDecider>>;
   rng: Rng;
   log: EventLog;
   /** Stop after this many turns even if neither side has broken. */
@@ -1010,13 +1022,13 @@ async function activate(
   // out what is moving (10.0) — which can reveal it, and so can bring it
   // within reach of the Reactive Fire that follows.
   if (chosen.actorId) {
-    next = attemptSightingInterrupt(next, chosen.actorId, side, config, turn);
+    next = await attemptSightingInterruptLive(next, chosen.actorId, side, config, turn);
   }
 
   // An assault has its own sequence (9.3.4): Surprise first, then Reactive
   // Fire from outside the objective and Defensive Fire from on it.
   if (chosen.kind === "assault" && chosen.actorId) {
-    next = resolveAssaultAction(next, chosen, config, turn, standing, "actionReaction");
+    next = await resolveAssaultActionLive(next, chosen, config, turn, standing, "actionReaction");
     return { state: markActivated(next, chosen.actorId), acted: true };
   }
 
@@ -1025,11 +1037,11 @@ async function activate(
   // move does not happen at all.
   const interruptible = chosen.kind === "move";
   if (interruptible && chosen.actorId) {
-    next = runReactiveFire(next, chosen.actorId, side, config, turn, standing, "actionReaction");
+    next = await reactiveFireLive(next, chosen.actorId, side, config, turn, standing, "actionReaction");
   }
 
   const stopped = interruptible && chosen.actorId != null && !mayProceed(next, chosen.actorId);
-  if (!stopped) next = resolveAction(next, chosen, config, turn);
+  if (!stopped) next = await resolveMoveLive(next, chosen, config, turn);
 
   next = markActivated(next, chosen.actorId ?? "");
   if (stopped && chosen.actorId) {
@@ -1055,6 +1067,13 @@ export interface ResolveContext {
   counteractionFire?: boolean;
   /** The attacker went in unseen (9.3.1). Set by resolveAssaultAction. */
   surprise?: boolean;
+  /**
+   * Filled in by a move, if given: whether it was cut short by contact, and
+   * by whom. Written to rather than returned so resolveAction keeps its
+   * signature — this is how resolveMoveLive learns there is a decision to
+   * make without walking the move twice.
+   */
+  report?: { halted?: boolean; contacts?: string[] };
 }
 
 /**
@@ -1309,6 +1328,10 @@ function resolveActionInner(
 
       const arrival = walk?.halted ? walk.end : option.destination;
       const halted = walk?.halted ?? false;
+      if (context.report) {
+        context.report.halted = halted;
+        context.report.contacts = walk?.contacts ?? [];
+      }
 
       return applyEffects(state, [
         ...(walk?.sighted ?? []),
@@ -1491,7 +1514,7 @@ export function capabilityCanEngage(kind: CapabilityClass, target: TargetClass):
  * is. Capabilities are listed best-first in the profiles, so the first one
  * that both reaches and applies is the right one.
  */
-function weaponFor(fe: ForceElement, target: ForceElement, rangeM: number) {
+export function weaponFor(fe: ForceElement, target: ForceElement, rangeM: number) {
   return fe.capabilities.find(
     (capability) =>
       rangeM <= capability.maxRangeM && capabilityCanEngage(capability.kind, target.targetClass),
@@ -1510,7 +1533,7 @@ function weaponFor(fe: ForceElement, target: ForceElement, rangeM: number) {
  * "use the most detrimental modifiers to the Firing side": one element in
  * defilade should not launder the whole troop's aspect.
  */
-function isFlankShot(
+export function isFlankShot(
   firers: readonly ForceElement[],
   target: ForceElement,
   ruleset: RuleSet,
@@ -1591,28 +1614,51 @@ export type ArcRound = "actionReaction" | "counteraction";
  * activating element targetable — including by the Reactive Fire that runs
  * immediately after this. Being seen is how you come to be shot at.
  */
+/**
+ * Who could make the Attempt Sighting interrupt, nearest first.
+ *
+ * Empty when there is nothing to attempt: the module is off, or the actor is
+ * not Concealed. Pure — split out so a TacticalDecider can be offered the
+ * same list the rule picks from.
+ */
+export function sightingObservers(
+  state: GameState,
+  activatingFeId: string,
+  activatingSide: Side,
+  config: PhaseConfig,
+): ForceElement[] {
+  if (!config.ruleset.modules.concealment) return [];
+
+  const actor = state.forceElements[activatingFeId];
+  // Only a Concealed FE can be the subject: there is nothing to reveal about
+  // something already on the map.
+  if (!actor || actor.combatStrength <= 0 || !actor.concealed) return [];
+
+  return forceElementsOf(state, opposing(activatingSide))
+    .filter((fe) => fe.combatStrength > 0)
+    .filter((fe) => lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible)
+    .sort((a, b) => distanceM(a.position, actor.position) - distanceM(b.position, actor.position));
+}
+
 export function attemptSightingInterrupt(
   state: GameState,
   activatingFeId: string,
   activatingSide: Side,
   config: PhaseConfig,
   turn: number,
+  /**
+   * The observer a TacticalDecider picked. Absent means the nearest, which is
+   * the rule's reading of "any one". Ignored if it is not an eligible one.
+   */
+  observerId?: string,
 ): GameState {
-  if (!config.ruleset.modules.concealment) return state;
-
+  const observers = sightingObservers(state, activatingFeId, activatingSide, config);
   const actor = state.forceElements[activatingFeId];
-  // Only a Concealed FE can be the subject: there is nothing to reveal about
-  // something already on the map.
-  if (!actor || actor.combatStrength <= 0 || !actor.concealed) return state;
-
   const watcher = opposing(activatingSide);
-  const observers = forceElementsOf(state, watcher)
-    .filter((fe) => fe.combatStrength > 0)
-    .filter((fe) => lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible)
-    .sort((a, b) => distanceM(a.position, actor.position) - distanceM(b.position, actor.position));
 
-  const observer = observers[0];
-  if (!observer) return state;
+  const observer =
+    (observerId ? observers.find((fe) => fe.id === observerId) : undefined) ?? observers[0];
+  if (!observer || !actor) return state;
 
   const outcome = resolveSighting(
     observer,
@@ -1640,6 +1686,103 @@ export function attemptSightingInterrupt(
   }
 
   return next;
+}
+
+/** An element the rules allow to answer an action, and what its ROE says. */
+interface EligibleReactor {
+  reactor: ForceElement;
+  rangeM: number;
+  capability: NonNullable<ReturnType<typeof weaponFor>>;
+  engage: StandingEngagement;
+  ruleSaysReact: boolean;
+}
+
+/**
+ * Everything that COULD answer this action, in the order the rules take them.
+ *
+ * Split out of runReactiveFire so that the ability to fire (range, line of
+ * sight, rounds, markers, fog of war) is decided in one place by the rules,
+ * and the WILLINGNESS to fire can be decided either by the declared ROE or by
+ * a TacticalDecider at the moment. Pure: no dice, no log.
+ */
+function eligibleReactors(
+  state: GameState,
+  actorId: string,
+  actingSide: Side,
+  config: PhaseConfig,
+  standing: StandingOrders,
+  round: ArcRound,
+  actorFiredAtId?: string,
+  excluded?: ReadonlySet<string>,
+): EligibleReactor[] {
+  const actor = state.forceElements[actorId];
+  if (!actor || actor.combatStrength <= 0) return [];
+
+  const defender = opposing(actingSide);
+
+  // Sighting is held per SIDE, so this is one check rather than a filter. A
+  // reaction is still subject to fog of war: you cannot shoot at something
+  // your side has not seen.
+  if (sightingOf(state, defender, actor.id) === "none") return [];
+
+  const eligible: EligibleReactor[] = [];
+  const reactors = forceElementsOf(state, defender)
+    .filter((fe) => fe.combatStrength > 0)
+    .filter((fe) => canEngage(fe.morale))
+    // A dummy has nothing to shoot with, and reacting would reveal it for free.
+    .filter((fe) => !(config.ruleset.modules.dummies && fe.isDummy))
+    .filter((fe) => !excluded?.has(fe.id))
+    .filter((fe) => !hasMarker(fe, "reacted"))
+    .filter((fe) => {
+      // 7.1.3, and the two rounds have DIFFERENT eligibility:
+      //   Action-Reaction Round: "the reacting FE has not yet Activated, or
+      //                           has been given a Hold Action"
+      //   Counteraction Round:   "it did not Fire in the Action-Reaction
+      //                           round (i.e. it does not have a FIRED marker)"
+      if (round === "counteraction") return !hasMarker(fe, "fired");
+      return !hasMarker(fe, "activated") || hasMarker(fe, "held");
+    });
+
+  for (const fe of reactors) {
+    const rangeM = distanceM(fe.position, actor.position);
+    const capability = weaponFor(fe, actor, rangeM);
+    if (!capability) continue;
+    if (!hasRounds(fe, capability.kind, config)) continue;
+    if (!lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible) {
+      continue;
+    }
+    // HOLDING IS OVERWATCH, and the rulebook says so twice: 7.1.3 names
+    // HOLD among the eleven Order Verbs that permit Reactive Fire, and
+    // names "has been given a Hold Action" as the other way to qualify in
+    // the Action-Reaction Round. An element that has chosen to do nothing
+    // else is watching its whole arc, not just short range.
+    //
+    // Without this the activation sequence produced ZERO reactions in every
+    // force list with `reactionFire` on and `counteraction` off — the
+    // per-activation Commander has no step in which to declare rules of
+    // engagement, so everything fell back to `withinShortRange`, and by the
+    // time anything was inside short range it was shooting rather than
+    // moving. The sweep would have called the R ceremony for want of an
+    // orders phase, which is the exact failure this whole exercise exists
+    // to prevent.
+    const declared = standing[defender].get(fe.id);
+    const order =
+      declared ?? (hasMarker(fe, "held") ? { actorId: fe.id, engage: "always" as const } : undefined);
+
+    eligible.push({
+      reactor: fe,
+      rangeM,
+      capability,
+      engage: order?.engage ?? config.ruleset.reaction.defaultEngage,
+      ruleSaysReact: willReact(order, config.ruleset, {
+        rangeM,
+        shortRangeM: capability.shortRangeM,
+        wasFiredUpon: actorFiredAtId != null,
+      }),
+    });
+  }
+
+  return eligible;
 }
 
 /**
@@ -1679,6 +1822,14 @@ export function runReactiveFire(
    * the radius get Defensive Fire instead, and must not get both.
    */
   excluded?: ReadonlySet<string>,
+  /**
+   * Reactors chosen at the moment by a TacticalDecider, best first.
+   *
+   * Absent means the declared rules of engagement decide, as they always
+   * did. Present, it REPLACES `willReact` — but only among elements the rules
+   * say are able to fire; an id that is not eligible is ignored.
+   */
+  chosenReactorIds?: readonly string[],
 ): GameState {
   if (!config.ruleset.modules.reactionFire) return state;
 
@@ -1686,61 +1837,25 @@ export function runReactiveFire(
   const actor = next.forceElements[actorId];
   if (!actor || actor.combatStrength <= 0) return next;
 
-  const defender = opposing(actingSide);
+  const candidates = eligibleReactors(
+    next,
+    actorId,
+    actingSide,
+    config,
+    standing,
+    round,
+    actorFiredAtId,
+    excluded,
+  );
 
-  // Sighting is held per SIDE, so this is one check rather than a filter. A
-  // reaction is still subject to fog of war: you cannot shoot at something
-  // your side has not seen.
-  if (sightingOf(next, defender, actor.id) === "none") return next;
-
-  const reactors = forceElementsOf(next, defender)
-    .filter((fe) => fe.combatStrength > 0)
-    .filter((fe) => canEngage(fe.morale))
-    // A dummy has nothing to shoot with, and reacting would reveal it for free.
-    .filter((fe) => !(config.ruleset.modules.dummies && fe.isDummy))
-    .filter((fe) => !excluded?.has(fe.id))
-    .filter((fe) => !hasMarker(fe, "reacted"))
-    .filter((fe) => {
-      // 7.1.3, and the two rounds have DIFFERENT eligibility:
-      //   Action-Reaction Round: "the reacting FE has not yet Activated, or
-      //                           has been given a Hold Action"
-      //   Counteraction Round:   "it did not Fire in the Action-Reaction
-      //                           round (i.e. it does not have a FIRED marker)"
-      if (round === "counteraction") return !hasMarker(fe, "fired");
-      return !hasMarker(fe, "activated") || hasMarker(fe, "held");
-    })
-    .filter((fe) => {
-      const rangeM = distanceM(fe.position, actor.position);
-      const capability = weaponFor(fe, actor, rangeM);
-      if (!capability) return false;
-      if (!hasRounds(fe, capability.kind, config)) return false;
-      if (!lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible) {
-        return false;
-      }
-      // HOLDING IS OVERWATCH, and the rulebook says so twice: 7.1.3 names
-      // HOLD among the eleven Order Verbs that permit Reactive Fire, and
-      // names "has been given a Hold Action" as the other way to qualify in
-      // the Action-Reaction Round. An element that has chosen to do nothing
-      // else is watching its whole arc, not just short range.
-      //
-      // Without this the activation sequence produced ZERO reactions in every
-      // force list with `reactionFire` on and `counteraction` off — the
-      // per-activation Commander has no step in which to declare rules of
-      // engagement, so everything fell back to `withinShortRange`, and by the
-      // time anything was inside short range it was shooting rather than
-      // moving. The sweep would have called the R ceremony for want of an
-      // orders phase, which is the exact failure this whole exercise exists
-      // to prevent.
-      const declared = standing[defender].get(fe.id);
-      const order =
-        declared ?? (hasMarker(fe, "held") ? { actorId: fe.id, engage: "always" as const } : undefined);
-
-      return willReact(order, config.ruleset, {
-        rangeM,
-        shortRangeM: capability.shortRangeM,
-        wasFiredUpon: actorFiredAtId != null,
-      });
-    })
+  const reactors = (
+    chosenReactorIds
+      ? chosenReactorIds
+          .map((id) => candidates.find((candidate) => candidate.reactor.id === id))
+          .filter((candidate): candidate is EligibleReactor => candidate != null)
+      : candidates.filter((candidate) => candidate.ruleSaysReact)
+  )
+    .map((candidate) => candidate.reactor)
     .slice(0, config.ruleset.reaction.maxReactorsPerAction);
 
   for (const reactor of reactors) {
@@ -2010,6 +2125,8 @@ export function resolveAssaultAction(
   standing: StandingOrders,
   round: ArcRound,
   phase: "arcAction" | "arcCounteraction" = "arcAction",
+  /** Reactors chosen at the moment by a TacticalDecider. See runReactiveFire. */
+  chosenReactorIds?: readonly string[],
 ): GameState {
   const attackerId = option.actorId;
   const targetId = option.targetId;
@@ -2074,6 +2191,7 @@ export function resolveAssaultAction(
       round,
       targetId,
       config.ruleset.modules.defensiveFire ? defenderIds : undefined,
+      chosenReactorIds,
     );
 
     // Everyone inside it, defending. "Combined Fire is not possible" — so
@@ -2135,6 +2253,383 @@ export function resolveAssaultAction(
   }
 
   return resolveAction(next, option, config, turn, { phase, surprise });
+}
+
+// ── Live decisions ─────────────────────────────────────────────────────────
+// The async doors into the three functions above, for the moments a
+// TacticalDecider may be asked about. See rules/tactical.ts.
+//
+// ⚠ EVERY ONE OF THESE IS A PASS-THROUGH WHEN NO DECIDER IS CONFIGURED. Same
+// function, same arguments, same dice in the same order — so every existing
+// test, calibration and fixed-seed replay still describes the game that is
+// played when `config.tactical` is absent.
+
+/** How many times one move may stop for contact and be asked about it. */
+const MAX_CONTACT_DECISIONS = 3;
+
+/** Put a decider's reasoning in the log, in sequence with what it caused. */
+function logTraces(
+  config: PhaseConfig,
+  turn: number,
+  phase: Phase,
+  side: Side,
+  traces: readonly TacticalTrace[],
+  /** The board at the moment of deciding, for the turn's playback. */
+  state?: GameState,
+): void {
+  for (const trace of traces) {
+    // A decision is a moment in the turn in its own right — "R1 held fire"
+    // leaves nothing on the board, so without a step the playback would show
+    // a tank crossing an arc and nothing else happening, which reads as a bug.
+    if (state) {
+      const p = trace.probabilities?.[trace.chosenId];
+      recordStep(
+        config,
+        state,
+        turn,
+        phase,
+        `${trace.actorId ?? side}: ${trace.question} \u2192 ${trace.chosenId}` +
+          (trace.fallback
+            ? ` (rules; Jev ${trace.fallback})`
+            : p != null
+              ? ` (Jev ${Math.round(p * 100)}%)`
+              : " (Jev)"),
+        { side, actorId: trace.actorId },
+      );
+    }
+    config.log.append({
+      type: "decision",
+      turn,
+      phase,
+      rulesetId: config.ruleset.id,
+      side,
+      actorId: trace.actorId,
+      question: trace.question,
+      options: trace.options,
+      chosenId: trace.chosenId,
+      chosenBy: trace.chosenBy,
+      rationale: trace.rationale,
+      probabilities: trace.probabilities,
+      confidence: trace.confidence,
+      latencyMs: trace.latencyMs,
+      costUsd: trace.costUsd,
+      fallback: trace.fallback,
+    });
+  }
+}
+
+function toCandidates(eligible: readonly EligibleReactor[]): ReactionCandidate[] {
+  return eligible.map((entry) => ({
+    reactorId: entry.reactor.id,
+    rangeM: Math.round(entry.rangeM),
+    capability: entry.capability.kind,
+    engage: entry.engage,
+    ruleSaysReact: entry.ruleSaysReact,
+  }));
+}
+
+/** Commander intent per side, where a sequence of play has one to give. */
+export type SideIntents = Partial<Record<Side, CommanderIntent>>;
+
+/**
+ * Reactive Fire, with the reacting side asked at the moment.
+ *
+ * The rules decide who CAN fire; the decider decides who DOES. See
+ * runReactiveFire for everything else.
+ */
+export async function reactiveFireLive(
+  state: GameState,
+  actorId: string,
+  actingSide: Side,
+  config: PhaseConfig,
+  turn: number,
+  standing: StandingOrders,
+  round: ArcRound,
+  actorFiredAtId?: string,
+  excluded?: ReadonlySet<string>,
+  intents?: SideIntents,
+): Promise<GameState> {
+  const side = opposing(actingSide);
+  const decider = config.tactical?.[side];
+  const plain = () =>
+    runReactiveFire(state, actorId, actingSide, config, turn, standing, round, actorFiredAtId, excluded);
+  if (!decider || !config.ruleset.modules.reactionFire) return plain();
+
+  const eligible = eligibleReactors(
+    state,
+    actorId,
+    actingSide,
+    config,
+    standing,
+    round,
+    actorFiredAtId,
+    excluded,
+  );
+  if (eligible.length === 0) return plain();
+
+  const verdict = await decider.decideReactions({
+    state,
+    config,
+    turn,
+    round,
+    side,
+    actorId,
+    wasFiredUpon: actorFiredAtId != null,
+    candidates: toCandidates(eligible),
+    maxReactors: config.ruleset.reaction.maxReactorsPerAction,
+    intent: intents?.[side],
+  });
+  logTraces(config, turn, "arcReaction", side, verdict.traces, state);
+
+  return runReactiveFire(
+    state,
+    actorId,
+    actingSide,
+    config,
+    turn,
+    standing,
+    round,
+    actorFiredAtId,
+    excluded,
+    verdict.reactorIds,
+  );
+}
+
+/**
+ * An assault, with the defending side's Reactive Fire asked at the moment.
+ *
+ * Asked BEFORE the Surprise roll, because the roll and the answer are
+ * independent and asking after would mean splitting resolveAssaultAction in
+ * two. The cost is a question that goes unused when the attacker achieves
+ * surprise, which is logged like any other — it was a decision, it simply
+ * turned out not to matter.
+ */
+export async function resolveAssaultActionLive(
+  state: GameState,
+  option: ActionOption,
+  config: PhaseConfig,
+  turn: number,
+  standing: StandingOrders,
+  round: ArcRound,
+  phase: "arcAction" | "arcCounteraction" = "arcAction",
+  intents?: SideIntents,
+): Promise<GameState> {
+  const plain = () =>
+    resolveAssaultAction(state, option, config, turn, standing, round, phase);
+  const attacker = option.actorId ? state.forceElements[option.actorId] : undefined;
+  const target = option.targetId ? state.forceElements[option.targetId] : undefined;
+  if (!attacker || !target || !config.ruleset.modules.reactionFire) return plain();
+
+  const decider = config.tactical?.[target.side];
+  if (!decider) return plain();
+
+  const radius = config.ruleset.assault.defenderRadiusM;
+  const defenderIds = new Set(
+    forceElementsOf(state, target.side)
+      .filter((fe) => fe.combatStrength > 0 && distanceM(fe.position, target.position) <= radius)
+      .map((fe) => fe.id),
+  );
+  const eligible = eligibleReactors(
+    state,
+    attacker.id,
+    attacker.side,
+    config,
+    standing,
+    round,
+    target.id,
+    config.ruleset.modules.defensiveFire ? defenderIds : undefined,
+  );
+  if (eligible.length === 0) return plain();
+
+  const verdict = await decider.decideReactions({
+    state,
+    config,
+    turn,
+    round,
+    side: target.side,
+    actorId: attacker.id,
+    wasFiredUpon: true,
+    candidates: toCandidates(eligible),
+    maxReactors: config.ruleset.reaction.maxReactorsPerAction,
+    intent: intents?.[target.side],
+  });
+  logTraces(config, turn, "arcReaction", target.side, verdict.traces, state);
+
+  return resolveAssaultAction(
+    state,
+    option,
+    config,
+    turn,
+    standing,
+    round,
+    phase,
+    verdict.reactorIds,
+  );
+}
+
+/**
+ * A move, with the mover asked what to do the moment it makes contact.
+ *
+ * The rulebook gives the moving player that choice at that moment (7.1.3);
+ * the engine used to take it in advance, on the option, because a move
+ * resolved synchronously. Here the move is walked with halt-on-contact, and
+ * if it halts the side's decider is asked whether to press on. If it does,
+ * the rest of the move is walked from where it stopped — and may stop again
+ * for someone else, up to MAX_CONTACT_DECISIONS times.
+ *
+ * ⚠ THE ONE PLACE A DECIDER CHANGES THE DICE. A continued walk re-attempts
+ * sighting against enemies the first leg looked for and missed, which the
+ * single pre-committed walk would not have. It is only reachable with a
+ * decider configured.
+ */
+export async function resolveMoveLive(
+  state: GameState,
+  option: ActionOption,
+  config: PhaseConfig,
+  turn: number,
+  context: ResolveContext = {},
+  intents?: SideIntents,
+): Promise<GameState> {
+  const actor = option.actorId ? state.forceElements[option.actorId] : undefined;
+  const decider = actor ? config.tactical?.[actor.side] : undefined;
+  if (
+    !actor ||
+    !decider ||
+    option.kind !== "move" ||
+    !option.destination ||
+    !config.ruleset.modules.contactHalt
+  ) {
+    return resolveAction(state, option, config, turn, context);
+  }
+
+  const destination = option.destination;
+  const preferred = option.onContact ?? "halt";
+  let next = state;
+  let leg: ActionOption = { ...option, onContact: "halt" };
+
+  for (let asked = 0; asked <= MAX_CONTACT_DECISIONS; asked += 1) {
+    const report: NonNullable<ResolveContext["report"]> = {};
+    next = resolveAction(next, leg, config, turn, { ...context, report });
+    if (!report.halted || asked === MAX_CONTACT_DECISIONS) return next;
+
+    // A shaken element has no choice to make and goes to ground (7.1.3).
+    const moved = next.forceElements[actor.id];
+    if (!moved || moved.combatStrength <= 0 || !canAdvance(moved.morale)) return next;
+    const remainingM = distanceM(moved.position, destination);
+    if (remainingM < MIN_USEFUL_MOVE_M) return next;
+
+    const verdict = await decider.decideContact({
+      state: next,
+      config,
+      turn,
+      side: actor.side,
+      option,
+      actorId: actor.id,
+      newContacts: report.contacts ?? [],
+      remainingM,
+      preferred,
+      intent: intents?.[actor.side],
+    });
+    logTraces(config, turn, context.phase ?? "arcAction", actor.side, verdict.traces, next);
+    if (!verdict.press) return next;
+
+    leg = {
+      ...option,
+      id: `${option.id}:press`,
+      summary: `${option.summary} (pressed on through contact)`,
+      onContact: "halt",
+    };
+  }
+
+  return next;
+}
+
+/**
+ * The Attempt Sighting interrupt, with the watching side choosing who looks.
+ *
+ * "Any one non-Activating FE" — the rule reads that as the nearest with a
+ * line. A decider may pick a better one: a recce element further off, say,
+ * or one in cover rather than one in the open. Only asked when there is more
+ * than one candidate, since one is not a choice.
+ */
+export async function attemptSightingInterruptLive(
+  state: GameState,
+  activatingFeId: string,
+  activatingSide: Side,
+  config: PhaseConfig,
+  turn: number,
+  intents?: SideIntents,
+): Promise<GameState> {
+  const side = opposing(activatingSide);
+  const decider = config.tactical?.[side];
+  const plain = () => attemptSightingInterrupt(state, activatingFeId, activatingSide, config, turn);
+  if (!decider?.chooseObserver) return plain();
+
+  const observers = sightingObservers(state, activatingFeId, activatingSide, config);
+  const actor = state.forceElements[activatingFeId];
+  if (observers.length < 2 || !actor) return plain();
+
+  const verdict = await decider.chooseObserver({
+    state,
+    config,
+    turn,
+    side,
+    actorId: activatingFeId,
+    observers: observers.map((fe) => ({
+      observerId: fe.id,
+      rangeM: Math.round(distanceM(fe.position, actor.position)),
+      recce: fe.commandRating == null && fe.concealed,
+    })),
+    intent: intents?.[side],
+  });
+  logTraces(config, turn, state.phase, side, verdict.traces, state);
+
+  return attemptSightingInterrupt(
+    state,
+    activatingFeId,
+    activatingSide,
+    config,
+    turn,
+    verdict.observerId ?? undefined,
+  );
+}
+
+/**
+ * Put a choice the engine would otherwise make by heuristic to the side's
+ * decider.
+ *
+ * Returns `undefined` when there is no decider to ask (or it gave an answer
+ * that is not on offer), so the caller keeps its own default; `null` when
+ * the decider declined everything and passing is allowed.
+ */
+export async function chooseOptionLive(
+  state: GameState,
+  side: Side,
+  options: ActionOption[],
+  question: string,
+  config: PhaseConfig,
+  turn: number,
+  allowPass: boolean,
+  intents?: SideIntents,
+): Promise<ActionOption | null | undefined> {
+  const decider = config.tactical?.[side];
+  if (!decider?.chooseOption || options.length === 0) return undefined;
+
+  const verdict = await decider.chooseOption({
+    state,
+    config,
+    turn,
+    side,
+    question,
+    options,
+    allowPass,
+    intent: intents?.[side],
+  });
+  logTraces(config, turn, state.phase, side, verdict.traces, state);
+
+  if (verdict.optionId === undefined) return undefined;
+  if (verdict.optionId === null) return allowPass ? null : undefined;
+  return options.find((option) => option.id === verdict.optionId);
 }
 
 /**
@@ -2401,6 +2896,8 @@ export async function runCounteractionRound(
   initiative: Side,
   standing: StandingOrders,
   decide: CounteractionChooser,
+  /** Each side's plan, for its TacticalDecider. Absent in the activation sequence. */
+  intents?: SideIntents,
 ): Promise<GameState> {
   if (!config.ruleset.modules.counteraction) return state;
 
@@ -2446,8 +2943,19 @@ export async function runCounteractionRound(
       // try to make out what is moving up, and then anything unfired may
       // shoot at it. "A Reserve Move can be subject to Reactive Fire by any
       // enemy FE/Group in Range and LoS that does not have a FIRED marker."
-      next = attemptSightingInterrupt(next, chosen.actorId, side, config, turn);
-      next = runReactiveFire(next, chosen.actorId, side, config, turn, standing, "counteraction");
+      next = await attemptSightingInterruptLive(next, chosen.actorId, side, config, turn, intents);
+      next = await reactiveFireLive(
+        next,
+        chosen.actorId,
+        side,
+        config,
+        turn,
+        standing,
+        "counteraction",
+        undefined,
+        undefined,
+        intents,
+      );
 
       // Mark it regardless: an element shot to a standstill has still used its
       // reserve move, and without the marker it would be offered again forever.
@@ -2457,7 +2965,14 @@ export async function runCounteractionRound(
 
       if (!mayProceed(next, chosen.actorId)) continue;
 
-      next = resolveAction(next, chosen, config, turn, { phase: "arcCounteraction" });
+      next = await resolveMoveLive(
+        next,
+        chosen,
+        config,
+        turn,
+        { phase: "arcCounteraction" },
+        intents,
+      );
 
       // "At the end of its Move, the Reserve FE/Group can DirF or Hasty Assault."
       const moved = next.forceElements[chosen.actorId];
@@ -2485,7 +3000,7 @@ export async function runCounteractionRound(
       // through Defensive Fire like any other (9.3, 9.3.4).
       next =
         followUp.kind === "assault"
-          ? resolveAssaultAction(
+          ? await resolveAssaultActionLive(
               next,
               followUp,
               config,
@@ -2493,6 +3008,7 @@ export async function runCounteractionRound(
               standing,
               "counteraction",
               "arcCounteraction",
+              intents,
             )
           : resolveAction(next, followUp, config, turn, {
               phase: "arcCounteraction",

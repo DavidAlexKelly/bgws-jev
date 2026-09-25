@@ -43,7 +43,8 @@ import type { ActionOption, FormationPreference } from "./commander";
 import { resolveInitiative } from "./resolvers";
 import {
   activationBudget,
-  attemptSightingInterrupt,
+  attemptSightingInterruptLive,
+  chooseOptionLive,
   counteractionFireOptionsFor,
   endStaleMelees,
   mayProceed,
@@ -51,13 +52,14 @@ import {
   optionsFor,
   reserveLimitFor,
   reserveMoveOptionsFor,
-  resolveAction,
-  resolveAssaultAction,
   runCounteractionRound,
   clearRoutesOnContact,
   runMoraleChecks,
   runRally,
-  runReactiveFire,
+  reactiveFireLive,
+  resolveAssaultActionLive,
+  resolveMoveLive,
+  type SideIntents,
   runSighting,
   willReact,
   type PhaseConfig,
@@ -178,7 +180,7 @@ export interface OrdersRequest {
  * where a per-activation decider is expected.
  */
 export interface OrdersCommander {
-  readonly kind: "human" | "heuristic" | "llm";
+  readonly kind: "human" | "heuristic" | "llm" | "jev";
   readonly name: string;
   planTurn(request: OrdersRequest): Promise<Orders>;
   /**
@@ -484,6 +486,7 @@ export async function executePlannedTurn(
 ): Promise<OrdersTurnResult> {
   const { turn, requests, orders, standing } = planned;
   let next = planned.state;
+  const intents = intentsFrom(planned);
 
   // Executed alternately in initiative order, so having the initiative is
   // worth something: your orders land first.
@@ -532,12 +535,21 @@ export async function executePlannedTurn(
       // 7.1, in the order it lists them. One enemy element may try to make
       // out what is activating (10.0), which can reveal it and so bring it
       // within reach of the Reactive Fire that follows.
-      next = attemptSightingInterrupt(next, intent.actorId, side, config, turn);
+      next = await attemptSightingInterruptLive(next, intent.actorId, side, config, turn, intents);
 
       // An assault runs its own sequence (9.3.4): Surprise, then Reactive
       // Fire from outside the objective and Defensive Fire from on it.
       if (chosen.kind === "assault") {
-        next = resolveAssaultAction(next, chosen, config, turn, standing, "actionReaction");
+        next = await resolveAssaultActionLive(
+          next,
+          chosen,
+          config,
+          turn,
+          standing,
+          "actionReaction",
+          "arcAction",
+          intents,
+        );
         next = applyEffects(next, [
           { kind: "marker", feId: intent.actorId, marker: "activated", added: true },
         ]);
@@ -548,7 +560,7 @@ export async function executePlannedTurn(
       // or Breaks the mover stops the move happening at all.
       const interruptible = chosen.kind === "move";
       if (interruptible) {
-        next = runReactiveFire(
+        next = await reactiveFireLive(
           { ...next, phase: "arcReaction" },
           intent.actorId,
           side,
@@ -556,12 +568,15 @@ export async function executePlannedTurn(
           turn,
           standing,
           "actionReaction",
+          undefined,
+          undefined,
+          intents,
         );
         next = { ...next, phase: "arcAction" };
       }
 
       const stopped = interruptible && !mayProceed(next, intent.actorId);
-      if (!stopped) next = resolveAction(next, chosen, config, turn);
+      if (!stopped) next = await resolveMoveLive(next, chosen, config, turn, {}, intents);
 
       next = applyEffects(next, [
         { kind: "marker", feId: intent.actorId, marker: "activated", added: true },
@@ -620,11 +635,28 @@ export async function executePlannedTurn(
         // Declining to shoot at the end of a move it chose to make would be
         // an odd way to lose a tank, so the follow-up falls back to the
         // heuristic rather than to nothing.
-        if (stage === "reserveFollowUp") return bestOf(current, options);
+        //
+        // With a decider configured, it is asked instead: this is exactly the
+        // kind of in-the-moment call it exists for, and the heuristic was only
+        // ever standing in because nobody had been asked.
+        if (stage === "reserveFollowUp") {
+          const live = await chooseOptionLive(
+            current,
+            forSide,
+            options,
+            "reserve at the end of its move: fire, assault, or nothing?",
+            config,
+            turn,
+            true,
+            intents,
+          );
+          return live === undefined ? bestOf(current, options) : live;
+        }
 
         // Nothing the commander asked for is available: Pass. Final by rule.
         return null;
       },
+      intents,
     );
   }
 
@@ -660,6 +692,32 @@ export async function executePlannedTurn(
     rejected: planned.rejected,
     counteraction,
   };
+}
+
+/**
+ * What each commander said it meant to do, in the form a TacticalDecider reads.
+ *
+ * Only ACCEPTED intents are passed down: an element whose order was dropped
+ * was not ordered to do anything, and telling its decider otherwise would be
+ * inventing an intent the commander never successfully gave.
+ */
+function intentsFrom(planned: PlannedTurn): SideIntents {
+  const intentFor = (side: Side) => {
+    const byElement: Record<string, { summary: string; why?: string }> = {};
+    for (const intent of planned.accepted[side]) {
+      const option = planned.requests[side].optionsByElement[intent.actorId]?.find(
+        (candidate) => candidate.id === intent.optionId,
+      );
+      if (!option) continue;
+      const earlier = byElement[intent.actorId];
+      byElement[intent.actorId] = {
+        summary: earlier ? `${earlier.summary}, then ${option.summary}` : option.summary,
+        why: intent.rationale ?? earlier?.why,
+      };
+    }
+    return { plan: planned.orders[side].plan, orders: byElement };
+  };
+  return { blue: intentFor("blue"), red: intentFor("red") };
 }
 
 /**

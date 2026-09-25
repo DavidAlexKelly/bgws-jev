@@ -107,10 +107,25 @@ export interface DecisionEvent {
   question: string;
   options: DecisionOption[];
   chosenId: string;
-  /** Who chose: a person, the scripted bot, or a model. */
-  chosenBy: "human" | "heuristic" | "llm";
+  /** Who chose: a person, the scripted bot, a language model, or a decision model. */
+  chosenBy: "human" | "heuristic" | "llm" | "jev";
   /** The model's stated reasoning, where there was one. Never trusted as fact. */
   rationale?: string;
+  /**
+   * The decision model's probability for each option, by option id.
+   *
+   * Kept because a choice taken at 0.51 and one taken at 0.97 are different
+   * facts about a commander, and only the second is a conviction.
+   */
+  probabilities?: Record<string, number>;
+  /** How concentrated those probabilities were, 0–1. */
+  confidence?: number;
+  /** Round trip to the model, in milliseconds. */
+  latencyMs?: number;
+  /** What the call cost, in US dollars, where the provider said. */
+  costUsd?: number;
+  /** Set when the model could not decide and a rule did instead. */
+  fallback?: "timeout" | "error" | "lowConfidence" | "vetoed";
 }
 
 export type GameEvent = ResolutionEvent | DecisionEvent;
