@@ -116,9 +116,13 @@ import { useTerrainRaster } from "@/shared/routing/useTerrainRaster";
 import type { ForceElement, GameState, Side } from "./lib/state";
 import { opposing } from "./lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "./data/commanderClient";
+import { jevConfigured, openRouterJevCall } from "./data/jevClient";
 import { createRng } from "./rules/dice";
 import { describeVerdict } from "./rules/victory";
-import { EventLog } from "./rules/events";
+import { EventLog, type DecisionEvent } from "./rules/events";
+import { jevOrdersCommander } from "./rules/jevCommander";
+import { jevTacticalDecider } from "./rules/jevDecider";
+import type { TacticalDecider } from "./rules/tactical";
 import {
   FORCE_LISTS,
   playablePlatforms,
@@ -334,7 +338,7 @@ const PLAN_HOLD_LAYER = "bgws-play-plan-hold-layer";
 
 const MAX_TURNS = 40;
 
-type CommanderKind = "heuristic" | "llm";
+type CommanderKind = "heuristic" | "llm" | "jev";
 type Viewpoint = Side | "both";
 type Phase = "placing" | "playing";
 let counter = 0;
@@ -387,6 +391,13 @@ export default function BgwsPlay() {
   // Different models on opposing sides is the experiment, not a gimmick.
   const [blueModel, setBlueModel] = useState<CommanderModelName>("claude-sonnet-4-6");
   const [redModel, setRedModel] = useState<CommanderModelName>("gpt-5-2");
+  /**
+   * Jev making this side's in-the-moment calls — who snap-fires at a mover,
+   * whether a move presses on through contact — under whichever commander is
+   * planning the turn. Off means the declared rules decide, as they always did.
+   */
+  const [blueTactics, setBlueTactics] = useState(false);
+  const [redTactics, setRedTactics] = useState(false);
 
   const [game, setGame] = useState<LiveGame | null>(null);
   const [index, setIndex] = useState(0);
@@ -615,26 +626,40 @@ export default function BgwsPlay() {
   // generator each turn would make every turn's luck identical.
   const runtimeRef = useRef<{ log: EventLog; rng: ReturnType<typeof createRng> } | null>(null);
 
+  // One client for the whole screen, so its answer cache is shared: the same
+  // moment asked twice — a discarded and regenerated turn — gets the same call.
+  const jevCall = useMemo(() => openRouterJevCall(), []);
+
   const commanders = useMemo((): Record<Side, OrdersCommander> => {
     const make = (
       s: Side,
       kind: CommanderKind,
       directive: string,
       model: CommanderModelName,
-    ): OrdersCommander =>
-      kind === "heuristic"
-        ? // Keep the troop together when Combined Fire is on, and only then:
-          // concentrating buys nothing mechanically without it.
-          heuristicOrdersCommander(
-            s,
-            modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
-          )
-        : llmCommander({
-            side: s,
-            call: foundryModelCall(model, directive),
-            directive,
-            name: `${model}-${s}`,
-          });
+    ): OrdersCommander => {
+      // Keep the troop together when Combined Fire is on, and only then:
+      // concentrating buys nothing mechanically without it.
+      const heuristic = heuristicOrdersCommander(
+        s,
+        modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
+      );
+      if (kind === "heuristic") return heuristic;
+      if (kind === "jev") {
+        return jevOrdersCommander({
+          side: s,
+          call: jevCall,
+          directive,
+          config: { terrain, ruleset },
+          fallback: heuristic,
+        });
+      }
+      return llmCommander({
+        side: s,
+        call: foundryModelCall(model, directive),
+        directive,
+        name: `${model}-${s}`,
+      });
+    };
     return {
       blue: make("blue", blueKind, blueDirective, blueModel),
       red: make("red", redKind, redDirective, redModel),
@@ -652,7 +677,18 @@ export default function BgwsPlay() {
     redModel,
     modules.combinedFire,
     ruleset,
+    terrain,
+    jevCall,
   ]);
+
+  const tactical = useMemo((): Partial<Record<Side, TacticalDecider>> => {
+    const make = (s: Side, on: boolean, directive: string) =>
+      on ? jevTacticalDecider({ side: s, call: jevCall, directive }) : undefined;
+    return {
+      blue: make("blue", blueTactics, blueDirective),
+      red: make("red", redTactics, redDirective),
+    };
+  }, [blueTactics, redTactics, blueDirective, redDirective, jevCall]);
 
   const strength = placedStrength(placed, ruleset);
 
@@ -710,11 +746,12 @@ export default function BgwsPlay() {
       terrain,
       routePlanner,
       commanders,
+      tactical,
       rng: runtime.rng,
       log: runtime.log,
       maxTurns: MAX_TURNS,
     };
-  }, [commanders, routePlanner, ruleset, terrain]);
+  }, [commanders, tactical, routePlanner, ruleset, terrain]);
 
   /**
    * STEP ONE: ask both commanders what they intend, and stop.
@@ -2032,14 +2069,14 @@ export default function BgwsPlay() {
             <div style={{ ...groupTitle, marginTop: 14 }}>2 &middot; Who commands</div>
             {(
               [
-                ["blue", blueKind, setBlueKind, blueDirective, setBlueDirective, blueModel, setBlueModel],
-                ["red", redKind, setRedKind, redDirective, setRedDirective, redModel, setRedModel],
+                ["blue", blueKind, setBlueKind, blueDirective, setBlueDirective, blueModel, setBlueModel, blueTactics, setBlueTactics],
+                ["red", redKind, setRedKind, redDirective, setRedDirective, redModel, setRedModel, redTactics, setRedTactics],
               ] as const
-            ).map(([s, kind, setKind, directive, setDirective, model, setModel]) => (
+            ).map(([s, kind, setKind, directive, setDirective, model, setModel, tactics, setTactics]) => (
               <div key={s} style={{ marginBottom: 8 }}>
                 <div style={row}>
                   <span style={{ ...subtle, width: 34 }}>{s}</span>
-                  {(["heuristic", "llm"] as CommanderKind[]).map((k) => (
+                  {(["heuristic", "llm", "jev"] as CommanderKind[]).map((k) => (
                     <button
                       key={k}
                       onClick={() => setKind(k)}
@@ -2067,7 +2104,7 @@ export default function BgwsPlay() {
                     ))}
                   </select>
                 )}
-                {kind === "llm" && (
+                {kind !== "heuristic" && (
                   <textarea
                     value={directive}
                     onChange={(e) => setDirective(e.target.value)}
@@ -2076,8 +2113,33 @@ export default function BgwsPlay() {
                     style={{ ...select, width: "100%", marginTop: 3, resize: "vertical" }}
                   />
                 )}
+                <label style={{ ...subtle, display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                  <input
+                    type="checkbox"
+                    checked={tactics}
+                    onChange={(e) => setTactics(e.target.checked)}
+                  />
+                  Jev tactics &mdash; decide reactive fire and contact at the moment
+                </label>
               </div>
             ))}
+            {(blueKind === "jev" || redKind === "jev" || blueTactics || redTactics) && (
+              <div
+                style={{
+                  ...subtle,
+                  lineHeight: 1.5,
+                  color: jevConfigured() ? undefined : "#e07a5f",
+                }}
+              >
+                {jevConfigured()
+                  ? "Jev (typesafe/jev-1.13) via OpenRouter. As commander it answers one " +
+                    "choice per element in a single call; as tactics it is asked each time " +
+                    "an enemy acts in an arc or a move runs into contact. If it cannot " +
+                    "answer, the heuristic or the declared rules decide, and the turn says so."
+                  : "No OpenRouter key: set VITE_OPENROUTER_API_KEY. Until then every Jev " +
+                    "decision falls back to the heuristic or the declared rules."}
+              </div>
+            )}
             {(blueKind === "llm" || redKind === "llm") && (
               <div style={{ ...subtle, lineHeight: 1.5 }}>
                 Calls the published <code>commanderTurn</code> function. Two model calls
@@ -2359,6 +2421,7 @@ export default function BgwsPlay() {
                       {turn.counteraction[s].plan && ` \u2014 ${turn.counteraction[s].plan}`}
                     </div>
                   )}
+                  <JevCalls decisions={turn.decisions} side={s} />
                 </div>
               ))}
 
@@ -2966,6 +3029,47 @@ const viewpointBar: React.CSSProperties = {
   color: "#e9ecfb",
   font: MONO,
 };
+
+/**
+ * The calls Jev made at the moment during a turn, one line each.
+ *
+ * These decisions happen INSIDE the resolution — a tank that held fire as an
+ * enemy crossed its arc leaves no order behind — so without this list the
+ * only evidence of them would be the absence of a shot. Fallbacks are shown
+ * too: "the rule decided because Jev timed out" is a different fact from
+ * "Jev decided to hold", and the two must never look the same.
+ */
+function JevCalls({ decisions, side }: { decisions: DecisionEvent[]; side: Side }) {
+  const calls = decisions.filter(
+    (d) => d.side === side && (d.chosenBy === "jev" || d.fallback != null),
+  );
+  if (calls.length === 0) return null;
+  const fell = calls.filter((d) => d.fallback != null).length;
+
+  return (
+    <details style={{ ...subtle, marginTop: 3 }}>
+      <summary style={{ cursor: "pointer" }}>
+        Jev: {calls.length} call{calls.length === 1 ? "" : "s"}
+        {fell > 0 && `, ${fell} fell back to the rules`}
+      </summary>
+      {calls.map((d) => {
+        const p = d.probabilities?.[d.chosenId];
+        return (
+          <div
+            key={d.seq}
+            style={{ color: d.fallback ? "#e07a5f" : "#e9ecfb", lineHeight: 1.4 }}
+          >
+            {d.actorId ?? "?"} &middot; {d.question} &rarr; <b>{d.chosenId}</b>
+            {p != null && ` (${Math.round(p * 100)}%)`}
+            {d.latencyMs != null && d.latencyMs > 0 && ` \u00b7 ${d.latencyMs} ms`}
+            {d.fallback && ` \u00b7 ${d.fallback}`}
+            {d.rationale && <div style={{ color: "#6a7292" }}>{d.rationale}</div>}
+          </div>
+        );
+      })}
+    </details>
+  );
+}
 
 const subtle: React.CSSProperties = { fontSize: 10, color: "#6a7292" };
 

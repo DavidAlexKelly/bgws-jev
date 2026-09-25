@@ -294,3 +294,27 @@ judgement beats the rules.
 4. `jevDecider` (reactions and contact) with logging and replay support.
 5. `jevCommander` for the ARC sequence, plus the UI selection.
 6. The harness comparison report.
+
+## 9. What has been built
+
+| Piece | File |
+|---|---|
+| Decision seam (`TacticalDecider`, `ruleDecider`) | `rules/tactical.ts` |
+| Engine hooks: `eligibleReactors` split out of `runReactiveFire`; async `reactiveFireLive`, `resolveAssaultActionLive`, `resolveMoveLive`; `GameConfig.tactical` | `rules/turnLoop.ts` |
+| Orders sequence passes commander intent down and uses the live hooks | `rules/orders.ts` |
+| Decisions API types, tolerant answer parser, deadline | `rules/jev.ts` |
+| State encoder: exact fire odds (all 36 dice outcomes), fog-safe enemy, terrain, exposure, intent | `rules/jevState.ts` |
+| Jev tactics: one `noul` per eligible reactor in one request; `choice` halt/press at contact | `rules/jevDecider.ts` |
+| Jev as commander: `jevCommander` (activation) and `jevOrdersCommander` (one request per turn) | `rules/jevCommander.ts` |
+| OpenRouter client, key from `import.meta.env.VITE_OPENROUTER_API_KEY`, answer cache | `data/jevClient.ts` |
+| `DecisionEvent` gains `"jev"`, `probabilities`, `confidence`, `latencyMs`, `fallback`; `TurnRecord.decisions` | `rules/events.ts`, `lib/liveGame.ts` |
+| Play screen: `jev` commander, per-side "Jev tactics" toggle, per-turn list of Jev's calls | `Play.tsx` |
+| Tests with a fake `JevCall` | `rules/jev.test.ts` |
+
+Without a decider configured, the event logs of 72 seeded games (both
+sequences of play, two rulesets, every force list) are byte-identical to
+before the change.
+
+The key goes directly from the browser to OpenRouter, so it is visible in the
+bundle. Use a key with a spend limit, or swap `openRouterJevCall` for a
+Foundry-function `JevCall` (Phase 1 above) later. Nothing else changes.

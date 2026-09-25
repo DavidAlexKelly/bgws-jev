@@ -19,7 +19,13 @@ import { forceElementsOf } from "./state";
 import type { TerrainSampler } from "./lineOfSight";
 import type { RoutePlanner } from "./routePlan";
 import type { TurnStep } from "../rules/turnLoop";
-import { EventLog, type GameEvent, type ResolutionEvent } from "../rules/events";
+import {
+  EventLog,
+  type DecisionEvent,
+  type GameEvent,
+  type ResolutionEvent,
+} from "../rules/events";
+import type { TacticalDecider } from "../rules/tactical";
 import type { Rng } from "../rules/dice";
 import {
   executePlannedTurn,
@@ -44,6 +50,12 @@ export interface TurnRecord {
   /** What each side did with the Counteraction Round, where it was played. */
   counteraction?: Record<Side, CounteractionOrders>;
   narrative: string[];
+  /**
+   * Every decision taken during the turn, in order — including the ones made
+   * at the moment by a TacticalDecider, which appear nowhere else. Carried so
+   * the play screen can show WHY an element held fire, not just that it did.
+   */
+  decisions: DecisionEvent[];
   strength: Record<Side, number>;
   /**
    * Every moment inside the turn, in order, each with the state it left behind.
@@ -114,6 +126,8 @@ export interface LiveGameConfig {
   /** Optional listener for live progress; the turn record keeps its own copy. */
   onStep?: (step: TurnStep) => void;
   commanders: Record<Side, OrdersCommander>;
+  /** Per-side in-the-moment decisions. Absent means the declared rules. */
+  tactical?: Partial<Record<Side, TacticalDecider>>;
   rng: Rng;
   log: EventLog;
   maxTurns: number;
@@ -255,6 +269,7 @@ export async function executePending(
       .filter((event): event is ResolutionEvent => event.type === "resolution")
       .map((event) => event.narrative)
       .filter((line): line is string => Boolean(line)),
+    decisions: events.filter((event): event is DecisionEvent => event.type === "decision"),
     strength: {
       blue: strengthOf(result.state, "blue"),
       red: strengthOf(result.state, "red"),
