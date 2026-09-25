@@ -34,6 +34,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { AppSwitcher } from "@/components/AppSwitcher";
 
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "./data/commanderClient";
+import { jevConfigured, openRouterJevCall } from "./data/jevClient";
+import { jevTacticalDecider } from "./rules/jevDecider";
 import { scenarioFactory } from "./lib/forceBuilder";
 import { proceduralTerrain, STANDARD_GROUND } from "./lib/proceduralTerrain";
 import type { Side } from "./lib/state";
@@ -61,7 +63,10 @@ const RULES = withModules(HOUSE_V1, {
 const terrain = proceduralTerrain(STANDARD_GROUND);
 
 export default function BgwsTrial() {
-  const [model, setModel] = useState<CommanderModelName>(COMMANDER_MODELS[0]);
+  // "heuristic" as a challenger is only interesting with Jev on: it isolates
+  // Jev's in-the-moment calls against the same planner on the other side.
+  const [model, setModel] = useState<CommanderModelName | "heuristic">(COMMANDER_MODELS[0]);
+  const [useJev, setUseJev] = useState(false);
   const [listId, setListId] = useState(SYMMETRIC_CONTROL_V1.id);
   const [seeds, setSeeds] = useState(3);
   const [maxTurns, setMaxTurns] = useState(8);
@@ -73,7 +78,7 @@ export default function BgwsTrial() {
   const [error, setError] = useState<string | null>(null);
   const outputRef = useRef<HTMLTextAreaElement>(null);
 
-  const estimatedCalls = seeds * 2 * maxTurns * 2;
+  const estimatedCalls = model === "heuristic" ? 0 : seeds * 2 * maxTurns * 2;
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -81,7 +86,8 @@ export default function BgwsTrial() {
     setOutput("");
     setProgress([`starting: ${seeds * 2} games, up to ${maxTurns} turns each`]);
 
-    const call = foundryModelCall(model, directive);
+    const jevCall = useJev ? openRouterJevCall() : undefined;
+    const label = `${model}${useJev ? " + Jev" : ""}`;
 
     try {
       const result: TrialResult = await runTrial({
@@ -91,7 +97,17 @@ export default function BgwsTrial() {
         seeds: Array.from({ length: seeds }, (_, index) => `trial${index}`),
         maxTurns,
         challenger: (side: Side) =>
-          llmCommander({ side, call, directive, name: `${model}-${side}` }),
+          model === "heuristic"
+            ? heuristicOrdersCommander(side, { coLocatedM: RULES.coLocatedM })
+            : llmCommander({
+                side,
+                call: foundryModelCall(model, directive),
+                directive,
+                name: `${model}-${side}`,
+              }),
+        challengerTactics: jevCall
+          ? (side: Side) => jevTacticalDecider({ side, call: jevCall, directive })
+          : undefined,
         // The baseline keeps formation, because combinedFire is on and a
         // commander that cannot mass is not the yardstick anybody wants.
         baseline: (side: Side) =>
@@ -102,7 +118,10 @@ export default function BgwsTrial() {
             `${finished}/${total}  seed ${game.seed} as ${game.challengerSide}: ` +
               `${game.winner ?? "drawn"} in ${game.turns} turns, ` +
               `${game.ordersRejected}/${game.ordersIssued} orders refused` +
-              (game.failedTurns > 0 ? `, ${game.failedTurns} turns unanswered` : ""),
+              (game.failedTurns > 0 ? `, ${game.failedTurns} turns unanswered` : "") +
+              (game.tacticalCalls > 0
+                ? `, ${game.tacticalCalls} Jev calls (${game.tacticalFallbacks} fell back)`
+                : ""),
           ]);
         },
       });
@@ -111,11 +130,12 @@ export default function BgwsTrial() {
       // verdict when the model did not answer — see describeTrial.
       setOutput(
         [
-          describeTrial(result, `${model} vs heuristic on ${listId}`),
+          describeTrial(result, `${label} vs heuristic on ${listId}`),
           "",
           JSON.stringify(
             {
               model,
+              jev: useJev,
               directive: directive.trim() || null,
               forceList: listId,
               ruleset: RULES.id,
@@ -132,7 +152,7 @@ export default function BgwsTrial() {
     } finally {
       setRunning(false);
     }
-  }, [model, listId, seeds, maxTurns, directive]);
+  }, [model, useJev, listId, seeds, maxTurns, directive]);
 
   const copy = useCallback(() => {
     // Selecting as well as copying: if the clipboard API is refused — it is,
@@ -158,16 +178,35 @@ export default function BgwsTrial() {
           <div style={groupTitle}>Challenger</div>
           <select
             value={model}
-            onChange={(event) => setModel(event.target.value as CommanderModelName)}
+            onChange={(event) => setModel(event.target.value as CommanderModelName | "heuristic")}
             style={field}
             disabled={running}
           >
+            <option value="heuristic">heuristic</option>
             {COMMANDER_MODELS.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
           </select>
+
+          <label style={{ ...note, display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={useJev}
+              onChange={(event) => setUseJev(event.target.checked)}
+              disabled={running}
+            />
+            Use Jev for decisions (challenger&rsquo;s side)
+          </label>
+          <div style={note}>
+            Jev makes the challenger&rsquo;s in-the-moment calls: reactive fire,
+            contact, spotting, reserve follow-ups. The baseline plays by the
+            rules. Heuristic + Jev against heuristic measures Jev alone.
+            {useJev && !jevConfigured() && (
+              <strong> No OpenRouter key: every call will fall back.</strong>
+            )}
+          </div>
 
           <div style={groupTitle}>Force list</div>
           <select
@@ -224,7 +263,7 @@ export default function BgwsTrial() {
           />
 
           <div style={{ ...note, marginTop: 10 }}>
-            About <strong>{estimatedCalls}</strong> model calls
+            About <strong>{estimatedCalls}</strong> commander model calls
             {" "}({seeds * 2} games &times; {maxTurns} turns &times; 2 calls a turn).
             Sequential on purpose — firing them all at once is how a trial
             becomes a rate-limit incident.

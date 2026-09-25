@@ -36,6 +36,7 @@ import { createRng } from "./dice";
 import { EventLog } from "./events";
 import type { OrdersCommander } from "./orders";
 import type { RuleSet } from "./ruleset";
+import type { TacticalDecider } from "./tactical";
 
 export interface TrialOptions {
   ruleset: RuleSet;
@@ -48,6 +49,14 @@ export interface TrialOptions {
   challenger: (side: Side) => OrdersCommander;
   /** What it has to beat. */
   baseline: (side: Side) => OrdersCommander;
+  /**
+   * In-the-moment decisions for the CHALLENGER'S side only, e.g. Jev.
+   *
+   * The baseline always plays by the declared rules, so "heuristic + Jev"
+   * against "heuristic" measures Jev and nothing else: same planner, same
+   * dice, and the only difference is who made the calls inside the turn.
+   */
+  challengerTactics?: (side: Side) => TacticalDecider;
   /**
    * Called after each game, so a caller can show progress.
    *
@@ -74,6 +83,14 @@ export interface TrialGame {
   firstFailure?: string;
   /** What the challenger said it was doing, for reading afterwards. */
   plans: string[];
+  /** In-the-moment calls made for the challenger by its TacticalDecider. */
+  tacticalCalls: number;
+  /** Of those, how many fell back to the rules (timeout, error, unsure). */
+  tacticalFallbacks: number;
+  /** Summed model latency for those calls, in milliseconds. */
+  tacticalLatencyMs: number;
+  /** Summed reported cost, in US dollars. */
+  tacticalCostUsd: number;
 }
 
 export interface TrialResult {
@@ -87,6 +104,11 @@ export interface TrialResult {
   /** Turns in which the challenger was unreachable or unreadable. */
   failedTurns: number;
   totalTurns: number;
+  tacticalCalls: number;
+  tacticalFallbacks: number;
+  tacticalCostUsd: number;
+  /** Mean model latency per tactical call that reached the model. */
+  meanTacticalLatencyMs: number;
 }
 
 /** One game. The challenger plays `challengerSide`. */
@@ -108,6 +130,9 @@ async function playOne(
     ruleset: options.ruleset,
     terrain: options.terrain,
     commanders,
+    tactical: options.challengerTactics
+      ? { [challengerSide]: options.challengerTactics(challengerSide) }
+      : undefined,
     // The dice are seeded identically for both orientations, so the only
     // thing that differs between the pair is which commander sat on which
     // side. They diverge once a decision differs — that IS the measurement.
@@ -135,6 +160,14 @@ async function playOne(
     if (orders.plan) plans.push(orders.plan);
   }
 
+  // Only the decider's own traces: they are the ones with a latency or a
+  // fallback, and only the challenger's side has a decider at all.
+  const tactical = game.turns
+    .flatMap((turn) => turn.decisions)
+    .filter(
+      (d) => d.side === challengerSide && (d.chosenBy === "jev" || d.fallback != null),
+    );
+
   return {
     seed,
     challengerSide,
@@ -147,6 +180,10 @@ async function playOne(
     failedTurns,
     firstFailure,
     plans,
+    tacticalCalls: tactical.length,
+    tacticalFallbacks: tactical.filter((d) => d.fallback != null).length,
+    tacticalLatencyMs: tactical.reduce((sum, d) => sum + (d.latencyMs ?? 0), 0),
+    tacticalCostUsd: tactical.reduce((sum, d) => sum + (d.costUsd ?? 0), 0),
   };
 }
 
@@ -188,6 +225,13 @@ export function summarise(games: TrialGame[]): TrialResult {
     ordersRejected: total((game) => game.ordersRejected),
     failedTurns: total((game) => game.failedTurns),
     totalTurns: total((game) => game.turns),
+    tacticalCalls: total((game) => game.tacticalCalls),
+    tacticalFallbacks: total((game) => game.tacticalFallbacks),
+    tacticalCostUsd: total((game) => game.tacticalCostUsd),
+    meanTacticalLatencyMs: (() => {
+      const answered = total((game) => game.tacticalCalls - game.tacticalFallbacks);
+      return answered === 0 ? 0 : Math.round(total((game) => game.tacticalLatencyMs) / answered);
+    })(),
   };
 }
 
@@ -214,6 +258,25 @@ export function describeTrial(result: TrialResult, label: string): string {
     `  turns the challenger could not answer: ${result.failedTurns} of ${result.totalTurns} ` +
       `(${Math.round(failureRate * 100)}%)`,
   ];
+
+  const tacticalFallbackRate =
+    result.tacticalCalls === 0 ? 0 : result.tacticalFallbacks / result.tacticalCalls;
+  if (result.tacticalCalls > 0) {
+    lines.push(
+      `  in-the-moment decisions: ${result.tacticalCalls}, ` +
+        `${result.tacticalFallbacks} fell back to the rules ` +
+        `(${Math.round(tacticalFallbackRate * 100)}%), ` +
+        `mean ${result.meanTacticalLatencyMs} ms` +
+        (result.tacticalCostUsd > 0 ? `, $${result.tacticalCostUsd.toFixed(4)}` : ""),
+    );
+  }
+
+  if (tacticalFallbackRate > 0.1) {
+    lines.push(
+      `  ⚠ NO VERDICT ON THE DECIDER. ${Math.round(tacticalFallbackRate * 100)}% of its ` +
+        `calls fell back to the rules, so this is mostly a game played by the rules.`,
+    );
+  }
 
   if (failureRate > 0.1) {
     lines.push(

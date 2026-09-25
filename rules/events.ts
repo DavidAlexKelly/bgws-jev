@@ -122,6 +122,8 @@ export interface DecisionEvent {
   confidence?: number;
   /** Round trip to the model, in milliseconds. */
   latencyMs?: number;
+  /** What the call cost, in US dollars, where the provider said. */
+  costUsd?: number;
   /** Set when the model could not decide and a rule did instead. */
   fallback?: "timeout" | "error" | "lowConfidence" | "vetoed";
 }

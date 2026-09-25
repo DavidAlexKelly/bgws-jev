@@ -43,7 +43,8 @@ import type { ActionOption, FormationPreference } from "./commander";
 import { resolveInitiative } from "./resolvers";
 import {
   activationBudget,
-  attemptSightingInterrupt,
+  attemptSightingInterruptLive,
+  chooseOptionLive,
   counteractionFireOptionsFor,
   endStaleMelees,
   mayProceed,
@@ -534,7 +535,7 @@ export async function executePlannedTurn(
       // 7.1, in the order it lists them. One enemy element may try to make
       // out what is activating (10.0), which can reveal it and so bring it
       // within reach of the Reactive Fire that follows.
-      next = attemptSightingInterrupt(next, intent.actorId, side, config, turn);
+      next = await attemptSightingInterruptLive(next, intent.actorId, side, config, turn, intents);
 
       // An assault runs its own sequence (9.3.4): Surprise, then Reactive
       // Fire from outside the objective and Defensive Fire from on it.
@@ -634,7 +635,23 @@ export async function executePlannedTurn(
         // Declining to shoot at the end of a move it chose to make would be
         // an odd way to lose a tank, so the follow-up falls back to the
         // heuristic rather than to nothing.
-        if (stage === "reserveFollowUp") return bestOf(current, options);
+        //
+        // With a decider configured, it is asked instead: this is exactly the
+        // kind of in-the-moment call it exists for, and the heuristic was only
+        // ever standing in because nobody had been asked.
+        if (stage === "reserveFollowUp") {
+          const live = await chooseOptionLive(
+            current,
+            forSide,
+            options,
+            "reserve at the end of its move: fire, assault, or nothing?",
+            config,
+            turn,
+            true,
+            intents,
+          );
+          return live === undefined ? bestOf(current, options) : live;
+        }
 
         // Nothing the commander asked for is available: Pass. Final by rule.
         return null;

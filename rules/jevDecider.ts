@@ -18,6 +18,7 @@
 //     declared rule for that element, and the log says so.
 
 import {
+  JEV_MAX_CHOICES,
   JEV_MODEL,
   choiceOf,
   keyed,
@@ -27,10 +28,20 @@ import {
   type JevQuestion,
   type JevResponse,
 } from "./jev";
-import { contactState, reactionState } from "./jevState";
+import {
+  contactState,
+  describeOption,
+  observerState,
+  optionState,
+  pruneOptions,
+  reactionState,
+} from "./jevState";
+import { projectForSide } from "../lib/fogOfWar";
 import type { Side } from "../lib/state";
 import type {
   ContactVerdict,
+  ObserverMoment,
+  OptionMoment,
   ReactionVerdict,
   TacticalDecider,
   TacticalTrace,
@@ -47,6 +58,8 @@ export interface JevDeciderOptions {
   minContactConfidence?: number;
   /** How long the engine will wait, mid-action, before the rule decides. */
   timeoutMs?: number;
+  /** Below this confidence an observer or option choice falls back to the rule. */
+  minChoiceConfidence?: number;
   /** Doctrine or temperament, prepended to every question's instructions. */
   directive?: string;
 }
@@ -54,6 +67,7 @@ export interface JevDeciderOptions {
 const DEFAULTS = {
   reactThreshold: 0.5,
   minContactConfidence: 0.3,
+  minChoiceConfidence: 0.2,
   timeoutMs: 2500,
 };
 
@@ -146,6 +160,7 @@ export function jevTacticalDecider(options: JevDeciderOptions): TacticalDecider 
             (p == null ? "; Jev gave no answer for this element" : ""),
           probabilities: p == null ? undefined : { fire: p, hold: 1 - p },
           latencyMs: response.latencyMs,
+          costUsd: traces.length === 0 ? response.costUsd : undefined,
           fallback: p == null ? "error" : undefined,
         });
       }
@@ -215,10 +230,162 @@ export function jevTacticalDecider(options: JevDeciderOptions): TacticalDecider 
             probabilities: answer?.probabilities,
             confidence: answer?.confidence,
             latencyMs: response.latencyMs,
+            costUsd: response.costUsd,
             fallback: confident ? undefined : answer ? "lowConfidence" : "error",
           },
         ],
       };
+    },
+
+    async chooseObserver(moment: ObserverMoment) {
+      const nearest = moment.observers[0]?.observerId ?? null;
+      const question = `who tries to make out ${moment.actorId}?`;
+      const candidates = keyed(moment.observers, "w");
+      const options = moment.observers.map((o) => ({
+        id: o.observerId,
+        summary: `${o.observerId} at ${o.rangeM} m${o.recce ? " (recce)" : ""}`,
+      }));
+      const criteria: Record<string, string> = {};
+      for (const { key, item } of candidates) {
+        criteria[key] =
+          `${item.observerId} looks: ${item.rangeM} m away` +
+          (item.recce ? ", a reconnaissance element" : "");
+      }
+
+      try {
+        const response = await ask(observerState(moment), {
+          observer: {
+            type: "choice",
+            instructions:
+              `${directive}A concealed enemy element has just given itself away by acting. ` +
+              "Exactly one of your elements may try to identify it. Pick the one most " +
+              "likely to succeed — closer is easier, cover on the target makes it " +
+              "harder, reconnaissance elements are better at it.",
+            criteria,
+          },
+        });
+        const answer = choiceOf(response.answers, "observer");
+        const picked = candidates.find(({ key }) => key === answer?.choice)?.item.observerId;
+        const confident =
+          picked != null && (answer?.confidence ?? 0) >= settings.minChoiceConfidence;
+        const chosenId = confident ? picked : nearest;
+        return {
+          observerId: chosenId,
+          traces: [
+            {
+              actorId: chosenId ?? undefined,
+              question,
+              options,
+              chosenId: chosenId ?? "none",
+              chosenBy: confident ? "jev" : "heuristic",
+              probabilities: answer
+                ? Object.fromEntries(
+                    candidates.map(({ key, item }) => [item.observerId, answer.probabilities[key] ?? 0]),
+                  )
+                : undefined,
+              confidence: answer?.confidence,
+              latencyMs: response.latencyMs,
+              costUsd: response.costUsd,
+              fallback: confident ? undefined : answer ? "lowConfidence" : "error",
+            } satisfies TacticalTrace,
+          ],
+        };
+      } catch (err) {
+        return {
+          observerId: nearest,
+          traces: [
+            {
+              actorId: nearest ?? undefined,
+              question,
+              options,
+              chosenId: nearest ?? "none",
+              chosenBy: "heuristic",
+              rationale: `Jev unavailable — nearest observer looked (${describe(err)})`,
+              fallback: failureOf(err),
+            } satisfies TacticalTrace,
+          ],
+        };
+      }
+    },
+
+    async chooseOption(moment: OptionMoment) {
+      const view = projectForSide(moment.state, moment.side);
+      const offered = keyed(pruneOptions(moment.options, JEV_MAX_CHOICES - 1), "o");
+      const criteria: Record<string, string> = {};
+      for (const { key, item } of offered) {
+        criteria[key] = describeOption(item, view, moment.config);
+      }
+      if (moment.allowPass) criteria.pass = "Do none of these.";
+      const options = [
+        ...moment.options.map((o) => ({ id: o.id, summary: o.summary })),
+        ...(moment.allowPass ? [{ id: "pass", summary: "do none of these" }] : []),
+      ];
+
+      try {
+        const response = await ask(optionState(moment), {
+          option: {
+            type: "choice",
+            instructions: `${directive}Decide: ${moment.question}`,
+            criteria,
+          },
+        });
+        const answer = choiceOf(response.answers, "option");
+        const confident = answer != null && answer.confidence >= settings.minChoiceConfidence;
+        if (!confident) {
+          return {
+            optionId: undefined,
+            traces: [
+              {
+                question: moment.question,
+                options,
+                chosenId: "rules",
+                chosenBy: "heuristic",
+                rationale: `Jev ${answer ? "was unsure" : "gave no answer"} — the engine's default decided`,
+                confidence: answer?.confidence,
+                latencyMs: response.latencyMs,
+                costUsd: response.costUsd,
+                fallback: answer ? "lowConfidence" : "error",
+              } satisfies TacticalTrace,
+            ],
+          };
+        }
+        const picked = offered.find(({ key }) => key === answer.choice)?.item;
+        return {
+          optionId: picked?.id ?? null,
+          traces: [
+            {
+              actorId: picked?.actorId,
+              question: moment.question,
+              options,
+              chosenId: picked?.id ?? "pass",
+              chosenBy: "jev",
+              probabilities: Object.fromEntries(
+                Object.entries(answer.probabilities).map(([key, p]) => [
+                  offered.find((entry) => entry.key === key)?.item.id ?? key,
+                  p,
+                ]),
+              ),
+              confidence: answer.confidence,
+              latencyMs: response.latencyMs,
+              costUsd: response.costUsd,
+            } satisfies TacticalTrace,
+          ],
+        };
+      } catch (err) {
+        return {
+          optionId: undefined,
+          traces: [
+            {
+              question: moment.question,
+              options,
+              chosenId: "rules",
+              chosenBy: "heuristic",
+              rationale: `Jev unavailable — the engine's default decided (${describe(err)})`,
+              fallback: failureOf(err),
+            } satisfies TacticalTrace,
+          ],
+        };
+      }
     },
   };
 }

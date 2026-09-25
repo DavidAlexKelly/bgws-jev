@@ -1022,7 +1022,7 @@ async function activate(
   // out what is moving (10.0) — which can reveal it, and so can bring it
   // within reach of the Reactive Fire that follows.
   if (chosen.actorId) {
-    next = attemptSightingInterrupt(next, chosen.actorId, side, config, turn);
+    next = await attemptSightingInterruptLive(next, chosen.actorId, side, config, turn);
   }
 
   // An assault has its own sequence (9.3.4): Surprise first, then Reactive
@@ -1614,28 +1614,51 @@ export type ArcRound = "actionReaction" | "counteraction";
  * activating element targetable — including by the Reactive Fire that runs
  * immediately after this. Being seen is how you come to be shot at.
  */
+/**
+ * Who could make the Attempt Sighting interrupt, nearest first.
+ *
+ * Empty when there is nothing to attempt: the module is off, or the actor is
+ * not Concealed. Pure — split out so a TacticalDecider can be offered the
+ * same list the rule picks from.
+ */
+export function sightingObservers(
+  state: GameState,
+  activatingFeId: string,
+  activatingSide: Side,
+  config: PhaseConfig,
+): ForceElement[] {
+  if (!config.ruleset.modules.concealment) return [];
+
+  const actor = state.forceElements[activatingFeId];
+  // Only a Concealed FE can be the subject: there is nothing to reveal about
+  // something already on the map.
+  if (!actor || actor.combatStrength <= 0 || !actor.concealed) return [];
+
+  return forceElementsOf(state, opposing(activatingSide))
+    .filter((fe) => fe.combatStrength > 0)
+    .filter((fe) => lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible)
+    .sort((a, b) => distanceM(a.position, actor.position) - distanceM(b.position, actor.position));
+}
+
 export function attemptSightingInterrupt(
   state: GameState,
   activatingFeId: string,
   activatingSide: Side,
   config: PhaseConfig,
   turn: number,
+  /**
+   * The observer a TacticalDecider picked. Absent means the nearest, which is
+   * the rule's reading of "any one". Ignored if it is not an eligible one.
+   */
+  observerId?: string,
 ): GameState {
-  if (!config.ruleset.modules.concealment) return state;
-
+  const observers = sightingObservers(state, activatingFeId, activatingSide, config);
   const actor = state.forceElements[activatingFeId];
-  // Only a Concealed FE can be the subject: there is nothing to reveal about
-  // something already on the map.
-  if (!actor || actor.combatStrength <= 0 || !actor.concealed) return state;
-
   const watcher = opposing(activatingSide);
-  const observers = forceElementsOf(state, watcher)
-    .filter((fe) => fe.combatStrength > 0)
-    .filter((fe) => lineOfSight(config.terrain, { from: fe.position, to: actor.position }).visible)
-    .sort((a, b) => distanceM(a.position, actor.position) - distanceM(b.position, actor.position));
 
-  const observer = observers[0];
-  if (!observer) return state;
+  const observer =
+    (observerId ? observers.find((fe) => fe.id === observerId) : undefined) ?? observers[0];
+  if (!observer || !actor) return state;
 
   const outcome = resolveSighting(
     observer,
@@ -2251,8 +2274,29 @@ function logTraces(
   phase: Phase,
   side: Side,
   traces: readonly TacticalTrace[],
+  /** The board at the moment of deciding, for the turn's playback. */
+  state?: GameState,
 ): void {
   for (const trace of traces) {
+    // A decision is a moment in the turn in its own right — "R1 held fire"
+    // leaves nothing on the board, so without a step the playback would show
+    // a tank crossing an arc and nothing else happening, which reads as a bug.
+    if (state) {
+      const p = trace.probabilities?.[trace.chosenId];
+      recordStep(
+        config,
+        state,
+        turn,
+        phase,
+        `${trace.actorId ?? side}: ${trace.question} \u2192 ${trace.chosenId}` +
+          (trace.fallback
+            ? ` (rules; Jev ${trace.fallback})`
+            : p != null
+              ? ` (Jev ${Math.round(p * 100)}%)`
+              : " (Jev)"),
+        { side, actorId: trace.actorId },
+      );
+    }
     config.log.append({
       type: "decision",
       turn,
@@ -2268,6 +2312,7 @@ function logTraces(
       probabilities: trace.probabilities,
       confidence: trace.confidence,
       latencyMs: trace.latencyMs,
+      costUsd: trace.costUsd,
       fallback: trace.fallback,
     });
   }
@@ -2334,7 +2379,7 @@ export async function reactiveFireLive(
     maxReactors: config.ruleset.reaction.maxReactorsPerAction,
     intent: intents?.[side],
   });
-  logTraces(config, turn, "arcReaction", side, verdict.traces);
+  logTraces(config, turn, "arcReaction", side, verdict.traces, state);
 
   return runReactiveFire(
     state,
@@ -2408,7 +2453,7 @@ export async function resolveAssaultActionLive(
     maxReactors: config.ruleset.reaction.maxReactorsPerAction,
     intent: intents?.[target.side],
   });
-  logTraces(config, turn, "arcReaction", target.side, verdict.traces);
+  logTraces(config, turn, "arcReaction", target.side, verdict.traces, state);
 
   return resolveAssaultAction(
     state,
@@ -2485,7 +2530,7 @@ export async function resolveMoveLive(
       preferred,
       intent: intents?.[actor.side],
     });
-    logTraces(config, turn, context.phase ?? "arcAction", actor.side, verdict.traces);
+    logTraces(config, turn, context.phase ?? "arcAction", actor.side, verdict.traces, next);
     if (!verdict.press) return next;
 
     leg = {
@@ -2497,6 +2542,94 @@ export async function resolveMoveLive(
   }
 
   return next;
+}
+
+/**
+ * The Attempt Sighting interrupt, with the watching side choosing who looks.
+ *
+ * "Any one non-Activating FE" — the rule reads that as the nearest with a
+ * line. A decider may pick a better one: a recce element further off, say,
+ * or one in cover rather than one in the open. Only asked when there is more
+ * than one candidate, since one is not a choice.
+ */
+export async function attemptSightingInterruptLive(
+  state: GameState,
+  activatingFeId: string,
+  activatingSide: Side,
+  config: PhaseConfig,
+  turn: number,
+  intents?: SideIntents,
+): Promise<GameState> {
+  const side = opposing(activatingSide);
+  const decider = config.tactical?.[side];
+  const plain = () => attemptSightingInterrupt(state, activatingFeId, activatingSide, config, turn);
+  if (!decider?.chooseObserver) return plain();
+
+  const observers = sightingObservers(state, activatingFeId, activatingSide, config);
+  const actor = state.forceElements[activatingFeId];
+  if (observers.length < 2 || !actor) return plain();
+
+  const verdict = await decider.chooseObserver({
+    state,
+    config,
+    turn,
+    side,
+    actorId: activatingFeId,
+    observers: observers.map((fe) => ({
+      observerId: fe.id,
+      rangeM: Math.round(distanceM(fe.position, actor.position)),
+      recce: fe.commandRating == null && fe.concealed,
+    })),
+    intent: intents?.[side],
+  });
+  logTraces(config, turn, state.phase, side, verdict.traces, state);
+
+  return attemptSightingInterrupt(
+    state,
+    activatingFeId,
+    activatingSide,
+    config,
+    turn,
+    verdict.observerId ?? undefined,
+  );
+}
+
+/**
+ * Put a choice the engine would otherwise make by heuristic to the side's
+ * decider.
+ *
+ * Returns `undefined` when there is no decider to ask (or it gave an answer
+ * that is not on offer), so the caller keeps its own default; `null` when
+ * the decider declined everything and passing is allowed.
+ */
+export async function chooseOptionLive(
+  state: GameState,
+  side: Side,
+  options: ActionOption[],
+  question: string,
+  config: PhaseConfig,
+  turn: number,
+  allowPass: boolean,
+  intents?: SideIntents,
+): Promise<ActionOption | null | undefined> {
+  const decider = config.tactical?.[side];
+  if (!decider?.chooseOption || options.length === 0) return undefined;
+
+  const verdict = await decider.chooseOption({
+    state,
+    config,
+    turn,
+    side,
+    question,
+    options,
+    allowPass,
+    intent: intents?.[side],
+  });
+  logTraces(config, turn, state.phase, side, verdict.traces, state);
+
+  if (verdict.optionId === undefined) return undefined;
+  if (verdict.optionId === null) return allowPass ? null : undefined;
+  return options.find((option) => option.id === verdict.optionId);
 }
 
 /**
@@ -2810,7 +2943,7 @@ export async function runCounteractionRound(
       // try to make out what is moving up, and then anything unfired may
       // shoot at it. "A Reserve Move can be subject to Reactive Fire by any
       // enemy FE/Group in Range and LoS that does not have a FIRED marker."
-      next = attemptSightingInterrupt(next, chosen.actorId, side, config, turn);
+      next = await attemptSightingInterruptLive(next, chosen.actorId, side, config, turn, intents);
       next = await reactiveFireLive(
         next,
         chosen.actorId,

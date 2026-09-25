@@ -27,7 +27,13 @@ import type { ActionOption } from "./commander";
 import type { Rng } from "./dice";
 import { resolveDirectFire, type FireContext } from "./resolvers";
 import type { RuleSet } from "./ruleset";
-import type { CommanderIntent, ContactMoment, ReactionMoment } from "./tactical";
+import type {
+  CommanderIntent,
+  ContactMoment,
+  ObserverMoment,
+  OptionMoment,
+  ReactionMoment,
+} from "./tactical";
 import { isFlankShot, smokeOnLine, weaponFor, type PhaseConfig } from "./turnLoop";
 
 // ── Odds ───────────────────────────────────────────────────────────────────
@@ -312,6 +318,51 @@ export function contactState(moment: ContactMoment) {
           .filter((contact) => !moment.newContacts.includes(contact.id))
           .map((contact) => contactFrom(contact, mover.position, config))
       : [],
+  };
+}
+
+// ── Sighting interrupt ─────────────────────────────────────────────────────
+
+/**
+ * The state for "who tries to make out the concealed thing that just moved?"
+ *
+ * The enemy is described only by where the activity was seen and what ground
+ * it is on. It is Concealed: its identity is exactly what the attempt is for.
+ */
+export function observerState(moment: ObserverMoment) {
+  const { state, config, side } = moment;
+  const actor = state.forceElements[moment.actorId];
+  return {
+    situation:
+      "A concealed enemy element has just acted. One of your elements may try to identify it.",
+    turn: moment.turn,
+    you: side,
+    ...(actor ? { activityAt: groundAt(config, actor.position) } : {}),
+    observers: moment.observers.map((observer) => {
+      const fe = state.forceElements[observer.observerId];
+      return {
+        ...(fe ? ownBrief(fe, config) : { id: observer.observerId }),
+        rangeM: observer.rangeM,
+        recce: observer.recce,
+      };
+    }),
+  };
+}
+
+// ── Engine choices nobody was asked about ──────────────────────────────────
+
+/** The state for a choice the engine would otherwise make by heuristic. */
+export function optionState(moment: OptionMoment) {
+  const view = projectForSide(moment.state, moment.side);
+  const actorIds = new Set(moment.options.map((option) => option.actorId).filter(Boolean));
+  return {
+    situation: moment.question,
+    ...(moment.intent?.plan ? { commandersPlan: moment.intent.plan } : {}),
+    ...sideState(view, moment.config),
+    deciding: [...actorIds].map((id) => {
+      const order = moment.intent?.orders?.[id as string];
+      return { id, ...(order ? { order: order.summary, why: order.why } : {}) };
+    }),
   };
 }
 

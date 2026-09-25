@@ -33,7 +33,12 @@ import { jevTacticalDecider } from "./jevDecider";
 import { fireOdds, reactionState } from "./jevState";
 import type { OrdersRequest, StandingOrders } from "./orders";
 import { HOUSE_V1, withModules } from "./ruleset";
+import { runTrial } from "./commanderTrial";
+import { heuristicOrdersCommander } from "./orders";
+import type { TacticalDecider } from "./tactical";
 import {
+  attemptSightingInterruptLive,
+  chooseOptionLive,
   noStandingOrders,
   reactiveFireLive,
   resolveAction,
@@ -611,5 +616,135 @@ describe("whole games with Jev deciding everything", () => {
       maxTurns: 12,
     });
     expect(outcome.turns).toBeGreaterThan(0);
+  }, 60_000);
+});
+
+// ── Spotting, and the choices nobody used to be asked ──────────────────────
+
+describe("Jev choosing who tries to spot a concealed element", () => {
+  const CONCEALMENT = withModules(HOUSE_V1, { concealment: true });
+  // B1 is concealed and acting; R-near is 600 m off, R-far 1.5 km.
+  const scene = () =>
+    board(
+      [
+        fe("B1", "blue", at(0, 0), { concealed: true }),
+        fe("Rnear", "red", at(0, 600)),
+        fe("Rfar", "red", at(0, 1500)),
+      ],
+      false,
+    );
+  const sightings = (log: EventLog) =>
+    log.all().filter((e): e is ResolutionEvent => e.type === "resolution" && e.kind === "sighting");
+
+  it("lets the nearest look when no decider is configured, as the rule reads it", async () => {
+    const cfg = config({}, CONCEALMENT);
+    await attemptSightingInterruptLive(scene(), "B1", "blue", cfg, 2);
+    expect(sightings(cfg.log)[0].actorIds).toEqual(["Rnear"]);
+  });
+
+  it("lets Jev pick a different observer", async () => {
+    // Observers are keyed nearest first: w0 = Rnear, w1 = Rfar.
+    const call = fakeJev(() => ({
+      observer: { type: "choice", choice: "w1", probabilities: { w0: 0.2, w1: 0.8 }, confidence: 0.6 },
+    }));
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call }) } }, CONCEALMENT);
+    await attemptSightingInterruptLive(scene(), "B1", "blue", cfg, 2);
+    expect(sightings(cfg.log)[0].actorIds).toEqual(["Rfar"]);
+    expect(decisions(cfg.log)[0]).toMatchObject({ chosenBy: "jev", chosenId: "Rfar" });
+    // The concealed element's identity is what the attempt is FOR.
+    expect(JSON.stringify(call.requests[0].state)).not.toContain('"B1"');
+  });
+
+  it("falls back to the nearest when Jev cannot be reached", async () => {
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: failing }) } }, CONCEALMENT);
+    await attemptSightingInterruptLive(scene(), "B1", "blue", cfg, 2);
+    expect(sightings(cfg.log)[0].actorIds).toEqual(["Rnear"]);
+    expect(decisions(cfg.log)[0].fallback).toBe("error");
+  });
+});
+
+describe("a choice the engine used to make by heuristic", () => {
+  const state = board([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1200))]);
+  const options = [
+    { id: "fire", kind: "fire" as const, actorId: "B1", targetId: "R1", summary: "B1 fires at R1" },
+  ];
+  const ask = (answer: JevAnswer | null, call?: JevCall) =>
+    chooseOptionLive(
+      state,
+      "blue",
+      options,
+      "reserve at the end of its move?",
+      config({
+        tactical: {
+          blue: jevTacticalDecider({
+            side: "blue",
+            call: call ?? fakeJev((): Record<string, JevAnswer> => (answer ? { option: answer } : {})),
+          }),
+        },
+      }),
+      2,
+      true,
+    );
+
+  it("takes Jev's choice", async () => {
+    expect((await ask({ type: "choice", choice: "o0", probabilities: {}, confidence: 0.9 }))?.id).toBe("fire");
+  });
+
+  it("treats Jev choosing to pass as a pass", async () => {
+    expect(await ask({ type: "choice", choice: "pass", probabilities: {}, confidence: 0.9 })).toBeNull();
+  });
+
+  it("does NOT treat an unsure or unreachable Jev as a pass — the engine's default decides", async () => {
+    // The difference matters: passing is final in the Counteraction Round,
+    // and an outage must not be read as a decision to stand down.
+    expect(await ask({ type: "choice", choice: "pass", probabilities: {}, confidence: 0.01 })).toBeUndefined();
+    expect(await ask(null, failing)).toBeUndefined();
+  });
+
+  it("asks nobody when no decider is configured", async () => {
+    expect(await chooseOptionLive(state, "blue", options, "?", config(), 2, true)).toBeUndefined();
+  });
+});
+
+describe("Jev's calls in the turn's playback", () => {
+  it("records a step for each call, so a held shot is visible", async () => {
+    const labels: string[] = [];
+    const cfg = config({
+      onStep: (step) => labels.push(step.label),
+      tactical: { red: jevTacticalDecider({ side: "red", call: fakeJev(everyNoul(0.2)) }) },
+    });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    expect(labels.some((label) => label.includes("hold") && label.includes("Jev 80%"))).toBe(true);
+  });
+});
+
+describe("a trial with Jev on the challenger's side", () => {
+  it("counts Jev's calls, and only the challenger's", async () => {
+    const result = await runTrial({
+      ruleset: withModules(HOUSE_V1, { reactionFire: true, contactHalt: true }),
+      terrain: proceduralTerrain(STANDARD_GROUND),
+      scenario: scenarioFactory(MEETING_ENGAGEMENT_V1, withModules(HOUSE_V1, { reactionFire: true })),
+      seeds: ["t1"],
+      maxTurns: 6,
+      challenger: (side) => heuristicOrdersCommander(side),
+      baseline: (side) => heuristicOrdersCommander(side),
+      challengerTactics: (side): TacticalDecider =>
+        jevTacticalDecider({
+          side,
+          // Yes to every yes/no, the first option of every choice, confidently.
+          call: fakeJev((questions) =>
+            Object.fromEntries(
+              Object.entries(questions).map(([key, q]): [string, JevAnswer] => [
+                key,
+                q.type === "noul"
+                  ? { type: "noul", noul: 0.9 }
+                  : { type: "choice", choice: Object.keys(q.criteria)[0], probabilities: {}, confidence: 0.9 },
+              ]),
+            ),
+          ),
+        }),
+    });
+    expect(result.tacticalCalls).toBeGreaterThan(0);
+    expect(result.tacticalFallbacks).toBe(0);
   }, 60_000);
 });

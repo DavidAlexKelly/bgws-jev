@@ -120,7 +120,6 @@ import { jevConfigured, openRouterJevCall } from "./data/jevClient";
 import { createRng } from "./rules/dice";
 import { describeVerdict } from "./rules/victory";
 import { EventLog, type DecisionEvent } from "./rules/events";
-import { jevOrdersCommander } from "./rules/jevCommander";
 import { jevTacticalDecider } from "./rules/jevDecider";
 import type { TacticalDecider } from "./rules/tactical";
 import {
@@ -338,7 +337,7 @@ const PLAN_HOLD_LAYER = "bgws-play-plan-hold-layer";
 
 const MAX_TURNS = 40;
 
-type CommanderKind = "heuristic" | "llm" | "jev";
+type CommanderKind = "heuristic" | "llm";
 type Viewpoint = Side | "both";
 type Phase = "placing" | "playing";
 let counter = 0;
@@ -392,12 +391,19 @@ export default function BgwsPlay() {
   const [blueModel, setBlueModel] = useState<CommanderModelName>("claude-sonnet-4-6");
   const [redModel, setRedModel] = useState<CommanderModelName>("gpt-5-2");
   /**
-   * Jev making this side's in-the-moment calls — who snap-fires at a mover,
-   * whether a move presses on through contact — under whichever commander is
-   * planning the turn. Off means the declared rules decide, as they always did.
+   * Use Jev for decisions. A setup choice, fixed once the game starts.
+   *
+   * On, Jev makes every in-the-moment call for both sides — who snap-fires at
+   * a mover, whether a move presses on through contact, who tries to spot a
+   * concealed element, what a reserve does at the end of its move — beneath
+   * whichever commander is planning the turn. Off, the declared rules and the
+   * heuristic decide, exactly as they always did.
+   *
+   * Fixed for the game rather than toggled mid-way, because a game whose
+   * deciders changed half-way through is two half-games, and nothing read
+   * from it afterwards would be about either.
    */
-  const [blueTactics, setBlueTactics] = useState(false);
-  const [redTactics, setRedTactics] = useState(false);
+  const [useJev, setUseJev] = useState(false);
 
   const [game, setGame] = useState<LiveGame | null>(null);
   const [index, setIndex] = useState(0);
@@ -644,15 +650,6 @@ export default function BgwsPlay() {
         modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
       );
       if (kind === "heuristic") return heuristic;
-      if (kind === "jev") {
-        return jevOrdersCommander({
-          side: s,
-          call: jevCall,
-          directive,
-          config: { terrain, ruleset },
-          fallback: heuristic,
-        });
-      }
       return llmCommander({
         side: s,
         call: foundryModelCall(model, directive),
@@ -677,18 +674,15 @@ export default function BgwsPlay() {
     redModel,
     modules.combinedFire,
     ruleset,
-    terrain,
-    jevCall,
   ]);
 
   const tactical = useMemo((): Partial<Record<Side, TacticalDecider>> => {
-    const make = (s: Side, on: boolean, directive: string) =>
-      on ? jevTacticalDecider({ side: s, call: jevCall, directive }) : undefined;
+    if (!useJev) return {};
     return {
-      blue: make("blue", blueTactics, blueDirective),
-      red: make("red", redTactics, redDirective),
+      blue: jevTacticalDecider({ side: "blue", call: jevCall, directive: blueDirective }),
+      red: jevTacticalDecider({ side: "red", call: jevCall, directive: redDirective }),
     };
-  }, [blueTactics, redTactics, blueDirective, redDirective, jevCall]);
+  }, [useJev, blueDirective, redDirective, jevCall]);
 
   const strength = placedStrength(placed, ruleset);
 
@@ -2069,14 +2063,14 @@ export default function BgwsPlay() {
             <div style={{ ...groupTitle, marginTop: 14 }}>2 &middot; Who commands</div>
             {(
               [
-                ["blue", blueKind, setBlueKind, blueDirective, setBlueDirective, blueModel, setBlueModel, blueTactics, setBlueTactics],
-                ["red", redKind, setRedKind, redDirective, setRedDirective, redModel, setRedModel, redTactics, setRedTactics],
+                ["blue", blueKind, setBlueKind, blueDirective, setBlueDirective, blueModel, setBlueModel],
+                ["red", redKind, setRedKind, redDirective, setRedDirective, redModel, setRedModel],
               ] as const
-            ).map(([s, kind, setKind, directive, setDirective, model, setModel, tactics, setTactics]) => (
+            ).map(([s, kind, setKind, directive, setDirective, model, setModel]) => (
               <div key={s} style={{ marginBottom: 8 }}>
                 <div style={row}>
                   <span style={{ ...subtle, width: 34 }}>{s}</span>
-                  {(["heuristic", "llm", "jev"] as CommanderKind[]).map((k) => (
+                  {(["heuristic", "llm"] as CommanderKind[]).map((k) => (
                     <button
                       key={k}
                       onClick={() => setKind(k)}
@@ -2104,7 +2098,7 @@ export default function BgwsPlay() {
                     ))}
                   </select>
                 )}
-                {kind !== "heuristic" && (
+                {(kind === "llm" || useJev) && (
                   <textarea
                     value={directive}
                     onChange={(e) => setDirective(e.target.value)}
@@ -2113,17 +2107,26 @@ export default function BgwsPlay() {
                     style={{ ...select, width: "100%", marginTop: 3, resize: "vertical" }}
                   />
                 )}
-                <label style={{ ...subtle, display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
-                  <input
-                    type="checkbox"
-                    checked={tactics}
-                    onChange={(e) => setTactics(e.target.checked)}
-                  />
-                  Jev tactics &mdash; decide reactive fire and contact at the moment
-                </label>
               </div>
             ))}
-            {(blueKind === "jev" || redKind === "jev" || blueTactics || redTactics) && (
+            <label
+              style={{
+                ...row,
+                gap: 6,
+                marginTop: 6,
+                cursor: phase === "placing" ? "pointer" : "default",
+                color: useJev ? "#e8c547" : "#8a91a8",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useJev}
+                onChange={(e) => setUseJev(e.target.checked)}
+                disabled={phase !== "placing"}
+              />
+              Use Jev for decisions
+            </label>
+            {useJev && (
               <div
                 style={{
                   ...subtle,
@@ -2132,12 +2135,14 @@ export default function BgwsPlay() {
                 }}
               >
                 {jevConfigured()
-                  ? "Jev (typesafe/jev-1.13) via OpenRouter. As commander it answers one " +
-                    "choice per element in a single call; as tactics it is asked each time " +
-                    "an enemy acts in an arc or a move runs into contact. If it cannot " +
-                    "answer, the heuristic or the declared rules decide, and the turn says so."
+                  ? "Jev (typesafe/jev-1.13, via OpenRouter) makes every in-the-moment " +
+                    "call for both sides: who fires on a unit crossing its arc, whether a " +
+                    "move presses on through contact, who tries to spot a concealed " +
+                    "element, and what a reserve does when it arrives. The commanders " +
+                    "above still plan each turn. If Jev cannot answer in time, the " +
+                    "declared rules decide and the turn says so. Fixed once the game starts."
                   : "No OpenRouter key: set VITE_OPENROUTER_API_KEY. Until then every Jev " +
-                    "decision falls back to the heuristic or the declared rules."}
+                    "decision will fall back to the declared rules."}
               </div>
             )}
             {(blueKind === "llm" || redKind === "llm") && (
@@ -3045,12 +3050,14 @@ function JevCalls({ decisions, side }: { decisions: DecisionEvent[]; side: Side 
   );
   if (calls.length === 0) return null;
   const fell = calls.filter((d) => d.fallback != null).length;
+  const cost = calls.reduce((sum, d) => sum + (d.costUsd ?? 0), 0);
 
   return (
     <details style={{ ...subtle, marginTop: 3 }}>
       <summary style={{ cursor: "pointer" }}>
         Jev: {calls.length} call{calls.length === 1 ? "" : "s"}
         {fell > 0 && `, ${fell} fell back to the rules`}
+        {cost > 0 && ` \u00b7 $${cost.toFixed(5)}`}
       </summary>
       {calls.map((d) => {
         const p = d.probabilities?.[d.chosenId];

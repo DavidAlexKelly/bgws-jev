@@ -111,8 +111,43 @@ export interface TacticalTrace {
   probabilities?: Record<string, number>;
   confidence?: number;
   latencyMs?: number;
+  /** Cost of the request, carried on ONE trace per request so totals add up. */
+  costUsd?: number;
   /** Set when the decider could not answer and the rule decided instead. */
   fallback?: "timeout" | "error" | "lowConfidence" | "vetoed";
+}
+
+/** Who on the watching side attempts to sight a Concealed element that activated. */
+export interface ObserverMoment {
+  state: GameState;
+  config: PhaseConfig;
+  turn: number;
+  /** The WATCHING side — the decider being asked. */
+  side: Side;
+  /** The Concealed enemy element that is activating. */
+  actorId: string;
+  /** Who has a line to it, nearest first — the rule would take the first. */
+  observers: { observerId: string; rangeM: number; recce: boolean }[];
+  intent?: CommanderIntent;
+}
+
+/**
+ * A choice among options the engine generated, with nothing pre-declared.
+ *
+ * Used where the engine used to pick by heuristic because nobody had been
+ * asked: what a reserve does at the end of its move, when its commander did
+ * not say.
+ */
+export interface OptionMoment {
+  state: GameState;
+  config: PhaseConfig;
+  turn: number;
+  side: Side;
+  question: string;
+  options: ActionOption[];
+  /** Whether declining all of them is a legal answer. */
+  allowPass: boolean;
+  intent?: CommanderIntent;
 }
 
 export interface ReactionVerdict {
@@ -137,6 +172,18 @@ export interface TacticalDecider {
   readonly name: string;
   decideReactions(moment: ReactionMoment): Promise<ReactionVerdict>;
   decideContact(moment: ContactMoment): Promise<ContactVerdict>;
+  /** Optional: absent means the nearest observer looks, as the rule reads it. */
+  chooseObserver?(
+    moment: ObserverMoment,
+  ): Promise<{ observerId: string | null; traces: TacticalTrace[] }>;
+  /** Optional: absent means the engine's heuristic picks, as before. */
+  /**
+   * `optionId` is the choice; `null` is a deliberate pass; `undefined` means
+   * no opinion (unreachable, unsure), and the engine's own default decides.
+   */
+  chooseOption?(
+    moment: OptionMoment,
+  ): Promise<{ optionId: string | null | undefined; traces: TacticalTrace[] }>;
 }
 
 /**

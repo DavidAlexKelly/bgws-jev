@@ -308,8 +308,16 @@ judgement beats the rules.
 | Jev as commander: `jevCommander` (activation) and `jevOrdersCommander` (one request per turn) | `rules/jevCommander.ts` |
 | OpenRouter client, key from `import.meta.env.VITE_OPENROUTER_API_KEY`, answer cache | `data/jevClient.ts` |
 | `DecisionEvent` gains `"jev"`, `probabilities`, `confidence`, `latencyMs`, `fallback`; `TurnRecord.decisions` | `rules/events.ts`, `lib/liveGame.ts` |
-| Play screen: `jev` commander, per-side "Jev tactics" toggle, per-turn list of Jev's calls | `Play.tsx` |
+| Play screen: one **"Use Jev for decisions"** setup checkbox (both sides, fixed once the game starts); per-turn list of Jev's calls with cost; each call is a step in the turn playback | `Play.tsx` |
+| Sighting interrupt: Jev picks which observer looks (`attemptSightingInterruptLive`) | `rules/turnLoop.ts`, `rules/jevDecider.ts` |
+| Reserve follow-up (fire / assault / nothing at the end of a reserve move) asked of Jev instead of the heuristic (`chooseOptionLive`) | `rules/turnLoop.ts`, `rules/orders.ts` |
+| Trial: challenger may be `heuristic`, plus "Use Jev for decisions" for the challenger's side; reports Jev calls, fallbacks, latency, cost | `rules/commanderTrial.ts`, `Trial.tsx` |
 | Tests with a fake `JevCall` | `rules/jev.test.ts` |
+
+`jevOrdersCommander` / `jevCommander` (Jev as the whole commander) remain in
+the library for experiments but are not offered on the play screen: there,
+the checkbox puts Jev in charge of every in-the-moment decision and the
+selected commander keeps planning the turn.
 
 Without a decider configured, the event logs of 72 seeded games (both
 sequences of play, two rulesets, every force list) are byte-identical to
