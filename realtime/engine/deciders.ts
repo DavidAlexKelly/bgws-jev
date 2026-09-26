@@ -63,10 +63,13 @@ export function ruleChoice(state: RtState, request: RtDecisionRequest): string {
     if (engage) return engage;
     return "keep";
   }
-  // Something new in sight: a unit standing still takes the best shot.
-  if (kinds.has("sighted")) {
-    const order = state.units[request.unitId]?.order.kind;
-    if ((order === "hold" || order === "overwatch") && engage) return engage;
+  // Run into the enemy, sighted one, or walked into its reach: stop and
+  // fight if there is a shot, unless this unit was told to stay silent.
+  // "Carry on" here is how two columns used to drive straight past each
+  // other.
+  if (kinds.has("contact") || kinds.has("sighted") || kinds.has("exposed")) {
+    const silent = state.units[request.unitId]?.roe === "never";
+    if (engage && !silent) return engage;
     return "keep";
   }
   // Nothing left to do where it is: fight if it can, else get on with the plan.

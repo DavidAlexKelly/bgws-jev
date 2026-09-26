@@ -162,7 +162,10 @@ export function jevRealtimeDecider(
             `What just happened: ${item.events.map((event) => event.detail).join("; ")}. ` +
             "Choose its order from now on. Weigh its purpose and your commander's plan " +
             "against the threats to it, its odds, the cover around it and its strength " +
-            "and morale. Carry on unless the situation calls for a change.",
+            "and morale. A unit that carries on moving only fires on the move, at a " +
+            "penalty and within its rules of engagement; once in contact, halting to " +
+            "engage, taking cover or pulling back is usually better than driving on " +
+            "into the enemy. Otherwise, carry on unless the situation calls for a change.",
           criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary])),
         };
       }
