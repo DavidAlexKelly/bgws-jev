@@ -78,3 +78,50 @@ The first and third are bugs. The second is missing modelling, and the rest of t
 Tier 1, items 1–5, as one piece of work. That fixes the behaviour you saw and gives Jev a sensible world to decide in. Each item comes with headless tests and a before-and-after run of the identical-forces balance check, plus a check that games end on a decision rather than on the time limit or an endless retreat.
 
 Then items 6–7, which do more than anything else to make the map look like real units fighting. Items 8–13 follow as needed.
+
+## 5. What was built: Tiers 1 and 2
+
+All of it is in `realtime/engine/`. The turn game is unchanged: its event logs are identical over the 72 seeded games of the equivalence check.
+
+### Tier 1
+
+| Item | How it works | Where |
+|---|---|---|
+| **Suppression separate from morale** | Every incoming shot adds suppression (0–100). A miss adds 8, a suppress result 18, a hit 30, and a damaging hit 15 more. That is ×0.6 in cover or hull-down, and less for better troops. After 10 s without fire it fades at 2/s. At 25 a unit is *suppressed*: it shoots worse, through the fire table's own modifier. At 60 it is *pinned*: it can't advance. | `engine.ts` §6–7, `timing.ts` |
+| **Morale is derived** | Each element's `morale` is written from cohesion and suppression every tick: *broken*, *disrupted* (shaken), *suppressed2* (pinned), *suppressed1*, or *good*. The shared fire table and `canAdvance` read it unchanged. | `derivedMorale` |
+| **Break tests at loss thresholds** | A unit tests its nerve when its losses reach 20% (attacker) or 40% (defender), then every further 20%. It also tests after a minute pinned. Score = d6 + ⌊TQ/2⌋, +1 in cover, +1 with an HQ within 1.5 km, −1 if pinned, −1 if a friend was lost in the last minute. 6+ passes; 4–5 shakes the unit; under 4, **losses** break it. Being pinned can only shake a unit. | `engine.ts` §8 |
+| **Shaken** | Holds where it is and fires only in self-defence. | |
+| **Broken → fall back once → rally** | A broken unit withdraws **once**, to a rally point: an HQ, then the nearest friend further from the enemy (preferring one out of the enemy's sight), otherwise 800 m away. It is never sent back again. Every 60 s, once it is out of fire (suppression under 25 and no incoming fire for 30 s), it rolls d6 + ⌊TQ/2⌋, +1 with an HQ nearby, +1 with no enemy in sight. 7+ moves it up a step: broken → shaken → steady. | `engine.ts` §8–9 |
+| **Autopilot while shaken or broken** | The runner doesn't ask shaken or broken units. On rallying, a unit raises a severe `rallied` event and is asked again. | `runner.ts` |
+| **Missions** | Every unit has a `mission` (take, hold or support; a place; a purpose), set from its opening order and kept when the order changes. | `types.ts`, `initialOrders.ts` |
+| **Idle re-ask** | A steady unit that is off its mission and has been quiet for 75 s (no events, no incoming fire, no shots) raises `idle`. The rules answer **resume**. This is what fixes the winner holding for ever. | `engine.ts` §10, `deciders.ts` |
+| **Pursue / consolidate** | When an enemy a unit can see breaks, that unit gets `enemyBroke`. The options include `pursue:X` (assault after it) and `consolidate` (overwatch). The rules pursue when the mission is to take ground, and consolidate otherwise. | `options.ts`, `deciders.ts` |
+| **Side breakpoint** | A side is beaten when 50% of its starting strength is destroyed or broken. The time limit remains as a backstop. | `engine.ts` §11 |
+| **Fire for real time** | A shot every 30 s. The fire table is rolled as it is, but a hit costs strength (3 CS) only with probability hits × `lethalityPerTurn` × 30 / 900. **`lethalityPerTurn` = 1.5** is the calibration knob. | `engine.ts` §5–6 |
+
+### Tier 2
+
+| Item | How it works |
+|---|---|
+| **React-to-contact drill** | Applies to a steady unit when a *new* shooter fires on it, or when it runs into the enemy. Its weapon is ready within 5 s (return fire). If it is moving in the open, it dashes to the nearest cover within 150 m, away from the threat; otherwise it halts and engages. A bounding unit halts to cover. An assault presses on. This all happens before Jev answers, and the event says what the crew did. |
+| **Movement modes** | `march`: full speed, doesn't fire. `tactical`: 60% speed, fires within its ROE (the default). `assault`: 80% speed, fires at anything, closes to 150 m before halting. `bound`: 300 m bounds with 40 s cover halts, alternating with the nearest bounding friend, and fires like overwatch while covering. `withdraw`: full speed, doesn't fire. Pinned units can't advance. |
+| **Posture and hull-down** | A unit is *moving*, *halted*, *settled* (still for 30 s) or *hull-down* (settled, and in cover or at least 5 m above its nearest known threat). Hull-down counts as cover for fire and suppression. Posture also sets the range at which a unit is seen without a roll: 800 m moving, 500 m halted or settled in the open, 300 m in cover or hull-down. |
+| **Self-defence and threat targeting** | Whoever fired on a unit in the last minute is always a valid target unless the ROE is "never". Targets are chosen by threat: +3 if it fired at me, +2 if it can hit me, +1 for a flank shot, minus range/3 km. |
+| **Contact reports and last-known positions** | A unit knows what it sees at once (`ownSeen`) and can fire on it. Its side learns after 15 s (`reports`). When a contact fades, its last-known position stays in `lastKnown`. It is drawn as a ring on the map and given to Jev as `lostContacts`, with its age. |
+
+### Jev
+
+Jev's state now includes each unit's cohesion, suppression, posture, mission, whether it is on its mission, and what it can see itself. It also includes visibly breaking enemies and lost contacts. The instructions describe the movement modes and say that the crew has already run its drill. New options include `resume`, `assault:X`, `pursue:X`, `consolidate`, and the objective by mode (`objective`, `objective:march`, `objective:bound`).
+
+### Measured
+
+These are headless runs with the rule decider on flat ground. Identical forces go to each side's objective in tactical mode.
+
+| Scenario | Games | Blue / red | Ended on breakpoint | Mean length |
+|---|---|---|---|---|
+| symmetric-control-v1 | 40 | 20 / 20 | 40 | 19 sim-min |
+| combined-arms-v1 | 40 | 22 / 18 | 40 | 25 sim-min |
+
+Lethality 2 gave 14 minutes and 1 gave 28. Before pinned tests were limited to shaking a unit, games ended in 6–10 minutes on suppression alone, with under one damaging hit each.
+
+The tests in `realtime.test.ts` cover each mechanic, plus balance (identical forces) and decisiveness. Decisiveness means no game reaches the time limit, and a broken unit falls back at most once per break.

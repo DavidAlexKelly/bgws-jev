@@ -28,11 +28,11 @@ import {
 } from "../../rules/jev";
 import { printDecision } from "../../rules/jevConsole";
 import type { TacticalTrace } from "../../rules/tactical";
-import { canHit, describeOrder } from "./engine";
+import { canHit, describeOrder, onMission } from "./engine";
 import { compass } from "./geometry";
 import { oddsAgainst } from "./options";
 import { ruleChoice, ruleTrace, type RtDecider, type RtDecision } from "./deciders";
-import { clock } from "./timing";
+import { PINNED_AT, SUPPRESSED_AT, clock } from "./timing";
 import type { RtConfig, RtState } from "./types";
 
 export interface JevRealtimeOptions {
@@ -78,17 +78,34 @@ export function realtimeSideState(
           ...(odds ? { pHitOnYou: odds.pHit } : {}),
         };
       });
+    const seesNow = unit
+      ? Object.keys(unit.ownSeen).filter((enemyId) => state.game.forceElements[enemyId]?.combatStrength > 0)
+      : [];
     return {
       id: self.id,
       unit: self.label,
       strength: `${self.combatStrength}/${self.combatStrengthStart}`,
       troopQuality: self.troopQuality,
-      morale: self.morale,
+      ...(unit
+        ? {
+            cohesion: unit.cohesion,
+            suppression: `${Math.round(unit.suppression)}/100${
+              unit.suppression >= PINNED_AT ? " (pinned: cannot advance)" : unit.suppression >= SUPPRESSED_AT ? " (suppressed)" : ""
+            }`,
+            posture: unit.posture,
+            mission: `${unit.mission.task}: ${unit.mission.purpose}${
+              unit.mission.at
+                ? ` (${Math.round(distanceM(self.position, unit.mission.at))} m ${compass(self.position, unit.mission.at)})`
+                : ""
+            }`,
+            onMission: onMission(unit, self),
+          }
+        : { morale: self.morale }),
       doing: unit ? describeOrder(unit.order) : "unknown",
       rulesOfEngagement: unit?.roe,
-      ...(unit?.purpose ? { purpose: unit.purpose } : {}),
       terrain: config.terrain.classify(self.position),
       inCover: inCover(config.terrain, self.position),
+      ...(seesNow.length ? { seesItself: seesNow } : {}),
       ...(objective
         ? {
             objective: `${Math.round(distanceM(self.position, objective))} m ${compass(self.position, objective)}`,
@@ -104,10 +121,24 @@ export function realtimeSideState(
     identified: contact.sighting === "full",
     unit: contact.label ?? "unidentified",
     seen: contact.observedMarkers,
+    ...(contact.sighting === "full" && state.units[contact.id]?.cohesion !== "steady"
+      ? { visiblyBreaking: state.units[contact.id]?.cohesion === "broken" ? "falling back" : "shaken" }
+      : {}),
     nearestOfYoursM: view.own.length
       ? Math.round(Math.min(...view.own.map((fe) => distanceM(fe.position, contact.position))))
       : null,
   }));
+  const inSight = new Set(view.contacts.map((contact) => contact.id));
+  const lastKnown = Object.entries(state.lastKnown?.[side] ?? {})
+    .filter(([id]) => !inSight.has(id))
+    .map(([id, seen]) => ({
+      id,
+      unit: seen.label ?? "unidentified",
+      lastSeen: `${clock(state.time - seen.time)} ago`,
+      nearestOfYoursM: view.own.length
+        ? Math.round(Math.min(...view.own.map((fe) => distanceM(fe.position, seen.at))))
+        : null,
+    }));
 
   return {
     clock: clock(state.time),
@@ -115,10 +146,13 @@ export function realtimeSideState(
     ...(state.plan[side] ? { commandersPlan: state.plan[side] } : {}),
     yourUnits: units,
     knownEnemies: contacts,
+    ...(lastKnown.length ? { lostContacts: lastKnown } : {}),
     recent: recent.slice(-8),
     note:
       "Real time: every unit acts at once. Enemies you have not sighted are not " +
-      "listed; their absence is not evidence that they are not there.",
+      "listed; their absence is not evidence that they are not there. Lost " +
+      "contacts are where an enemy was last seen, not where it is. Shaken and " +
+      "broken units are not yours to order until they rally.",
   };
 }
 
@@ -160,12 +194,16 @@ export function jevRealtimeDecider(
           instructions:
             `${directive}Your unit ${item.unitId} (${label}) is ${describeOrder(state.units[item.unitId].order)}. ` +
             `What just happened: ${item.events.map((event) => event.detail).join("; ")}. ` +
-            "Choose its order from now on. Weigh its purpose and your commander's plan " +
-            "against the threats to it, its odds, the cover around it and its strength " +
-            "and morale. A unit that carries on moving only fires on the move, at a " +
-            "penalty and within its rules of engagement; once in contact, halting to " +
-            "engage, taking cover or pulling back is usually better than driving on " +
-            "into the enemy. Otherwise, carry on unless the situation calls for a change.",
+            "The crew has already run its drill (returned fire, taken the nearest cover). " +
+            "Choose its order from now on. Weigh its mission and your commander's plan " +
+            "against the threats to it, its odds, the cover around it, its strength " +
+            "and its suppression. How it moves matters: a road march does not fire; " +
+            "tactical movement fires within its ROE; an assault fires at anything and " +
+            "closes to point-blank, which is how ground is taken; bounding is slow and " +
+            "covered. Once in contact, halting to engage, taking cover or flanking is " +
+            "usually better than driving on into the enemy; a quiet unit off its " +
+            "mission should resume it; an enemy that breaks can be pursued. Otherwise, " +
+            "carry on unless the situation calls for a change.",
           criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary])),
         };
       }

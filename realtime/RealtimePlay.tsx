@@ -69,7 +69,7 @@ import { createRealtimeState, describeOrder } from "./engine/engine";
 import { heuristicInitialOrders, jevInitialOrders } from "./engine/initialOrders";
 import { jevRealtimeDecider } from "./engine/jevDecider";
 import { RealtimeRunner, type RtLogEntry } from "./engine/runner";
-import { clock, DEFAULT_TIMING } from "./engine/timing";
+import { clock, DEFAULT_TIMING, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
 
 type Phase = "setup" | "ordered" | "running";
@@ -78,6 +78,8 @@ type Viewpoint = Side | "both";
 const BOARD_SOURCE = "rt-board";
 const FIRE_SOURCE = "rt-fire";
 const ORDER_SOURCE = "rt-orders";
+/** Where faded contacts were last seen. */
+const LAST_KNOWN_SOURCE = "rt-last-known";
 const SPEEDS = [1, 5, 10, 30, 60];
 /** How long a shot's line stays on the map, in simulated seconds. */
 const FIRE_LINE_S = 12;
@@ -382,6 +384,21 @@ export default function RealtimePlay() {
             },
           });
         }
+        if (!map.getSource(LAST_KNOWN_SOURCE)) {
+          map.addSource(LAST_KNOWN_SOURCE, { type: "geojson", data: emptyCollection() });
+          map.addLayer({
+            id: `${LAST_KNOWN_SOURCE}-circle`,
+            type: "circle",
+            source: LAST_KNOWN_SOURCE,
+            paint: {
+              "circle-radius": 7,
+              "circle-color": "rgba(0,0,0,0)",
+              "circle-stroke-width": 1.5,
+              "circle-stroke-color": ["match", ["get", "side"], "blue", SIDE_COLOUR.blue, SIDE_COLOUR.red],
+              "circle-stroke-opacity": ["get", "opacity"],
+            },
+          });
+        }
         if (!map.getSource(FIRE_SOURCE)) {
           map.addSource(FIRE_SOURCE, { type: "geojson", data: emptyCollection() });
           map.addLayer({
@@ -446,9 +463,24 @@ export default function RealtimePlay() {
       marker.setLngLat([fe.position.lng, fe.position.lat]);
       const own = view === "both" || fe.side === view;
       const unit = state.units[id];
-      node.style.opacity = fe.morale === "broken" ? "0.45" : "1";
+      node.style.opacity = unit?.cohesion === "broken" ? "0.45" : unit?.cohesion === "shaken" ? "0.7" : "1";
       caption.textContent = own
-        ? `${label} · ${fe.combatStrength}/${fe.combatStrengthStart}${fe.morale === "good" ? "" : ` · ${fe.morale}`}${unit ? ` · ${describeOrder(unit.order)}` : ""}`
+        ? [
+            label,
+            `${fe.combatStrength}/${fe.combatStrengthStart}`,
+            ...(unit
+              ? [
+                  ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),
+                  ...(unit.suppression >= PINNED_AT
+                    ? ["pinned"]
+                    : unit.suppression >= SUPPRESSED_AT
+                      ? [`suppressed ${Math.round(unit.suppression)}`]
+                      : []),
+                  ...(unit.posture === "hullDown" ? ["hull-down"] : []),
+                  describeOrder(unit.order),
+                ]
+              : []),
+          ].join(" · ")
         : fe.id;
 
       // The latest decision, for a while after it was made. Own side only:
@@ -512,6 +544,27 @@ export default function RealtimePlay() {
     (map.getSource(ORDER_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
       features: orders,
+    });
+
+    // Last-known positions: where a contact was when it was last seen.
+    const ghosts = (["blue", "red"] as const)
+      .filter((viewer) => own(viewer))
+      .flatMap((viewer) =>
+        Object.entries(state.lastKnown?.[viewer] ?? {})
+          .filter(([id]) => (state.game.sighting[viewer][id] ?? "none") === "none")
+          .map(([id, seen]) => ({
+            type: "Feature" as const,
+            properties: {
+              id,
+              side: viewer === "blue" ? "red" : "blue",
+              opacity: Math.max(0.2, 1 - (state.time - seen.time) / 600),
+            },
+            geometry: { type: "Point" as const, coordinates: [seen.at.lng, seen.at.lat] },
+          })),
+      );
+    (map.getSource(LAST_KNOWN_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: ghosts,
     });
 
     const runner = runnerRef.current;
@@ -814,6 +867,21 @@ export default function RealtimePlay() {
             {view && (
               <div style={{ ...subtle, lineHeight: 1.5 }}>
                 {view.contacts.length} enemy contact{view.contacts.length === 1 ? "" : "s"} in sight
+                {state && viewpoint !== "both"
+                  ? ` · ${Object.keys(state.lastKnown?.[viewpoint] ?? {}).filter((id) => (state.game.sighting[viewpoint][id] ?? "none") === "none").length} lost (rings)`
+                  : ""}
+              </div>
+            )}
+            {state && phase === "running" && (
+              <div style={{ ...subtle, lineHeight: 1.5 }}>
+                {(["blue", "red"] as const).map((side) => {
+                  const fighting = Object.values(state.game.forceElements)
+                    .filter((fe) => fe.side === side && fe.combatStrength > 0 && state.units[fe.id]?.cohesion !== "broken")
+                    .reduce((sum, fe) => sum + fe.combatStrength, 0);
+                  const start = Math.max(1, state.startStrength?.[side] ?? 1);
+                  return `${side} ${Math.round((fighting / start) * 100)}%`;
+                }).join(" · ")}{" "}
+                fighting strength (a side breaks below 50%)
               </div>
             )}
           </>

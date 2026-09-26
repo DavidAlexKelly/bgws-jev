@@ -129,7 +129,7 @@ describe("the autopilot", () => {
   it("moves a unit at the ground's speed and stops it on arrival", () => {
     const cfg = config();
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 500) }, cfg);
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 500), mode: "march" }, cfg);
     const after10 = run(state, cfg, 10).state;
     const perSecond = HOUSE_V1.movement.T.open! / DEFAULT_TIMING.turnS;
     expect(distanceM(after10.game.forceElements.B1.position, at(0, 0))).toBeCloseTo(perSecond * 10, 0);
@@ -148,7 +148,7 @@ describe("the autopilot", () => {
     };
     const cfg = config({ terrain: lake });
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000), mode: "march" }, cfg);
     const { state: after, events } = run(state, cfg, 600);
     expect(events.some((e) => e.unitId === "B1" && (e.kind === "blocked" || e.kind === "arrived"))).toBe(true);
     expect(after.game.forceElements.B1.position.lat).toBeLessThanOrEqual(at(0, 101).lat);
@@ -167,17 +167,17 @@ describe("the autopilot", () => {
     const cfg = config();
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2000))], true));
     // R1 drives out of sight range; blue's picture of it goes stale.
-    state = setOrder(state, "R1", { kind: "move", to: at(0, 12_000) }, cfg);
+    state = setOrder(state, "R1", { kind: "move", to: at(0, 12_000), mode: "tactical" }, cfg);
     const { state: after } = run(state, cfg, 1800);
     expect(after.game.sighting.blue.R1 ?? "none").toBe("none");
   });
 
-  it("fires once per engagement cycle, and not at all under 'never'", () => {
+  it("fires once per shot interval, and not at all under 'never'", () => {
     const cfg = config();
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
     state = setOrder(state, "B1", { kind: "overwatch" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
-    const { shots } = run(state, cfg, DEFAULT_TIMING.engagementCycleS * 2 + 1);
+    const { shots } = run(state, cfg, DEFAULT_TIMING.shotIntervalS * 2 + 1);
     expect(shots).toBeGreaterThanOrEqual(2);
     expect(shots).toBeLessThanOrEqual(3);
 
@@ -229,8 +229,8 @@ describe("meeting the enemy", () => {
   const column = (roe: "never" | "withinShortRange" = "withinShortRange") => {
     const cfg = config();
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 4000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 6000) }, cfg, { roe });
-    state = setOrder(state, "R1", { kind: "move", to: at(0, -2000) }, cfg, { roe });
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 6000), mode: "tactical" }, cfg, { roe });
+    state = setOrder(state, "R1", { kind: "move", to: at(0, -2000), mode: "tactical" }, cfg, { roe });
     return { cfg, state };
   };
 
@@ -250,17 +250,20 @@ describe("meeting the enemy", () => {
     expect(distanceM(after.game.forceElements.B1.position, after.game.forceElements.R1.position)).toBeGreaterThan(200);
   });
 
-  it("sees anything close in the open without a roll", () => {
+  it("sees anything close in the open without a roll; the side hears after the report delay", () => {
     const cfg = config();
     const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 400))]));
     const after = tick(state, cfg).state;
-    expect(after.game.sighting.blue.R1).toBe("full");
+    expect(after.units.B1.ownSeen.R1?.level).toBe("full");
+    expect(after.game.sighting.blue.R1 ?? "none").toBe("none");
+    const reported = run(after, cfg, DEFAULT_TIMING.reportDelayS).state;
+    expect(reported.game.sighting.blue.R1).toBe("full");
   });
 
   it("the rules engage what they sight instead of carrying on", async () => {
     const cfg = config();
     const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
-    const moving = setOrder(state, "B1", { kind: "move", to: at(0, 3000) }, cfg);
+    const moving = setOrder(state, "B1", { kind: "move", to: at(0, 3000), mode: "tactical" }, cfg);
     const [decision] = await ruleDecider.decide(
       moving,
       "blue",
@@ -288,7 +291,7 @@ describe("routes", () => {
     };
     const cfg = config({ planner });
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000), mode: "tactical" }, cfg);
     let furthestEast = 0;
     for (let i = 0; i < 2000 && state.units.B1.order.kind === "move"; i += 1) {
       state = tick(state, cfg).state;
@@ -303,7 +306,7 @@ describe("routes", () => {
     const river = (p: LatLng) => !(p.lat > at(0, 200).lat && p.lat < at(0, 260).lat);
     const cfg = config({ isPassable: river, planner: { kind: "raster", plan: () => null } });
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000), mode: "tactical" }, cfg);
     const { state: after } = run(state, cfg, 900);
     expect(after.game.forceElements.B1.position.lat).toBeLessThanOrEqual(at(0, 200).lat);
   });
@@ -313,8 +316,9 @@ describe("routes", () => {
 
 describe("the runner", () => {
   /** A decider that records when it was asked and answers `optionId`. */
-  function recording(optionId: string, delayMs = 0): RtDecider & { calls: { time: number; units: string[]; kinds: string[] }[] } {
-    const calls: { time: number; units: string[]; kinds: string[] }[] = [];
+  type Call = { time: number; units: string[]; kinds: string[]; severe: string[] };
+  function recording(optionId: string, delayMs = 0): RtDecider & { calls: Call[] } {
+    const calls: Call[] = [];
     return {
       name: "recording",
       calls,
@@ -323,6 +327,7 @@ describe("the runner", () => {
           time: state.time,
           units: requests.map((r) => r.unitId),
           kinds: requests.flatMap((r) => r.events.map((e) => e.kind)),
+          severe: requests.filter((r) => r.events.some((e) => e.severe)).map((r) => r.unitId),
         });
         if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
         return requests.map((r) => ({
@@ -337,7 +342,7 @@ describe("the runner", () => {
   it("asks when something happens, and applies the answer after the reaction time", async () => {
     const cfg = config();
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 5000))]));
-    state = setOrder(state, "B1", { kind: "move", to: at(0, 200) }, cfg);
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 200), mode: "march" }, cfg);
     const decider = recording("objective");
     const runner = new RealtimeRunner(state, cfg, { deciders: { blue: decider } });
     await runner.advance(400);
@@ -355,7 +360,7 @@ describe("the runner", () => {
     const play = async (delayMs: number) => {
       const cfg = config({ rng: createRng("slow") });
       let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1400))]));
-      state = setOrder(state, "B1", { kind: "move", to: at(0, 600) }, cfg);
+      state = setOrder(state, "B1", { kind: "move", to: at(0, 600), mode: "march" }, cfg);
       const runner = new RealtimeRunner(state, cfg, {
         deciders: { blue: recording("overwatch", delayMs), red: recording("overwatch", delayMs) },
       });
@@ -383,7 +388,7 @@ describe("the runner", () => {
     const askedB1 = decider.calls.filter((c) => c.units.includes("B1"));
     for (let i = 1; i < askedB1.length; i += 1) {
       const gap = askedB1[i].time - askedB1[i - 1].time;
-      const severe = askedB1[i].kinds.some((k) => k === "hit" || k === "friendLost" || k === "sighted" || k === "moraleDrop");
+      const severe = askedB1[i].severe.includes("B1");
       if (!severe) expect(gap).toBeGreaterThanOrEqual(DEFAULT_TIMING.cooldownS);
     }
   });
@@ -486,7 +491,7 @@ describe("initial orders", () => {
     const order = state.units.B1.order as { to: LatLng; route?: LatLng[] };
     expect(distanceM(order.to, at(0, 5000))).toBeLessThan(5);
     expect(order.route?.length).toBeGreaterThan(0);
-    expect(state.units.B1.purpose).toBe("take the objective");
+    expect(state.units.B1.mission).toMatchObject({ task: "take", purpose: "take the objective" });
   });
 
   it("Jev: one request choosing each unit's opening order and rules of engagement", async () => {
@@ -509,4 +514,256 @@ describe("initial orders", () => {
     });
     expect(state.units.B1.order.kind).toBe("move");
   });
+});
+
+// ── Realism: suppression, breaking, rallying, missions ────────────────────
+
+describe("suppression and nerve", () => {
+  it("builds suppression from fire, misses included, and lets it fade once the fire stops", () => {
+    const cfg = config();
+    let state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(100, 0)), fe("B3", "blue", at(-100, 0)), fe("R1", "red", at(0, 1500))], true),
+    );
+    for (const id of ["B1", "B2", "B3"]) state = setOrder(state, id, { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const fired = run(state, cfg, 5).state;
+    expect(fired.units.R1.suppression).toBeGreaterThan(0);
+    // Stop the fire and wait: it fades back to nothing.
+    let quiet = fired;
+    for (const id of ["B1", "B2", "B3"]) quiet = setOrder(quiet, id, { kind: "hold" }, cfg, { roe: "never" });
+    const later = run(quiet, cfg, 120).state;
+    expect(later.units.R1.suppression).toBe(0);
+    expect(later.game.forceElements.R1.morale).toBe("good");
+  });
+
+  it("does not break a unit per hit, but tests it at a loss threshold", () => {
+    const cfg = config();
+    // A defender at 25% losses: under its 40% threshold, no test.
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = { ...state, game: { ...state.game, forceElements: { ...state.game.forceElements, B1: { ...state.game.forceElements.B1, combatStrength: 6 } } } };
+    expect(tick(state, cfg).state.units.B1.breakTests).toBe(0);
+    // Past it, a hopeless crew breaks and a superb one holds.
+    const hurt = (tq: number) => {
+      const s = createRealtimeState(game([fe("B1", "blue", at(0, 0), { troopQuality: tq }), fe("R1", "red", at(0, 30_000))]));
+      return { ...s, game: { ...s.game, forceElements: { ...s.game.forceElements, B1: { ...s.game.forceElements.B1, combatStrength: 4 } } } };
+    };
+    const bad = tick(hurt(-8), cfg).state.units.B1;
+    expect(bad.cohesion).toBe("broken");
+    expect(bad.order.kind).toBe("withdraw");
+    const good = tick(hurt(20), cfg).state.units.B1;
+    expect(good.cohesion).toBe("steady");
+    expect(good.breakTests).toBe(1);
+  });
+
+  it("a broken unit falls back ONCE, stops, rallies, and is asked again", async () => {
+    const cfg = config();
+    let state = createRealtimeState(
+      game([
+        fe("B1", "blue", at(0, 0), { troopQuality: -8 }),
+        fe("B2", "blue", at(0, -600)),
+        fe("B3", "blue", at(300, -600)),
+        fe("R1", "red", at(0, 30_000)),
+      ]),
+    );
+    state = { ...state, game: { ...state.game, forceElements: { ...state.game.forceElements, B1: { ...state.game.forceElements.B1, combatStrength: 4 } } } };
+    state = tick(state, cfg).state;
+    expect(state.units.B1.cohesion).toBe("broken");
+    // Now make it a good crew, so the rally is certain; the break stays.
+    state = { ...state, game: { ...state.game, forceElements: { ...state.game.forceElements, B1: { ...state.game.forceElements.B1, troopQuality: 20 } } } };
+    const withdrawals: number[] = [];
+    const events: RtEvent[] = [];
+    for (let i = 0; i < 1200 && !state.over; i += 1) {
+      const before = state.units.B1.order.kind;
+      const r = tick(state, cfg);
+      state = r.state;
+      events.push(...r.events);
+      if (state.units.B1.order.kind === "withdraw" && before !== "withdraw") withdrawals.push(state.time);
+    }
+    expect(state.over).toBeUndefined();
+    expect(withdrawals).toHaveLength(0); // never sent back again after the first
+    expect(distanceM(state.game.forceElements.B1.position, at(0, -600))).toBeLessThan(5); // rallied on its friends
+    expect(state.units.B1.cohesion).toBe("steady");
+    expect(events.some((e) => e.unitId === "B1" && e.kind === "rallied")).toBe(true);
+  });
+
+  it("the runner does not ask shaken or broken units", async () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
+    state = { ...state, units: { ...state.units, B1: { ...state.units.B1, cohesion: "shaken", lastRallyCheckAt: 1e9 } } };
+    state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
+    const asked: string[] = [];
+    const runner = new RealtimeRunner(state, cfg, {
+      deciders: {
+        blue: {
+          name: "spy",
+          async decide(_s, _side, requests) {
+            asked.push(...requests.map((r) => r.unitId));
+            return requests.map((r) => ({ unitId: r.unitId, optionId: "keep", trace: { question: "", options: [], chosenId: "keep", chosenBy: "heuristic" as const } }));
+          },
+        },
+      },
+    });
+    await runner.advance(120);
+    expect(asked).not.toContain("B1");
+  });
+});
+
+describe("missions", () => {
+  it("a quiet unit off its mission is asked again, and the rules resume it", async () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = setOrder(state, "B1", { kind: "hold" }, cfg, { mission: { task: "take", at: at(0, 3000), purpose: "take the objective" } });
+    const runner = new RealtimeRunner(state, cfg);
+    await runner.advance(DEFAULT_TIMING.idleS + 30);
+    expect(runner.log.some((e) => e.type === "event" && e.event.kind === "idle")).toBe(true);
+    expect(runner.state.units.B1.order.kind).toBe("move");
+  });
+
+  it("a unit on its mission is left alone", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = setOrder(state, "B1", { kind: "overwatch" }, cfg);
+    expect(run(state, cfg, 600).events.some((e) => e.kind === "idle")).toBe(false);
+  });
+
+  it("offers pursuit of a broken enemy, and the rules pursue when the mission is to take ground", async () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
+    state = setOrder(state, "B1", { kind: "overwatch" }, cfg, { mission: { task: "take", at: at(0, 3000), purpose: "take the objective" } });
+    state = { ...state, units: { ...state.units, R1: { ...state.units.R1, cohesion: "broken" } } };
+    const options = optionsFor(state, "B1", cfg);
+    expect(options.map((o) => o.id)).toEqual(expect.arrayContaining(["pursue:R1", "consolidate", "resume"]));
+    const [decision] = await ruleDecider.decide(
+      state,
+      "blue",
+      [{ unitId: "B1", events: [{ time: 1, unitId: "B1", kind: "enemyBroke", detail: "", severe: false }], options }],
+      cfg,
+    );
+    expect(decision.optionId).toBe("pursue:R1");
+  });
+
+  it("ends the game when a side is past its breakpoint, not at its last unit", () => {
+    const cfg = config();
+    let state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(500, 0)), fe("R1", "red", at(0, 30_000)), fe("R2", "red", at(500, 30_000))]),
+    );
+    state = { ...state, units: { ...state.units, B1: { ...state.units.B1, cohesion: "broken" } } };
+    const after = tick(state, cfg).state;
+    expect(after.over?.winner).toBe("red");
+    expect(after.over?.reason).toMatch(/breakpoint/);
+  });
+});
+
+describe("the crew's drills and movement", () => {
+  const woods: TerrainSampler = {
+    groundHeightM: () => 0,
+    // A wood 100 m east of the start line.
+    classify: (p) => (p.lng > at(80, 0).lng && p.lng < at(160, 0).lng ? "woodsLight" : "open"),
+  };
+
+  it("reacts to contact at once: returns fire and dashes for the nearest cover", () => {
+    const cfg = config({ terrain: woods });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2500))], true));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 2000), mode: "tactical" }, cfg);
+    state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
+    const { state: after, events } = run(state, cfg, 3);
+    const underFire = events.find((e) => e.unitId === "B1" && e.kind === "underFire");
+    expect(underFire?.detail).toMatch(/dashing .* for cover/);
+    expect(after.units.B1.order).toMatchObject({ kind: "move", dash: true });
+    expect(after.units.B1.weaponReadyAt).toBeLessThanOrEqual(after.time + 5);
+  });
+
+  it("an assault presses on under fire and closes to point-blank", () => {
+    const cfg = config({ terrain: woods });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1200))], true));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1200), mode: "assault" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const { events, state: after } = run(state, cfg, 900);
+    const contact = events.find((e) => e.kind === "contact" && e.unitId === "B1");
+    expect(contact?.detail).toMatch(/closed with/);
+    expect(distanceM(after.game.forceElements.B1.position, after.game.forceElements.R1.position)).toBeLessThanOrEqual(151);
+  });
+
+  it("moves faster on a road march than tactically, and does not fire on the march", () => {
+    const cfg = config();
+    const go = (mode: "march" | "tactical") => {
+      let s = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+      s = setOrder(s, "B1", { kind: "move", to: at(0, 5000), mode }, cfg);
+      return distanceM(run(s, cfg, 60).state.game.forceElements.B1.position, at(0, 0));
+    };
+    expect(go("tactical") / go("march")).toBeCloseTo(0.6, 1);
+
+    let s = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2500))], true));
+    s = setOrder(s, "B1", { kind: "move", to: at(0, 30_000), mode: "march" }, cfg, { roe: "always" });
+    s = setOrder(s, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const shots = [];
+    for (let i = 0; i < 30; i += 1) {
+      const r = tick(s, cfg);
+      s = r.state;
+      shots.push(...r.shots.filter((shot) => shot.firerId === "B1"));
+    }
+    expect(shots).toHaveLength(0);
+  });
+
+  it("bounding overwatch: a pair never both moves at once", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(200, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 3000), mode: "bound" }, cfg);
+    state = setOrder(state, "B2", { kind: "move", to: at(200, 3000), mode: "bound" }, cfg);
+    let both = 0;
+    let moved = 0;
+    for (let i = 0; i < 900; i += 1) {
+      state = tick(state, cfg).state;
+      const m1 = state.units.B1.lastMovedAt === state.time;
+      const m2 = state.units.B2.lastMovedAt === state.time;
+      if (m1 && m2) both += 1;
+      if (m1 || m2) moved += 1;
+    }
+    expect(moved).toBeGreaterThan(100);
+    expect(both).toBe(0);
+  });
+
+  it("defends itself against whoever fires on it, even outside its rules of engagement", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2500))], true));
+    // B1 only fires inside short range (1500 m); R1 at 2500 m fires first.
+    state = setOrder(state, "B1", { kind: "hold" }, cfg, { roe: "withinShortRange" });
+    state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
+    const { state: after } = run(state, cfg, 20);
+    expect(after.units.R1.attackers.B1).toBeDefined();
+  });
+
+  it("keeps a last-known position once contact fades", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2000))], true));
+    state = setOrder(state, "R1", { kind: "move", to: at(0, 12_000), mode: "march" }, cfg);
+    const { state: after } = run(state, cfg, 1800);
+    expect(after.game.sighting.blue.R1 ?? "none").toBe("none");
+    expect(after.lastKnown.blue.R1).toBeDefined();
+    expect(distanceM(after.lastKnown.blue.R1.at, after.game.forceElements.R1.position)).toBeGreaterThan(1000);
+  });
+});
+
+describe("decisiveness", () => {
+  it("games end on a breakpoint, not the time limit or an endless retreat", async () => {
+    let limit = 0;
+    let rallyPointArrivals = 0;
+    let breaks = 0;
+    for (let i = 0; i < 12; i += 1) {
+      const cfg = config({ rng: createRng(`decisive${i}`) });
+      let state = createRealtimeState(scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)());
+      state = heuristicInitialOrders(heuristicInitialOrders(state, "blue", cfg), "red", cfg);
+      const runner = new RealtimeRunner(state, cfg, { logLimit: 1e6 });
+      while (!runner.state.over) await runner.advance(300);
+      if (runner.state.over?.reason === "time limit") limit += 1;
+      for (const entry of runner.log) {
+        if (entry.type !== "event") continue;
+        if (entry.event.kind === "moraleDrop" && entry.event.detail.startsWith("broken")) breaks += 1;
+        if (entry.event.kind === "arrived" && entry.event.detail === "reached its rally point") rallyPointArrivals += 1;
+      }
+    }
+    expect(limit).toBe(0);
+    // Each break sends a unit back once at most.
+    expect(rallyPointArrivals).toBeLessThanOrEqual(breaks);
+  }, 120_000);
 });
