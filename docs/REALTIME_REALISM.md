@@ -125,3 +125,31 @@ These are headless runs with the rule decider on flat ground. Identical forces g
 Lethality 2 gave 14 minutes and 1 gave 28. Before pinned tests were limited to shaking a unit, games ended in 6–10 minutes on suppression alone, with under one damaging hit each.
 
 The tests in `realtime.test.ts` cover each mechanic, plus balance (identical forces) and decisiveness. Decisiveness means no game reaches the time limit, and a broken unit falls back at most once per break.
+
+## 6. Giving Jev the context to decide
+
+**What was seen:** two units traded long-range misses for minutes, and Jev kept answering "carry on".
+
+**Causes:**
+- **Unsure became "carry on".** With 15–20 options, even a clear preference can score under the 0.25 confidence threshold, and every low-confidence answer fell back to "carry on".
+- **No memory.** Each question is a fresh request, and the state didn't say how long the unit had been firing or what the fire had achieved.
+- **Misleading odds.** Options showed the fire table's "% to hit". In real time only a small fraction of hits do damage, so long-range fire looked many times more effective than it is.
+- **The firing unit was never asked.** Missing isn't an event, so nothing prompted a review of the fire.
+- **No way to close in.** The only "move closer" option was a point-blank assault, and nothing told a unit that a friend was already covering the target.
+
+**What was added:**
+
+| | |
+|---|---|
+| **Low confidence → the rules** | An unsure Jev hands the decision to the rule decider. The trace records Jev's pick and its confidence. |
+| **Memory per unit** | Each unit keeps a record of its current fire: target, how long, shots, rounds that struck, and damage done. It also keeps the fire it is taking, by shooter, and its last 4 decisions: Jev's, the rules' or its crew's drill, including "carry on". Each decision says what it was about and what has happened since ("lost 0 strength, did 0 damage"). |
+| **Review triggers** | After 3 minutes of firing, a unit raises `ineffective` if it did no damage in that time, or `review` if it did. The rules answer `ineffective` by closing to effective range, shifting to a target it can hurt, or flanking, whichever is at least 1.5 times better. |
+| **Honest odds** | Every fire option shows its chance per minute of doing damage and the expected minutes to knock the target out, using the real-time lethality and the damage this side has already done. Threats to a unit are shown the same way. |
+| **`close:X`** | Close to effective range of the target: the shorter of the weapon's short range and half its maximum. The chosen spot is on the near side, with a line of sight, preferring cover, fewer watchers and a shorter move. The summary gives the move and its time, the odds from there against the odds from here, the enemy's fire on you there, and which friends are firing on the target to cover you. Offered for the three nearest known enemies. |
+| **Coordination** | Each known enemy lists `engagedBy`, `firingOn` and `damageYouHaveDoneToIt`. Each unit being asked, and each unit in the same fights, gets its memory and its friends within 1.5 km. Each fire option says who else is on that target, or that nobody is. Each question names the other units being decided at the same time, so they can be ordered to work together. |
+| **Instructions** | Jev is told to judge fire by what it has done and by the damage odds, to change something when a long exchange isn't working, and to use a friend's covering fire to move. |
+
+**Measured:**
+- A request covering one side's whole combined-arms force is about 30,000 characters, roughly 8,000 tokens.
+- Balance is unchanged within chance: 74 / 86 over 160 symmetric games, and 20 / 20 over 40 combined-arms games.
+- No game reached the time limit.

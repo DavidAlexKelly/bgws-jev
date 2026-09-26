@@ -67,9 +67,11 @@ import {
   CLOSE_CONTACT_M,
   DEFENDER_BREAK_AT,
   DRILL_COVER_M,
+  HISTORY_LENGTH,
   HQ_RADIUS_M,
   PINNED_AT,
   PINNED_TEST_S,
+  REVIEW_S,
   SETTLE_S,
   SIDE_BREAKPOINT,
   SUPPRESSED_AT,
@@ -78,6 +80,7 @@ import {
 } from "./timing";
 import type {
   Cohesion,
+  DecisionMemory,
   MoveMode,
   Posture,
   ReportLevel,
@@ -140,6 +143,12 @@ function stagger(text: string, modulo: number): number {
   let h = 0;
   for (let i = 0; i < text.length; i += 1) h = (Math.imul(h, 31) + text.charCodeAt(i)) | 0;
   return Math.abs(h) % Math.max(1, modulo);
+}
+
+/** "3:05" for a span of seconds. */
+function clockOf(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 function higher<T extends SightingLevel>(a: T, b: T): T {
@@ -247,7 +256,17 @@ function freshUnit(fe: ForceElement): RtUnit {
     lastShotAt: -Infinity,
     lastEventAt: 0,
     exposedTo: [],
+    engagement: null,
+    incoming: {},
+    dealt: 0,
+    lastReviewAt: 0,
+    history: [],
   };
+}
+
+/** Add a decision to a unit's memory, keeping the last few. */
+export function remember(unit: RtUnit, entry: DecisionMemory): DecisionMemory[] {
+  return [...unit.history, entry].slice(-HISTORY_LENGTH);
 }
 
 /** A fresh real-time game from a placed board. Everyone holds until ordered. */
@@ -435,6 +454,22 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
    * Returns what it did, for the event's detail.
    */
   const drill = (id: string, threatId: string): string => {
+    const did = runDrill(id, threatId);
+    if (did && !did.startsWith("; pressing")) {
+      setUnit(id, {
+        history: remember(units[id], {
+          time,
+          chose: `drill: ${did.replace(/^; /, "")}`,
+          by: "crew",
+          because: `contact with ${threatId}`,
+          strength: fe(id).combatStrength,
+          dealt: units[id].dealt,
+        }),
+      });
+    }
+    return did;
+  };
+  const runDrill = (id: string, threatId: string): string => {
     const self = fe(id);
     const unit = units[id];
     if (unit.cohesion !== "steady") return "";
@@ -853,7 +888,27 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         "arcAction",
       ),
     });
-    setUnit(id, { weaponReadyAt: time + timing.shotIntervalS, lastShotAt: time });
+    // Its fire on this target, for "is this working?". A new target, or a
+    // pause of a minute, starts a new record.
+    const was = unit.engagement;
+    const same = was != null && was.targetId === target.id && time - was.lastShotAt <= FIRED_UPON_MEMORY_S;
+    const engagement = same
+      ? { ...was, lastShotAt: time, shots: was.shots + 1, window: { ...was.window, shots: was.window.shots + 1 } }
+      : {
+          targetId: target.id,
+          since: time,
+          lastShotAt: time,
+          shots: 1,
+          hits: 0,
+          damage: 0,
+          window: { since: time, shots: 1, hits: 0, damage: 0 },
+        };
+    setUnit(id, {
+      weaponReadyAt: time + timing.shotIntervalS,
+      lastShotAt: time,
+      engagement,
+      ...(same ? {} : { lastReviewAt: time }),
+    });
   }
 
   // ── 6. What the fire did ──────────────────────────────────────────────────
@@ -883,6 +938,29 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const base =
       (hits > 0 ? SUPPRESSION_FOR.hit : result === "suppress" ? SUPPRESSION_FOR.suppress : SUPPRESSION_FOR.miss) +
       (damaged ? SUPPRESSION_FOR.damaged : 0);
+    const lostNow = damaged ? Math.min(target.combatStrength, config.ruleset.lethality.strengthPerHit) : 0;
+    const firerUnit = units[firer.id];
+    if (firerUnit?.engagement && firerUnit.engagement.targetId === target.id) {
+      const e = firerUnit.engagement;
+      const struck = hits > 0 ? 1 : 0;
+      setUnit(firer.id, {
+        dealt: firerUnit.dealt + lostNow,
+        engagement: {
+          ...e,
+          hits: e.hits + struck,
+          damage: e.damage + lostNow,
+          window: { ...e.window, hits: e.window.hits + struck, damage: e.window.damage + lostNow },
+        },
+      });
+    }
+    const had = targetUnit.incoming[firer.id];
+    const incoming = {
+      ...targetUnit.incoming,
+      [firer.id]:
+        had && time - had.last <= FIRED_UPON_MEMORY_S * 2
+          ? { ...had, shots: had.shots + 1, damage: had.damage + lostNow, last: time }
+          : { shots: 1, damage: lostNow, since: time, last: time },
+    };
     const cover = isCovered({ units }, target, config) ? 0.6 : 1;
     const quality = Math.max(0.5, 1.2 - target.troopQuality * 0.05);
     const recent = time - (targetUnit.attackers[firer.id] ?? -Infinity) <= FIRED_UPON_MEMORY_S;
@@ -891,6 +969,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       suppression: Math.min(100, targetUnit.suppression + base * cover * quality),
       lastIncomingAt: time,
       attackers: { ...targetUnit.attackers, [firer.id]: time },
+      incoming,
     });
     lastFiredOn[target.side][firer.id] = time;
     shots.push({
@@ -1093,6 +1172,32 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const quiet = Math.min(time - unit.lastEventAt, time - unit.lastIncomingAt, time - unit.lastShotAt);
     if (quiet < timing.idleS) continue;
     emit(id, "idle", `quiet for ${Math.round(quiet)} s and off its mission (${unit.mission.purpose})`);
+  }
+
+  // Is its fire working? A unit that has been engaging for `REVIEW_S` is
+  // asked again: "ineffective" if it has done no damage in that time, which
+  // is what an endless long-range exchange of misses looks like, and
+  // "review" if it has. Nothing else would ever ask the unit doing the firing.
+  for (const id of ids) {
+    const self = fe(id);
+    const unit = units[id];
+    if (!unit || self.combatStrength <= 0 || unit.cohesion !== "steady") continue;
+    const e = unit.engagement;
+    if (!e || time - e.lastShotAt > FIRED_UPON_MEMORY_S) continue;
+    if (time - Math.max(e.window.since, unit.lastReviewAt) < REVIEW_S) continue;
+    const w = e.window;
+    const span = clockOf(time - w.since);
+    const taken = Object.values(unit.incoming)
+      .filter((one) => one.last >= w.since)
+      .reduce((sum, one) => sum + one.damage, 0);
+    const summary =
+      `${span} on ${e.targetId}: ${w.shots} shots, ${w.hits} struck, ${w.damage} damage done` +
+      `; ${taken} damage taken meanwhile`;
+    emit(id, w.damage === 0 ? "ineffective" : "review", w.damage === 0 ? `fire not working — ${summary}` : summary);
+    setUnit(id, {
+      lastReviewAt: time,
+      engagement: { ...e, window: { since: time, shots: 0, hits: 0, damage: 0 } },
+    });
   }
 
   // Morale as the shared rules see it.

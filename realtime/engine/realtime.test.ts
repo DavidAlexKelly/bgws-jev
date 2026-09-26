@@ -10,14 +10,14 @@ import { scenarioFactory } from "../../lib/forceBuilder";
 import { flatTerrain, type TerrainSampler } from "../../lib/lineOfSight";
 import type { ForceElement, GameState, Side } from "../../lib/state";
 import { createRng } from "../../rules/dice";
-import { SYMMETRIC_CONTROL_V1 } from "../../rules/forceList";
+import { COMBINED_ARMS_V1, SYMMETRIC_CONTROL_V1 } from "../../rules/forceList";
 import type { JevAnswer, JevCall, JevRequest } from "../../rules/jev";
 import { HOUSE_V1 } from "../../rules/ruleset";
 import { ruleDecider, type RtDecider } from "./deciders";
 import { createRealtimeState, setOrder, tick } from "./engine";
 import { heuristicInitialOrders, jevInitialOrders } from "./initialOrders";
 import { jevRealtimeDecider } from "./jevDecider";
-import { optionsFor } from "./options";
+import { oddsAgainst, optionsFor } from "./options";
 import { RealtimeRunner } from "./runner";
 import { DEFAULT_TIMING, perTick } from "./timing";
 import type { RtConfig, RtEvent, RtState } from "./types";
@@ -420,11 +420,13 @@ describe("Jev in real time", () => {
     expect(decisions[0].trace.chosenBy).toBe("jev");
   });
 
-  it("carries on when Jev is unsure", async () => {
+  it("lets the rules decide when Jev is unsure, rather than carrying on", async () => {
     const { cfg, state } = scene();
-    const call = fakeJev((criteria) => keyWhere(criteria, /engage/), 0.05);
+    const call = fakeJev((criteria) => keyWhere(criteria, /overwatch/), 0.05);
     const decisions = await jevRealtimeDecider({ side: "blue", call }).decide(state, "blue", requests(state, cfg), cfg);
-    expect(decisions.every((d) => d.optionId === "keep" && d.trace.fallback === "lowConfidence")).toBe(true);
+    const byRules = await ruleDecider.decide(state, "blue", requests(state, cfg), cfg);
+    expect(decisions.map((d) => d.optionId)).toEqual(byRules.map((d) => d.optionId));
+    expect(decisions.every((d) => d.trace.fallback === "lowConfidence")).toBe(true);
   });
 
   it("lets the rules decide when Jev cannot be reached", async () => {
@@ -766,4 +768,110 @@ describe("decisiveness", () => {
     // Each break sends a unit back once at most.
     expect(rallyPointArrivals).toBeLessThanOrEqual(breaks);
   }, 120_000);
+});
+
+
+// ── Context for Jev: memory, honest odds, coordination ─────────────────────
+
+describe("context for decisions", () => {
+  /** Two blue troops trading long-range fire with one red one — the scene that kept "carrying on". */
+  const longRange = (lethalityPerTurn = 0) => {
+    const cfg = config({ timing: { ...DEFAULT_TIMING, lethalityPerTurn } });
+    let state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(300, 0)), fe("R1", "red", at(0, 2800)), fe("R9", "red", at(0, 40_000))], true),
+    );
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "B2", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
+    return { cfg, state };
+  };
+
+  it("keeps a record of each unit's fire, and raises 'ineffective' when it is doing nothing", () => {
+    const { cfg, state } = longRange(0);
+    const { state: after, events } = run(state, cfg, 200);
+    const e = after.units.B1.engagement!;
+    expect(e.targetId).toBe("R1");
+    expect(e.shots).toBeGreaterThanOrEqual(6);
+    expect(e.damage).toBe(0);
+    const ineffective = events.find((ev) => ev.unitId === "B1" && ev.kind === "ineffective");
+    expect(ineffective?.detail).toMatch(/fire not working .* shots/);
+    expect(after.units.R1.incoming.B1.shots).toBeGreaterThan(0);
+  });
+
+  it("shows the real chance of doing damage, not the chance of a round striking", () => {
+    const { cfg, state } = longRange(DEFAULT_TIMING.lethalityPerTurn);
+    const engage = optionsFor(state, "R1", cfg).find((o) => o.id === "engage:B2")!;
+    expect(engage.summary).toMatch(/%\/min to damage it/);
+    expect(engage.summary).not.toMatch(/to hit/);
+    const odds = oddsAgainst(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
+    // Per minute of real-time fire, far below the table's per-shot hit chance.
+    expect(engage.effect!).toBeLessThan(odds.pHit);
+  });
+
+  it("offers closing to effective range, with who would cover the move, and the rules take it when fire is not working", async () => {
+    const { cfg, state: start } = longRange(0);
+    const { state } = run(start, cfg, 200);
+    // Judged at the normal lethality; the run used none, to guarantee the misses.
+    const judged = { ...cfg, timing: DEFAULT_TIMING };
+    const options = optionsFor(state, "B1", judged);
+    const close = options.find((o) => o.id === "close:R1")!;
+    expect(close).toBeDefined();
+    expect(close.order).toMatchObject({ kind: "move", mode: "tactical" });
+    expect(close.summary).toMatch(/B2 firing on it to cover you/);
+    expect(close.effect!).toBeGreaterThan(options.find((o) => o.id === "keep")!.effect ?? 0);
+    const [decision] = await ruleDecider.decide(
+      state,
+      "blue",
+      [{ unitId: "B1", events: [{ time: state.time, unitId: "B1", kind: "ineffective", detail: "", severe: false }], options }],
+      judged,
+    );
+    expect(decision.optionId).toBe("close:R1");
+  });
+
+  it("gives Jev each unit's memory and the side's picture of who is fighting whom", async () => {
+    const { cfg, state: start } = longRange(0);
+    const runner = new RealtimeRunner(start, cfg);
+    await runner.advance(400);
+    const state = runner.state;
+    // The runner remembered its decisions, "carry on" included.
+    expect(state.units.B1.history.length).toBeGreaterThan(0);
+
+    const call = fakeJev(() => "keep", 0.9);
+    const requests = ["B1", "B2"].map((unitId) => ({
+      unitId,
+      events: [{ time: state.time, unitId, kind: "ineffective" as const, detail: "fire not working", severe: false }],
+      options: optionsFor(state, unitId, cfg),
+    }));
+    await jevRealtimeDecider({ side: "blue", call }).decide(state, "blue", requests, cfg);
+    const sent = call.requests[0];
+    const b1 = (sent.state as { yourUnits: Record<string, unknown>[] }).yourUnits.find((u) => u.id === "B1")!;
+    expect(b1.yourFire).toMatchObject({ target: "R1", damageDone: 0 });
+    expect(b1.lastDecisions).toBeDefined();
+    expect(b1.fireOnYou).toBeDefined();
+    const r1 = (sent.state as { knownEnemies: Record<string, unknown>[] }).knownEnemies.find((e) => e.id === "R1")!;
+    expect(r1.engagedBy).toEqual(["B1", "B2"]);
+    // Each question names the other unit being decided, so they can be coordinated.
+    expect((sent.questions.u0 as { instructions: string }).instructions).toMatch(/Also being decided now.*B2/);
+    expect((sent.questions.u0 as { instructions: string }).instructions).toMatch(/firing on R1 for .* shots/);
+  });
+
+  it("keeps a whole-battle request within Jev's context", async () => {
+    const cfg = config({ rng: createRng("size") });
+    let state = createRealtimeState(scenarioFactory(COMBINED_ARMS_V1, HOUSE_V1)());
+    state = heuristicInitialOrders(heuristicInitialOrders(state, "blue", cfg), "red", cfg);
+    const runner = new RealtimeRunner(state, cfg);
+    await runner.advance(420);
+    const call = fakeJev(() => "keep");
+    const blue = Object.values(runner.state.game.forceElements).filter((one) => one.side === "blue" && one.combatStrength > 0);
+    await jevRealtimeDecider({ side: "blue", call }).decide(
+      runner.state,
+      "blue",
+      blue.map((one) => ({ unitId: one.id, events: [], options: optionsFor(runner.state, one.id, cfg) })),
+      cfg,
+    );
+    const size = JSON.stringify(call.requests[0]).length;
+    if (process.env.SHOW_SIZE) process.stdout.write(`whole-side request: ${size} characters\n`);
+    // Jev's window is 32k tokens; ~4 characters a token, with room for the answer.
+    expect(size).toBeLessThan(90_000);
+  }, 60_000);
 });

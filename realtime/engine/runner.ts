@@ -23,7 +23,7 @@
 import type { Side } from "../../lib/state";
 import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
 import { ruleDecider } from "./deciders";
-import { setOrder, tick } from "./engine";
+import { remember, setOrder, tick } from "./engine";
 import { optionsFor } from "./options";
 import type { RtConfig, RtEvent, RtShot, RtState } from "./types";
 
@@ -210,6 +210,18 @@ export class RealtimeRunner {
         if (option.id !== "keep") {
           this.state = setOrder(this.state, unitId, option.order, this.config, option.roe ? { roe: option.roe } : {});
         }
+        // Remember it, "carry on" included, so the next question about this
+        // unit can see what it was told and what came of it.
+        const unit = this.state.units[unitId];
+        const memory = remember(unit, {
+          time,
+          chose: option.id === "keep" ? `carry on (${option.summary.replace(/^carry on /, "")})` : option.summary,
+          by: decision.trace.chosenBy === "jev" ? "jev" : "rules",
+          because: [...new Set(request!.events.map((event) => event.kind))].join(", "),
+          strength: fe.combatStrength,
+          dealt: unit.dealt,
+        });
+        this.state = { ...this.state, units: { ...this.state.units, [unitId]: { ...unit, history: memory } } };
         this.push({
           type: "decision",
           time,
