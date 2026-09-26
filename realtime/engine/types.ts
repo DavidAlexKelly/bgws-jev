@@ -251,11 +251,11 @@ export interface RtTiming {
   /** How often a unit engaging something fires. */
   shotIntervalS: number;
   /**
-   * How many turn-game fire results one turn's worth of continuous fire is
-   * worth. Each shot's fire-table result is scaled by
-   * `lethalityPerTurn × shotIntervalS / turnS`. THE calibration knob.
+   * Multiplies the chance a fire-table hit is a round on target (fire.ts).
+   * 1 is the realistic figure; tests set 0 to guarantee nothing lands.
+   * Fight length is set by `shotIntervalS`, not by this.
    */
-  lethalityPerTurn: number;
+  strikeScale: number;
   /** How often each observer gets a sighting attempt at each enemy it can see. */
   sightingIntervalS: number;
   /** How long a contact stays on the map after the last time anyone saw it. */

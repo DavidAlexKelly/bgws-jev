@@ -1,49 +1,56 @@
 // ── bgws/realtime/engine/fire.ts ───────────────────────────────────────────
-// What range does to a shot in real time. One place, used by the engine to
-// roll fire and by the options to state the odds, so the two cannot disagree.
+// Whether a round hits, in real time. One place, used by the engine to roll
+// fire and by the options to state the odds, so the two cannot disagree.
 //
-// The turn game's table knows one range effect: -1 beyond half the weapon's
-// maximum range. So a tank at 300 m shot no better than at 1,500 m, and with
-// every hit scaled down for real time, point-blank fights read as endless
-// misses. Two things fix it, neither touching the turn game:
+// NOT THE TURN GAME'S FIRE TABLE. That table gives one result for a whole
+// troop's fifteen-minute turn, from its combat strength; it knows one range
+// effect (-1 beyond half maximum range) and nothing of fire control. Rolled
+// every few seconds it reported point-blank rounds as near misses two times
+// in three. Real time uses a per-round model instead, as tank engagement
+// models do (see docs/REALTIME_REALISM.md §2):
 //
-//   RANGE BANDS   a modifier on the roll: +2 within 500 m, +1 within 1 km.
-//                 Beyond half maximum range the table's own -1 still applies.
-//   STRIKES       a fire-table hit becomes a round on target with a
-//                 probability that scales with range: about 4× more at 300 m
-//                 than at 2.5 km, and `lethalityPerTurn` × shotIntervalS /
-//                 turnS on average — the calibration knob. What a round on
-//                 target then does is lethality.ts: intercept, penetrate the
-//                 face it strikes, knock the vehicle out.
+//   every fit vehicle in the firing unit fires a round per aimed shot;
+//   each round hits with a chance from range (a modern fire-control
+//   system's first-round figures) times what degrades it — moving, cover,
+//   suppression; each hit then goes through lethality.ts: the face it
+//   strikes, penetration there, whether the vehicle is knocked out.
+//
+// Every figure here is DECLARED: the L7 tables carry no accuracy data, and
+// optics_class has no data dictionary yet. They are the place to plug that
+// data in when it arrives.
 
-import type { Modifier } from "../../rules/events";
 import type { RtTiming } from "./types";
 
-/** Range bands: [out to, modifier]. */
-const RANGE_BANDS: readonly [number, number][] = [
-  [500, 2],
-  [1000, 1],
+/** DECLARED. Chance one aimed round hits a stationary, exposed vehicle, by range: [metres, chance]. */
+const HIT_BY_RANGE: readonly [number, number][] = [
+  [300, 0.97],
+  [500, 0.95],
+  [1000, 0.9],
+  [1500, 0.8],
+  [2000, 0.65],
+  [2500, 0.5],
+  [3000, 0.4],
 ];
 
-/** How likely a hit is a real round on target, by range: [metres, factor], interpolated. */
-const LETHALITY_BY_RANGE: readonly [number, number][] = [
-  [300, 2.4],
-  [500, 2.0],
-  [1000, 1.3],
-  [1500, 0.9],
-  [2500, 0.6],
-  [3500, 0.5],
-];
+/** DECLARED. What degrades a round's chance of hitting, as multipliers. */
+export const HIT_FACTORS = {
+  /** Firing on the move, even stabilised. */
+  firerMoving: 0.7,
+  /** A crossing or moving target. */
+  targetMoving: 0.85,
+  /** In woods or towns, or hull-down: less of it to hit. */
+  targetCovered: 0.6,
+  /** Rounds coming in: the crew is ducking. */
+  firerSuppressed: 0.8,
+  /** Pinned: barely looking out. */
+  firerPinned: 0.5,
+  /** Shaken: firing wild. */
+  firerShaken: 0.6,
+} as const;
 
-/** The real-time range modifier for a shot, as the fire table's `extraModifiers`. */
-export function rangeModifiers(rangeM: number): Modifier[] {
-  const band = RANGE_BANDS.find(([limit]) => rangeM <= limit);
-  return band ? [{ source: band[1] >= 2 ? "pointBlank" : "closeRange", value: band[1] }] : [];
-}
-
-/** How much more (or less) lethal a hit is at this range than on average. */
-export function lethalityFactor(rangeM: number): number {
-  const points = LETHALITY_BY_RANGE;
+/** The chance a round hits a stationary, exposed target at this range. */
+export function hitAtRange(rangeM: number): number {
+  const points = HIT_BY_RANGE;
   if (rangeM <= points[0][0]) return points[0][1];
   for (let i = 1; i < points.length; i += 1) {
     const [x1, y1] = points[i];
@@ -55,7 +62,20 @@ export function lethalityFactor(rangeM: number): number {
   return points[points.length - 1][1];
 }
 
-/** The chance one fire-table hit is a round on target, at this range. */
-export function strikeChance(rangeM: number, timing: RtTiming): number {
-  return Math.min(1, ((timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS) * lethalityFactor(rangeM));
+export interface HitConditions {
+  firerMoving?: boolean;
+  targetMoving?: boolean;
+  targetCovered?: boolean;
+  firerSuppressed?: boolean;
+  firerPinned?: boolean;
+  firerShaken?: boolean;
+}
+
+/** The chance one round hits, at this range and in these conditions (× `strikeScale`, 1 unless a test says otherwise). */
+export function hitChance(rangeM: number, conditions: HitConditions, timing: RtTiming): number {
+  let p = hitAtRange(rangeM);
+  for (const [key, factor] of Object.entries(HIT_FACTORS)) {
+    if (conditions[key as keyof HitConditions]) p *= factor;
+  }
+  return Math.min(1, Math.max(0, p * timing.strikeScale));
 }

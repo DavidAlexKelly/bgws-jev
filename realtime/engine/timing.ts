@@ -7,19 +7,22 @@
 //   CHANCES    something that happens with probability p in a turn happens
 //              with probability 1 − (1 − p)^(dt / turnS) in a tick of dt.
 //   ACTIONS    a shot is an action, not a chance. A unit that is engaging
-//              fires every `shotIntervalS`. The fire table is rolled as it
-//              is, but its RESULT is scaled: a hit only costs strength with
-//              probability hits × lethalityPerTurn × shotIntervalS / turnS.
-//              Every shot, misses included, adds suppression.
+//              gets an aimed shot away every `shotIntervalS` — acquiring,
+//              laying, firing, observing. The fire table says how many rounds
+//              are hits; fire.ts how many of those are really on target at
+//              that range; lethality.ts what each one does to the face it
+//              strikes. Every shot, misses included, adds suppression.
 //
-// ⚠ `lethalityPerTurn` IS THE CALIBRATION KNOB. It sets how often a fire-
-// table hit is a round actually on target (scaled by range in fire.ts); what
-// that round does is lethality.ts — the face it strikes, the round's
-// penetration there against that armour, and whether the vehicle is knocked
-// out. Peer tanks mostly bounce off each other's fronts, so it is higher than
-// when every hit simply cost strength. At 4, identical forces fight for 22-24
-// sim-minutes and end on a breakpoint: 149/151 over 300 symmetric games — see
-// the balance and decisiveness checks in realtime.test.ts.
+// ⚠ `shotIntervalS` IS THE CALIBRATION KNOB for how long fights last. It was
+// once the chance of a hit that did the calibrating, which reported rounds
+// at 600 m as "near misses" three times in four; hits are now as likely as
+// the fire control makes them, and the pace comes from how often a troop
+// gets an aimed round away: one per vehicle per minute, allowing for
+// acquiring, laying, firing and observing. With hits that land, a fight in
+// the open between peer troops is decided in two or three minutes, as it
+// would be; time goes on getting there — approach, cover, hull-down, flank —
+// which is where the decisions are. See the balance and decisiveness checks
+// in realtime.test.ts.
 
 import type { RtTiming } from "./types";
 
@@ -69,8 +72,8 @@ export const HISTORY_LENGTH = 4;
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,
-  shotIntervalS: 30,
-  lethalityPerTurn: 4,
+  shotIntervalS: 60,
+  strikeScale: 1,
   sightingIntervalS: 30,
   contactMemoryS: 120,
   rallyCheckS: 60,

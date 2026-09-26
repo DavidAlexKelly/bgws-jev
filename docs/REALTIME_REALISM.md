@@ -191,7 +191,7 @@ Built from the L7 curated profiles. Real-time only; the turn game is unchanged (
 | | How it works | Source |
 |---|---|---|
 | **Vehicles** | A unit is `platformCount` vehicles, and a round knocks out one vehicle. Strength follows from the vehicles still fit, so the fire-table column weakens as a troop loses tanks. Break tests use vehicles lost. | force list / placement |
-| **Round on target** | A fire-table hit (with the range bands) becomes a round on target with probability `lethalityPerTurn` × 30 s ÷ 900 s, scaled by range. `lethalityPerTurn` = 4 is the calibration knob. | fire.ts |
+| **Round on target** | Replaced — see §9. | fire.ts |
 | **Face struck** | Worked out from the firer's position and the target's facing: front within 60° of the facing, rear beyond 150°, side in between. Top-attack weapons hit the roof. A hull-down vehicle is struck on the turret front. | geometry |
 | **Penetration** | Read off the munition's curve at the actual range, e.g. L27A1: 676 / 657 / 620 / 583 mm at 0 / 1 / 2 / 3 km. With no curve: the 1 km figure, less 6% per km beyond for kinetic rounds (the L27A1's own slope); shaped charges stay flat. The chance of penetrating is a soft curve around penetration = armour, with 12% spread. | `bgws_munition_profile`, `bgws_capability_profile` |
 | **Armour** | Kinetic or chemical figure for the face struck: hull front, turret front, side, rear, roof. Tandem warheads strip 40% where reactive armour is fitted. Where only the front is known, side, rear and roof take the Challenger 2's ratios (DECLARED). | `bgws_platform_profile` |
@@ -210,3 +210,31 @@ Built from the L7 curated profiles. Real-time only; the turn game is unchanged (
 - symmetric-control: 149 / 151 over 300 games, 24 sim-minutes on average, no game at the time limit;
 - combined arms: 22 / 18 over 40 games, 22 sim-minutes;
 - per symmetric game: about 7 vehicles knocked out, 16 strikes that don't penetrate, and 5 penetrations the crew survives.
+
+## 9. Hitting what you aim at
+
+**What was seen:** at 520–640 m most shots read *near miss, suppressed*. A round that got through the rear armour (664 vs 40 mm) left the crew *fighting on*.
+
+**Causes:**
+- **Game length was calibrated through hit chance.** Only 24% of fire-table hits at 640 m became a round on target, and the rest were reported as near misses.
+- **The 2d6 table was never a per-shot hit model.** It gives one result for a whole troop's 15-minute turn, from combat strength; its "suppress" band alone was 44% of all shots.
+- **The knock-out chance was the same however far a round beat the armour.**
+
+**What changed:**
+- **Per-round hits** (`fire.ts`). The turn game's table is no longer used in real time; the resolver change from §7 is reverted, and `rules/` is untouched. Every fit vehicle fires one round per aimed shot. Each round hits with a chance by range — 97% at 300 m, 90% at 1 km, 80% at 1.5 km, 65% at 2 km, 40% at 3 km — multiplied by:
+  - firing on the move: 0.7;
+  - target moving: 0.85;
+  - target in cover or hull-down: 0.6;
+  - firer suppressed: 0.8, pinned: 0.5, shaken: 0.6.
+
+  All of these are DECLARED, as the L7 tables carry no accuracy data and `optics_class` has no data dictionary yet; this is where that data will plug in.
+- **Knock-out given penetration scales with overmatch:** 0.5 when the round barely gets through, rising to 0.95 at 2.5× the armour. A sabot through 40 mm of rear plate now knocks the vehicle out about 95% of the time.
+- **Fight length is set by `shotIntervalS`:** one aimed round per vehicle per minute. `strikeScale` (default 1) is a plain multiplier that tests set to 0.
+- **Feed lines say what happened to every round,** e.g. "4 rounds, 3 hit: did not penetrate (front, 636 vs 700 mm)" or "4 rounds, 2 hit: knocked out 1 (side, 620 vs 140 mm); 3/4 left".
+
+**Measured:**
+- Over the whole game, 58% of rounds hit, counting long range, movement, cover and suppression.
+- symmetric-control: 58 / 62 over 120 games.
+- Troops starting 1.6 km apart in plain view on open ground now decide it in 2–3 minutes, as they would. The time in a game is spent getting there: approach, cover, hull-down and flank, which is where the decisions are.
+
+**The map** now shows the turn game's strength bar under each of your own counters: side colour, length for vehicles still fighting ("3/4"), dimmed below a third, and a thin amber line for suppression. As in the turn game, enemies get no bar.

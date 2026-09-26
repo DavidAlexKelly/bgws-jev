@@ -23,7 +23,7 @@
 //      its side after `reportDelayS`; faded contacts leave a last-known position
 //   5. fire, simultaneous: one shot per `shotIntervalS`, targets by threat,
 //      self-defence always allowed unless the ROE is "never"
-//   6. what the fire did: strength (scaled by `lethalityPerTurn`), suppression,
+//   6. what the fire did: rounds on target, penetration, knock-outs, suppression,
 //      the drill for a new attacker
 //   7. suppression fades; posture
 //   8. break tests at loss thresholds and when pinned; broken units fall back
@@ -49,12 +49,11 @@ import {
   type SightingLevel,
 } from "../../lib/state";
 import { applyEffects } from "../../rules/apply";
-import { canAdvance, resolveDirectFire, resolveSighting } from "../../rules/resolvers";
-import { hitsFor, type FireResult } from "../../rules/ruleset";
+import { canAdvance, resolveSighting } from "../../rules/resolvers";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
-import { rangeModifiers, strikeChance } from "./fire";
+import { hitChance, type HitConditions } from "./fire";
 import {
   allowanceAt,
   compass,
@@ -229,6 +228,31 @@ export function isCovered(
   if (inCover(config.terrain, fe.position)) return true;
   if (from == null) return state.units[fe.id]?.posture === "hullDown";
   return hullDownFrom(state, fe, from, config);
+}
+
+/**
+ * What degrades a round from `firer` at `target` right now (fire.ts): moving
+ * this second, the target moving, cover or hull-down against this firer, and
+ * the firer's own suppression and nerve. `from` is where the firer would be.
+ */
+export function hitConditions(
+  state: Pick<RtState, "units" | "time">,
+  firer: ForceElement,
+  target: ForceElement,
+  config: RtConfig,
+  from: LatLng = firer.position,
+): HitConditions {
+  const own = state.units[firer.id];
+  const their = state.units[target.id];
+  const suppression = own?.suppression ?? 0;
+  return {
+    firerMoving: from === firer.position && own?.lastMovedAt === state.time,
+    targetMoving: their?.lastMovedAt === state.time,
+    targetCovered: isCovered(state, target, config, from),
+    firerSuppressed: suppression >= SUPPRESSED_AT && suppression < PINNED_AT,
+    firerPinned: suppression >= PINNED_AT,
+    firerShaken: own?.cohesion === "shaken",
+  };
 }
 
 /** Hull-down against fire from `from`: halted behind a crest that hides the hull (from the DEM). */
@@ -849,7 +873,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     firerId: string;
     targetId: string;
     rangeM: number;
-    outcome: ReturnType<typeof resolveDirectFire>;
+    /** Rounds fired: one per fit vehicle. */
+    rounds: number;
+    /** Chance each hits (fire.ts). */
+    pHit: number;
   }[] = [];
 
   for (const id of ids) {
@@ -920,30 +947,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
 
     const rangeM = distanceM(self.position, target.position);
-    const weapon = weaponFor(self, target, rangeM)!;
     planned.push({
       firerId: id,
       targetId: target.id,
       rangeM,
-      outcome: resolveDirectFire(
-        [self],
-        target,
-        {
-          rangeM,
-          maxRangeM: weapon.maxRangeM,
-          penetrationMm: weapon.penetrationMm,
-          munition: weapon.munition,
-          topAttack: weapon.topAttack,
-          targetInCover: isCovered({ units }, target, config, self.position),
-          flank: isFlankShot([self], target, config.ruleset),
-          // Real time only: closer is easier (see fire.ts).
-          extraModifiers: rangeModifiers(rangeM),
-        },
-        config.ruleset,
-        rng,
-        turn,
-        "arcAction",
-      ),
+      rounds: Math.max(1, unit.vehicles.fit),
+      pHit: hitChance(rangeM, hitConditions({ units, time }, self, target, config), timing),
     });
     // Its fire on this target, for "is this working?". A new target, or a
     // pause of a minute, starts a new record.
@@ -970,11 +979,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
   // ── 6. What the fire did ──────────────────────────────────────────────────
   //
-  // The table was written for one result per 15-minute turn. Here a hit costs
-  // strength only with probability hits × lethalityPerTurn × shotIntervalS /
-  // turnS × the range's lethality factor (fire.ts), so a quarter-hour of
-  // steady fire does about what `lethalityPerTurn` turn-game results would —
-  // much more at point-blank range, less at the limit of the gun's reach.
+  // The table says how many rounds hit; fire.ts how many of those are on
+  // target at this range; lethality.ts what each does to the face it strikes.
   // Every shot, misses included, suppresses.
   const newAttacker = new Map<string, string>();
   const labels = new Map<(typeof planned)[number], string>();
@@ -983,19 +989,18 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const target = fe(shot.targetId);
     const targetUnit = units[shot.targetId];
     if (target.combatStrength <= 0) continue;
-    const result = shot.outcome.event.result as FireResult;
-    const hits = hitsFor(result);
-    // Each fire-table hit is a round on target with a range-scaled chance
-    // (fire.ts); each round on target is then intercepted, stopped by the
-    // armour on the face it strikes, or penetrates and may knock a vehicle out
-    // (lethality.ts).
+    // Every round: does it hit (fire.ts)? Every hit: intercepted, stopped by
+    // the armour on the face it strikes, or through — and does it knock the
+    // vehicle out (lethality.ts)?
     const weapon = weaponFor(firer, target, shot.rangeM);
     const odds = weapon
       ? strikeOdds(weapon, target, firer.position, shot.rangeM, config.ruleset, hullDownFrom({ units }, target, firer.position, config))
       : null;
     const outcomes: StrikeResult[] = [];
-    for (let k = 0; k < hits; k += 1) {
-      if (rng.int(1_000_000) >= strikeChance(shot.rangeM, timing) * 1_000_000 || !odds) continue;
+    let hits = 0;
+    for (let k = 0; k < shot.rounds; k += 1) {
+      if (rng.int(1_000_000) >= shot.pHit * 1_000_000 || !odds) continue;
+      hits += 1;
       outcomes.push(rollStrike(odds, rng));
     }
     const vehicles = units[target.id].vehicles;
@@ -1012,29 +1017,29 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         ...(strength <= 0 ? [{ kind: "eliminated" as const, feId: target.id }] : []),
       ]);
     }
-    const struck = outcomes.length > 0;
+    const struck = hits > 0;
     const face = odds ? describeStrike(odds) : "";
-    const label =
+    const fired = `${shot.rounds} round${shot.rounds === 1 ? "" : "s"}`;
+    const what =
       knocked > 0
         ? `knocked out ${knocked} (${face}); ${vehicles.fit - knocked}/${vehicles.total} left`
         : outcomes.includes("survived")
           ? `penetrated (${face}), crew fighting on`
           : outcomes.includes("noPenetration")
-            ? `struck, did not penetrate (${face})`
+            ? `did not penetrate (${face})`
             : outcomes.includes("intercepted")
               ? "intercepted by active protection"
-              : hits > 0 || result === "suppress"
-                ? "near miss, suppressed"
-                : "missed";
+              : "";
+    const label = struck ? `${fired}, ${hits} hit: ${what}` : `${fired}, all missed`;
     labels.set(shot, label);
 
     const base =
-      (struck ? SUPPRESSION_FOR.hit : hits > 0 || result === "suppress" ? SUPPRESSION_FOR.suppress : SUPPRESSION_FOR.miss) +
+      (struck ? SUPPRESSION_FOR.hit : shot.rounds > 1 ? SUPPRESSION_FOR.suppress : SUPPRESSION_FOR.miss) +
       (damaged ? SUPPRESSION_FOR.damaged : 0);
     const firerUnit = units[firer.id];
     if (firerUnit?.engagement && firerUnit.engagement.targetId === target.id) {
       const e = firerUnit.engagement;
-      const struckCount = struck ? 1 : 0;
+      const struckCount = hits;
       setUnit(firer.id, {
         dealt: firerUnit.dealt + lostNow,
         engagement: {
@@ -1069,7 +1074,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       firerId: firer.id,
       targetId: target.id,
       result: label,
-      narrative: shot.outcome.event.narrative,
+      narrative:
+        `${firer.label} fired ${shot.rounds} at ${target.label} at ${Math.round(shot.rangeM)} m, ` +
+        `${Math.round(shot.pHit * 100)}% each to hit: ${label}.`,
     });
 
     // Firing gives a position away to whoever it was aimed at, if they can see back.
@@ -1096,7 +1103,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       continue;
     }
     const by = firers
-      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? shot.outcome.event.result})`)
+      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? "fired"})`)
       .join(", ");
     const shooter = newAttacker.get(targetId);
     const did = shooter ? drill(targetId, shooter) : "";
