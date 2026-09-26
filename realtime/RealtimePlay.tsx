@@ -33,10 +33,9 @@ import { foundryFileClient } from "@/shared/routing/foundryFileClient";
 import { DEFAULT_TERRAIN } from "@/shared/routing/terrainDatasets";
 import { useTerrainRaster } from "@/shared/routing/useTerrainRaster";
 
-import { boardBounds, boardRing, isOnBoard, metresPerDegreeLon, type LatLng } from "../lib/board";
+import { boardBounds, boardRing, isOnBoard, type LatLng } from "../lib/board";
 import {
   DEFAULT_ORIGIN,
-  offsetToLatLng,
   placedFromList,
   toGameStateFromPlaced,
   type PlacedElement,
@@ -50,6 +49,7 @@ import {
 } from "../lib/rasterTerrain";
 import { rasterRoutePlanner } from "../lib/routePlan";
 import { mobilityClassFor } from "../lib/terrainAdapter";
+import { moveBoard, onBoard } from "./board";
 import { projectForSide } from "../lib/fogOfWar";
 import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
@@ -87,26 +87,6 @@ const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
 
 /** The ground choices offered here: real land cover, or generated. */
 type GroundChoice = Extract<TerrainSource, "generated" | "raster+relief" | "raster">;
-
-/**
- * A force list, moved onto wherever the board is.
- *
- * The lists are laid out around DEFAULT_ORIGIN. On real ground the board
- * recentres onto the raster's coverage, which may be a long way off — so the
- * list keeps its shape and moves with the board, rather than being placed off
- * the edge of it.
- */
-function onBoard(placed: PlacedElement[], origin: LatLng): PlacedElement[] {
-  if (origin.lat === DEFAULT_ORIGIN.lat && origin.lng === DEFAULT_ORIGIN.lng) return placed;
-  return placed.map((element) => ({
-    ...element,
-    position: offsetToLatLng(
-      origin,
-      (element.position.lng - DEFAULT_ORIGIN.lng) * metresPerDegreeLon(DEFAULT_ORIGIN.lat),
-      (element.position.lat - DEFAULT_ORIGIN.lat) * 111_320,
-    ),
-  }));
-}
 
 let counter = 0;
 const nextId = () => `rt-${(counter += 1)}`;
@@ -228,10 +208,26 @@ export default function RealtimePlay() {
 
   // ── Placement ─────────────────────────────────────────────────────────────
 
+  // ⚠ READ THROUGH A REF. The map's click handler is registered once, when
+  // the map is ready, and closes over whatever it saw then. Reading `bounds`
+  // directly meant a board that moved (switching to real ground recentres it)
+  // still accepted clicks only inside the OLD board, far away.
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
+
+  // Units already placed move with the board, keeping their layout, rather
+  // than being stranded off the edge of it.
+  const originRef = useRef(origin);
+  useEffect(() => {
+    const from = originRef.current;
+    originRef.current = origin;
+    if (phaseRef.current === "setup") setPlaced((current) => moveBoard(current, from, origin));
+  }, [origin]);
+
   const place = useCallback(
     (at: LatLng) => {
       if (phaseRef.current !== "setup") return;
-      if (!isOnBoard(at, bounds)) return;
+      if (!isOnBoard(at, boundsRef.current)) return;
       const brush = brushRef.current;
       const snapshot = PLATFORM_SNAPSHOT[brush.platform];
       if (!snapshot) return;
@@ -248,8 +244,10 @@ export default function RealtimePlay() {
         },
       ]);
     },
-    [bounds],
+    [],
   );
+  const placeRef = useRef(place);
+  placeRef.current = place;
 
   // ── Orders and the clock ──────────────────────────────────────────────────
 
@@ -400,9 +398,9 @@ export default function RealtimePlay() {
       };
       if (map.isStyleLoaded()) draw();
       else map.once("load", draw);
-      map.on("click", (event) => place({ lat: event.lngLat.lat, lng: event.lngLat.lng }));
+      map.on("click", (event) => placeRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng }));
     },
-    [bounds, place],
+    [bounds],
   );
 
   /** Build a counter for one unit, and a function that keeps it up to date. */
