@@ -3,13 +3,14 @@
 // game's options, so a decider chooses among legal orders and cannot invent
 // one.
 
-import { distanceM, type LatLng } from "../../lib/board";
-import { sightingOf, type ForceElement } from "../../lib/state";
+import { bearingDeg, distanceM, type LatLng } from "../../lib/board";
+import { lineOfSight } from "../../lib/lineOfSight";
+import { sightingOf, type ForceElement, type Side } from "../../lib/state";
 import { inCover } from "../../lib/proceduralTerrain";
 import { fireOdds } from "../../rules/jevState";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { canHit, describeOrder, knownEnemies, knownTo } from "./engine";
-import { compass, positionsFor } from "./geometry";
+import { allowanceAt, compass, offsetBy, positionsFor } from "./geometry";
 import type { RtConfig, RtOption, RtState } from "./types";
 
 /** Objective within this is "reached": no point offering to advance on it. */
@@ -57,12 +58,120 @@ export function oddsAgainst(
       penetrationMm: weapon.penetrationMm,
       munition: weapon.munition,
       topAttack: weapon.topAttack,
-      targetInCover: inCover(config.terrain, enemy.position),
+      targetInCover: state.units[enemy.id]?.posture === "hullDown" || inCover(config.terrain, enemy.position),
       flank: isFlankShot([self], enemy, config.ruleset),
     },
     config.ruleset,
   );
   return { pHit: odds.pHit, expectedHits: odds.expectedHits };
+}
+
+/** Strength this side has seen itself take off an enemy: it watched the rounds land. */
+export function knownDamage(state: RtState, side: Side, enemyId: string): number {
+  return Object.entries(state.units)
+    .filter(([id]) => state.game.forceElements[id]?.side === side)
+    .reduce((sum, [, unit]) => sum + (unit.engagement?.targetId === enemyId ? unit.engagement.damage : 0), 0);
+}
+
+/** What fire from `firer` would really do to `target`, in real time. */
+export interface Effect {
+  /** Chance one shot does damage. */
+  perShot: number;
+  /** Chance of doing some damage within a minute. */
+  perMinute: number;
+  /** Expected minutes of steady fire to knock it out, as far as this side knows its strength. */
+  minutesToKnockOut: number | null;
+}
+
+/**
+ * The honest odds. The fire table's "to hit" is the chance of a hit RESULT;
+ * in real time a hit only does damage with probability lethalityPerTurn ×
+ * shotIntervalS / turnS. Showing Jev "40% to hit" when a shot has a 2% chance
+ * of doing anything is what made endless long-range misses look worth it.
+ * `from` is where the firer would be — for "close to" options.
+ */
+export function damageEffect(
+  firer: ForceElement,
+  target: ForceElement,
+  state: RtState,
+  config: RtConfig,
+  from: LatLng = firer.position,
+): Effect | null {
+  const moved = from !== firer.position;
+  const at = moved ? { ...firer, position: from, markers: firer.markers.filter((m) => m !== "moved") } : firer;
+  const odds = oddsAgainst(at, target, state, config);
+  if (!odds) return null;
+  const { timing } = config;
+  const perHit = (timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS;
+  const perShot = Math.min(1, odds.expectedHits * perHit);
+  const shotsPerMinute = 60 / timing.shotIntervalS;
+  const perMinute = 1 - Math.pow(1 - perShot, shotsPerMinute);
+  const remaining = Math.max(1, target.combatStrengthStart - knownDamage(state, firer.side, target.id));
+  const needed = Math.ceil(remaining / config.ruleset.lethality.strengthPerHit);
+  return {
+    perShot,
+    perMinute,
+    minutesToKnockOut: perShot > 0 ? needed / (perShot * shotsPerMinute) : null,
+  };
+}
+
+/** "≈4%/min to damage it, ~35 min to knock it out". */
+export function describeEffect(effect: Effect | null, it = "it"): string {
+  if (!effect || effect.perShot <= 0) return `no chance of damaging ${it} from there`;
+  const pct = effect.perMinute < 0.01 ? "<1" : String(Math.round(effect.perMinute * 100));
+  const mins = effect.minutesToKnockOut;
+  const ko = mins == null ? "" : mins > 120 ? ", over 2 h to knock it out" : `, ~${Math.max(1, Math.round(mins))} min to knock it out`;
+  return `≈${pct}%/min to damage ${it}${ko}`;
+}
+
+/** Own units already firing on this enemy (within the last minute), besides `except`. */
+export function engagedBy(state: RtState, side: Side, enemyId: string, except?: string): string[] {
+  return Object.entries(state.units)
+    .filter(([id, unit]) => {
+      const fe = state.game.forceElements[id];
+      return (
+        id !== except &&
+        fe?.side === side &&
+        fe.combatStrength > 0 &&
+        unit.engagement?.targetId === enemyId &&
+        state.time - unit.engagement.lastShotAt <= 60
+      );
+    })
+    .map(([id]) => id)
+    .sort();
+}
+
+/**
+ * A place to close to effective range of `enemy` from: on the near side of
+ * it at the shorter of the weapon's short range and half its maximum (inside
+ * both, no long-range penalty), with a line of sight to shoot from, and
+ * preferring cover, fewer known enemies watching, and a shorter move.
+ */
+export function closePosition(
+  self: ForceElement,
+  enemy: ForceElement,
+  known: readonly ForceElement[],
+  config: RtConfig,
+): { at: LatLng; rangeM: number; cover: boolean; seenBy: number } | null {
+  const weapon = weaponFor(self, enemy, 500);
+  if (!weapon) return null;
+  const rangeM = Math.max(400, Math.min(weapon.shortRangeM, weapon.maxRangeM / 2) * 0.9);
+  if (distanceM(self.position, enemy.position) <= rangeM + 250) return null;
+  const bearing = bearingDeg(enemy.position, self.position);
+  const seenBy = (at: LatLng) =>
+    known.filter((other) => distanceM(other.position, at) <= 3000 && lineOfSight(config.terrain, { from: other.position, to: at }).visible)
+      .length;
+  const best = [-60, -40, -20, 0, 20, 40, 60]
+    .map((delta) => offsetBy(enemy.position, (bearing + delta + 360) % 360, rangeM))
+    .filter((at) => allowanceAt(self, at, config) > 0)
+    .filter((at) => lineOfSight(config.terrain, { from: at, to: enemy.position }).visible)
+    .map((at) => ({ at, cover: inCover(config.terrain, at), seenBy: seenBy(at) }))
+    .sort(
+      (a, b) =>
+        distanceM(self.position, a.at) / 1000 - (a.cover ? 1 : 0) + a.seenBy * 0.5 -
+        (distanceM(self.position, b.at) / 1000 - (b.cover ? 1 : 0) + b.seenBy * 0.5),
+    )[0];
+  return best ? { ...best, rangeM } : null;
 }
 
 /** Every order this unit may be given now. "keep" is always first. */
@@ -81,7 +190,18 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
             ? "firing at anything on the move)"
             : `fires on the move only ${unit.roe === "never" ? "never" : `if ${unit.roe}`}, at a penalty)`)
       : `carry on (${describeOrder(unit.order)})`;
-  const options: RtOption[] = [{ id: "keep", summary: keep, order: unit.order }];
+  // What its fire has done so far, and would do if it carries on: the thing
+  // a "carry on" is really a bet on.
+  const e = unit.engagement;
+  const firing = e && state.time - e.lastShotAt <= 60 ? e : null;
+  const firingAt = firing ? state.game.forceElements[firing.targetId] : undefined;
+  const keepEffect = firingAt && firingAt.combatStrength > 0 ? damageEffect(self, firingAt, state, config) : null;
+  const record = firing
+    ? `; so far on ${firing.targetId}: ${firing.shots} shots, ${firing.damage} damage in ${Math.round((state.time - firing.since) / 60)} min, ${describeEffect(keepEffect)}`
+    : "";
+  const options: RtOption[] = [
+    { id: "keep", summary: `${keep}${record}`, order: unit.order, ...(keepEffect ? { effect: keepEffect.perMinute } : {}) },
+  ];
 
   // Back to what it is for.
   const { mission } = unit;
@@ -117,19 +237,54 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
   }
 
   const known = knownEnemies(state, id);
+  // "Close on" is worked out for the three nearest known enemies — enough to
+  // choose from, without every question growing with the size of the battle.
+  const closeable = new Set(
+    [...known]
+      .sort((a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position))
+      .slice(0, 3)
+      .map((enemy) => enemy.id),
+  );
   const broken = (enemyId: string) => state.units[enemyId]?.cohesion === "broken";
 
   for (const enemy of known) {
     const identified = knownTo(state.game, state.units, id, enemy.id) === "full";
     const name = `${identified ? enemy.label : "the contact"} ${enemy.id}`;
     const range = distanceM(self.position, enemy.position);
-    if (canHit(self, enemy, enemy.position, config) && !(unit.order.kind === "engage" && unit.order.targetId === enemy.id)) {
-      const odds = oddsAgainst(self, enemy, state, config);
+    const others = engagedBy(state, self.side, enemy.id, id);
+    const alongside = others.length ? `; ${others.join(", ")} already firing on it` : "; nobody else is firing on it";
+    const hereEffect = canHit(self, enemy, enemy.position, config) ? damageEffect(self, enemy, state, config) : null;
+    if (hereEffect && !(unit.order.kind === "engage" && unit.order.targetId === enemy.id)) {
+      const shift = firing && firing.targetId !== enemy.id ? ` (shifting fire from ${firing.targetId})` : "";
       options.push({
         id: `engage:${enemy.id}`,
-        summary: `halt and engage ${name} at ${Math.round(range)} m` + (odds ? ` (${Math.round(odds.pHit * 100)}% to hit)` : ""),
+        summary: `halt and engage ${name} at ${Math.round(range)} m${shift}: ${describeEffect(hereEffect)}${alongside}`,
         order: { kind: "engage", targetId: enemy.id },
+        effect: hereEffect.perMinute,
       });
+    }
+    // Close to effective range, rather than trade misses from where it is.
+    if (closeable.has(enemy.id)) {
+      const spot = closePosition(self, enemy, known, config);
+      if (spot) {
+        const there = damageEffect(self, enemy, state, config, spot.at);
+        const move = distanceM(self.position, spot.at);
+        const speed = (allowanceAt(self, self.position, config) / config.timing.turnS) * 0.6;
+        const minutes = speed > 0 ? Math.max(1, Math.round(move / speed / 60)) : null;
+        const covering = others.length ? `; ${others.join(", ")} firing on it to cover you` : "; nobody covering you";
+        const back = damageEffect(enemy, { ...self, position: spot.at, markers: [] }, state, config);
+        options.push({
+          id: `close:${enemy.id}`,
+          summary:
+            `close on ${name} to ~${Math.round(spot.rangeM)} m: move ${where(spot.at)} tactically` +
+            `${minutes ? ` (~${minutes} min)` : ""}${spot.cover ? `, ending in ${config.terrain.classify(spot.at)}` : ", ending in the open"}` +
+            `; from there ${describeEffect(there)} (from here: ${hereEffect ? describeEffect(hereEffect) : "cannot fire on it"})` +
+            `, and its fire on you there ${describeEffect(back, "you").replace(/, .*$/, "")}` +
+            `; ${spot.seenBy} known enem${spot.seenBy === 1 ? "y sees" : "ies see"} that spot${covering}`,
+          order: { kind: "move", to: spot.at, mode: "tactical" },
+          ...(there ? { effect: there.perMinute } : {}),
+        });
+      }
     }
     // A broken enemy seen falling back is there to be followed up.
     if (identified && broken(enemy.id)) {
@@ -157,7 +312,7 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
   for (const position of positionsFor(self, known, config)) {
     options.push({
       id: `pos:${position.purpose}`,
-      summary: position.summary,
+      summary: position.purpose === "withdraw" ? `break contact: ${position.summary}` : position.summary,
       order:
         position.purpose === "withdraw"
           ? { kind: "withdraw", to: position.at }

@@ -58,6 +58,10 @@ export const BOUND_M = 300;
 export const BOUND_COVER_S = 40;
 /** Still for this long, a unit has settled into its position. */
 export const SETTLE_S = 30;
+/** A unit engaging for this long is reviewed: "ineffective" if it has done nothing, "review" if it has. */
+export const REVIEW_S = 180;
+/** Decisions each unit remembers. */
+export const HISTORY_LENGTH = 4;
 
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,

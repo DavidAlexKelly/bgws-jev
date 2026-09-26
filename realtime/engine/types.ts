@@ -115,6 +115,41 @@ export interface RtUnit {
   bound?: { moving: boolean; until: number };
   /** Identified enemies that could already reach it when its current order began. */
   exposedTo: string[];
+  /** Its own fire on its current target, for "is this working?". */
+  engagement: Engagement | null;
+  /** Fire it has taken, by who fired it. */
+  incoming: Record<string, { shots: number; damage: number; since: number; last: number }>;
+  /** Strength it has taken off the enemy, in all. */
+  dealt: number;
+  /** When its fire was last reviewed (see the "review" and "ineffective" events). */
+  lastReviewAt: number;
+  /** Its last few decisions — Jev's, the rules' or the crew's own drill — and where it stood then. */
+  history: DecisionMemory[];
+}
+
+/** One unit's fire on one target, since it started. */
+export interface Engagement {
+  targetId: string;
+  since: number;
+  lastShotAt: number;
+  shots: number;
+  /** Fire-table hits: rounds that struck, whether or not they did damage. */
+  hits: number;
+  /** Strength taken off the target. */
+  damage: number;
+  /** The same, since the last review. */
+  window: { since: number; shots: number; hits: number; damage: number };
+}
+
+/** What a unit was told, when, by whom, and how things stood — so the next decision can see what came of it. */
+export interface DecisionMemory {
+  time: number;
+  chose: string;
+  by: "jev" | "rules" | "crew";
+  /** What it was asked about. */
+  because: string;
+  strength: number;
+  dealt: number;
 }
 
 export type ReportLevel = "veryPartial" | "partial" | "full";
@@ -177,7 +212,11 @@ export type RtEventKind =
   /** Recovered from shaken or broken and takes orders again. */
   | "rallied"
   /** An enemy it can see has broken: pursue, or consolidate? */
-  | "enemyBroke";
+  | "enemyBroke"
+  /** It has been firing for a while and doing no damage: change something? */
+  | "ineffective"
+  /** A long exchange of fire: a periodic check that the plan still holds. */
+  | "review";
 
 /** Something that happened to a unit. What a decider is asked about. */
 export interface RtEvent {
@@ -258,4 +297,6 @@ export interface RtOption {
   order: RtOrder;
   /** Only on "roe:" options: the rules of engagement it sets. */
   roe?: Roe;
+  /** Chance per minute of damaging the enemy it is about, from where the order leaves it. */
+  effect?: number;
 }

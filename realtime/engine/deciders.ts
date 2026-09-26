@@ -38,18 +38,21 @@ export interface RtDecider {
   ): Promise<RtDecision[]>;
 }
 
+/** How much better an option's damage odds must be to be worth changing for. */
+const BETTER = 1.5;
+
 /** The option the rule would take. */
 export function ruleChoice(state: RtState, request: RtDecisionRequest): string {
   const kinds = new Set(request.events.map((event) => event.kind));
   const has = (id: string) => request.options.some((option) => option.id === id);
   const self = state.game.forceElements[request.unitId];
 
-  // The best shot on offer, by the odds in its summary; otherwise the nearest.
+  // The best shot on offer, by its real chance of doing damage; otherwise the nearest.
   const engage = request.options
     .filter((option) => option.id.startsWith("engage:"))
     .map((option) => ({
       option,
-      p: Number(/(\d+)% to hit/.exec(option.summary)?.[1] ?? 0),
+      p: option.effect ?? 0,
       range:
         option.order.kind === "engage" && self
           ? distanceM(self.position, state.game.forceElements[option.order.targetId]?.position ?? self.position)
@@ -69,6 +72,26 @@ export function ruleChoice(state: RtState, request: RtDecisionRequest): string {
       (option) => option.order.kind === "engage" && attackers.has(option.order.targetId),
     )?.id ?? engage;
 
+  // Its fire is not working: change something. Close to effective range on
+  // what it is shooting at if that is clearly better; else a target it can
+  // actually hurt; else the flank; else pull out of a losing trade.
+  if (kinds.has("ineffective")) {
+    const now = request.options.find((option) => option.id === "keep")?.effect ?? 0;
+    const target = unit?.engagement?.targetId;
+    const close = request.options.find((option) => option.id === `close:${target}`);
+    if (close && (close.effect ?? 0) > Math.max(0.02, now * BETTER)) return close.id;
+    const better = request.options
+      .filter((option) => option.id.startsWith("engage:") && (option.effect ?? 0) > Math.max(0.02, now * BETTER))
+      .sort((a, b) => (b.effect ?? 0) - (a.effect ?? 0))[0];
+    if (better) return better.id;
+    const anyClose = request.options
+      .filter((option) => option.id.startsWith("close:") && (option.effect ?? 0) > Math.max(0.02, now * BETTER))
+      .sort((a, b) => (b.effect ?? 0) - (a.effect ?? 0))[0];
+    if (anyClose) return anyClose.id;
+    if (has("pos:flank")) return "pos:flank";
+    return "keep";
+  }
+  if (kinds.has("review")) return "keep";
   // Back from being shaken or broken, or quiet and off its mission: get on
   // with what it is for. This is what stops a unit holding for ever.
   if (kinds.has("rallied") || kinds.has("idle")) {

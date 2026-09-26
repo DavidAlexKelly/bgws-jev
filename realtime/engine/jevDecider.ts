@@ -6,9 +6,15 @@
 // Jev chooses from the options the rules generated, so it cannot give an
 // order that is not possible.
 //
-// "Carry on" is always an option and is what an unsure Jev gets: a unit that
-// is not told something new keeps doing what it was doing, which is the
-// right default for a crew and stops units dithering between two orders.
+// "Carry on" is always an option. When Jev is unsure the RULES decide — not
+// "carry on", which is how a unit used to trade misses for ever.
+//
+// Jev is stateless: each question is a fresh request. So the state carries
+// the memory — each unit's fire record, the fire it is taking, its last
+// decisions and what came of them — and the side's picture of who is
+// fighting whom, and every option says what it would really achieve (the
+// chance per minute of doing damage, not of a round striking). That is what
+// lets Jev weigh a trade-off instead of repeating the last answer.
 //
 // Every decision is printed to the browser console, like the turn game's.
 
@@ -29,8 +35,8 @@ import {
 import { printDecision } from "../../rules/jevConsole";
 import type { TacticalTrace } from "../../rules/tactical";
 import { canHit, describeOrder, onMission } from "./engine";
+import { damageEffect, describeEffect, engagedBy, knownDamage } from "./options";
 import { compass } from "./geometry";
-import { oddsAgainst } from "./options";
 import { ruleChoice, ruleTrace, type RtDecider, type RtDecision } from "./deciders";
 import { PINNED_AT, SUPPRESSED_AT, clock } from "./timing";
 import type { RtConfig, RtState } from "./types";
@@ -65,19 +71,38 @@ export function realtimeSideState(
   const view = projectForSide(state.game, side);
   const objective = state.game.objectives?.[side];
 
+  // Units being asked, and every unit in the same fights, get the full
+  // picture — memory, fire record, friends around them. The rest are
+  // summarised, so a big battle does not crowd out the part being decided.
+  const fightOf = (id: string) => {
+    const unit = state.units[id];
+    const out = new Set<string>();
+    if (unit?.engagement && state.time - unit.engagement.lastShotAt <= 60) out.add(unit.engagement.targetId);
+    for (const [enemyId, fire] of Object.entries(unit?.incoming ?? {})) if (state.time - fire.last <= 60) out.add(enemyId);
+    return out;
+  };
+  const askedFights = new Set(asked.flatMap((id) => [...fightOf(id)]));
+  const involved = new Set(view.own.map((fe) => fe.id).filter((id) => [...fightOf(id)].some((e) => askedFights.has(e))));
+
   const units = view.own.map((self) => {
     const unit = state.units[self.id];
     const threats = forceElementsOf(state.game, opposing(side))
       .filter((enemy) => enemy.combatStrength > 0 && sightingOf(state.game, side, enemy.id) === "full")
       .filter((enemy) => canHit(enemy, self, self.position, config))
-      .map((enemy) => {
-        const odds = oddsAgainst(enemy, self, state, config);
-        return {
-          from: enemy.id,
-          rangeM: Math.round(distanceM(enemy.position, self.position)),
-          ...(odds ? { pHitOnYou: odds.pHit } : {}),
-        };
-      });
+      .map((enemy) => ({
+        from: enemy.id,
+        rangeM: Math.round(distanceM(enemy.position, self.position)),
+        itsFireOnYou: describeEffect(damageEffect(enemy, self, state, config), "you"),
+      }));
+    const detailed = unit != null && (asked.includes(self.id) || involved.has(self.id));
+    const memory = detailed ? unitMemory(state, self.id) : {};
+    const friends = view.own
+      .filter((other) => other.id !== self.id && distanceM(other.position, self.position) <= FRIENDS_M)
+      .map((other) => ({
+        id: other.id,
+        rangeM: Math.round(distanceM(other.position, self.position)),
+        doing: state.units[other.id] ? describeOrder(state.units[other.id].order) : "unknown",
+      }));
     const seesNow = unit
       ? Object.keys(unit.ownSeen).filter((enemyId) => state.game.forceElements[enemyId]?.combatStrength > 0)
       : [];
@@ -112,6 +137,8 @@ export function realtimeSideState(
           }
         : {}),
       ...(threats.length ? { threatsToYou: threats } : {}),
+      ...memory,
+      ...(detailed && friends.length ? { friendsWithin1500m: friends } : {}),
       beingAskedNow: asked.includes(self.id),
     };
   });
@@ -121,6 +148,16 @@ export function realtimeSideState(
     identified: contact.sighting === "full",
     unit: contact.label ?? "unidentified",
     seen: contact.observedMarkers,
+    // Who is fighting whom, so units can be coordinated: one covering while
+    // another moves, or fire spread over targets that are being ignored.
+    engagedBy: engagedBy(state, side, contact.id),
+    firingOn: view.own
+      .filter((fe) => {
+        const fire = state.units[fe.id]?.incoming[contact.id];
+        return fire != null && state.time - fire.last <= 60;
+      })
+      .map((fe) => fe.id),
+    damageYouHaveDoneToIt: knownDamage(state, side, contact.id),
     ...(contact.sighting === "full" && state.units[contact.id]?.cohesion !== "steady"
       ? { visiblyBreaking: state.units[contact.id]?.cohesion === "broken" ? "falling back" : "shaken" }
       : {}),
@@ -156,6 +193,74 @@ export function realtimeSideState(
   };
 }
 
+/** Units in this much range of each other are "nearby" for coordination. */
+const FRIENDS_M = 1500;
+
+/**
+ * What a unit remembers: its fire on its target, the fire it is taking, and
+ * its last few decisions with what came of each. Jev is stateless — every
+ * question is a fresh request — so this is its only memory.
+ */
+export function unitMemory(state: RtState, id: string) {
+  const unit = state.units[id];
+  const fe = state.game.forceElements[id];
+  if (!unit || !fe) return {};
+  const e = unit.engagement;
+  const firing = e && state.time - e.lastShotAt <= 60 ? e : null;
+  const incoming = Object.entries(unit.incoming)
+    .filter(([, fire]) => state.time - fire.last <= 120)
+    .map(([from, fire]) => ({
+      from,
+      for: clock(fire.last - fire.since),
+      shots: fire.shots,
+      damageToYou: fire.damage,
+    }));
+  const decisions = unit.history.map((memory) => ({
+    ago: `${clock(state.time - memory.time)} ago`,
+    chose: memory.chose,
+    by: memory.by,
+    because: memory.because,
+    since: `lost ${memory.strength - fe.combatStrength} strength, did ${unit.dealt - memory.dealt} damage`,
+  }));
+  return {
+    ...(firing
+      ? {
+          yourFire: {
+            target: firing.targetId,
+            for: clock(state.time - firing.since),
+            shots: firing.shots,
+            struck: firing.hits,
+            damageDone: firing.damage,
+          },
+        }
+      : {}),
+    ...(incoming.length ? { fireOnYou: incoming } : {}),
+    ...(decisions.length ? { lastDecisions: decisions } : {}),
+  };
+}
+
+/** One line on a unit's fire and last decision, for its question. */
+function briefing(state: RtState, id: string): string {
+  const unit = state.units[id];
+  const e = unit?.engagement;
+  const parts: string[] = [];
+  if (e && state.time - e.lastShotAt <= 60) {
+    parts.push(
+      `It has been firing on ${e.targetId} for ${clock(state.time - e.since)}: ${e.shots} shots, ` +
+        `${e.hits} struck, ${e.damage} damage done.`,
+    );
+  }
+  const last = unit?.history[unit.history.length - 1];
+  if (last) {
+    const fe = state.game.forceElements[id];
+    parts.push(
+      `Last decision (${clock(state.time - last.time)} ago, by ${last.by}): ${last.chose} — since then it has ` +
+        `lost ${last.strength - (fe?.combatStrength ?? last.strength)} strength and done ${(unit?.dealt ?? 0) - last.dealt} damage.`,
+    );
+  }
+  return parts.length ? `${parts.join(" ")} ` : "";
+}
+
 function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -181,6 +286,10 @@ export function jevRealtimeDecider(
       const keysFor = new Map<string, { key: string; id: string; summary: string }[]>();
       const questions: Record<string, JevQuestion> = {};
 
+      const team = requests.map((request) => ({
+        id: request.unitId,
+        doing: describeOrder(state.units[request.unitId].order),
+      }));
       for (const { key, item } of asked) {
         const choices = item.options.slice(0, JEV_MAX_CHOICES).map((option, index) => ({
           key: option.id === "keep" ? "keep" : `o${index}`,
@@ -194,6 +303,13 @@ export function jevRealtimeDecider(
           instructions:
             `${directive}Your unit ${item.unitId} (${label}) is ${describeOrder(state.units[item.unitId].order)}. ` +
             `What just happened: ${item.events.map((event) => event.detail).join("; ")}. ` +
+            briefing(state, item.unitId) +
+            (team.length > 1
+              ? `Also being decided now, so choose them to work together: ${team
+                  .filter((one) => one.id !== item.unitId)
+                  .map((one) => `${one.id} (${one.doing})`)
+                  .join(", ")}. `
+              : "") +
             "The crew has already run its drill (returned fire, taken the nearest cover). " +
             "Choose its order from now on. Weigh its mission and your commander's plan " +
             "against the threats to it, its odds, the cover around it, its strength " +
@@ -202,8 +318,13 @@ export function jevRealtimeDecider(
             "closes to point-blank, which is how ground is taken; bounding is slow and " +
             "covered. Once in contact, halting to engage, taking cover or flanking is " +
             "usually better than driving on into the enemy; a quiet unit off its " +
-            "mission should resume it; an enemy that breaks can be pursued. Otherwise, " +
-            "carry on unless the situation calls for a change.",
+            "mission should resume it; an enemy that breaks can be pursued. " +
+            "Judge fire by what it has actually done (yourFire, lastDecisions) and the " +
+            "damage odds per minute in each option, not by how often rounds strike: " +
+            "if a long exchange is doing nothing, change something — close to effective " +
+            "range, flank, shift to a target you can hurt, or break contact. When a friend " +
+            "is already firing on a target, it can cover you while you move. " +
+            "Carry on only when what it is doing is working or nothing better is on offer.",
           criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary])),
         };
       }
@@ -230,7 +351,10 @@ export function jevRealtimeDecider(
         const answer = choiceOf(response.answers, key);
         const picked = choices.find((choice) => choice.key === answer?.choice);
         const confident = answer != null && picked != null && answer.confidence >= minConfidence;
-        const optionId = confident ? picked.id : "keep";
+        // Unsure is not "carry on": with twenty options on the table even a
+        // clear preference can have low confidence, and defaulting to "carry
+        // on" is how a unit kept trading misses for ever. The rules decide.
+        const optionId = confident ? picked.id : ruleChoice(state, item);
         const trace: TacticalTrace = {
           actorId: item.unitId,
           question: item.events.map((event) => event.kind).join(" + "),
@@ -239,7 +363,7 @@ export function jevRealtimeDecider(
           chosenBy: confident ? "jev" : "heuristic",
           rationale: confident
             ? item.events.map((event) => event.detail).join("; ")
-            : `Jev ${answer ? "was unsure" : "gave no answer"} — carried on`,
+            : `Jev ${answer ? `was unsure (${picked?.id ?? answer.choice} at ${Math.round((answer.confidence ?? 0) * 100)}% confidence)` : "gave no answer"} — the rules chose`,
           probabilities: answer
             ? Object.fromEntries(choices.map((choice) => [choice.id, answer.probabilities[choice.key] ?? 0]))
             : undefined,
