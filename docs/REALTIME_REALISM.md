@@ -280,3 +280,27 @@ A sabot's 1.3 s flight to 2 km, against a HEAT round's 2.2 s, is why it hits a m
 - symmetric-control: 74 / 74 / 2 over 150 games; 75% of rounds hit.
 - Troops that meet in the open settle it in about **30 seconds** of fire; combined arms is the same.
 - This is the real rate of fire meeting real accuracy. What slows real engagements that the model does not have yet: target acquisition time, fire distribution (several tanks picking the same target) and the time to spot the enemy on real ground. See the PR notes.
+
+## 11. What slows a real engagement
+
+With real accuracy (§10) at real rates of fire, troops meeting in the open settled it in about 30 s. Three things that slow real engagements were missing. All their figures are DECLARED; the L7 tables carry no sensor data.
+
+**Spotting** (`detection.ts`). This replaces the turn game's once-a-turn sighting table and the fixed "certain to see" distances.
+- Each crew finds each enemy in sight at a **rate**: 0.1 a second for a halted, exposed vehicle at 1 km (10 s on average), falling with the square of range.
+- The rate is multiplied ×3 for a moving target, ×5 for one that fired in the last 10 s, ×0.3 in cover, ×0.4 hull-down, ×0.7 settled, ×0.3 on foot, ×0.5 when the observer is moving or suppressed, and ×0.2 when it is pinned.
+- Within 150 m it is certain. Once found, a target in sight is tracked with no further roll, and it is identified within 2 km.
+
+**Target acquisition** (`fire.ts`, `acquisitionS`). Before the first round at a new target, the gunner must find it in the sight and lay on it: 4 s plus 2 s per km, 4 s more if the crew has only been told where it is, ×1.5 when suppressed and ×2.5 when pinned. A target already being engaged costs nothing.
+
+**Fire distribution.** Each round that hits was aimed at one vehicle of the target, picked by its own gunner. Rounds on a vehicle already knocked out in the same volley, or on a wreck less than 15 s old, are wasted. The feed says so: "…; 2 on a tank already knocked out".
+
+**Measured (rules deciding):**
+
+| Ground | Scenario | First shot | Fight length | Hit rate | Wasted hits/game | Decisions/game |
+|---|---|---|---|---|---|---|
+| Flat, open | symmetric | 0.2 min | 0.6 min | 84% | 7 | 14 |
+| Flat, open | combined arms | 0.2 min | 0.8 min | 71% | 5.5 | 30 |
+| Procedural relief + woods | symmetric | 1.1 min | 1.9 min | 84% | 7 | 12 |
+| Procedural relief + woods | combined arms | 0.6 min | 2.8 min | 45% | 8 | 34 |
+
+**Balance:** over 600 symmetric games, 279 blue / 317 red / 4 draws. With processing order reversed (red processed first), 304 / 292 / 4. Pooled by colour that is 583 / 609, and pooled by order 571 / 621 — neither significant, so no side or processing-order bias shows.

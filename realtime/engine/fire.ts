@@ -203,3 +203,24 @@ export function hitChance(
   }
   return Math.min(1, Math.max(0, p * timing.strikeScale));
 }
+
+// ── Target acquisition ─────────────────────────────────────────────────────
+//
+// Before the first round at a new target, the gunner has to find it in the
+// sight, identify it, lase and lay. DECLARED: 4 s plus 2 s a kilometre; 4 s
+// more if the crew has only been told where it is and has not seen it
+// itself; slower under fire.
+const ACQUIRE_BASE_S = 4;
+const ACQUIRE_PER_KM_S = 2;
+const ACQUIRE_REPORTED_S = 4;
+const ACQUIRE_NERVE = { suppressed: 1.5, pinned: 2.5 };
+
+/** Seconds from choosing a new target to the first round at it. */
+export function acquisitionS(
+  rangeM: number,
+  c: { onlyReported?: boolean; suppressed?: boolean; pinned?: boolean } = {},
+): number {
+  const base = ACQUIRE_BASE_S + (ACQUIRE_PER_KM_S * rangeM) / 1000 + (c.onlyReported ? ACQUIRE_REPORTED_S : 0);
+  const nerve = c.pinned ? ACQUIRE_NERVE.pinned : c.suppressed ? ACQUIRE_NERVE.suppressed : 1;
+  return Math.round(base * nerve);
+}

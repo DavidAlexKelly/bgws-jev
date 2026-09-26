@@ -18,8 +18,8 @@
 //      pinned units cannot advance; arriving and getting stuck are events
 //   3. running into the enemy: halt (or, in an assault, close to 150 m) and
 //      run the react-to-contact drill
-//   4. sighting: certain at close range (how close depends on the target's
-//      posture), otherwise staggered rolls; a unit knows what it saw at once,
+//   4. sighting: a chance per second of spotting each enemy in sight
+//      (detection.ts), tracking once found; a unit knows what it saw at once,
 //      its side after `reportDelayS`; faded contacts leave a last-known position
 //   5. fire, simultaneous: each weapon at its own rate of fire, targets by threat,
 //      self-defence always allowed unless the ROE is "never"
@@ -49,11 +49,12 @@ import {
   type SightingLevel,
 } from "../../lib/state";
 import { applyEffects } from "../../rules/apply";
-import { canAdvance, resolveSighting } from "../../rules/resolvers";
+import { canAdvance } from "../../rules/resolvers";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
-import { aimedIntervalS, hitChance, type HitConditions } from "./fire";
+import { IDENTIFY_M, detectChance } from "./detection";
+import { acquisitionS, aimedIntervalS, hitChance, type HitConditions } from "./fire";
 import {
   allowanceAt,
   compass,
@@ -68,9 +69,6 @@ import { aspectOf, describeStrike, rollStrike, strikeOdds, type StrikeResult } f
 import {
   ASSAULT_CONTACT_M,
   ATTACKER_BREAK_AT,
-  AUTO_SIGHT_HIDDEN_M,
-  AUTO_SIGHT_M,
-  AUTO_SIGHT_MOVING_M,
   BOUND_COVER_S,
   BOUND_M,
   BREAK_STEP,
@@ -115,6 +113,8 @@ const RETURN_FIRE_S = 5;
 const ATTACKING_S = 120;
 /** No incoming fire for this long before a rally can be tried. */
 const QUIET_S = 30;
+/** A knocked-out vehicle still draws fire for this long, until it is seen to be dead. DECLARED. */
+const WRECK_DRAWS_FIRE_S = 15;
 /** A friend's loss shakes nerves for this long. */
 const FRIEND_LOST_S = 60;
 /** How far a broken unit will go to reach its rally point, and how far if there is none. */
@@ -144,13 +144,6 @@ export interface TickResult {
   state: RtState;
   events: RtEvent[];
   shots: RtShot[];
-}
-
-/** A stable small number from a string, for staggering checks across ticks. */
-function stagger(text: string, modulo: number): number {
-  let h = 0;
-  for (let i = 0; i < text.length; i += 1) h = (Math.imul(h, 31) + text.charCodeAt(i)) | 0;
-  return Math.abs(h) % Math.max(1, modulo);
 }
 
 /** "3:05" for a span of seconds. */
@@ -312,6 +305,7 @@ function freshUnit(fe: ForceElement): RtUnit {
     lastReviewAt: 0,
     history: [],
     vehicles: { total: vehiclesIn(fe), fit: vehiclesIn(fe) },
+    losses: [],
   };
 }
 
@@ -752,81 +746,50 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const enemies = ids.filter((id) => fe(id).side !== side && alive(id));
 
     for (const enemyId of enemies) {
-      // How close is certain depends on the target: a moving vehicle is seen
-      // from further, a settled one in cover or hull-down only much closer.
-      const posture: Posture = units[enemyId].posture;
-      const hidden = posture === "hullDown" || inCover(config.terrain, fe(enemyId).position);
-      const certain =
-        posture === "moving"
-          ? AUTO_SIGHT_MOVING_M
-          : posture === "settled" || posture === "hullDown"
-            ? hidden
-              ? AUTO_SIGHT_HIDDEN_M
-              : AUTO_SIGHT_M
-            : AUTO_SIGHT_M;
-
+      const enemy = fe(enemyId);
+      const their = units[enemyId];
+      const enemyInCover = inCover(config.terrain, enemy.position);
       for (const observerId of observers) {
         const observer = fe(observerId);
-        const enemy = fe(enemyId);
         const range = distanceM(observer.position, enemy.position);
-
-        // Close enough that nobody fails to see it: no roll, every tick.
-        if (range <= certain) {
-          if (sees(observer.position, enemy.position)) {
-            const was = known(observerId, enemyId);
-            observe(observerId, enemyId, "full");
-            if (was === "none") {
-              emit(observerId, "sighted", `${enemy.label} (${enemyId}) at ${Math.round(range)} m, close`, true);
-            }
-          }
-          continue;
-        }
-
-        // Seeded per game: an unseeded stagger gave the same side the earlier
-        // look in every game, whatever the seed — enough to tip identical
-        // engagements 44 to 15.
-        if (
-          (time + stagger(`${rng.seed}:${observerId}>${enemyId}`, timing.sightingIntervalS)) %
-            timing.sightingIntervalS !==
-          0
-        ) {
-          continue;
-        }
         if (range > LOS_CAP_M) continue;
         if (!sees(observer.position, enemy.position)) continue;
 
+        // Already found (by this crew, or reported to it): tracked while in
+        // sight, no roll — and identified once close enough to tell.
         const before = known(observerId, enemyId);
-        if (before === "full") {
-          observe(observerId, enemyId, "full");
+        if (before !== "none") {
+          observe(observerId, enemyId, before === "full" || range <= IDENTIFY_M ? "full" : (before as ReportLevel));
           continue;
         }
-        if (before !== "none") observe(observerId, enemyId, before);
-        else lastSeen[side][enemyId] = time;
 
-        const outcome = resolveSighting(
-          observer,
-          enemy,
-          { targetInCover: hidden },
-          config.ruleset,
-          rng,
-          turn,
-          "arcAction",
-          side,
+        // Not yet found: a chance per second (detection.ts).
+        const mine = units[observerId];
+        const p = detectChance(
+          range,
+          {
+            targetMoving: their.lastMovedAt === time,
+            targetFired: time - their.lastShotAt <= 10,
+            targetInCover: enemyInCover,
+            targetHullDown: their.posture === "hullDown" && !enemyInCover,
+            targetSettled: their.posture === "settled",
+            targetOnFoot: enemy.targetClass === "foot",
+            observerMoving: mine.lastMovedAt === time,
+            observerSuppressed: mine.suppression >= SUPPRESSED_AT && mine.suppression < PINNED_AT,
+            observerPinned: mine.suppression >= PINNED_AT,
+          },
+          timing.tickS,
         );
-        const found = outcome.effects.find((effect) => effect.kind === "sighting");
-        const level = (found && found.kind === "sighting" ? found.to : "none") as SightingLevel;
-        if (level === "none" || SIGHT_RANK[level] <= SIGHT_RANK[before]) continue;
-
+        if (p < 1 && rng.int(1_000_000) >= p * 1_000_000) continue;
+        const level: ReportLevel = range <= IDENTIFY_M ? "full" : "partial";
         observe(observerId, enemyId, level);
-        if (before === "none") {
-          // A new enemy is worth a decision at once, not after the cooldown.
-          emit(
-            observerId,
-            "sighted",
-            `${level === "full" ? enemy.label : "an unidentified contact"} (${enemyId}) at ${Math.round(range)} m`,
-            true,
-          );
-        }
+        // A new enemy is worth a decision at once, not after the cooldown.
+        emit(
+          observerId,
+          "sighted",
+          `${level === "full" ? enemy.label : "an unidentified contact"} (${enemyId}) at ${Math.round(range)} m`,
+          true,
+        );
       }
     }
 
@@ -951,6 +914,28 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
     const rangeM = distanceM(self.position, target.position);
     const weapon = weaponFor(self, target, rangeM)!;
+    // A new target has to be found in the sight and laid on before the first
+    // round goes (fire.ts, acquisitionS); a target already being engaged does not.
+    const continuing =
+      unit.engagement != null &&
+      unit.engagement.targetId === target.id &&
+      time - unit.engagement.lastShotAt <= FIRED_UPON_MEMORY_S;
+    if (!continuing) {
+      const laying = unit.laying;
+      if (!laying || laying.targetId !== target.id) {
+        const readyAt =
+          time +
+          acquisitionS(rangeM, {
+            onlyReported: units[id].ownSeen[target.id] == null,
+            suppressed: unit.suppression >= SUPPRESSED_AT && unit.suppression < PINNED_AT,
+            pinned: unit.suppression >= PINNED_AT,
+          });
+        setUnit(id, { laying: { targetId: target.id, readyAt }, weaponReadyAt: readyAt });
+        continue;
+      }
+      if (laying.readyAt > time) continue;
+    }
+    setUnit(id, { laying: undefined });
     planned.push({
       firerId: id,
       targetId: target.id,
@@ -988,6 +973,22 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   // target at this range; lethality.ts what each does to the face it strikes.
   // Every shot, misses included, suppresses.
   const newAttacker = new Map<string, string>();
+  // FIRE DISTRIBUTION. Every round that hits was aimed at one vehicle of the
+  // target, picked by its own gunner: two crews pick the same tank, or a
+  // wreck that has not yet been seen to burn. Rounds on a vehicle already
+  // knocked out this volley, or on a fresh wreck, are wasted. Slots are the
+  // vehicles fit at the start of the volley, then the fresh wrecks.
+  const slotsAtStart = new Map<string, { fit: number; wrecks: number }>();
+  const killedSlots = new Map<string, Set<number>>();
+  for (const shot of planned) {
+    if (slotsAtStart.has(shot.targetId)) continue;
+    const t = units[shot.targetId];
+    slotsAtStart.set(shot.targetId, {
+      fit: t.vehicles.fit,
+      wrecks: t.losses.filter((at) => time - at <= WRECK_DRAWS_FIRE_S).length,
+    });
+    killedSlots.set(shot.targetId, new Set());
+  }
   const labels = new Map<(typeof planned)[number], string>();
   for (const shot of planned) {
     const firer = snapshot.forceElements[shot.firerId];
@@ -1003,10 +1004,20 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       : null;
     const outcomes: StrikeResult[] = [];
     let hits = 0;
+    let wasted = 0;
+    const slots = slotsAtStart.get(target.id)!;
+    const killed = killedSlots.get(target.id)!;
     for (let k = 0; k < shot.rounds; k += 1) {
       if (rng.int(1_000_000) >= shot.pHit * 1_000_000 || !odds) continue;
       hits += 1;
-      outcomes.push(rollStrike(odds, rng));
+      const slot = rng.int(slots.fit + slots.wrecks);
+      if (slot >= slots.fit || killed.has(slot)) {
+        wasted += 1;
+        continue;
+      }
+      const outcome = rollStrike(odds, rng);
+      outcomes.push(outcome);
+      if (outcome === "knockedOut") killed.add(slot);
     }
     const vehicles = units[target.id].vehicles;
     const knocked = Math.min(vehicles.fit, outcomes.filter((one) => one === "knockedOut").length);
@@ -1016,7 +1027,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       const next = { ...vehicles, fit: vehicles.fit - knocked };
       const strength = strengthFor(target, next);
       lostNow = target.combatStrength - strength;
-      setUnit(target.id, { vehicles: next });
+      setUnit(target.id, {
+        vehicles: next,
+        losses: [...units[target.id].losses.filter((at) => time - at <= WRECK_DRAWS_FIRE_S), ...Array(knocked).fill(time)],
+      });
       game = applyEffects(game, [
         { kind: "combatStrength", feId: target.id, delta: -lostNow },
         ...(strength <= 0 ? [{ kind: "eliminated" as const, feId: target.id }] : []),
@@ -1035,7 +1049,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
             : outcomes.includes("intercepted")
               ? "intercepted by active protection"
               : "";
-    const label = struck ? `${fired}, ${hits} hit: ${what}` : `${fired}, all missed`;
+    const onWrecks = wasted > 0 ? `${what ? "; " : ""}${wasted} on a tank already knocked out` : "";
+    const label = struck ? `${fired}, ${hits} hit: ${what}${onWrecks}` : `${fired}, all missed`;
     labels.set(shot, label);
 
     const base =

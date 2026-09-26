@@ -20,12 +20,6 @@ import type { RtTiming } from "./types";
 export const CLOSE_CONTACT_M = 300;
 /** An assault keeps closing until this close. */
 export const ASSAULT_CONTACT_M = 150;
-/** Closer than this, with a line of sight, nobody fails to see a unit (halted target). */
-export const AUTO_SIGHT_M = 500;
-/** A moving target is seen without a roll from this far. */
-export const AUTO_SIGHT_MOVING_M = 800;
-/** A settled, hull-down target in cover is only certain to be seen this close. */
-export const AUTO_SIGHT_HIDDEN_M = 300;
 
 /** Suppression at or above this lowers accuracy. */
 export const SUPPRESSED_AT = 25;
@@ -64,7 +58,6 @@ export const DEFAULT_TIMING: RtTiming = {
   turnS: 15 * 60,
   shotIntervalS: 8,
   strikeScale: 1,
-  sightingIntervalS: 30,
   contactMemoryS: 120,
   rallyCheckS: 60,
   idleS: 75,
