@@ -9,15 +9,18 @@ import { sightingOf, type ForceElement, type Side } from "../../lib/state";
 import { inCover } from "../../lib/proceduralTerrain";
 import { fireOdds } from "../../rules/jevState";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
-import { canHit, describeOrder, knownEnemies, knownTo } from "./engine";
-import { damagePerHit, rangeModifiers } from "./fire";
-import { allowanceAt, compass, offsetBy, positionsFor } from "./geometry";
+import { canHit, describeOrder, hullDownFrom, knownEnemies, knownTo } from "./engine";
+import { rangeModifiers, strikeChance } from "./fire";
+import { describeStrike, strikeOdds, type StrikeOdds } from "./lethality";
+import { allowanceAt, compass, hullDownAgainst, hullDownSpot, offsetBy, positionsFor } from "./geometry";
 import type { RtConfig, RtOption, RtState } from "./types";
 
 /** Objective within this is "reached": no point offering to advance on it. */
 const ON_OBJECTIVE_M = 300;
 /** Held ground within this is "on position". */
 const ON_POSITION_M = 150;
+/** How far to look for a hull-down position. */
+const HULL_DOWN_SEARCH_M = 400;
 /** An assault is offered on enemies within this. */
 const ASSAULT_RANGE_M = 1500;
 
@@ -59,7 +62,7 @@ export function oddsAgainst(
       penetrationMm: weapon.penetrationMm,
       munition: weapon.munition,
       topAttack: weapon.topAttack,
-      targetInCover: state.units[enemy.id]?.posture === "hullDown" || inCover(config.terrain, enemy.position),
+      targetInCover: inCover(config.terrain, enemy.position) || hullDownFrom(state, enemy, self.position, config),
       flank: isFlankShot([self], enemy, config.ruleset),
       extraModifiers: rangeModifiers(rangeM),
     },
@@ -77,20 +80,24 @@ export function knownDamage(state: RtState, side: Side, enemyId: string): number
 
 /** What fire from `firer` would really do to `target`, in real time. */
 export interface Effect {
-  /** Chance one shot does damage. */
+  /** Chance one shot knocks out a vehicle. */
   perShot: number;
-  /** Chance of doing some damage within a minute. */
+  /** Chance of knocking out at least one vehicle within a minute. */
   perMinute: number;
-  /** Expected minutes of steady fire to knock it out, as far as this side knows its strength. */
+  /** Expected minutes of steady fire to knock out every vehicle still fighting. */
   minutesToKnockOut: number | null;
+  /** The face it would strike, and whether the round gets through. */
+  strike?: StrikeOdds;
+  /** Vehicles still fighting, as far as this side can see. */
+  vehiclesLeft: number;
 }
 
 /**
- * The honest odds. The fire table's "to hit" is the chance of a hit RESULT;
- * in real time a hit only does damage with probability lethalityPerTurn ×
- * shotIntervalS / turnS. Showing Jev "40% to hit" when a shot has a 2% chance
- * of doing anything is what made endless long-range misses look worth it.
- * `from` is where the firer would be — for "close to" options.
+ * The honest odds, by the same chain the engine rolls: the fire table's
+ * hits (with range bands), the range-scaled chance a hit is a round on
+ * target, and then — from where the firer would be — the face it strikes,
+ * the round's penetration there against that armour, and the chance a
+ * penetration knocks the vehicle out. `from` is for "close to" options.
  */
 export function damageEffect(
   firer: ForceElement,
@@ -103,26 +110,41 @@ export function damageEffect(
   const at = moved ? { ...firer, position: from, markers: firer.markers.filter((m) => m !== "moved") } : firer;
   const odds = oddsAgainst(at, target, state, config);
   if (!odds) return null;
+  const rangeM = distanceM(from, target.position);
+  const weapon = weaponFor(at, target, rangeM);
+  if (!weapon) return null;
+  const strike = strikeOdds(weapon, target, from, rangeM, config.ruleset, hullDownFrom(state, target, from, config));
   const { timing } = config;
-  const perShot = Math.min(1, odds.expectedHits * damagePerHit(distanceM(from, target.position), timing));
+  const perShot = Math.min(1, odds.expectedHits * strikeChance(rangeM, timing) * strike.pKnockOut);
   const shotsPerMinute = 60 / timing.shotIntervalS;
   const perMinute = 1 - Math.pow(1 - perShot, shotsPerMinute);
-  const remaining = Math.max(1, target.combatStrengthStart - knownDamage(state, firer.side, target.id));
-  const needed = Math.ceil(remaining / config.ruleset.lethality.strengthPerHit);
+  // Knocked-out vehicles are seen to be knocked out.
+  const vehiclesLeft = state.units[target.id]?.vehicles.fit ?? 1;
   return {
     perShot,
     perMinute,
-    minutesToKnockOut: perShot > 0 ? needed / (perShot * shotsPerMinute) : null,
+    minutesToKnockOut: perShot > 0 ? vehiclesLeft / (perShot * shotsPerMinute) : null,
+    strike,
+    vehiclesLeft,
   };
 }
 
-/** "≈4%/min to damage it, ~35 min to knock it out". */
+/** "≈4%/min to knock out one of its vehicles (side, 620 vs 140 mm: 99% penetrate), ~35 min to finish all 4". */
 export function describeEffect(effect: Effect | null, it = "it"): string {
-  if (!effect || effect.perShot <= 0) return `no chance of damaging ${it} from there`;
+  const whose = it === "you" ? "your" : "its";
+  if (!effect || effect.perShot <= 0) {
+    const s = effect?.strike;
+    return s && s.pPenetrate < 0.01
+      ? `cannot hurt ${it} from there (${describeStrike(s)}: rounds do not penetrate)`
+      : `no chance of hurting ${it} from there`;
+  }
   const pct = effect.perMinute < 0.01 ? "<1" : String(Math.round(effect.perMinute * 100));
+  const s = effect.strike;
+  const pen = s ? ` (${describeStrike(s)}: ${Math.round(s.pPenetrate * 100)}% penetrate)` : "";
   const mins = effect.minutesToKnockOut;
-  const ko = mins == null ? "" : mins > 120 ? ", over 2 h to knock it out" : `, ~${Math.max(1, Math.round(mins))} min to knock it out`;
-  return `≈${pct}%/min to damage ${it}${ko}`;
+  const all = effect.vehiclesLeft > 1 ? `all ${effect.vehiclesLeft}` : "the last one";
+  const ko = mins == null ? "" : mins > 120 ? `, over 2 h to finish ${all}` : `, ~${Math.max(1, Math.round(mins))} min to finish ${all}`;
+  return `≈${pct}%/min to knock out one of ${whose} vehicles${pen}${ko}`;
 }
 
 /** Own units already firing on this enemy (within the last minute), besides `except`. */
@@ -322,6 +344,24 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
           ? { kind: "withdraw", to: position.at }
           : { kind: "move", to: position.at, mode: "tactical" },
     });
+  }
+
+  // A fold in the ground against the nearest known threat (from the DEM): the
+  // hull hidden, the turret still able to see and shoot over the crest.
+  const nearest = [...known].sort(
+    (a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position),
+  )[0];
+  if (nearest && self.targetClass === "armoured_vehicle" && !hullDownAgainst(self.position, nearest.position, config)) {
+    const spot = hullDownSpot(self, nearest.position, config, HULL_DOWN_SEARCH_M);
+    if (spot) {
+      options.push({
+        id: "pos:hulldown",
+        summary:
+          `move ${where(spot)} to a hull-down position against ${nearest.id}: the crest hides the hull, ` +
+          `hits land on the turret front, and it is harder to hit`,
+        order: { kind: "move", to: spot, mode: "tactical" },
+      });
+    }
   }
 
   const objective = state.game.objectives?.[self.side];

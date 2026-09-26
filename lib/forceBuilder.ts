@@ -127,6 +127,11 @@ export function toForceElement(
     armourMm: platform.armourMm,
     armour: platform.armour,
     eraFitted: platform.eraFitted,
+    // Read by the real-time mode only; the turn game never looks at them.
+    platformCount: spec.platformCount,
+    ...(platform.speedKmh != null ? { speedKmh: platform.speedKmh } : {}),
+    ...(platform.hpPerTonne != null ? { hpPerTonne: platform.hpPerTonne } : {}),
+    ...(platform.apsFitted != null ? { apsFitted: platform.apsFitted } : {}),
     troopQuality: TROOP_QUALITY[spec.troopQuality],
     combatStrength: strength,
     combatStrengthStart: strength,

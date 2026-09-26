@@ -9,11 +9,12 @@
 //
 //   RANGE BANDS   a modifier on the roll: +2 within 500 m, +1 within 1 km.
 //                 Beyond half maximum range the table's own -1 still applies.
-//   LETHALITY     the chance a hit does damage scales with range: about 4×
-//                 more at 300 m than at 2.5 km. The chance of a kill given a
-//                 hit rises steeply as range closes (see the tank engagement
-//                 models in docs/REALTIME_REALISM.md); a hit at 3 km is often a
-//                 glancing or non-penetrating one.
+//   STRIKES       a fire-table hit becomes a round on target with a
+//                 probability that scales with range: about 4× more at 300 m
+//                 than at 2.5 km, and `lethalityPerTurn` × shotIntervalS /
+//                 turnS on average — the calibration knob. What a round on
+//                 target then does is lethality.ts: intercept, penetrate the
+//                 face it strikes, knock the vehicle out.
 
 import type { Modifier } from "../../rules/events";
 import type { RtTiming } from "./types";
@@ -24,7 +25,7 @@ const RANGE_BANDS: readonly [number, number][] = [
   [1000, 1],
 ];
 
-/** Lethality by range, [metres, factor], interpolated between points. */
+/** How likely a hit is a real round on target, by range: [metres, factor], interpolated. */
 const LETHALITY_BY_RANGE: readonly [number, number][] = [
   [300, 2.4],
   [500, 2.0],
@@ -54,14 +55,7 @@ export function lethalityFactor(rangeM: number): number {
   return points[points.length - 1][1];
 }
 
-/** The chance one fire-table hit does damage, at this range. */
-export function damagePerHit(rangeM: number, timing: RtTiming): number {
+/** The chance one fire-table hit is a round on target, at this range. */
+export function strikeChance(rangeM: number, timing: RtTiming): number {
   return Math.min(1, ((timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS) * lethalityFactor(rangeM));
-}
-
-/** A shot's outcome, in words a reader can trust: a "hit" that did nothing is not a hit. */
-export function shotLabel(hits: number, suppressed: boolean, damaged: boolean): string {
-  if (damaged) return hits > 1 ? `struck ${hits}×, damaged` : "struck, damaged";
-  if (hits > 0) return hits > 1 ? `struck ${hits}×, no damage` : "struck, no damage";
-  return suppressed ? "near miss, suppressed" : "missed";
 }

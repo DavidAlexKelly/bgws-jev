@@ -108,6 +108,7 @@ export function ruleChoice(state: RtState, request: RtDecisionRequest): string {
   // Under fire in the open: get into cover if there is any, else shoot back.
   if (kinds.has("hit") || kinds.has("underFire") || kinds.has("moraleDrop")) {
     if (has("pos:cover")) return "pos:cover";
+    if (has("pos:hulldown")) return "pos:hulldown";
     if (answer) return answer;
     return "keep";
   }
