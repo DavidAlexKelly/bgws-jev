@@ -7,30 +7,68 @@
 //   CHANCES    something that happens with probability p in a turn happens
 //              with probability 1 − (1 − p)^(dt / turnS) in a tick of dt.
 //   ACTIONS    a shot is an action, not a chance. A unit that is engaging
-//              resolves one shot every `engagementCycleS`, using the fire
-//              table exactly as it is.
+//              fires every `shotIntervalS`. The fire table is rolled as it
+//              is, but its RESULT is scaled: a hit only costs strength with
+//              probability hits × lethalityPerTurn × shotIntervalS / turnS.
+//              Every shot, misses included, adds suppression.
 //
-// ⚠ `engagementCycleS` IS THE CALIBRATION KNOB. At 300 s a unit gets three
-// shots in the time a turn-based unit gets one, which makes real time
-// bloodier per simulated minute; a game is about how the trade goes, not how
-// long it took, so what matters is the ratio of fire to movement. The
-// headless runner exists so that ratio can be tuned against the turn game —
-// see realtime/engine/calibration.test.ts.
+// ⚠ `lethalityPerTurn` IS THE CALIBRATION KNOB. The table was written for one
+// result per 15-minute turn; rolled every 30 s unscaled it broke units in a
+// couple of minutes, which is what made them withdraw for ever. At 1.5, fifteen
+// minutes of continuous fire does what one and a half turn-game results would —
+// see the balance and decisiveness checks in realtime.test.ts.
 
 import type { RtTiming } from "./types";
 
 /** Closer than this, a moving unit halts: it has run into the enemy. */
 export const CLOSE_CONTACT_M = 300;
-/** Closer than this, with a line of sight, nobody fails to see a unit. */
+/** An assault keeps closing until this close. */
+export const ASSAULT_CONTACT_M = 150;
+/** Closer than this, with a line of sight, nobody fails to see a unit (halted target). */
 export const AUTO_SIGHT_M = 500;
+/** A moving target is seen without a roll from this far. */
+export const AUTO_SIGHT_MOVING_M = 800;
+/** A settled, hull-down target in cover is only certain to be seen this close. */
+export const AUTO_SIGHT_HIDDEN_M = 300;
+
+/** Suppression at or above this lowers accuracy. */
+export const SUPPRESSED_AT = 25;
+/** Suppression at or above this pins: no advancing. */
+export const PINNED_AT = 60;
+/** Suppression fades by this much per second once fire stops... */
+export const SUPPRESSION_DECAY_PER_S = 2;
+/** ...after this long without an incoming shot. */
+export const SUPPRESSION_GRACE_S = 10;
+/** Pinned this long, and a unit tests its nerve. */
+export const PINNED_TEST_S = 60;
+
+/** Break-test thresholds, as fractions of strength lost (Dupuy: attackers ~20%, defenders ~40%). */
+export const ATTACKER_BREAK_AT = 0.2;
+export const DEFENDER_BREAK_AT = 0.4;
+export const BREAK_STEP = 0.2;
+/** A side is beaten when this much of its strength is destroyed or broken. */
+export const SIDE_BREAKPOINT = 0.5;
+
+/** An HQ within this range steadies nerves and speeds rallying. */
+export const HQ_RADIUS_M = 1500;
+/** Cover this close is worth dashing for in the react-to-contact drill. */
+export const DRILL_COVER_M = 150;
+/** Bounding overwatch: how far a bound goes, and how long the cover halt lasts. */
+export const BOUND_M = 300;
+export const BOUND_COVER_S = 40;
+/** Still for this long, a unit has settled into its position. */
+export const SETTLE_S = 30;
 
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,
-  engagementCycleS: 300,
+  shotIntervalS: 30,
+  lethalityPerTurn: 1.5,
   sightingIntervalS: 30,
   contactMemoryS: 120,
-  recoveryS: 180,
+  rallyCheckS: 60,
+  idleS: 75,
+  reportDelayS: 15,
   coalesceS: 3,
   cooldownS: 20,
   // A crew takes longer to react the worse it is: 15 s for a conscript

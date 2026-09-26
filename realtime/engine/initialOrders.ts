@@ -8,8 +8,8 @@
 //   Jev         one request: for every unit, an opening order and its rules
 //               of engagement, chosen from options the rules generate
 
-import { distanceM } from "../../lib/board";
-import type { Side } from "../../lib/state";
+import { distanceM, type LatLng } from "../../lib/board";
+import type { ForceElement, Side } from "../../lib/state";
 import {
   JEV_MODEL,
   choiceOf,
@@ -22,7 +22,7 @@ import { printDecision } from "../../rules/jevConsole";
 import { setOrder } from "./engine";
 import { realtimeSideState } from "./jevDecider";
 import { optionsFor } from "./options";
-import type { Roe, RtConfig, RtOption, RtState } from "./types";
+import type { Mission, Roe, RtConfig, RtOption, RtState } from "./types";
 
 const ROE_CHOICES: Record<Roe, string> = {
   never: "Hold fire and stay hidden until ordered otherwise.",
@@ -31,18 +31,33 @@ const ROE_CHOICES: Record<Roe, string> = {
   always: "Fire at anything that can be reached.",
 };
 
-/** What a unit may be told at the start: no "carry on" — there is nothing to carry on with. */
+/**
+ * What a unit may be told at the start: no "carry on" — there is nothing to
+ * carry on with — and no "resume", since there is no mission yet.
+ */
 export function openingOptions(state: RtState, id: string, config: RtConfig): RtOption[] {
-  return optionsFor(state, id, config).filter((option) => option.id !== "keep");
+  return optionsFor(state, id, config).filter((option) => option.id !== "keep" && option.id !== "resume");
 }
 
-function purposeOf(option: RtOption): string {
-  if (option.id === "objective") return "take the objective";
-  if (option.id === "overwatch") return "cover the advance from here";
-  if (option.id === "hold") return "hold this ground";
-  if (option.id.startsWith("pos:")) return option.summary;
-  if (option.id.startsWith("engage:")) return option.summary;
-  return option.summary;
+/**
+ * What the unit is FOR, from its opening order. It outlasts the order: a unit
+ * that has been knocked off it — into cover, back to rally — returns to it.
+ */
+export function missionOf(option: RtOption, fe: ForceElement, objective?: LatLng): Mission {
+  const order = option.order;
+  if (option.id.startsWith("objective") && objective) {
+    return { task: "take", at: objective, purpose: "take the objective" };
+  }
+  if (order.kind === "move" && order.mode === "assault") {
+    return { task: "take", at: order.to, purpose: `take the ground ${option.summary.replace(/^assault /, "held by ")}` };
+  }
+  if (option.id === "overwatch" || option.id === "pos:overwatch") {
+    return { task: "support", at: order.kind === "move" ? order.to : fe.position, purpose: "cover the advance" };
+  }
+  if (order.kind === "move" || order.kind === "withdraw") {
+    return { task: "hold", at: order.to, purpose: `hold the ground at the end of: ${option.summary}` };
+  }
+  return { task: "hold", at: fe.position, purpose: "hold this ground" };
 }
 
 /** Everyone advances on the objective; a unit already on it watches over it. */
@@ -55,9 +70,14 @@ export function heuristicInitialOrders(state: RtState, side: Side, config: RtCon
     next = setOrder(
       next,
       fe.id,
-      far ? { kind: "move", to: objective } : { kind: "overwatch" },
+      far ? { kind: "move", to: objective, mode: "tactical" } : { kind: "overwatch" },
       config,
-      { roe: "withinShortRange", purpose: far ? "take the objective" : "hold the objective" },
+      {
+        roe: "withinShortRange",
+        mission: far
+          ? { task: "take", at: objective, purpose: "take the objective" }
+          : { task: "hold", at: objective ?? fe.position, purpose: "hold the objective" },
+      },
     );
   }
   return { ...next, plan: { ...next.plan, [side]: "advance on the objective and take it" } };
@@ -99,7 +119,11 @@ export async function jevInitialOrders(
       instructions:
         `${directive}The engagement is about to start in real time: every unit will act ` +
         `at once. Choose the opening order for your unit ${item.id} (${item.label}). ` +
-        "Think about the objective, the ground and keeping units able to support each other.",
+        "Think about the objective, the ground and keeping units able to support each other. " +
+        "How it moves matters: a road march is fastest but does not fire on the move; " +
+        "tactical movement is slower and answers fire; bounding overwatch is slowest " +
+        "and safest, pairs covering each other. The order you choose also sets the " +
+        "unit's mission, which it returns to after being knocked off it.",
       criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.option.summary])),
     };
     questions[`${key}_roe`] = {
@@ -131,13 +155,16 @@ export async function jevInitialOrders(
     if (!picked) {
       next = setOrder(next, item.id, fallback.units[item.id].order, config, {
         roe: fallback.units[item.id].roe,
-        purpose: fallback.units[item.id].purpose,
+        mission: fallback.units[item.id].mission,
       });
       continue;
     }
     chosenCount += 1;
     const rules = roe && roe.choice in ROE_CHOICES ? (roe.choice as Roe) : "withinShortRange";
-    next = setOrder(next, item.id, picked.order, config, { roe: rules, purpose: purposeOf(picked) });
+    next = setOrder(next, item.id, picked.order, config, {
+      roe: rules,
+      mission: missionOf(picked, item, state.game.objectives?.[side]),
+    });
     if (options.log !== false) {
       printDecision(side, {
         actorId: item.id,

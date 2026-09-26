@@ -3,17 +3,21 @@
 // game's options, so a decider chooses among legal orders and cannot invent
 // one.
 
-import { distanceM } from "../../lib/board";
-import { forceElementsOf, opposing, sightingOf, type ForceElement } from "../../lib/state";
+import { distanceM, type LatLng } from "../../lib/board";
+import { sightingOf, type ForceElement } from "../../lib/state";
 import { inCover } from "../../lib/proceduralTerrain";
 import { fireOdds } from "../../rules/jevState";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
-import { canHit, describeOrder } from "./engine";
+import { canHit, describeOrder, knownEnemies, knownTo } from "./engine";
 import { compass, positionsFor } from "./geometry";
 import type { RtConfig, RtOption, RtState } from "./types";
 
 /** Objective within this is "reached": no point offering to advance on it. */
 const ON_OBJECTIVE_M = 300;
+/** Held ground within this is "on position". */
+const ON_POSITION_M = 150;
+/** An assault is offered on enemies within this. */
+const ASSAULT_RANGE_M = 1500;
 
 /**
  * The enemy as this side can judge it: morale unknown (assumed steady), armour
@@ -41,7 +45,12 @@ export function oddsAgainst(
   if (!weapon) return null;
   const odds = fireOdds(
     [self],
-    perceived(enemy, sightingOf(state.game, self.side, enemy.id) === "full"),
+    perceived(
+      enemy,
+      state.units[self.id]
+        ? knownTo(state.game, state.units, self.id, enemy.id) === "full"
+        : sightingOf(state.game, self.side, enemy.id) === "full",
+    ),
     {
       rangeM,
       maxRangeM: weapon.maxRangeM,
@@ -61,13 +70,41 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
   const self = state.game.forceElements[id];
   const unit = state.units[id];
   if (!self || !unit || self.combatStrength <= 0) return [];
+  const where = (at: LatLng) => `${Math.round(distanceM(self.position, at))} m ${compass(self.position, at)}`;
 
   const keep =
     unit.order.kind === "move"
-      ? `carry on moving (${Math.round(distanceM(self.position, unit.order.to))} m to go; ` +
-        `fires on the move only ${unit.roe === "never" ? "never" : `if ${unit.roe}`}, at a penalty)`
+      ? `carry on ${describeOrder(unit.order)} (${Math.round(distanceM(self.position, unit.order.to))} m to go; ` +
+        (unit.order.mode === "march"
+          ? "does not fire on the move)"
+          : unit.order.mode === "assault"
+            ? "firing at anything on the move)"
+            : `fires on the move only ${unit.roe === "never" ? "never" : `if ${unit.roe}`}, at a penalty)`)
       : `carry on (${describeOrder(unit.order)})`;
   const options: RtOption[] = [{ id: "keep", summary: keep, order: unit.order }];
+
+  // Back to what it is for.
+  const { mission } = unit;
+  if (mission.task === "take" && mission.at) {
+    options.push(
+      distanceM(self.position, mission.at) > ON_OBJECTIVE_M
+        ? {
+            id: "resume",
+            summary: `resume the mission: ${mission.purpose}, moving tactically (${where(mission.at)})`,
+            order: { kind: "move", to: mission.at, mode: "tactical" },
+          }
+        : { id: "resume", summary: `resume the mission: ${mission.purpose}, watching from it`, order: { kind: "overwatch" } },
+    );
+  } else if (mission.at && distanceM(self.position, mission.at) > ON_POSITION_M) {
+    options.push({
+      id: "resume",
+      summary: `resume the mission: back to ${mission.purpose} (${where(mission.at)})`,
+      order: { kind: "move", to: mission.at, mode: "tactical" },
+    });
+  } else if (unit.order.kind !== "overwatch") {
+    options.push({ id: "resume", summary: `resume the mission: ${mission.purpose}, on overwatch`, order: { kind: "overwatch" } });
+  }
+
   if (unit.order.kind !== "hold") {
     options.push({ id: "hold", summary: "halt and hold here", order: { kind: "hold" } });
   }
@@ -79,22 +116,41 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
     });
   }
 
-  const known = forceElementsOf(state.game, opposing(self.side)).filter(
-    (enemy) => enemy.combatStrength > 0 && sightingOf(state.game, self.side, enemy.id) !== "none",
-  );
+  const known = knownEnemies(state, id);
+  const broken = (enemyId: string) => state.units[enemyId]?.cohesion === "broken";
 
   for (const enemy of known) {
-    if (!canHit(self, enemy, enemy.position, config)) continue;
-    if (unit.order.kind === "engage" && unit.order.targetId === enemy.id) continue;
-    const odds = oddsAgainst(self, enemy, state, config);
-    const identified = sightingOf(state.game, self.side, enemy.id) === "full";
+    const identified = knownTo(state.game, state.units, id, enemy.id) === "full";
+    const name = `${identified ? enemy.label : "the contact"} ${enemy.id}`;
+    const range = distanceM(self.position, enemy.position);
+    if (canHit(self, enemy, enemy.position, config) && !(unit.order.kind === "engage" && unit.order.targetId === enemy.id)) {
+      const odds = oddsAgainst(self, enemy, state, config);
+      options.push({
+        id: `engage:${enemy.id}`,
+        summary: `halt and engage ${name} at ${Math.round(range)} m` + (odds ? ` (${Math.round(odds.pHit * 100)}% to hit)` : ""),
+        order: { kind: "engage", targetId: enemy.id },
+      });
+    }
+    // A broken enemy seen falling back is there to be followed up.
+    if (identified && broken(enemy.id)) {
+      options.push({
+        id: `pursue:${enemy.id}`,
+        summary: `pursue ${name}, which has broken: assault after it, firing on the move (${where(enemy.position)})`,
+        order: { kind: "move", to: enemy.position, mode: "assault" },
+      });
+    } else if (range <= ASSAULT_RANGE_M) {
+      options.push({
+        id: `assault:${enemy.id}`,
+        summary: `assault ${name}: close in firing at anything, to point-blank (${where(enemy.position)})`,
+        order: { kind: "move", to: enemy.position, mode: "assault" },
+      });
+    }
+  }
+  if (known.some((enemy) => broken(enemy.id))) {
     options.push({
-      id: `engage:${enemy.id}`,
-      summary:
-        `halt and engage ${identified ? enemy.label : "the contact"} ${enemy.id} at ` +
-        `${Math.round(distanceM(self.position, enemy.position))} m` +
-        (odds ? ` (${Math.round(odds.pHit * 100)}% to hit)` : ""),
-      order: { kind: "engage", targetId: enemy.id },
+      id: "consolidate",
+      summary: "consolidate: stop here on overwatch rather than follow the broken enemy",
+      order: { kind: "overwatch" },
     });
   }
 
@@ -105,17 +161,30 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
       order:
         position.purpose === "withdraw"
           ? { kind: "withdraw", to: position.at }
-          : { kind: "move", to: position.at },
+          : { kind: "move", to: position.at, mode: "tactical" },
     });
   }
 
   const objective = state.game.objectives?.[self.side];
   if (objective && distanceM(self.position, objective) > ON_OBJECTIVE_M) {
-    options.push({
-      id: "objective",
-      summary: `advance on the objective (${Math.round(distanceM(self.position, objective))} m ${compass(self.position, objective)})`,
-      order: { kind: "move", to: objective },
-    });
+    const to = where(objective);
+    options.push(
+      {
+        id: "objective",
+        summary: `advance on the objective, tactically: slower, firing within the ROE (${to})`,
+        order: { kind: "move", to: objective, mode: "tactical" },
+      },
+      {
+        id: "objective:march",
+        summary: `road-march to the objective: fastest, not firing on the move (${to})`,
+        order: { kind: "move", to: objective, mode: "march" },
+      },
+      {
+        id: "objective:bound",
+        summary: `bound towards the objective: short moves, covering between them with a partner (${to})`,
+        order: { kind: "move", to: objective, mode: "bound" },
+      },
+    );
   }
 
   return options;

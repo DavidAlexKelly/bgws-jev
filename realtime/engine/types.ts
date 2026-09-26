@@ -22,37 +22,116 @@ import type { TerrainSampler } from "../../lib/lineOfSight";
 import type { Rng } from "../../rules/dice";
 import type { RuleSet, StandingEngagement } from "../../rules/ruleset";
 
+/**
+ * How a unit moves, which also decides what it does when it meets the enemy.
+ * After Steel Beasts' route tactics and Arma's behaviour modes.
+ *
+ *   march     fastest; does not fire on the move; on contact halts and runs
+ *             the react-to-contact drill
+ *   tactical  slower; fires on the move within its ROE; on contact halts and
+ *             takes cover (the default)
+ *   assault   fires on the move at anything, and keeps closing until point
+ *             blank — it is how ground is taken
+ *   bound     bounding overwatch: moves in bounds, stopping to cover between
+ *             them; paired with a friend doing the same, one always covers
+ */
+export type MoveMode = "march" | "tactical" | "assault" | "bound";
+
 /** What a unit is doing. The autopilot carries it out every tick. */
 export type RtOrder =
-  /**
-   * Go there, at the ground's speed, along `route` when one was planned.
-   * Fires on the move within its rules of engagement, at the moving penalty.
-   */
-  | { kind: "move"; to: LatLng; route?: LatLng[] }
-  /** Stay. Fire only as the rules of engagement allow. */
+  /** Go there, at the ground's speed, along `route` when one was planned. */
+  | {
+      kind: "move";
+      to: LatLng;
+      route?: LatLng[];
+      mode: MoveMode;
+      /** The react-to-contact drill's dash for cover: it does not halt on contact again. */
+      dash?: boolean;
+    }
+  /** Stay. Fire only as the rules of engagement (and self-defence) allow. */
   | { kind: "hold" }
   /** Stay and watch: fire at anything in reach, unless the ROE is "never". */
   | { kind: "overwatch" }
   /** Stay and fire at this target whenever it can be hit. */
   | { kind: "engage"; targetId: string }
-  /** Get away. Moves like `move`, and does not fire. */
+  /** Get away. Moves at full speed, and does not fire. */
   | { kind: "withdraw"; to: LatLng; route?: LatLng[] };
 
 export type Roe = StandingEngagement;
+
+/**
+ * Whether a unit is still a fighting unit. Separate from suppression, which
+ * is momentary; this is the lasting effect of losses (Combat Mission's split).
+ *
+ *   steady   takes orders
+ *   shaken   holds where it is and fires only in self-defence; runs itself
+ *   broken   falls back once to a rally point and tries to rally; runs itself
+ */
+export type Cohesion = "steady" | "shaken" | "broken";
+
+/** How exposed a unit is, from how long it has been still and where. */
+export type Posture = "moving" | "halted" | "settled" | "hullDown";
+
+/** What a unit is FOR, which outlasts any one order. */
+export interface Mission {
+  task: "take" | "hold" | "support";
+  /** Where the mission is: the objective to take, or the ground to hold. */
+  at?: LatLng;
+  purpose: string;
+}
 
 /** One unit's real-time status, alongside its ForceElement in `game`. */
 export interface RtUnit {
   order: RtOrder;
   roe: Roe;
-  /** What the unit is FOR, in its commander's words. Jev reads it. */
-  purpose?: string;
+  mission: Mission;
   /** Sim time at which its weapon can next fire. */
   weaponReadyAt: number;
   lastMovedAt: number;
-  /** Sim time it was last hurt or suppressed. Morale recovers after a quiet spell. */
-  lastHurtAt: number;
+  /** 0–100. From incoming fire, misses included; fades once the fire stops. */
+  suppression: number;
+  /** Sim time of the last incoming shot. */
+  lastIncomingAt: number;
+  /** Sim time suppression first reached "pinned", or null. */
+  pinnedSince: number | null;
+  cohesion: Cohesion;
+  /** Break tests passed so far; the next is at the next loss threshold. */
+  breakTests: number;
+  /** A broken unit that has reached its rally point: it tries to rally there. */
+  fellBack: boolean;
+  lastRallyCheckAt: number;
+  /** Who has fired at THIS unit, and when — for self-defence and threat. */
+  attackers: Record<string, number>;
+  /** Enemies this unit has seen itself — at once, before any report reaches its side. */
+  ownSeen: Record<string, { time: number; level: ReportLevel }>;
+  /** Sim time a friend close by was destroyed or broke. */
+  lastFriendLostAt: number;
+  posture: Posture;
+  /** Sim time it last fired. */
+  lastShotAt: number;
+  /** Sim time something last happened to it, for the idle check. */
+  lastEventAt: number;
+  /** Bounding overwatch: moving in this bound, or covering, until `until`. */
+  bound?: { moving: boolean; until: number };
   /** Identified enemies that could already reach it when its current order began. */
   exposedTo: string[];
+}
+
+export type ReportLevel = "veryPartial" | "partial" | "full";
+
+/** A sighting on its way from the unit that made it to the rest of its side. */
+export interface ContactReport {
+  side: Side;
+  enemyId: string;
+  level: ReportLevel;
+  dueAt: number;
+}
+
+/** Where an enemy was last seen, once nobody can see it any more. */
+export interface LastKnown {
+  at: LatLng;
+  time: number;
+  label?: string;
 }
 
 export interface RtState {
@@ -61,7 +140,8 @@ export interface RtState {
   /**
    * The board in the turn engine's shape, so the shared rules — fire,
    * sighting, fog of war, victory — can read it unchanged. `turn` is only
-   * ever used as a label here.
+   * ever used as a label here. `morale` on each element is DERIVED from
+   * cohesion and suppression every tick, so the fire table's modifiers see it.
    */
   game: GameState;
   units: Record<string, RtUnit>;
@@ -69,6 +149,12 @@ export interface RtState {
   lastSeen: Record<Side, Record<string, number>>;
   /** When each enemy last fired at each side, for the "ifFiredUpon" rule. */
   lastFiredOn: Record<Side, Record<string, number>>;
+  /** Sightings made but not yet reported to the side. */
+  reports: ContactReport[];
+  /** Faded contacts: where they were last seen. */
+  lastKnown: Record<Side, Record<string, LastKnown>>;
+  /** Combat strength each side started with, for the side breakpoint. */
+  startStrength: Record<Side, number>;
   /** Each side's plan, in its commander's words. */
   plan: Partial<Record<Side, string>>;
   over?: { winner: Side | null; reason: string };
@@ -85,7 +171,13 @@ export type RtEventKind =
   | "blocked"
   | "exposed"
   /** Closed to point-blank range with an enemy: it has halted. */
-  | "contact";
+  | "contact"
+  /** Nothing has happened to it for a while and it is not doing its mission. */
+  | "idle"
+  /** Recovered from shaken or broken and takes orders again. */
+  | "rallied"
+  /** An enemy it can see has broken: pursue, or consolidate? */
+  | "enemyBroke";
 
 /** Something that happened to a unit. What a decider is asked about. */
 export interface RtEvent {
@@ -112,14 +204,24 @@ export interface RtTiming {
   tickS: number;
   /** One turn of the turn-based game, in seconds — what the rules' rates are per. */
   turnS: number;
-  /** How often a unit engaging something resolves a shot. The main calibration knob. */
-  engagementCycleS: number;
+  /** How often a unit engaging something fires. */
+  shotIntervalS: number;
+  /**
+   * How many turn-game fire results one turn's worth of continuous fire is
+   * worth. Each shot's fire-table result is scaled by
+   * `lethalityPerTurn × shotIntervalS / turnS`. THE calibration knob.
+   */
+  lethalityPerTurn: number;
   /** How often each observer gets a sighting attempt at each enemy it can see. */
   sightingIntervalS: number;
   /** How long a contact stays on the map after the last time anyone saw it. */
   contactMemoryS: number;
-  /** Quiet time after which morale recovers one step (never from broken). */
-  recoveryS: number;
+  /** How often a shaken or fallen-back broken unit tries to rally. */
+  rallyCheckS: number;
+  /** A steady unit that is not on its mission and has been quiet this long is asked again. */
+  idleS: number;
+  /** How long a sighting takes to reach the rest of the side. */
+  reportDelayS: number;
   /** Events for one unit within this window become one question. */
   coalesceS: number;
   /** A unit is not asked again within this long, unless the event is severe. */

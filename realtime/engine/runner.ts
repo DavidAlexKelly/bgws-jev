@@ -16,8 +16,9 @@
 //   game replayable: the same seed and the same answers give the same game,
 //   however fast or slow the connection was.
 //
-// Broken units are not asked anything: they are withdrawing, and the engine
-// is doing that for them.
+// Shaken and broken units are not asked anything, as in Combat Mission: the
+// autopilot runs them (holding, falling back, rallying) until they rally,
+// when they are asked again.
 
 import type { Side } from "../../lib/state";
 import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
@@ -142,7 +143,7 @@ export class RealtimeRunner {
 
     for (const [unitId, held] of this.pending) {
       const fe = state.game.forceElements[unitId];
-      if (!fe || fe.combatStrength <= 0 || fe.morale === "broken") {
+      if (!fe || fe.combatStrength <= 0 || state.units[unitId]?.cohesion !== "steady") {
         this.pending.delete(unitId);
         continue;
       }
@@ -204,7 +205,8 @@ export class RealtimeRunner {
         const request = batch.requests.get(unitId);
         const option = request?.options.find((one) => one.id === decision?.optionId);
         const fe = this.state.game.forceElements[unitId];
-        if (!decision || !option || !fe || fe.combatStrength <= 0 || fe.morale === "broken") continue;
+        const steady = this.state.units[unitId]?.cohesion === "steady";
+        if (!decision || !option || !fe || fe.combatStrength <= 0 || !steady) continue;
         if (option.id !== "keep") {
           this.state = setOrder(this.state, unitId, option.order, this.config, option.roe ? { roe: option.roe } : {});
         }
