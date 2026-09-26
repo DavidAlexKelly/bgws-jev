@@ -134,3 +134,37 @@ RealtimePlay.tsx      (or a mode inside Play.tsx) map animation, controls, event
 6. **Replay and Trial support:** heuristic + Jev vs heuristic in real time; optional LLM re-plan.
 
 Steps 1–2 are the foundation, and nothing after them is trustworthy without them.
+
+## 11. What has been built (first version)
+
+**Entry.** `/bgws/play` now opens a splash that chooses the mode (`Play.tsx`,
+kept in the URL as `?mode=turn` or `?mode=realtime`). The turn-based screen
+moved to `TurnPlay.tsx` **byte for byte**. No other existing file changed, and
+the turn engine's event logs are still identical.
+
+**Real-time, all in `realtime/`:**
+
+| File | What |
+|---|---|
+| `engine/types.ts`, `engine/timing.ts` | orders, state, events; the time scale (`engagementCycleS` 300 s, sighting every 30 s per pair, contact memory 120 s, reaction 5–15 s by troop quality) |
+| `engine/engine.ts` | the pure tick: broken units withdraw, movement at terrain speed, staggered sighting and fading contact, **simultaneous** fire, morale recovery, victory |
+| `engine/options.ts`, `engine/geometry.ts` | a unit's legal next orders: carry on, hold, overwatch, engage X (with odds), move to cover / overwatch / withdraw / flank, advance on the objective |
+| `engine/runner.ts` | the clock: coalesces events, cooldowns, severity, one batch per side, answers applied at event time + reaction time, and the clock **waits** for a late answer (so games replay exactly) |
+| `engine/deciders.ts` | the rule decider (default and fallback) |
+| `engine/jevDecider.ts` | Jev in command: one request per side per moment, "carry on" when unsure, rules when unreachable, console output |
+| `engine/initialOrders.ts` | opening orders: heuristic, or Jev (order + rules of engagement per unit, one request) |
+| `RealtimePlay.tsx` | setup (placement, force lists, Jev in command, directives, ground and seed), generate initial orders, play/pause, ×1–×60, umpire/blue/red views, moving counters, order and fire lines, decision tags, live feed |
+
+**Findings from the first headless runs:**
+- The first engine resolved fire in list order, so blue shot first. On open
+  ground blue won 15 of 20 identical games. Fire is now simultaneous: 56–44
+  over 100 games, which is within chance.
+- On the default generated ground (`baltic-v1`), red wins 20 of 20 identical
+  games. That is the ground, not the engine: on a different seed the same
+  forces are even. It is worth knowing when judging a result.
+- Many games end on the time limit with little contact. Calibration (step 2
+  of §10) is the next piece of work.
+
+**Not yet:** assaults, ammunition, concealment, smoke and indirect fire in
+real time; LLM-written opening orders and the background re-plan; a Trial
+page for real time; calibration against the turn game.
