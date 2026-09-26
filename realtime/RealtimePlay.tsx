@@ -432,11 +432,44 @@ export default function RealtimePlay() {
     }).asDOM();
     inner.appendChild(symbol);
 
+    // ── Label, strength bar and status, under the counter ─────────────────
+    // The turn game's bar, same look: absolute so it cannot push the symbol
+    // about, inline-block so the bar is exactly as wide as the name, side
+    // colour for the fill (length carries the health), and ONLY on own units
+    // or in the umpire's view — how badly the enemy is hurt is not something
+    // this side can see. Here the bar counts VEHICLES still fighting, and a
+    // thin amber line under it shows suppression.
+    const halo = "text-shadow:0 0 2px #0d1017,0 0 2px #0d1017,0 0 2px #0d1017";
     const caption = document.createElement("div");
     caption.style.cssText =
-      "position:absolute;top:100%;left:50%;transform:translate(-50%,2px);white-space:nowrap;" +
-      "pointer-events:none;line-height:1.1;font-size:9px;text-align:center;color:#e6e9f2;" +
-      "text-shadow:0 0 2px #0d1017,0 0 2px #0d1017,0 0 2px #0d1017";
+      "position:absolute;top:100%;left:50%;transform:translate(-50%,3px);" +
+      "display:inline-block;white-space:nowrap;pointer-events:none;line-height:1";
+    const name = document.createElement("div");
+    name.style.cssText = `font-size:9px;text-align:center;color:#e6e9f2;${halo}`;
+    caption.appendChild(name);
+
+    const track = document.createElement("div");
+    track.style.cssText =
+      "position:relative;width:100%;min-width:34px;height:9px;margin-top:1px;" +
+      "background:rgba(13,16,23,0.85);border:1px solid rgba(255,255,255,0.22);" +
+      "border-radius:1px;overflow:hidden";
+    const fill = document.createElement("div");
+    fill.style.cssText = `position:absolute;inset:0 auto 0 0;background:${SIDE_COLOUR[sideOf]}`;
+    track.appendChild(fill);
+    const figure = document.createElement("div");
+    figure.style.cssText =
+      "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+      `font-size:7px;font-weight:600;color:#f2f4fa;${halo}`;
+    track.appendChild(figure);
+    caption.appendChild(track);
+
+    const pinned = document.createElement("div");
+    pinned.style.cssText = "height:2px;margin-top:1px;background:#e8c547;width:0";
+    caption.appendChild(pinned);
+
+    const status = document.createElement("div");
+    status.style.cssText = `font-size:8px;text-align:center;color:#c7ccdb;margin-top:1px;${halo}`;
+    caption.appendChild(status);
     inner.appendChild(caption);
 
     const tag = document.createElement("div");
@@ -464,24 +497,28 @@ export default function RealtimePlay() {
       const own = view === "both" || fe.side === view;
       const unit = state.units[id];
       node.style.opacity = unit?.cohesion === "broken" ? "0.45" : unit?.cohesion === "shaken" ? "0.7" : "1";
-      caption.textContent = own
+      name.textContent = own ? label : fe.id;
+      const fit = unit?.vehicles.fit ?? fe.combatStrength;
+      const total = unit?.vehicles.total ?? fe.combatStrengthStart;
+      const fraction = total > 0 ? Math.max(0, Math.min(1, fit / total)) : 0;
+      track.style.display = own ? "" : "none";
+      fill.style.width = `${(fraction * 100).toFixed(1)}%`;
+      // Below a third it dims — the turn game's one health cue that needs no new colour.
+      fill.style.opacity = fraction < 1 / 3 ? "0.55" : "1";
+      figure.textContent = `${fit}/${total}`;
+      track.title = `${fit} of ${total} vehicles still fighting · strength ${fe.combatStrength}/${fe.combatStrengthStart}`;
+      pinned.style.display = own ? "" : "none";
+      pinned.style.width = `${Math.round(Math.min(100, unit?.suppression ?? 0))}%`;
+      pinned.style.opacity = (unit?.suppression ?? 0) >= PINNED_AT ? "1" : "0.6";
+      status.style.display = own ? "" : "none";
+      status.textContent = unit
         ? [
-            label,
-            unit ? `${unit.vehicles.fit}/${unit.vehicles.total} fit` : `${fe.combatStrength}/${fe.combatStrengthStart}`,
-            ...(unit
-              ? [
-                  ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),
-                  ...(unit.suppression >= PINNED_AT
-                    ? ["pinned"]
-                    : unit.suppression >= SUPPRESSED_AT
-                      ? [`suppressed ${Math.round(unit.suppression)}`]
-                      : []),
-                  ...(unit.posture === "hullDown" ? ["hull-down"] : []),
-                  describeOrder(unit.order),
-                ]
-              : []),
+            ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),
+            ...(unit.suppression >= PINNED_AT ? ["pinned"] : unit.suppression >= SUPPRESSED_AT ? ["suppressed"] : []),
+            ...(unit.posture === "hullDown" ? ["hull-down"] : []),
+            describeOrder(unit.order),
           ].join(" · ")
-        : fe.id;
+        : "";
 
       // The latest decision, for a while after it was made. Own side only:
       // what the enemy decided is not something this side can see.

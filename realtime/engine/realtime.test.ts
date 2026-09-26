@@ -20,7 +20,8 @@ import { jevRealtimeDecider } from "./jevDecider";
 import { damageEffect, describeEffect, oddsAgainst, optionsFor } from "./options";
 import { penetrationAt, strikeOdds } from "./lethality";
 import { hullDownAgainst, hullDownSpot, platformSpeedFactor, slopeFactor } from "./geometry";
-import { lethalityFactor, rangeModifiers } from "./fire";
+import { acquisitionS, aimedIntervalS, errorBudget, hitChance } from "./fire";
+import { detectChance, detectionRate } from "./detection";
 import { RealtimeRunner } from "./runner";
 import { DEFAULT_TIMING, perTick } from "./timing";
 import type { RtConfig, RtEvent, RtState } from "./types";
@@ -46,7 +47,13 @@ function fe(id: string, side: Side, position: LatLng, extra: Partial<ForceElemen
     sidc: "SFGPUCA-------",
     moveType: "T",
     targetClass: "armoured_vehicle",
-    capabilities: [{ kind: "atk", maxRangeM: 3000, shortRangeM: 1500 }],
+    // A Challenger-like troop: peers mostly bounce off each other's fronts,
+    // as the real ones do, so a fight lasts long enough to test.
+    capabilities: [{ kind: "atk", munition: "ke", maxRangeM: 3000, shortRangeM: 1500, penetrationMm: 650 }],
+    armour: { frontKeMm: 700, turretFrontKeMm: 950, sideKeMm: 140, rearKeMm: 40, roofKeMm: 30 },
+    armourMm: 700,
+    facing: side === "blue" ? 0 : 180,
+    platformCount: 4,
     troopQuality: 4,
     combatStrength: 8,
     combatStrengthStart: 8,
@@ -180,7 +187,8 @@ describe("the autopilot", () => {
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
     state = setOrder(state, "B1", { kind: "overwatch" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
-    const { shots } = run(state, cfg, DEFAULT_TIMING.shotIntervalS * 2 + 1);
+    const interval = aimedIntervalS(state.game.forceElements.B1.capabilities[0], DEFAULT_TIMING.shotIntervalS);
+    const { shots } = run(state, cfg, interval * 2 + 1);
     expect(shots).toBeGreaterThanOrEqual(2);
     expect(shots).toBeLessThanOrEqual(3);
 
@@ -195,7 +203,9 @@ describe("the autopilot", () => {
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 800))], true));
     state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
     state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
-    const first = tick(state, cfg);
+    // Both lay on at the same speed, so the first rounds go in the same second.
+    let first = tick(state, cfg);
+    for (let i = 0; i < 60 && first.shots.length === 0; i += 1) first = tick(first.state, cfg);
     expect(first.shots.map((s) => s.firerId).sort()).toEqual(["B1", "R1"]);
   });
 
@@ -255,7 +265,10 @@ describe("meeting the enemy", () => {
 
   it("sees anything close in the open without a roll; the side hears after the report delay", () => {
     const cfg = config();
-    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 400))]));
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 400))]));
+    // Neither fires: the test is about seeing, not about who wins.
+    state = setOrder(state, "B1", { kind: "hold" }, cfg, { roe: "never" });
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
     const after = tick(state, cfg).state;
     expect(after.units.B1.ownSeen.R1?.level).toBe("full");
     expect(after.game.sighting.blue.R1 ?? "none").toBe("none");
@@ -536,13 +549,14 @@ function losing(state: RtState, id: string, fit: number, total: number): RtState
 
 describe("suppression and nerve", () => {
   it("builds suppression from fire, misses included, and lets it fade once the fire stops", () => {
-    const cfg = config();
+    // Every round misses: misses alone suppress, and nobody breaks and ends the game.
+    const cfg = config({ timing: { ...DEFAULT_TIMING, strikeScale: 0 } });
     let state = createRealtimeState(
       game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(100, 0)), fe("B3", "blue", at(-100, 0)), fe("R1", "red", at(0, 1500))], true),
     );
     for (const id of ["B1", "B2", "B3"]) state = setOrder(state, id, { kind: "engage", targetId: "R1" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
-    const fired = run(state, cfg, 5).state;
+    const fired = run(state, cfg, 25).state;
     expect(fired.units.R1.suppression).toBeGreaterThan(0);
     // Stop the fire and wait: it fades back to nothing.
     let quiet = fired;
@@ -682,7 +696,14 @@ describe("the crew's drills and movement", () => {
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2500))], true));
     state = setOrder(state, "B1", { kind: "move", to: at(0, 2000), mode: "tactical" }, cfg);
     state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
-    const { state: after, events } = run(state, cfg, 3);
+    // R1 lays on B1 (acquisition time), fires, and B1's drill runs that second.
+    let after = state;
+    let events: RtEvent[] = [];
+    for (let i = 0; i < 60 && !events.some((e) => e.unitId === "B1" && e.kind === "underFire"); i += 1) {
+      const r = tick(after, cfg);
+      after = r.state;
+      events = r.events;
+    }
     const underFire = events.find((e) => e.unitId === "B1" && e.kind === "underFire");
     expect(underFire?.detail).toMatch(/dashing .* for cover/);
     expect(after.units.B1.order).toMatchObject({ kind: "move", dash: true });
@@ -690,7 +711,8 @@ describe("the crew's drills and movement", () => {
   });
 
   it("an assault presses on under fire and closes to point-blank", () => {
-    const cfg = config({ terrain: woods });
+    // Nothing lands, so the test is about the movement, not who wins the fire fight.
+    const cfg = config({ terrain: woods, timing: { ...DEFAULT_TIMING, strikeScale: 0 } });
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1200))], true));
     state = setOrder(state, "B1", { kind: "move", to: at(0, 1200), mode: "assault" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
@@ -745,7 +767,7 @@ describe("the crew's drills and movement", () => {
     // B1 only fires inside short range (1500 m); R1 at 2500 m fires first.
     state = setOrder(state, "B1", { kind: "hold" }, cfg, { roe: "withinShortRange" });
     state = setOrder(state, "R1", { kind: "engage", targetId: "B1" }, cfg);
-    const { state: after } = run(state, cfg, 20);
+    const { state: after } = run(state, cfg, 60);
     expect(after.units.R1.attackers.B1).toBeDefined();
   });
 
@@ -789,8 +811,8 @@ describe("decisiveness", () => {
 
 describe("context for decisions", () => {
   /** Two blue troops trading long-range fire with one red one — the scene that kept "carrying on". */
-  const longRange = (lethalityPerTurn = 0) => {
-    const cfg = config({ timing: { ...DEFAULT_TIMING, lethalityPerTurn } });
+  const longRange = (strikeScale = 0) => {
+    const cfg = config({ timing: { ...DEFAULT_TIMING, strikeScale } });
     let state = createRealtimeState(
       game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(300, 0)), fe("R1", "red", at(0, 2800)), fe("R9", "red", at(0, 40_000))], true),
     );
@@ -801,11 +823,13 @@ describe("context for decisions", () => {
   };
 
   it("keeps a record of each unit's fire, and raises 'ineffective' when it is doing nothing", () => {
-    const { cfg, state } = longRange(0);
+    const { cfg, state: start } = longRange(0);
+    // R1 holds its fire, so B1 is not pinned (and handed to the autopilot) first.
+    const state = setOrder(start, "R1", { kind: "hold" }, cfg, { roe: "never" });
     const { state: after, events } = run(state, cfg, 200);
     const e = after.units.B1.engagement!;
     expect(e.targetId).toBe("R1");
-    expect(e.shots).toBeGreaterThanOrEqual(6);
+    expect(e.shots).toBeGreaterThanOrEqual(Math.floor(180 / aimedIntervalS(state.game.forceElements.B1.capabilities[0], DEFAULT_TIMING.shotIntervalS)));
     expect(e.damage).toBe(0);
     const ineffective = events.find((ev) => ev.unitId === "B1" && ev.kind === "ineffective");
     expect(ineffective?.detail).toMatch(/fire not working .* shots/);
@@ -813,19 +837,21 @@ describe("context for decisions", () => {
   });
 
   it("shows the real chance of doing damage, not the chance of a round striking", () => {
-    const { cfg, state } = longRange(DEFAULT_TIMING.lethalityPerTurn);
+    const { cfg, state } = longRange(DEFAULT_TIMING.strikeScale);
     const engage = optionsFor(state, "R1", cfg).find((o) => o.id === "engage:B2")!;
     expect(engage.summary).toMatch(/%\/min to knock out one of its vehicles/);
     expect(engage.summary).not.toMatch(/to hit/);
     const odds = oddsAgainst(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
-    // Per minute of real-time fire, far below the table's per-shot hit chance.
-    expect(engage.effect!).toBeLessThan(odds.pHit);
+    const effect = damageEffect(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
+    // A hit is not a knock-out: per round, the chance of one is the hit chance × getting through × killing.
+    expect(effect.strike!.pKnockOut).toBeLessThan(1);
+    expect(effect.perShot).toBeLessThan(1 - Math.pow(1 - odds.pHit, odds.rounds));
   });
 
   it("offers closing to effective range, with who would cover the move, and the rules take it when fire is not working", async () => {
     const { cfg, state: start } = longRange(0);
     const { state } = run(start, cfg, 200);
-    // Judged at the normal lethality; the run used none, to guarantee the misses.
+    // Judged with rounds landing; the run had none land, to guarantee the misses.
     const judged = { ...cfg, timing: DEFAULT_TIMING };
     const options = optionsFor(state, "B1", judged);
     const close = options.find((o) => o.id === "close:R1")!;
@@ -897,7 +923,7 @@ describe("range", () => {
   it("makes point-blank fire far more accurate and lethal than long-range fire", () => {
     const cfg = config();
     const state = createRealtimeState(
-      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(1000, 1500))], true),
+      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(0, 2900))], true),
     );
     const [b1, r1, r2] = ["B1", "R1", "R2"].map((id) => state.game.forceElements[id]);
     const close = oddsAgainst(b1, r1, state, cfg)!;
@@ -905,16 +931,32 @@ describe("range", () => {
     expect(close.pHit).toBeGreaterThan(far.pHit + 0.15);
     const closeEffect = damageEffect(b1, r1, state, cfg)!;
     const farEffect = damageEffect(b1, r2, state, cfg)!;
-    expect(closeEffect.perMinute).toBeGreaterThan(farEffect.perMinute * 3);
+    expect(farEffect.minutesToKnockOut!).toBeGreaterThan(closeEffect.minutesToKnockOut! * 1.5);
   });
 
-  it("scales lethality smoothly with range, and adds the range band to the roll", () => {
-    expect(lethalityFactor(300)).toBeGreaterThan(lethalityFactor(1000));
-    expect(lethalityFactor(1000)).toBeGreaterThan(lethalityFactor(2500));
-    expect(lethalityFactor(750)).toBeCloseTo((lethalityFactor(500) + lethalityFactor(1000)) / 2, 5);
-    expect(rangeModifiers(300)).toEqual([{ source: "pointBlank", value: 2 }]);
-    expect(rangeModifiers(800)).toEqual([{ source: "closeRange", value: 1 }]);
-    expect(rangeModifiers(2000)).toEqual([]);
+  it("works hit chance out from an error budget: range, motion, cover and the gun's own ballistics", () => {
+    const t = DEFAULT_TIMING;
+    const g = scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)();
+    const tank = g.forceElements["red-1"];
+    const gun = g.forceElements["blue-1"].capabilities.find((c) => c.kind === "atk")!;
+    const p = (range: number, c = {}) => hitChance(gun, tank, range, { aspect: "front", ...c }, t);
+    // Stationary, modern fire control: near-certain close in, falling continuously with range.
+    expect(p(1000)).toBeGreaterThan(0.95);
+    expect(p(2000)).toBeGreaterThan(0.85);
+    expect(p(1500)).toBeGreaterThan(p(2000));
+    expect(p(2000)).toBeGreaterThan(p(2500));
+    expect(p(2500)).toBeGreaterThan(p(3000));
+    // Each degrades it, more at range.
+    for (const c of [{ targetMoving: true }, { firerMoving: true }, { targetHullDown: true, aspect: "turret" }, { targetInCover: true }, { firerSuppressed: true }]) {
+      expect(p(2500, c)).toBeLessThan(p(2500));
+    }
+    // A slow round leads a moving target worse than a fast one: flight time from muzzle velocity.
+    const heat = { ...gun, munition: "ce" as const, muzzleVelocityMs: 900 };
+    expect(errorBudget(heat, 2000, {}).timeOfFlightS).toBeGreaterThan(errorBudget(gun, 2000, {}).timeOfFlightS * 1.5);
+    expect(hitChance(heat, tank, 2000, { aspect: "front", targetMoving: true }, t)).toBeLessThan(p(2000, { targetMoving: true }));
+    // Rate of fire from the data: the Challenger's gun sustains 6 aimed rounds a minute.
+    expect(aimedIntervalS(gun, t.shotIntervalS)).toBe(10);
+    expect(hitChance(gun, tank, 600, {}, { ...t, strikeScale: 0 })).toBe(0);
   });
 
   it("says what a shot did: a hit that did no damage is not reported as a hit", () => {
@@ -928,7 +970,11 @@ describe("range", () => {
       state = r.state;
       for (const shot of r.shots) results.add(shot.result);
     }
-    for (const result of results) expect(result).toMatch(/^(missed|near miss, suppressed|struck( \d×)?, (no damage|damaged))$/);
+    for (const result of results) {
+      expect(result).toMatch(
+        /^\d+ rounds?, (all missed|\d+ hit: (did not penetrate \(.+\)|penetrated \(.+\), crew fighting on|intercepted by active protection|knocked out \d+ \(.+\); \d+\/\d+ left))$/,
+      );
+    }
   });
 
   it("closes to inside a kilometre, where fire pays", () => {
@@ -979,7 +1025,7 @@ describe("the data behind a shot", () => {
   });
 
   it("knocks out vehicles one at a time, and strength follows", () => {
-    const cfg = config({ timing: { ...DEFAULT_TIMING, lethalityPerTurn: 30 } });
+    const cfg = config();
     let state = createRealtimeState(
       game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(200, 0)), fe("R1", "red", at(0, 400), { platformCount: 4 })], true),
     );
@@ -987,17 +1033,21 @@ describe("the data behind a shot", () => {
     state = setOrder(state, "B2", { kind: "engage", targetId: "R1" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
     expect(state.units.R1.vehicles).toEqual({ total: 4, fit: 4 });
-    const seen: number[] = [];
+    const seen: number[] = [state.units.R1.vehicles.fit];
     const labels: string[] = [];
-    for (let i = 0; i < 1200 && state.game.forceElements.R1.combatStrength > 0; i += 1) {
+    for (let i = 0; i < 1200 && state.game.forceElements.R1.combatStrength > 0 && !state.over; i += 1) {
       const r = tick(state, cfg);
       state = r.state;
       labels.push(...r.shots.map((s) => s.result));
       if (seen[seen.length - 1] !== state.units.R1.vehicles.fit) seen.push(state.units.R1.vehicles.fit);
     }
-    expect(seen[seen.length - 1]).toBe(0);
-    expect(state.game.forceElements.R1.combatStrength).toBe(0);
-    expect(labels.some((l) => /^knocked out \d/.test(l))).toBe(true);
+    // It loses vehicles one knock-out at a time (it may break, and red lose, before the last).
+    expect(seen[0]).toBe(4);
+    expect(seen.length).toBeGreaterThan(1);
+    const { fit, total } = state.units.R1.vehicles;
+    const r1 = state.game.forceElements.R1;
+    expect(r1.combatStrength).toBe(fit === 0 ? 0 : Math.max(1, Math.round((r1.combatStrengthStart * fit) / total)));
+    expect(labels.some((l) => /knocked out \d/.test(l))).toBe(true);
   });
 
   it("finds hull-down positions from the ground itself", () => {
@@ -1039,5 +1089,86 @@ describe("the data behind a shot", () => {
     const state = createRealtimeState(scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)());
     const effect = damageEffect(state.game.forceElements["blue-1"], state.game.forceElements["red-1"], state, cfg)!;
     expect(describeEffect(effect)).toMatch(/knock out one of its vehicles \((front|side|rear), \d+ vs \d+ mm: \d+% penetrate\)/);
+  });
+});
+
+// ── What slows a real engagement: spotting, acquisition, fire distribution ──
+
+describe("finding, laying on and sharing out targets", () => {
+  it("spots at a rate: faster close, moving or firing; slower in cover, hull-down or on the move", () => {
+    const base = detectionRate(1000, {});
+    expect(detectionRate(500, {})).toBeCloseTo(base * 4, 6);
+    expect(detectionRate(1000, { targetMoving: true })).toBeGreaterThan(base);
+    expect(detectionRate(1000, { targetFired: true })).toBeGreaterThan(base);
+    expect(detectionRate(1000, { targetInCover: true })).toBeLessThan(base);
+    expect(detectionRate(1000, { targetHullDown: true })).toBeLessThan(base);
+    expect(detectionRate(1000, { observerMoving: true })).toBeLessThan(base);
+    expect(detectChance(100, {}, 1)).toBe(1);
+  });
+
+  it("takes longer to find a still enemy far off than a close one", () => {
+    const timeToSight = (north: number) => {
+      let total = 0;
+      for (let seed = 0; seed < 20; seed += 1) {
+        const cfg = config({ rng: createRng(`spot${seed}`) });
+        let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, north))]));
+        state = setOrder(state, "B1", { kind: "hold" }, cfg, { roe: "never" });
+        state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+        let t = 0;
+        while (t < 600 && !state.units.B1.ownSeen.R1) {
+          state = tick(state, cfg).state;
+          t += 1;
+        }
+        total += t;
+      }
+      return total / 20;
+    };
+    expect(timeToSight(2500)).toBeGreaterThan(timeToSight(600) * 3);
+  });
+
+  it("lays on a new target before the first round, but not on one it is already engaging", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2000))], true));
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const shotTimes: number[] = [];
+    for (let i = 0; i < 60; i += 1) {
+      const r = tick(state, cfg);
+      state = r.state;
+      for (const shot of r.shots) shotTimes.push(shot.time);
+    }
+    // In sight of the crew itself (tracked from the first second), 2 km off: 4 + 4 s.
+    expect(shotTimes[0]).toBeGreaterThanOrEqual(acquisitionS(2000));
+    expect(acquisitionS(2000, { onlyReported: true })).toBeGreaterThan(acquisitionS(2000));
+    // After that, the weapon's own rate of fire.
+    const gun = state.game.forceElements.B1.capabilities[0];
+    expect(shotTimes[1] - shotTimes[0]).toBe(aimedIntervalS(gun, DEFAULT_TIMING.shotIntervalS));
+  });
+
+  it("wastes rounds when two crews pick the same tank, or a fresh wreck", () => {
+    const cfg = config();
+    let state = createRealtimeState(
+      game(
+        [
+          fe("B1", "blue", at(0, 0)),
+          fe("B2", "blue", at(200, 0)),
+          fe("R1", "red", at(0, 300), { platformCount: 1, armour: { frontKeMm: 10, sideKeMm: 10, rearKeMm: 10 } }),
+          fe("R2", "red", at(3000, 30_000)),
+        ],
+        true,
+      ),
+    );
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "B2", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const labels: string[] = [];
+    for (let i = 0; i < 60 && state.game.forceElements.R1.combatStrength > 0; i += 1) {
+      const r = tick(state, cfg);
+      state = r.state;
+      labels.push(...r.shots.map((s) => s.result));
+    }
+    // Eight rounds at one thin-skinned vehicle at 300 m: it dies, and the rest were wasted on it.
+    expect(state.game.forceElements.R1.combatStrength).toBe(0);
+    expect(labels.some((l) => /on a tank already knocked out/.test(l))).toBe(true);
   });
 });

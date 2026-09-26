@@ -130,6 +130,10 @@ export interface RtUnit {
    * "3 combat strength"; strength follows from how many are still fit.
    */
   vehicles: { total: number; fit: number };
+  /** Laying on a new target: the first round goes when acquisition is done. */
+  laying?: { targetId: string; readyAt: number };
+  /** When each of its vehicles was knocked out: fresh wrecks still draw fire for a while. */
+  losses: number[];
 }
 
 /** One unit's fire on one target, since it started. */
@@ -248,17 +252,19 @@ export interface RtTiming {
   tickS: number;
   /** One turn of the turn-based game, in seconds — what the rules' rates are per. */
   turnS: number;
-  /** How often a unit engaging something fires. */
-  shotIntervalS: number;
   /**
-   * How many turn-game fire results one turn's worth of continuous fire is
-   * worth. Each shot's fire-table result is scaled by
-   * `lethalityPerTurn × shotIntervalS / turnS`. THE calibration knob.
+   * The least time between aimed shots for one vehicle: an engagement cycle
+   * (acquire, lay, fire, observe). Each weapon's own rate of fire (fire.ts,
+   * from L7) is slower still for most guns.
    */
-  lethalityPerTurn: number;
-  /** How often each observer gets a sighting attempt at each enemy it can see. */
-  sightingIntervalS: number;
-  /** How long a contact stays on the map after the last time anyone saw it. */
+    shotIntervalS: number;
+  /**
+   * Multiplies the chance a fire-table hit is a round on target (fire.ts).
+   * 1 is the realistic figure; tests set 0 to guarantee nothing lands.
+   * Not a pacing knob: rates of fire come from the data.
+   */
+  strikeScale: number;
+    /** How long a contact stays on the map after the last time anyone saw it. */
   contactMemoryS: number;
   /** How often a shaken or fallen-back broken unit tries to rally. */
   rallyCheckS: number;

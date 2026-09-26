@@ -5,14 +5,21 @@
 
 import { bearingDeg, distanceM, type LatLng } from "../../lib/board";
 import { lineOfSight } from "../../lib/lineOfSight";
-import { sightingOf, type ForceElement, type Side } from "../../lib/state";
+import type { ForceElement, Side } from "../../lib/state";
 import { inCover } from "../../lib/proceduralTerrain";
-import { fireOdds } from "../../rules/jevState";
-import { isFlankShot, weaponFor } from "../../rules/turnLoop";
-import { canHit, describeOrder, hullDownFrom, knownEnemies, knownTo } from "./engine";
-import { rangeModifiers, strikeChance } from "./fire";
+import { weaponFor } from "../../rules/turnLoop";
+import { canHit, describeOrder, hitConditions, hullDownFrom, knownEnemies, knownTo, vehiclesIn } from "./engine";
+import { aimedIntervalS, hitChance } from "./fire";
 import { describeStrike, strikeOdds, type StrikeOdds } from "./lethality";
-import { allowanceAt, compass, hullDownAgainst, hullDownSpot, offsetBy, positionsFor } from "./geometry";
+import {
+  allowanceAt,
+  compass,
+  hullDownAgainst,
+  hullDownSpot,
+  offsetBy,
+  platformSpeedFactor,
+  positionsFor,
+} from "./geometry";
 import type { RtConfig, RtOption, RtState } from "./types";
 
 /** Objective within this is "reached": no point offering to advance on it. */
@@ -25,50 +32,22 @@ const HULL_DOWN_SEARCH_M = 400;
 const ASSAULT_RANGE_M = 1500;
 
 /**
- * The enemy as this side can judge it: morale unknown (assumed steady), armour
- * unknown until identified. Same rule as the turn game's odds.
+ * The chance each round from `self` hits `enemy` right now (fire.ts), and how
+ * many hits a shot should land — one round per fit vehicle.
  */
-export function perceived(enemy: ForceElement, identified: boolean): ForceElement {
-  return {
-    ...enemy,
-    morale: "good",
-    combatStrength: enemy.combatStrengthStart,
-    armour: identified ? enemy.armour : undefined,
-    armourMm: identified ? enemy.armourMm : undefined,
-  };
-}
-
-/** The odds of `self` hitting `enemy` right now, as this side would estimate them. */
 export function oddsAgainst(
   self: ForceElement,
   enemy: ForceElement,
   state: RtState,
   config: RtConfig,
-): { pHit: number; expectedHits: number } | null {
-  const rangeM = distanceM(self.position, enemy.position);
+  from: LatLng = self.position,
+): { pHit: number; expectedHits: number; rounds: number } | null {
+  const rangeM = distanceM(from, enemy.position);
   const weapon = weaponFor(self, enemy, rangeM);
   if (!weapon) return null;
-  const odds = fireOdds(
-    [self],
-    perceived(
-      enemy,
-      state.units[self.id]
-        ? knownTo(state.game, state.units, self.id, enemy.id) === "full"
-        : sightingOf(state.game, self.side, enemy.id) === "full",
-    ),
-    {
-      rangeM,
-      maxRangeM: weapon.maxRangeM,
-      penetrationMm: weapon.penetrationMm,
-      munition: weapon.munition,
-      topAttack: weapon.topAttack,
-      targetInCover: inCover(config.terrain, enemy.position) || hullDownFrom(state, enemy, self.position, config),
-      flank: isFlankShot([self], enemy, config.ruleset),
-      extraModifiers: rangeModifiers(rangeM),
-    },
-    config.ruleset,
-  );
-  return { pHit: odds.pHit, expectedHits: odds.expectedHits };
+  const pHit = hitChance(weapon, enemy, rangeM, hitConditions(state, self, enemy, config, from), config.timing);
+  const rounds = Math.max(1, state.units[self.id]?.vehicles.fit ?? vehiclesIn(self));
+  return { pHit, expectedHits: pHit * rounds, rounds };
 }
 
 /** Strength this side has seen itself take off an enemy: it watched the rounds land. */
@@ -106,24 +85,25 @@ export function damageEffect(
   config: RtConfig,
   from: LatLng = firer.position,
 ): Effect | null {
-  const moved = from !== firer.position;
-  const at = moved ? { ...firer, position: from, markers: firer.markers.filter((m) => m !== "moved") } : firer;
-  const odds = oddsAgainst(at, target, state, config);
+  const odds = oddsAgainst(firer, target, state, config, from);
   if (!odds) return null;
   const rangeM = distanceM(from, target.position);
-  const weapon = weaponFor(at, target, rangeM);
+  const weapon = weaponFor(firer, target, rangeM);
   if (!weapon) return null;
   const strike = strikeOdds(weapon, target, from, rangeM, config.ruleset, hullDownFrom(state, target, from, config));
   const { timing } = config;
-  const perShot = Math.min(1, odds.expectedHits * strikeChance(rangeM, timing) * strike.pKnockOut);
-  const shotsPerMinute = 60 / timing.shotIntervalS;
+  // Per round: hits and knocks out. Per shot: any of its rounds does.
+  const perRound = odds.pHit * strike.pKnockOut;
+  const perShot = 1 - Math.pow(1 - perRound, odds.rounds);
+  const expectedPerShot = perRound * odds.rounds;
+  const shotsPerMinute = 60 / aimedIntervalS(weapon, timing.shotIntervalS);
   const perMinute = 1 - Math.pow(1 - perShot, shotsPerMinute);
   // Knocked-out vehicles are seen to be knocked out.
   const vehiclesLeft = state.units[target.id]?.vehicles.fit ?? 1;
   return {
     perShot,
     perMinute,
-    minutesToKnockOut: perShot > 0 ? vehiclesLeft / (perShot * shotsPerMinute) : null,
+    minutesToKnockOut: expectedPerShot > 0 ? vehiclesLeft / (expectedPerShot * shotsPerMinute) : null,
     strike,
     vehiclesLeft,
   };
@@ -295,7 +275,7 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
       if (spot) {
         const there = damageEffect(self, enemy, state, config, spot.at);
         const move = distanceM(self.position, spot.at);
-        const speed = (allowanceAt(self, self.position, config) / config.timing.turnS) * 0.6;
+        const speed = (allowanceAt(self, self.position, config) / config.timing.turnS) * 0.6 * platformSpeedFactor(self);
         const minutes = speed > 0 ? Math.max(1, Math.round(move / speed / 60)) : null;
         const covering = others.length ? `; ${others.join(", ")} firing on it to cover you` : "; nobody covering you";
         const back = damageEffect(enemy, { ...self, position: spot.at, markers: [] }, state, config);
@@ -305,7 +285,9 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
             `close on ${name} to ~${Math.round(spot.rangeM)} m: move ${where(spot.at)} tactically` +
             `${minutes ? ` (~${minutes} min)` : ""}${spot.cover ? `, ending in ${config.terrain.classify(spot.at)}` : ", ending in the open"}` +
             `; from there ${describeEffect(there)} (from here: ${hereEffect ? describeEffect(hereEffect) : "cannot fire on it"})` +
-            `, and its fire on you there ${describeEffect(back, "you").replace(/, .*$/, "")}` +
+            `, and its fire on you there ${
+              back && back.perShot > 0 ? `≈${back.perMinute < 0.01 ? "<1" : Math.round(back.perMinute * 100)}%/min to knock out one of yours` : "cannot hurt you"
+            }` +
             `; ${spot.seenBy} known enem${spot.seenBy === 1 ? "y sees" : "ies see"} that spot${covering}`,
           order: { kind: "move", to: spot.at, mode: "tactical" },
           ...(there ? { effect: there.perMinute } : {}),

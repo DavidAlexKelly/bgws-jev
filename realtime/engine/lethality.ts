@@ -30,8 +30,17 @@ const KE_FALLOFF_PER_KM = 0.06;
 const ASPECT_FRACTION: Record<Exclude<Aspect, "front" | "turret">, number> = { side: 0.2, rear: 0.06, roof: 0.045 };
 /** DECLARED. How soft the penetration margin is: at ±12% of the armour the chance is ~27% / ~73%. */
 const PEN_SPREAD = 0.12;
-/** DECLARED. Chance a penetration knocks the vehicle out, by what it is. */
-const P_KILL: Record<string, number> = { armoured_vehicle: 0.6, default: 0.85 };
+/**
+ * DECLARED. Chance a penetration knocks an armoured vehicle out: a round that
+ * barely gets through often does not, one that overmatches the armour by a
+ * wide margin (a sabot into 40 mm of rear plate) nearly always does.
+ */
+const P_KILL_MARGINAL = 0.5;
+const P_KILL_OVERMATCH = 0.95;
+/** Penetration this many times the armour counts as full overmatch. */
+const OVERMATCH_RATIO = 2.5;
+/** DECLARED. Anything unarmoured that is struck. */
+const P_KILL_SOFT = 0.9;
 /** DECLARED. Chance an active protection system defeats one missile or rocket. */
 const P_APS_INTERCEPT = 0.5;
 /** As the rules have it (tandemEraDefeatFraction): a tandem warhead strips this much of ERA-fitted armour. */
@@ -130,7 +139,14 @@ export function strikeOdds(
       ? 1
       : 1 / (1 + Math.exp(-(penetration - armour) / (PEN_SPREAD * armour)));
   const pIntercept = shaped && target.apsFitted ? P_APS_INTERCEPT : 0;
-  const pKill = P_KILL[target.targetClass] ?? P_KILL.default;
+  const pKill =
+    target.targetClass !== "armoured_vehicle"
+      ? P_KILL_SOFT
+      : penetration == null || armour == null || armour <= 0
+        ? P_KILL_MARGINAL
+        : P_KILL_MARGINAL +
+          (P_KILL_OVERMATCH - P_KILL_MARGINAL) *
+            Math.max(0, Math.min(1, (penetration / armour - 1) / (OVERMATCH_RATIO - 1)));
   return {
     aspect,
     ...(penetration != null ? { penetrationMm: Math.round(penetration) } : {}),

@@ -6,20 +6,13 @@
 //
 //   CHANCES    something that happens with probability p in a turn happens
 //              with probability 1 − (1 − p)^(dt / turnS) in a tick of dt.
-//   ACTIONS    a shot is an action, not a chance. A unit that is engaging
-//              fires every `shotIntervalS`. The fire table is rolled as it
-//              is, but its RESULT is scaled: a hit only costs strength with
-//              probability hits × lethalityPerTurn × shotIntervalS / turnS.
-//              Every shot, misses included, adds suppression.
-//
-// ⚠ `lethalityPerTurn` IS THE CALIBRATION KNOB. It sets how often a fire-
-// table hit is a round actually on target (scaled by range in fire.ts); what
-// that round does is lethality.ts — the face it strikes, the round's
-// penetration there against that armour, and whether the vehicle is knocked
-// out. Peer tanks mostly bounce off each other's fronts, so it is higher than
-// when every hit simply cost strength. At 4, identical forces fight for 22-24
-// sim-minutes and end on a breakpoint: 149/151 over 300 symmetric games — see
-// the balance and decisiveness checks in realtime.test.ts.
+//   ACTIONS    a shot is an action, not a chance. Each vehicle fires at its
+//              weapon's own sustained rate (L7 rof_sustained) — a Challenger's
+//              gun six aimed rounds a minute — with `shotIntervalS` as the
+//              least an engagement cycle (acquire, lay, fire, observe) can
+//              take. fire.ts's error budget says whether each round hits;
+//              lethality.ts what it does to the face it strikes. Every shot,
+//              misses included, adds suppression.
 
 import type { RtTiming } from "./types";
 
@@ -27,12 +20,6 @@ import type { RtTiming } from "./types";
 export const CLOSE_CONTACT_M = 300;
 /** An assault keeps closing until this close. */
 export const ASSAULT_CONTACT_M = 150;
-/** Closer than this, with a line of sight, nobody fails to see a unit (halted target). */
-export const AUTO_SIGHT_M = 500;
-/** A moving target is seen without a roll from this far. */
-export const AUTO_SIGHT_MOVING_M = 800;
-/** A settled, hull-down target in cover is only certain to be seen this close. */
-export const AUTO_SIGHT_HIDDEN_M = 300;
 
 /** Suppression at or above this lowers accuracy. */
 export const SUPPRESSED_AT = 25;
@@ -69,9 +56,8 @@ export const HISTORY_LENGTH = 4;
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,
-  shotIntervalS: 30,
-  lethalityPerTurn: 4,
-  sightingIntervalS: 30,
+  shotIntervalS: 8,
+  strikeScale: 1,
   contactMemoryS: 120,
   rallyCheckS: 60,
   idleS: 75,
