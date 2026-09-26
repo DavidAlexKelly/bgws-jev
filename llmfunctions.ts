@@ -42,6 +42,23 @@
  * Different models commanding opposing sides is the experiment, not a gimmick.
  * The harness already measures whether a MECHANIC earns its place; the same
  * method measures whether a COMMANDER does.
+ *
+ * WHY THREE QUERIES
+ *
+ *   bgwsCommanderTurn     orders for a turn, carried out EXACTLY as written.
+ *                         Jev off.
+ *   bgwsCommanderTurnJev  orders for a turn that Jev, a fast decision model,
+ *                         will carry out — choosing which committed element
+ *                         acts next, adapting an order when the board has
+ *                         changed, and making reactive-fire and contact calls
+ *                         at the moment. Jev on.
+ *   bgwsCommanderDecide   one quick call Jev was unsure about, escalated to
+ *                         the side's model mid-turn. Jev on.
+ *
+ * Separate queries rather than a flag on one, because the brief is what
+ * differs and the brief is what a reader of this file needs to see. With Jev
+ * on, the old brief is actively wrong: it tells the model its standing orders
+ * are final and that its orders run as written, and neither is true.
  */
 
 import { Query, UserFacingError } from "@foundry/functions-api";
@@ -78,6 +95,23 @@ const TEMPERATURE = 0;
  */
 const MAX_TOKENS = 2000;
 
+/**
+ * With Jev on, a model that reasons before answering needs the room: GPT-5.2
+ * may count hidden reasoning against the limit, and a reply cut short is
+ * unreadable JSON — an unanswered turn. A higher ceiling costs nothing unless
+ * it is used.
+ */
+const MAX_TOKENS_JEV: Record<CommanderModel, number> = {
+    "claude-sonnet-4-6": 3000,
+    "gpt-5-2": 8000,
+};
+
+/** A single escalated decision: a key and one sentence. */
+const MAX_TOKENS_DECIDE: Record<CommanderModel, number> = {
+    "claude-sonnet-4-6": 300,
+    "gpt-5-2": 2000,
+};
+
 const SYSTEM_BRIEF = [
     "You are a sub-unit commander in a turn-based wargame at platoon and troop level.",
     "",
@@ -91,7 +125,10 @@ const SYSTEM_BRIEF = [
     "- engage from short range where the modifiers favour you, and close if you are not there;",
     "- do not advance broken or disrupted elements into contact;",
     "- keep your HQ alive: it is what lets you commit elements at all;",
-    "- an element with nothing useful to do should hold rather than expose itself.",
+    // Leave it out, not "hold": the app prompt says holding costs a whole
+    // activation against command capacity and achieves nothing, and the two
+    // briefs must not give the model opposite instructions.
+    "- an element with nothing useful to do should be left out of your orders, not ordered to hold.",
     "",
     "An element may be ordered to MOVE and then ENGAGE in the same turn. Both",
     "orders count as one element against your command capacity.",
@@ -99,6 +136,89 @@ const SYSTEM_BRIEF = [
     "Absence of a contact is not evidence of absence. You are seeing through fog of war.",
     "",
     "Reply with JSON only. No prose, no code fences, no explanation outside the JSON.",
+].join("\n");
+
+/**
+ * The brief when Jev carries the orders out.
+ *
+ * What changes, and why each line is there:
+ *
+ *   - ORDERS ARE INTENT. Jev picks which committed element acts next and may
+ *     adapt an order to what has happened since. So the model's job moves up
+ *     a level: say what each element is FOR, because that is what Jev reads
+ *     when it adapts. A "why" that only restates the order gives it nothing.
+ *   - COMMITTING IS STILL THE MODEL'S. Jev can only act with elements the
+ *     orders commit; command capacity is spent here and nowhere else.
+ *   - RULES OF ENGAGEMENT ARE DEFAULTS. Jev decides reactive fire at the
+ *     moment and may depart from them — except "never", which it must obey.
+ *     "never" is therefore how the model keeps an element hidden.
+ *   - THE NEW OPTIONS AND THE ASSESSMENT ARE NAMED, so the model knows what a
+ *     "moves 420 m NE to overwatch" option is and what the JEV ASSESSMENT
+ *     table in the prompt means.
+ */
+const JEV_SYSTEM_BRIEF = [
+    "You are the commander of one side in a turn-based wargame at platoon and troop level.",
+    "",
+    "You write the plan and the orders for this turn. A fast tactical controller",
+    "(Jev) then fights the turn for you, one activation at a time. It:",
+    "- chooses WHICH of your committed elements acts next, and when;",
+    "- may ADAPT an element's order if the board has changed since you wrote it —",
+    "  a target gone, a new threat, a better shot;",
+    "- decides reactive fire and what a moving element does on contact or under",
+    "  fire, at the moment it happens;",
+    "- can only use elements your orders commit. Command capacity is spent by you.",
+    "",
+    "So your orders are INTENT, and the reasons matter as much as the choices:",
+    "- `plan` names the main effort and what the rest are for.",
+    "- every order's `why` says what that element is FOR — \"fix R1 so B3 can reach",
+    "  its flank\", not \"B2 fires at R1\". Jev reads it when it has to adapt.",
+    "- order the list by importance; it is also how you tell Jev what matters most.",
+    "",
+    "Options are generated by the rules engine: they are the only moves available.",
+    "Anything you reply that is not on that list is discarded, so choose only from",
+    "the ids given. Some move options are chosen for the ground — into cover, to",
+    "overwatch, pulling back out of sight, onto a flank — and say so.",
+    "",
+    "Standing orders (rules of engagement) are DEFAULTS for Jev, which may depart",
+    "from them at the moment. The exception is \"never\": Jev must obey it. Use",
+    "\"never\" for an element you want kept hidden whatever happens.",
+    "",
+    "If the prompt includes a JEV ASSESSMENT, it is the controller's quick read of",
+    "each element's danger and opportunity (1 low – 5 high). It is advice, not fact;",
+    "the board is the fact.",
+    "",
+    "Sound tactical practice, in rough priority:",
+    "- concentrate fire rather than spreading it across many targets;",
+    "- engage from short range where the modifiers favour you, and close if you are not there;",
+    "- do not advance broken or disrupted elements into contact;",
+    "- keep your HQ alive: it is what lets you commit elements at all;",
+    "- use the ground: an element in cover or on overwatch is worth more than one in the open;",
+    "- an element with nothing useful to do should be left out of your orders, not ordered to hold.",
+    "",
+    "An element may be ordered to MOVE and then ENGAGE in the same turn. Both",
+    "orders count as one element against your command capacity.",
+    "",
+    "Absence of a contact is not evidence of absence. You are seeing through fog of war.",
+    "",
+    "Reply with JSON only. No prose, no code fences, no explanation outside the JSON.",
+].join("\n");
+
+/**
+ * The brief for one escalated decision.
+ *
+ * Short on purpose: the game is paused mid-activation waiting for this. The
+ * prompt from the app already carries the situation, the directive and the
+ * options with their keys; all this adds is who is asking and the reply rule.
+ */
+const DECIDE_BRIEF = [
+    "You are the commander of one side in a turn-based wargame. Your fast tactical",
+    "controller was unsure about the decision below and has passed it to you. The",
+    "game is waiting on your answer.",
+    "",
+    "Choose exactly one of the option keys given. A key that was not offered is",
+    "ignored and the rules decide instead.",
+    "",
+    'Reply with JSON only, on one line: {"choice":"<key>","why":"<one sentence>"}',
 ].join("\n");
 
 export class BgwsCommanderFunctions {
@@ -133,37 +253,103 @@ export class BgwsCommanderFunctions {
             throw new UserFacingError("No prompt was supplied, so there is nothing to command.");
         }
 
+        const chosen = this.modelFor(model);
+        return this.run(chosen, this.compose(SYSTEM_BRIEF, directive, prompt), MAX_TOKENS);
+    }
+
+    /**
+     * One side's orders for one turn, for Jev to carry out.
+     *
+     * Same contract as bgwsCommanderTurn — same parameters, same reply format,
+     * parsed by the same code in the app. Only the brief differs; see
+     * JEV_SYSTEM_BRIEF for what and why.
+     */
+    @Query({ apiName: "bgwsCommanderTurnJev" })
+    public async commanderTurnJev(
+        prompt: string,
+        model: string,
+        directive: string,
+    ): Promise<string> {
+        if (!prompt || prompt.trim().length === 0) {
+            throw new UserFacingError("No prompt was supplied, so there is nothing to command.");
+        }
+        const chosen = this.modelFor(model);
+        return this.run(
+            chosen,
+            this.compose(JEV_SYSTEM_BRIEF, directive, prompt),
+            MAX_TOKENS_JEV[chosen],
+        );
+    }
+
+    /**
+     * One decision Jev was unsure about, escalated mid-turn.
+     *
+     * The app's prompt already includes the situation, the side's directive
+     * and the keyed options, so `directive` is normally empty here — passing
+     * it again would only say the same thing twice.
+     *
+     * Reply: {"choice":"<key>","why":"..."}. An empty or unreadable reply is
+     * not an error: the app lets the rules decide and records that it did.
+     */
+    @Query({ apiName: "bgwsCommanderDecide" })
+    public async commanderDecide(
+        prompt: string,
+        model: string,
+        directive: string,
+    ): Promise<string> {
+        if (!prompt || prompt.trim().length === 0) {
+            throw new UserFacingError("No decision was supplied, so there is nothing to decide.");
+        }
+        const chosen = this.modelFor(model);
+        return this.run(
+            chosen,
+            this.compose(DECIDE_BRIEF, directive, prompt),
+            MAX_TOKENS_DECIDE[chosen],
+        );
+    }
+
+    /** A known model, or a loud error naming the ones that are. */
+    private modelFor(model: string): CommanderModel {
         const chosen = MODELS.find((candidate) => candidate === model);
         if (chosen === undefined) {
             throw new UserFacingError(
                 `Unknown commander model "${model}". Available: ${MODELS.join(", ")}.`,
             );
         }
+        return chosen;
+    }
 
+    /**
+     * Brief, directive and prompt, as one user turn.
+     *
+     * The brief is prepended to the user turn rather than sent as a SYSTEM
+     * message, because the two imported models disagree about how a system
+     * role is shaped and this function is not the place to care.
+     */
+    private compose(brief: string, directive: string, prompt: string): string {
         const system = directive && directive.trim().length > 0
-            ? `${SYSTEM_BRIEF}\n\nYOUR DIRECTIVE\n\n${directive.trim()}`
-            : SYSTEM_BRIEF;
+            ? `${brief}\n\nYOUR DIRECTIVE\n\n${directive.trim()}`
+            : brief;
+        return `${system}\n\n---\n\n${prompt}`;
+    }
 
-        // The brief is prepended to the user turn rather than sent as a SYSTEM
-        // message, because the two imported models disagree about how a system
-        // role is shaped and this function is not the place to care.
-        const content = `${system}\n\n---\n\n${prompt}`;
-
+    /**
+     * Ask the chosen model, and return its reply as it came.
+     *
+     * ⚠ AN EMPTY REPLY IS RETURNED EMPTY, not dressed up as JSON. This used to
+     * return {"plan":"the model returned nothing","orders":[]}, which the app
+     * parsed as a real decision to do nothing — so a trial counted a silent
+     * model as a turn played rather than a turn unanswered, which is exactly
+     * the "unreachable model looks like a cautious general" error the trial
+     * exists to catch. An empty string is read by the app as unanswered: the
+     * side still holds position and the game goes on, and the failure is
+     * counted.
+     */
+    private async run(chosen: CommanderModel, content: string, maxTokens: number): Promise<string> {
         const completion = chosen === "claude-sonnet-4-6"
-            ? await this.askClaude(content)
-            : await this.askGpt(content);
-
-        if (completion === undefined || completion.trim().length === 0) {
-            // Returned as text rather than thrown: the app treats an unreadable
-            // reply as "this side held position, and here is why", which keeps
-            // a game alive through one bad response.
-            return JSON.stringify({
-                plan: "the model returned nothing",
-                orders: [],
-            });
-        }
-
-        return completion;
+            ? await this.askClaude(content, maxTokens)
+            : await this.askGpt(content, maxTokens);
+        return completion === undefined ? "" : completion;
     }
 
     /** Every model this function will accept, for the app's picker. */
@@ -178,17 +364,17 @@ export class BgwsCommanderFunctions {
      * `completion`; GPT returns `choices[0].message.content`. Casting over that
      * would move the breakage from compile time to the middle of a game.
      */
-    private async askClaude(content: string): Promise<string | undefined> {
+    private async askClaude(content: string, maxTokens: number): Promise<string | undefined> {
         const response = await AnthropicClaude_4_6_Sonnet.createGenericChatCompletion({
-            params: { temperature: TEMPERATURE, maxTokens: MAX_TOKENS },
+            params: { temperature: TEMPERATURE, maxTokens },
             messages: [{ role: "USER", contents: [{ text: content }] }],
         });
         return response.completion;
     }
 
-    private async askGpt(content: string): Promise<string | undefined> {
+    private async askGpt(content: string, maxTokens: number): Promise<string | undefined> {
         const response = await GPT_5_2.createChatCompletion({
-            params: { temperature: TEMPERATURE, maxTokens: MAX_TOKENS },
+            params: { temperature: TEMPERATURE, maxTokens },
             messages: [{ role: "USER", contents: [{ text: content }] }],
         });
         return response.choices.length > 0 ? response.choices[0].message.content : undefined;
