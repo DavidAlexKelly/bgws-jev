@@ -153,3 +153,33 @@ The tests in `realtime.test.ts` cover each mechanic, plus balance (identical for
 - A request covering one side's whole combined-arms force is about 30,000 characters, roughly 8,000 tokens.
 - Balance is unchanged within chance: 74 / 86 over 160 symmetric games, and 20 / 20 over 40 combined-arms games.
 - No game reached the time limit.
+
+## 7. Range
+
+**What was seen:** units missed "a lot, very close".
+
+**Cause:** the turn game's fire table has one range effect, −1 beyond half the weapon's maximum range. A Challenger troop was struck 58% of the time at 300 m and 58% at 1,500 m. In real time only about one hit in twenty did damage, and those hits were reported with the table's "oneHit" label even when they did nothing.
+
+**What was added** (`realtime/engine/fire.ts`, real time only):
+- **Range bands on the roll:** +2 within 500 m, +1 within 1 km. The shared resolver takes them through a new optional `extraModifiers` field on the fire context. The turn game never sets that field, so it is unchanged, and the equivalence check still shows identical logs.
+- **Lethality by range:** the chance that a hit does damage is multiplied by 2.4 at 300 m, 2.0 at 500 m, 1.3 at 1 km, 0.9 at 1.5 km, 0.6 at 2.5 km and 0.5 at 3.5 km, interpolated in between.
+- **Honest shot results:** each shot reads *missed*, *near miss, suppressed*, *struck, no damage* or *struck, damaged*.
+- **`close:X` aims inside 1 km,** where both effects apply.
+- **`lethalityPerTurn` recalibrated from 1.5 to 1,** keeping game length at 20–25 sim-minutes.
+
+Challenger troop against Challenger troop, both halted:
+
+| Range | Struck | Damage per minute | In cover: struck | In cover: damage per minute |
+|---|---|---|---|---|
+| 300 m | 83% | 36% | 58% | 21% |
+| 800 m | 72% | 20% | 42% | 9% |
+| 1,500 m | 58% | 8% | 28% | 3% |
+| 2,500 m | 42% | 4% | 17% | 1% |
+
+These figures were measured at lethality 1.5. At the chosen 1.0 the damage chances are about two-thirds as high.
+
+**Measured at lethality 1:**
+- symmetric-control: 78 / 82 over 160 games, 20 sim-minutes on average;
+- combined arms: 22 / 18 over 40 games, 25 sim-minutes;
+- no game reached the time limit;
+- the rules close in 18–26 times a game, up from 3.

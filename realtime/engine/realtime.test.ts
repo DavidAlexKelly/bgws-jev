@@ -17,7 +17,8 @@ import { ruleDecider, type RtDecider } from "./deciders";
 import { createRealtimeState, setOrder, tick } from "./engine";
 import { heuristicInitialOrders, jevInitialOrders } from "./initialOrders";
 import { jevRealtimeDecider } from "./jevDecider";
-import { oddsAgainst, optionsFor } from "./options";
+import { damageEffect, oddsAgainst, optionsFor } from "./options";
+import { lethalityFactor, rangeModifiers } from "./fire";
 import { RealtimeRunner } from "./runner";
 import { DEFAULT_TIMING, perTick } from "./timing";
 import type { RtConfig, RtEvent, RtState } from "./types";
@@ -874,4 +875,55 @@ describe("context for decisions", () => {
     // Jev's window is 32k tokens; ~4 characters a token, with room for the answer.
     expect(size).toBeLessThan(90_000);
   }, 60_000);
+});
+
+
+// ── Range ──────────────────────────────────────────────────────────────────
+
+describe("range", () => {
+  it("makes point-blank fire far more accurate and lethal than long-range fire", () => {
+    const cfg = config();
+    const state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(1000, 1500))], true),
+    );
+    const [b1, r1, r2] = ["B1", "R1", "R2"].map((id) => state.game.forceElements[id]);
+    const close = oddsAgainst(b1, r1, state, cfg)!;
+    const far = oddsAgainst(b1, r2, state, cfg)!;
+    expect(close.pHit).toBeGreaterThan(far.pHit + 0.15);
+    const closeEffect = damageEffect(b1, r1, state, cfg)!;
+    const farEffect = damageEffect(b1, r2, state, cfg)!;
+    expect(closeEffect.perMinute).toBeGreaterThan(farEffect.perMinute * 3);
+  });
+
+  it("scales lethality smoothly with range, and adds the range band to the roll", () => {
+    expect(lethalityFactor(300)).toBeGreaterThan(lethalityFactor(1000));
+    expect(lethalityFactor(1000)).toBeGreaterThan(lethalityFactor(2500));
+    expect(lethalityFactor(750)).toBeCloseTo((lethalityFactor(500) + lethalityFactor(1000)) / 2, 5);
+    expect(rangeModifiers(300)).toEqual([{ source: "pointBlank", value: 2 }]);
+    expect(rangeModifiers(800)).toEqual([{ source: "closeRange", value: 1 }]);
+    expect(rangeModifiers(2000)).toEqual([]);
+  });
+
+  it("says what a shot did: a hit that did no damage is not reported as a hit", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2000))], true));
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const results = new Set<string>();
+    for (let i = 0; i < 900 && !state.over; i += 1) {
+      const r = tick(state, cfg);
+      state = r.state;
+      for (const shot of r.shots) results.add(shot.result);
+    }
+    for (const result of results) expect(result).toMatch(/^(missed|near miss, suppressed|struck( \d×)?, (no damage|damaged))$/);
+  });
+
+  it("closes to inside a kilometre, where fire pays", () => {
+    const cfg = config();
+    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2800))], true));
+    const close = optionsFor(state, "B1", cfg).find((o) => o.id === "close:R1")!;
+    expect(close.order.kind).toBe("move");
+    const to = (close.order as { to: LatLng }).to;
+    expect(distanceM(to, state.game.forceElements.R1.position)).toBeLessThanOrEqual(1000);
+  });
 });

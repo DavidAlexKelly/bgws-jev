@@ -54,6 +54,7 @@ import { hitsFor, type FireResult } from "../../rules/ruleset";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
+import { damagePerHit, rangeModifiers, shotLabel } from "./fire";
 import { allowanceAt, compass, offsetBy, towards } from "./geometry";
 import {
   ASSAULT_CONTACT_M,
@@ -881,6 +882,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           topAttack: weapon.topAttack,
           targetInCover: isCovered({ units }, target, config),
           flank: isFlankShot([self], target, config.ruleset),
+          // Real time only: closer is easier (see fire.ts).
+          extraModifiers: rangeModifiers(rangeM),
         },
         config.ruleset,
         rng,
@@ -915,10 +918,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   //
   // The table was written for one result per 15-minute turn. Here a hit costs
   // strength only with probability hits × lethalityPerTurn × shotIntervalS /
-  // turnS, so a quarter-hour of steady fire does what `lethalityPerTurn`
-  // turn-game results would. Every shot, misses included, suppresses.
-  const perHit = (timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS;
+  // turnS × the range's lethality factor (fire.ts), so a quarter-hour of
+  // steady fire does about what `lethalityPerTurn` turn-game results would —
+  // much more at point-blank range, less at the limit of the gun's reach.
+  // Every shot, misses included, suppresses.
   const newAttacker = new Map<string, string>();
+  const labels = new Map<(typeof planned)[number], string>();
   for (const shot of planned) {
     const firer = snapshot.forceElements[shot.firerId];
     const target = fe(shot.targetId);
@@ -926,7 +931,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     if (target.combatStrength <= 0) continue;
     const result = shot.outcome.event.result as FireResult;
     const hits = hitsFor(result);
-    const damaged = hits > 0 && rng.int(1_000_000) < Math.min(1, hits * perHit) * 1_000_000;
+    const damaged =
+      hits > 0 && rng.int(1_000_000) < Math.min(1, hits * damagePerHit(shot.rangeM, timing)) * 1_000_000;
+    const label = shotLabel(hits, result === "suppress", damaged);
+    labels.set(shot, label);
     if (damaged) {
       const lost = config.ruleset.lethality.strengthPerHit;
       game = applyEffects(game, [
@@ -976,7 +984,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       time,
       firerId: firer.id,
       targetId: target.id,
-      result: damaged ? `${result}, damaged` : hits > 0 ? `${result}, no damage` : result,
+      result: label,
       narrative: shot.outcome.event.narrative,
     });
 
@@ -1004,7 +1012,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       continue;
     }
     const by = firers
-      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${shot.outcome.event.result})`)
+      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? shot.outcome.event.result})`)
       .join(", ");
     const shooter = newAttacker.get(targetId);
     const did = shooter ? drill(targetId, shooter) : "";

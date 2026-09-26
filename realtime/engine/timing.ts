@@ -14,9 +14,10 @@
 //
 // ⚠ `lethalityPerTurn` IS THE CALIBRATION KNOB. The table was written for one
 // result per 15-minute turn; rolled every 30 s unscaled it broke units in a
-// couple of minutes, which is what made them withdraw for ever. At 1.5, fifteen
-// minutes of continuous fire does what one and a half turn-game results would —
-// see the balance and decisiveness checks in realtime.test.ts.
+// couple of minutes, which is what made them withdraw for ever. The chance a
+// hit does damage is also scaled by range (fire.ts): about 2.4× at 300 m,
+// 0.6× at 2.5 km. At 1, identical forces fight for 20-25 sim-minutes and end
+// on a breakpoint — see the balance and decisiveness checks in realtime.test.ts.
 
 import type { RtTiming } from "./types";
 
@@ -67,7 +68,7 @@ export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,
   shotIntervalS: 30,
-  lethalityPerTurn: 1.5,
+  lethalityPerTurn: 1,
   sightingIntervalS: 30,
   contactMemoryS: 120,
   rallyCheckS: 60,

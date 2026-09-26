@@ -10,6 +10,7 @@ import { inCover } from "../../lib/proceduralTerrain";
 import { fireOdds } from "../../rules/jevState";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { canHit, describeOrder, knownEnemies, knownTo } from "./engine";
+import { damagePerHit, rangeModifiers } from "./fire";
 import { allowanceAt, compass, offsetBy, positionsFor } from "./geometry";
 import type { RtConfig, RtOption, RtState } from "./types";
 
@@ -60,6 +61,7 @@ export function oddsAgainst(
       topAttack: weapon.topAttack,
       targetInCover: state.units[enemy.id]?.posture === "hullDown" || inCover(config.terrain, enemy.position),
       flank: isFlankShot([self], enemy, config.ruleset),
+      extraModifiers: rangeModifiers(rangeM),
     },
     config.ruleset,
   );
@@ -102,8 +104,7 @@ export function damageEffect(
   const odds = oddsAgainst(at, target, state, config);
   if (!odds) return null;
   const { timing } = config;
-  const perHit = (timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS;
-  const perShot = Math.min(1, odds.expectedHits * perHit);
+  const perShot = Math.min(1, odds.expectedHits * damagePerHit(distanceM(from, target.position), timing));
   const shotsPerMinute = 60 / timing.shotIntervalS;
   const perMinute = 1 - Math.pow(1 - perShot, shotsPerMinute);
   const remaining = Math.max(1, target.combatStrengthStart - knownDamage(state, firer.side, target.id));
@@ -143,8 +144,9 @@ export function engagedBy(state: RtState, side: Side, enemyId: string, except?: 
 
 /**
  * A place to close to effective range of `enemy` from: on the near side of
- * it at the shorter of the weapon's short range and half its maximum (inside
- * both, no long-range penalty), with a line of sight to shoot from, and
+ * it, inside 1 km (where the range bands make fire far more accurate and
+ * lethal) and inside the weapon's short range and half its maximum, with a
+ * line of sight to shoot from, and
  * preferring cover, fewer known enemies watching, and a shorter move.
  */
 export function closePosition(
@@ -155,7 +157,9 @@ export function closePosition(
 ): { at: LatLng; rangeM: number; cover: boolean; seenBy: number } | null {
   const weapon = weaponFor(self, enemy, 500);
   if (!weapon) return null;
-  const rangeM = Math.max(400, Math.min(weapon.shortRangeM, weapon.maxRangeM / 2) * 0.9);
+  // Inside 1 km, where fire gets markedly more accurate and more lethal
+  // (fire.ts), and inside the weapon's short range and half its maximum.
+  const rangeM = Math.max(400, Math.min(900, weapon.shortRangeM * 0.9, (weapon.maxRangeM / 2) * 0.9));
   if (distanceM(self.position, enemy.position) <= rangeM + 250) return null;
   const bearing = bearingDeg(enemy.position, self.position);
   const seenBy = (at: LatLng) =>
