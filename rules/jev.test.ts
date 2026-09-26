@@ -1261,3 +1261,31 @@ describe("a move stops to ask when something happens to it", () => {
     });
   });
 });
+
+// ── The planner's prompt when Jev carries the orders out ───────────────────
+
+describe("the orders prompt with and without Jev", () => {
+  const request: OrdersRequest = {
+    side: "blue",
+    turn: 2,
+    view: projectForSide(board([mover(), watcher()]), "blue"),
+    optionsByElement: {},
+    activationBudget: 2,
+    reserveLimit: 0,
+  };
+
+  it("is unchanged with Jev off: standing orders are final, orders run as written", () => {
+    const prompt = buildOrdersPrompt(request);
+    expect(prompt).toContain("You are not asked again when the moment comes");
+    expect(prompt).not.toContain("HOW YOUR ORDERS ARE CARRIED OUT");
+    expect(prompt).toBe(buildOrdersPrompt(request, undefined, { jev: false }));
+  });
+
+  it("with Jev on, says orders are intent and standing orders are defaults — except never", () => {
+    const prompt = buildOrdersPrompt(request, undefined, { jev: true });
+    expect(prompt).toContain("HOW YOUR ORDERS ARE CARRIED OUT");
+    expect(prompt).toContain('except "never", which it must obey');
+    expect(prompt).toContain('"why":"what this element is for"');
+    expect(prompt).not.toContain("You are not asked again");
+  });
+});

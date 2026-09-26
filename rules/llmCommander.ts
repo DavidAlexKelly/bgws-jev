@@ -47,6 +47,13 @@ export interface LlmCommanderOptions {
   directive?: string;
   /** Shown in logs and on the counter's decision line. */
   name?: string;
+  /**
+   * Jev will carry these orders out, and may reorder and adapt them. Changes
+   * what the prompt tells the model about how its orders and standing orders
+   * are used — see buildOrdersPrompt. The model call should then be the
+   * bgwsCommanderTurnJev query, whose brief says the same.
+   */
+  jev?: boolean;
 }
 
 /**
@@ -56,7 +63,17 @@ export interface LlmCommanderOptions {
  * work out why a commander did something stupid is to look at what it was
  * actually told. Anything not in here, it did not know.
  */
-export function buildOrdersPrompt(request: OrdersRequest, directive?: string): string {
+export function buildOrdersPrompt(
+  request: OrdersRequest,
+  directive?: string,
+  /**
+   * `jev`: the orders will be carried out by Jev. Two paragraphs change, and
+   * both were true only while orders ran exactly as written: how the orders
+   * are used, and what a standing order binds. Off, the prompt is word for
+   * word what it always was.
+   */
+  options: { jev?: boolean } = {},
+): string {
   const lines: string[] = [];
 
   lines.push(
@@ -107,6 +124,21 @@ export function buildOrdersPrompt(request: OrdersRequest, directive?: string): s
     "",
   );
 
+  if (options.jev) {
+    lines.push(
+      "HOW YOUR ORDERS ARE CARRIED OUT",
+      "",
+      "A fast tactical controller (Jev) fights this turn from your orders. It",
+      "decides which of your COMMITTED elements acts next, and may adapt an",
+      "element's order if the board has changed by the time it acts — a target",
+      "gone, a new threat, a better shot. It cannot commit an element you left",
+      "out. So each order's `why` should say what the element is FOR (\"fix R1 so",
+      "B3 can reach its flank\"), not repeat the order: that is what Jev reads",
+      "when it has to adapt.",
+      "",
+    );
+  }
+
   // A fast decision model's read of each element, when one was asked. Given
   // as advice with its source named, because it is a second opinion, not a
   // fact — the numbers above it are the facts.
@@ -145,8 +177,14 @@ export function buildOrdersPrompt(request: OrdersRequest, directive?: string): s
     "STANDING ORDERS (optional, and they matter)",
     "",
     "Each element also has rules of engagement for the turn: whether it answers",
-    "an enemy that acts within its arc. You are not asked again when the moment",
-    "comes — you decide now and live with it.",
+    "an enemy that acts within its arc.",
+    ...(options.jev
+      ? [
+          "They are DEFAULTS: Jev decides each reaction at the moment and may depart",
+          'from them — except "never", which it must obey. Use "never" for an element',
+          "you want kept hidden whatever happens.",
+        ]
+      : ["You are not asked again when the moment comes — you decide now and live with it."]),
     "",
     '  "never"             hold fire, stay concealed, keep the ammunition',
     '  "ifFiredUpon"       stay quiet until someone engages your side',
@@ -189,7 +227,9 @@ export function buildOrdersPrompt(request: OrdersRequest, directive?: string): s
     "there to do. Then list the orders in the priority order it implies.",
     "",
     '{"plan":"main effort: X does Y; Z screens",',
-    ' "orders":[{"actorId":"...","optionId":"...","why":"..."}],',
+    options.jev
+      ? ' "orders":[{"actorId":"...","optionId":"...","why":"what this element is for"}],'
+      : ' "orders":[{"actorId":"...","optionId":"...","why":"..."}],',
     ' "standingOrders":[{"actorId":"...","engage":"withinShortRange"}],',
     ' "reserves":["actorId"]}',
   );
@@ -444,7 +484,7 @@ export function llmCommander(options: LlmCommanderOptions): OrdersCommander {
     kind: "llm",
     name: options.name ?? `llm-${options.side}`,
     async planTurn(request: OrdersRequest): Promise<Orders> {
-      const prompt = buildOrdersPrompt(request, options.directive);
+      const prompt = buildOrdersPrompt(request, options.directive, { jev: options.jev });
 
       let reply: string;
       try {

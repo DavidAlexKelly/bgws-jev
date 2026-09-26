@@ -107,9 +107,10 @@ export default function BgwsTrial() {
             ? heuristicOrdersCommander(side, { coLocatedM: RULES.coLocatedM })
             : llmCommander({
                 side,
-                call: foundryModelCall(model, directive),
+                call: foundryModelCall(model, directive, useJev ? "turnJev" : "turn"),
                 directive,
                 name: `${model}-${side}`,
+                jev: useJev,
               }),
         challengerTactics: jevCall
           ? (side: Side) =>
@@ -117,7 +118,7 @@ export default function BgwsTrial() {
                 side,
                 call: jevCall,
                 directive,
-                escalate: model === "heuristic" ? undefined : foundryModelCall(model, directive),
+                escalate: model === "heuristic" ? undefined : foundryModelCall(model, "", "decide"),
                 // A trial prints nothing per decision: hundreds of groups would
                 // bury the progress lines. The JSON result has them all.
                 log: false,

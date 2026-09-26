@@ -23,6 +23,7 @@
 // app already does. The SDK knows the ontology, the api name and the
 // parameter types, so none of them can be wrong again.
 
+import * as sdk from "@nxg-simulation-execution-testing/sdk";
 import { bgwsCommanderTurn } from "@nxg-simulation-execution-testing/sdk";
 
 import { client } from "../../../client";
@@ -35,6 +36,44 @@ export type CommanderModelName = (typeof COMMANDER_MODELS)[number];
 
 /** Named for error messages; the SDK holds the real api name. */
 export const COMMANDER_QUERY = "bgwsCommanderTurn";
+
+/**
+ * Which published query a call goes to. See llmfunctions.ts for the briefs.
+ *
+ *   turn     orders carried out exactly as written (Jev off)
+ *   turnJev  orders Jev will carry out and may adapt (Jev on)
+ *   decide   one escalated decision Jev was unsure about (Jev on)
+ */
+export type CommanderQueryKind = "turn" | "turnJev" | "decide";
+
+const QUERY_NAMES: Record<CommanderQueryKind, string> = {
+  turn: "bgwsCommanderTurn",
+  turnJev: "bgwsCommanderTurnJev",
+  decide: "bgwsCommanderDecide",
+};
+
+/**
+ * The query to call, falling back to bgwsCommanderTurn while the SDK has not
+ * been regenerated.
+ *
+ * ⚠ LOOKED UP BY NAME, NOT IMPORTED, ON PURPOSE. A named import of a query
+ * the SDK does not have yet fails the BUILD, so the app would be unusable in
+ * the gap between merging this and republishing the functions. Looked up at
+ * runtime, the new queries simply take over once they exist, and until then
+ * the old one answers — with the old brief, which is the only cost.
+ */
+function queryFor(kind: CommanderQueryKind): { query: typeof bgwsCommanderTurn; name: string } {
+  const wanted = QUERY_NAMES[kind];
+  const found = (sdk as unknown as Record<string, unknown>)[wanted];
+  if (found) return { query: found as typeof bgwsCommanderTurn, name: wanted };
+  if (kind !== "turn" && typeof console !== "undefined") {
+    console.warn?.(
+      `[commander] ${wanted} is not in the generated SDK yet; using ${COMMANDER_QUERY}. ` +
+        "Publish llmfunctions.ts and regenerate the SDK to use it.",
+    );
+  }
+  return { query: bgwsCommanderTurn, name: COMMANDER_QUERY };
+}
 
 export class CommanderCallError extends Error {
   constructor(
@@ -102,11 +141,16 @@ function describeApiError(err: unknown): string {
  * a side's commander does not change mid-game and the Commander interface
  * should not have to know about either.
  */
-export function foundryModelCall(model: CommanderModelName, directive: string): ModelCall {
+export function foundryModelCall(
+  model: CommanderModelName,
+  directive: string,
+  kind: CommanderQueryKind = "turn",
+): ModelCall {
   return async (prompt: string): Promise<string> => {
+    const { query, name } = queryFor(kind);
     let result: unknown;
     try {
-      result = await client(bgwsCommanderTurn).executeFunction({
+      result = await client(query).executeFunction({
         prompt,
         model,
         directive,
@@ -115,7 +159,7 @@ export function foundryModelCall(model: CommanderModelName, directive: string): 
       const denied = looksLikePermissionProblem(err);
       throw new CommanderCallError(
         denied
-          ? `No access to the "${COMMANDER_QUERY}" query. Add [NXG] BGWS LLM ` +
+          ? `No access to the "${name}" query. Add [NXG] BGWS LLM ` +
             "Commanders as a permitted resource on this app in Developer Console."
           : `Commander query failed: ${describeApiError(err)}`,
         denied,
@@ -127,7 +171,7 @@ export function foundryModelCall(model: CommanderModelName, directive: string): 
       // version and this caller have drifted, which is worth saying plainly
       // rather than coercing into a reply the parser will reject.
       throw new CommanderCallError(
-        `Expected a string from ${COMMANDER_QUERY}, got ${typeof result}. ` +
+        `Expected a string from ${name}, got ${typeof result}. ` +
           "The published query and this caller may have drifted.",
         false,
       );

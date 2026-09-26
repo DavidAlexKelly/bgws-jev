@@ -670,11 +670,14 @@ export default function BgwsPlay() {
         modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
       );
       if (kind === "heuristic") return heuristic;
+      // With Jev on, the planner is told its orders are intent Jev will carry
+      // out and may adapt — and asks the query whose brief says the same.
       const planner = llmCommander({
         side: s,
-        call: foundryModelCall(model, directive),
+        call: foundryModelCall(model, directive, useJev ? "turnJev" : "turn"),
         directive,
         name: `${model}-${s}`,
+        jev: useJev,
       });
       // With Jev on, the planner is handed Jev's read of every element —
       // danger and opportunity, 1 to 5 — before it writes its orders.
@@ -725,7 +728,9 @@ export default function BgwsPlay() {
         // When Jev is unsure, an LLM-commanded side asks its own model — the
         // slow expert for the hard calls only. A heuristic side has no one to
         // ask, and the declared rules decide.
-        escalate: kind === "llm" ? foundryModelCall(model, directive) : undefined,
+        // The short "decide" brief. No directive: the escalation prompt
+        // already carries it, and saying it twice only costs time.
+        escalate: kind === "llm" ? foundryModelCall(model, "", "decide") : undefined,
         sampleRng: jevSample ? createRng(`${gameSeed}:jev:${s}`) : undefined,
       });
     return {
