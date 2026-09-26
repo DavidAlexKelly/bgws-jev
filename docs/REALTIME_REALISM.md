@@ -153,3 +153,60 @@ The tests in `realtime.test.ts` cover each mechanic, plus balance (identical for
 - A request covering one side's whole combined-arms force is about 30,000 characters, roughly 8,000 tokens.
 - Balance is unchanged within chance: 74 / 86 over 160 symmetric games, and 20 / 20 over 40 combined-arms games.
 - No game reached the time limit.
+
+## 7. Range
+
+**What was seen:** units missed "a lot, very close".
+
+**Cause:** the turn game's fire table has one range effect, −1 beyond half the weapon's maximum range. A Challenger troop was struck 58% of the time at 300 m and 58% at 1,500 m. In real time only about one hit in twenty did damage, and those hits were reported with the table's "oneHit" label even when they did nothing.
+
+**What was added** (`realtime/engine/fire.ts`, real time only):
+- **Range bands on the roll:** +2 within 500 m, +1 within 1 km. The shared resolver takes them through a new optional `extraModifiers` field on the fire context. The turn game never sets that field, so it is unchanged, and the equivalence check still shows identical logs.
+- **Lethality by range:** the chance that a hit does damage is multiplied by 2.4 at 300 m, 2.0 at 500 m, 1.3 at 1 km, 0.9 at 1.5 km, 0.6 at 2.5 km and 0.5 at 3.5 km, interpolated in between.
+- **Honest shot results:** each shot reads *missed*, *near miss, suppressed*, *struck, no damage* or *struck, damaged*.
+- **`close:X` aims inside 1 km,** where both effects apply.
+- **`lethalityPerTurn` recalibrated from 1.5 to 1,** keeping game length at 20–25 sim-minutes.
+
+Challenger troop against Challenger troop, both halted:
+
+| Range | Struck | Damage per minute | In cover: struck | In cover: damage per minute |
+|---|---|---|---|---|
+| 300 m | 83% | 36% | 58% | 21% |
+| 800 m | 72% | 20% | 42% | 9% |
+| 1,500 m | 58% | 8% | 28% | 3% |
+| 2,500 m | 42% | 4% | 17% | 1% |
+
+These figures were measured at lethality 1.5. At the chosen 1.0 the damage chances are about two-thirds as high.
+
+**Measured at lethality 1:**
+- symmetric-control: 78 / 82 over 160 games, 20 sim-minutes on average;
+- combined arms: 22 / 18 over 40 games, 25 sim-minutes;
+- no game reached the time limit;
+- the rules close in 18–26 times a game, up from 3.
+
+## 8. From the data: vehicles, penetration, hull-down, speed
+
+Built from the L7 curated profiles. Real-time only; the turn game is unchanged (identical equivalence check).
+
+| | How it works | Source |
+|---|---|---|
+| **Vehicles** | A unit is `platformCount` vehicles, and a round knocks out one vehicle. Strength follows from the vehicles still fit, so the fire-table column weakens as a troop loses tanks. Break tests use vehicles lost. | force list / placement |
+| **Round on target** | A fire-table hit (with the range bands) becomes a round on target with probability `lethalityPerTurn` × 30 s ÷ 900 s, scaled by range. `lethalityPerTurn` = 4 is the calibration knob. | fire.ts |
+| **Face struck** | Worked out from the firer's position and the target's facing: front within 60° of the facing, rear beyond 150°, side in between. Top-attack weapons hit the roof. A hull-down vehicle is struck on the turret front. | geometry |
+| **Penetration** | Read off the munition's curve at the actual range, e.g. L27A1: 676 / 657 / 620 / 583 mm at 0 / 1 / 2 / 3 km. With no curve: the 1 km figure, less 6% per km beyond for kinetic rounds (the L27A1's own slope); shaped charges stay flat. The chance of penetrating is a soft curve around penetration = armour, with 12% spread. | `bgws_munition_profile`, `bgws_capability_profile` |
+| **Armour** | Kinetic or chemical figure for the face struck: hull front, turret front, side, rear, roof. Tandem warheads strip 40% where reactive armour is fitted. Where only the front is known, side, rear and roof take the Challenger 2's ratios (DECLARED). | `bgws_platform_profile` |
+| **Active protection** | Intercepts 50% of shaped-charge rounds (DECLARED). | `aps_fit` |
+| **Knock-out** | Given a penetration, 0.6 for armoured vehicles and 0.85 for anything else (DECLARED; `survivability_band` covers aircraft only). | — |
+| **Hull-down** | Worked out from the bare-earth elevation data. A halted vehicle is hull-down against an enemy when the enemy can see its turret (2.4 m) but ground within 250 m in front of it hides its hull (1.2 m). That counts as cover on the roll, and hits land on the turret front. The crew's drill backs into a hull-down spot when there is no cover close by, and `pos:hulldown` offers one against the nearest threat. | DEM |
+| **Speed** | The ground table × stat-card speed ÷ baseline (60 km/h tracked, 90 wheeled, clamped 0.6–1.4). Uphill costs speed, more for less horsepower per tonne. | `statcard_speed_kmh`, `hp_per_tonne` |
+
+**What we don't use, and why:**
+- `optics_class` and `signature_class` have no data dictionary.
+- Rounds carried isn't in L7, so ammunition stays off.
+- Vegetation and buildings aren't in the raster, so woods cover remains the only non-ground cover.
+- Rate of fire, muzzle velocity and the full penetration curve are waiting on the pipeline change to `bgws_capability_profile`. The code reads `penetrationCurveMm` when it's present and falls back when it isn't.
+
+**Measured at lethality 4:**
+- symmetric-control: 149 / 151 over 300 games, 24 sim-minutes on average, no game at the time limit;
+- combined arms: 22 / 18 over 40 games, 22 sim-minutes;
+- per symmetric game: about 7 vehicles knocked out, 16 strikes that don't penetrate, and 5 penetrations the crew survives.

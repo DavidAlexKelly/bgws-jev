@@ -17,7 +17,10 @@ import { ruleDecider, type RtDecider } from "./deciders";
 import { createRealtimeState, setOrder, tick } from "./engine";
 import { heuristicInitialOrders, jevInitialOrders } from "./initialOrders";
 import { jevRealtimeDecider } from "./jevDecider";
-import { oddsAgainst, optionsFor } from "./options";
+import { damageEffect, describeEffect, oddsAgainst, optionsFor } from "./options";
+import { penetrationAt, strikeOdds } from "./lethality";
+import { hullDownAgainst, hullDownSpot, platformSpeedFactor, slopeFactor } from "./geometry";
+import { lethalityFactor, rangeModifiers } from "./fire";
 import { RealtimeRunner } from "./runner";
 import { DEFAULT_TIMING, perTick } from "./timing";
 import type { RtConfig, RtEvent, RtState } from "./types";
@@ -520,6 +523,17 @@ describe("initial orders", () => {
 
 // ── Realism: suppression, breaking, rallying, missions ────────────────────
 
+/** A unit that has lost vehicles: `fit` of `total` still fighting, strength to match. */
+function losing(state: RtState, id: string, fit: number, total: number): RtState {
+  const fe = state.game.forceElements[id];
+  const strength = Math.max(1, Math.round((fe.combatStrengthStart * fit) / total));
+  return {
+    ...state,
+    game: { ...state.game, forceElements: { ...state.game.forceElements, [id]: { ...fe, combatStrength: strength } } },
+    units: { ...state.units, [id]: { ...state.units[id], vehicles: { total, fit } } },
+  };
+}
+
 describe("suppression and nerve", () => {
   it("builds suppression from fire, misses included, and lets it fade once the fire stops", () => {
     const cfg = config();
@@ -542,12 +556,12 @@ describe("suppression and nerve", () => {
     const cfg = config();
     // A defender at 25% losses: under its 40% threshold, no test.
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
-    state = { ...state, game: { ...state.game, forceElements: { ...state.game.forceElements, B1: { ...state.game.forceElements.B1, combatStrength: 6 } } } };
+    state = losing(state, "B1", 3, 4);
     expect(tick(state, cfg).state.units.B1.breakTests).toBe(0);
     // Past it, a hopeless crew breaks and a superb one holds.
     const hurt = (tq: number) => {
       const s = createRealtimeState(game([fe("B1", "blue", at(0, 0), { troopQuality: tq }), fe("R1", "red", at(0, 30_000))]));
-      return { ...s, game: { ...s.game, forceElements: { ...s.game.forceElements, B1: { ...s.game.forceElements.B1, combatStrength: 4 } } } };
+      return losing(s, "B1", 2, 4);
     };
     const bad = tick(hurt(-8), cfg).state.units.B1;
     expect(bad.cohesion).toBe("broken");
@@ -567,7 +581,7 @@ describe("suppression and nerve", () => {
         fe("R1", "red", at(0, 30_000)),
       ]),
     );
-    state = { ...state, game: { ...state.game, forceElements: { ...state.game.forceElements, B1: { ...state.game.forceElements.B1, combatStrength: 4 } } } };
+    state = losing(state, "B1", 2, 4);
     state = tick(state, cfg).state;
     expect(state.units.B1.cohesion).toBe("broken");
     // Now make it a good crew, so the rally is certain; the break stays.
@@ -801,7 +815,7 @@ describe("context for decisions", () => {
   it("shows the real chance of doing damage, not the chance of a round striking", () => {
     const { cfg, state } = longRange(DEFAULT_TIMING.lethalityPerTurn);
     const engage = optionsFor(state, "R1", cfg).find((o) => o.id === "engage:B2")!;
-    expect(engage.summary).toMatch(/%\/min to damage it/);
+    expect(engage.summary).toMatch(/%\/min to knock out one of its vehicles/);
     expect(engage.summary).not.toMatch(/to hit/);
     const odds = oddsAgainst(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
     // Per minute of real-time fire, far below the table's per-shot hit chance.
@@ -874,4 +888,156 @@ describe("context for decisions", () => {
     // Jev's window is 32k tokens; ~4 characters a token, with room for the answer.
     expect(size).toBeLessThan(90_000);
   }, 60_000);
+});
+
+
+// ── Range ──────────────────────────────────────────────────────────────────
+
+describe("range", () => {
+  it("makes point-blank fire far more accurate and lethal than long-range fire", () => {
+    const cfg = config();
+    const state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(1000, 1500))], true),
+    );
+    const [b1, r1, r2] = ["B1", "R1", "R2"].map((id) => state.game.forceElements[id]);
+    const close = oddsAgainst(b1, r1, state, cfg)!;
+    const far = oddsAgainst(b1, r2, state, cfg)!;
+    expect(close.pHit).toBeGreaterThan(far.pHit + 0.15);
+    const closeEffect = damageEffect(b1, r1, state, cfg)!;
+    const farEffect = damageEffect(b1, r2, state, cfg)!;
+    expect(closeEffect.perMinute).toBeGreaterThan(farEffect.perMinute * 3);
+  });
+
+  it("scales lethality smoothly with range, and adds the range band to the roll", () => {
+    expect(lethalityFactor(300)).toBeGreaterThan(lethalityFactor(1000));
+    expect(lethalityFactor(1000)).toBeGreaterThan(lethalityFactor(2500));
+    expect(lethalityFactor(750)).toBeCloseTo((lethalityFactor(500) + lethalityFactor(1000)) / 2, 5);
+    expect(rangeModifiers(300)).toEqual([{ source: "pointBlank", value: 2 }]);
+    expect(rangeModifiers(800)).toEqual([{ source: "closeRange", value: 1 }]);
+    expect(rangeModifiers(2000)).toEqual([]);
+  });
+
+  it("says what a shot did: a hit that did no damage is not reported as a hit", () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2000))], true));
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    const results = new Set<string>();
+    for (let i = 0; i < 900 && !state.over; i += 1) {
+      const r = tick(state, cfg);
+      state = r.state;
+      for (const shot of r.shots) results.add(shot.result);
+    }
+    for (const result of results) expect(result).toMatch(/^(missed|near miss, suppressed|struck( \d×)?, (no damage|damaged))$/);
+  });
+
+  it("closes to inside a kilometre, where fire pays", () => {
+    const cfg = config();
+    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 2800))], true));
+    const close = optionsFor(state, "B1", cfg).find((o) => o.id === "close:R1")!;
+    expect(close.order.kind).toBe("move");
+    const to = (close.order as { to: LatLng }).to;
+    expect(distanceM(to, state.game.forceElements.R1.position)).toBeLessThanOrEqual(1000);
+  });
+});
+
+
+// ── From the data: vehicles, penetration, hull-down, speed ─────────────────
+
+describe("the data behind a shot", () => {
+  const challenger = () => {
+    const g = scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)();
+    return { blue: g.forceElements["blue-1"], red: g.forceElements["red-1"] };
+  };
+
+  it("reads penetration off the munition's curve at the actual range", () => {
+    const { blue } = challenger();
+    const gun = blue.capabilities.find((c) => c.kind === "atk")!;
+    expect(penetrationAt(gun, 0)).toBe(676);
+    expect(penetrationAt(gun, 1500)).toBeCloseTo(638.5, 1);
+    expect(penetrationAt(gun, 3000)).toBe(583);
+    // No curve: the 1 km figure, kinetic falloff beyond it; a shaped charge does not fall off.
+    expect(penetrationAt({ kind: "atk", maxRangeM: 3000, shortRangeM: 1500, penetrationMm: 500 }, 2000)).toBeCloseTo(470, 5);
+    expect(penetrationAt({ kind: "atk", munition: "ce", maxRangeM: 3000, shortRangeM: 1500, penetrationMm: 500 }, 2000)).toBe(500);
+  });
+
+  it("makes the face struck decide the outcome: a Challenger's front mostly stops a peer round, its side does not", () => {
+    const { blue, red } = challenger();
+    const gun = blue.capabilities.find((c) => c.kind === "atk")!;
+    const facingSouth = { ...red, position: at(0, 0), facing: 180 };
+    const front = strikeOdds(gun, facingSouth, at(0, -1500), 1500, HOUSE_V1);
+    const side = strikeOdds(gun, facingSouth, at(1500, 0), 1500, HOUSE_V1);
+    const hullDown = strikeOdds(gun, facingSouth, at(0, -1500), 1500, HOUSE_V1, true);
+    expect(front.aspect).toBe("front");
+    expect(front.armourMm).toBe(700);
+    expect(front.pPenetrate).toBeLessThan(0.4);
+    expect(side.aspect).toBe("side");
+    expect(side.pPenetrate).toBeGreaterThan(0.99);
+    expect(hullDown.aspect).toBe("turret");
+    expect(hullDown.pPenetrate).toBeLessThan(0.1);
+    expect(hullDown.pPenetrate).toBeLessThan(front.pPenetrate / 4);
+  });
+
+  it("knocks out vehicles one at a time, and strength follows", () => {
+    const cfg = config({ timing: { ...DEFAULT_TIMING, lethalityPerTurn: 30 } });
+    let state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(200, 0)), fe("R1", "red", at(0, 400), { platformCount: 4 })], true),
+    );
+    state = setOrder(state, "B1", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "B2", { kind: "engage", targetId: "R1" }, cfg);
+    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    expect(state.units.R1.vehicles).toEqual({ total: 4, fit: 4 });
+    const seen: number[] = [];
+    const labels: string[] = [];
+    for (let i = 0; i < 1200 && state.game.forceElements.R1.combatStrength > 0; i += 1) {
+      const r = tick(state, cfg);
+      state = r.state;
+      labels.push(...r.shots.map((s) => s.result));
+      if (seen[seen.length - 1] !== state.units.R1.vehicles.fit) seen.push(state.units.R1.vehicles.fit);
+    }
+    expect(seen[seen.length - 1]).toBe(0);
+    expect(state.game.forceElements.R1.combatStrength).toBe(0);
+    expect(labels.some((l) => /^knocked out \d/.test(l))).toBe(true);
+  });
+
+  it("finds hull-down positions from the ground itself", () => {
+    // A low crest 60-100 m north of the start line: it hides a hull, not a turret.
+    const crest: TerrainSampler = {
+      groundHeightM: (p) => {
+        const north = (p.lat - ORIGIN.lat) * 111_320;
+        return north > 60 && north < 100 ? 1.8 : 0;
+      },
+      classify: () => "open",
+    };
+    const cfg = config({ terrain: crest });
+    expect(hullDownAgainst(at(0, 0), at(0, 2000), cfg)).toBe(true);
+    // Not from the side, and not on open ground.
+    expect(hullDownAgainst(at(0, 0), at(2000, 0), cfg)).toBe(false);
+    expect(hullDownAgainst(at(0, -400), at(0, 2000), config())).toBe(false);
+    const spot = hullDownSpot(fe("B1", "blue", at(0, -150)), at(0, 2000), cfg, 200);
+    expect(spot).not.toBeNull();
+    expect(hullDownAgainst(spot!, at(0, 2000), cfg)).toBe(true);
+  });
+
+  it("moves each platform at its own speed, and slower uphill for a weaker engine", () => {
+    const fast = { ...fe("B1", "blue", at(0, 0)), speedKmh: 72 };
+    const slow = { ...fe("B2", "blue", at(0, 0)), speedKmh: 45 };
+    expect(platformSpeedFactor(fast)).toBeCloseTo(1.2, 5);
+    expect(platformSpeedFactor(slow)).toBeCloseTo(0.75, 5);
+    expect(platformSpeedFactor(fe("B3", "blue", at(0, 0)))).toBe(1);
+    const hill: TerrainSampler = { groundHeightM: (p) => (p.lat - ORIGIN.lat) * 111_320 * 0.1, classify: () => "open" };
+    const cfg = config({ terrain: hill });
+    const strong = slopeFactor({ ...fast, hpPerTonne: 27 }, at(0, 0), at(0, 50), cfg);
+    const weak = slopeFactor({ ...fast, hpPerTonne: 14 }, at(0, 0), at(0, 50), cfg);
+    expect(strong).toBeLessThan(1);
+    expect(weak).toBeLessThan(strong);
+    expect(slopeFactor(fast, at(0, 50), at(0, 0), cfg)).toBe(1);
+  });
+
+  it("tells Jev which face it would strike and whether rounds get through", () => {
+    const cfg = config();
+    const state = createRealtimeState(scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)());
+    const effect = damageEffect(state.game.forceElements["blue-1"], state.game.forceElements["red-1"], state, cfg)!;
+    expect(describeEffect(effect)).toMatch(/knock out one of its vehicles \((front|side|rear), \d+ vs \d+ mm: \d+% penetrate\)/);
+  });
 });

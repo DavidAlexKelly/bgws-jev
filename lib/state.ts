@@ -138,8 +138,15 @@ export type MunitionKind = "ke" | "ce" | "ceTandem";
  * shaped charge.
  */
 export interface ArmourByAspect {
+  /** Hull front — what the turn game calls "front". */
   frontKeMm?: number;
   frontCeMm?: number;
+  /**
+   * Turret front, where the source separates it. The real-time mode uses it
+   * for a hull-down vehicle, whose hull is behind the crest.
+   */
+  turretFrontKeMm?: number;
+  turretFrontCeMm?: number;
   sideKeMm?: number;
   sideCeMm?: number;
   rearKeMm?: number;
@@ -161,6 +168,12 @@ export interface Capability {
   topAttack?: boolean;
   /** Metres. Direct fire is capped at the 3 km line-of-sight limit regardless. */
   maxRangeM: number;
+  /**
+   * Penetration against range, where the munition profile gives a curve:
+   * points in increasing range, interpolated between. Only the real-time mode
+   * reads it; absent, it falls back to `penetrationMm` at 1 km.
+   */
+  penetrationCurveMm?: readonly { rangeM: number; mm: number }[];
   /** Under 51% of Max Range is short range (BGWS 2.1.8). */
   shortRangeM: number;
   /**
@@ -241,6 +254,17 @@ export interface ForceElement {
   combatStrengthStart: number;
   /** HQs only: how many subordinate activations it can command. */
   commandRating?: number;
+  /**
+   * Platform figures only the real-time mode reads, copied from the snapshot.
+   * The turn game ignores them. Absent means the source does not say.
+   */
+  platformCount?: number;
+  /** Road/stat-card speed, km/h (L7 `statcard_speed_kmh`). */
+  speedKmh?: number;
+  /** Power to weight (L7 `hp_per_tonne`), for slopes. */
+  hpPerTonne?: number;
+  /** An active protection system is fitted (L7 `aps_fit` other than "none"). */
+  apsFitted?: boolean;
 
   morale: Morale;
   markers: Marker[];

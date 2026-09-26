@@ -467,7 +467,7 @@ export default function RealtimePlay() {
       caption.textContent = own
         ? [
             label,
-            `${fe.combatStrength}/${fe.combatStrengthStart}`,
+            unit ? `${unit.vehicles.fit}/${unit.vehicles.total} fit` : `${fe.combatStrength}/${fe.combatStrengthStart}`,
             ...(unit
               ? [
                   ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),

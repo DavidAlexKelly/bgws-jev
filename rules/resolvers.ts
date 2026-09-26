@@ -58,6 +58,11 @@ export interface FireContext {
    * because somebody has reported a contact rather than identified a target.
    */
   partialContact?: boolean;
+  /**
+   * Modifiers a caller adds on top of the rulebook's — the real-time mode's
+   * range bands. Absent in the turn game, which is therefore unchanged.
+   */
+  extraModifiers?: readonly Modifier[];
 }
 
 export interface ResolutionOutcome {
@@ -135,6 +140,7 @@ export function resolveDirectFire(
   ) {
     modifiers.push({ source: "longRange", value: ruleset.drms.longRange });
   }
+  if (context.extraModifiers) modifiers.push(...context.extraModifiers);
 
   const roll = rng.d66();
   const total = roll.total + modifiers.reduce((sum, m) => sum + m.value, 0);

@@ -73,6 +73,12 @@ export interface PlatformSnapshot {
   armour?: ArmourByAspect;
   /** Explosive reactive armour is fitted; only tandem warheads care. */
   eraFitted?: boolean;
+  /** L7 `statcard_speed_kmh`. Read by the real-time mode only. */
+  speedKmh?: number;
+  /** L7 `hp_per_tonne`. Read by the real-time mode only. */
+  hpPerTonne?: number;
+  /** L7 `aps_fit` is something other than "none". Read by the real-time mode only. */
+  apsFitted?: boolean;
   /**
    * Where the figures came from, when they came from a source.
    *
@@ -254,8 +260,23 @@ export const PINNED_PLATFORMS: Record<string, PlatformSnapshot> = {
     // profile's armor_max_mm is the hull front, and the aspect table below
     // already agreed with it — so this field alone was out of step.
     armourMm: 700,
-    armour: { frontKeMm: 700, frontCeMm: 1000, sideKeMm: 140, sideCeMm: 400, rearKeMm: 40, rearCeMm: 60, roofKeMm: 30, roofCeMm: 30 },
+    armour: {
+      frontKeMm: 700,
+      frontCeMm: 1000,
+      turretFrontKeMm: 950,
+      turretFrontCeMm: 1300,
+      sideKeMm: 140,
+      sideCeMm: 400,
+      rearKeMm: 40,
+      rearCeMm: 60,
+      roofKeMm: 30,
+      roofCeMm: 30,
+    },
     eraFitted: true,
+    // L7 row: statcard_speed_kmh 59, hp_per_tonne 19.2, aps_fit none.
+    speedKmh: 59,
+    hpPerTonne: 19.2,
+    apsFitted: false,
     // ⚠ RANGES ARE OURS AND STAY OURS. The profile says 4,000 m for the
     // L30A1 and the board is 1,600 m deep. Adopting source ranges would let
     // every tank engage across the whole map from its start line, which is a
@@ -267,7 +288,20 @@ export const PINNED_PLATFORMS: Record<string, PlatformSnapshot> = {
     // the gun that is meant to be the sharp end of the blue force was
     // defeating every armour value in the game unconditionally.
     capabilities: [
-      { kind: "atk", munition: "ke", maxRangeM: 3000, shortRangeM: 3000, penetrationMm: 657 },
+      {
+        kind: "atk",
+        munition: "ke",
+        maxRangeM: 3000,
+        shortRangeM: 3000,
+        penetrationMm: 657,
+        // L7 bgws_munition_profile m_l27a1 (L27A1 CHARM 3 APFSDS).
+        penetrationCurveMm: [
+          { rangeM: 0, mm: 676 },
+          { rangeM: 1000, mm: 657 },
+          { rangeM: 2000, mm: 620 },
+          { rangeM: 3000, mm: 583 },
+        ],
+      },
       { kind: "apers", maxRangeM: 2000, shortRangeM: 1000 },
     ],
   },

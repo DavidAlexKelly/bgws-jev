@@ -125,6 +125,11 @@ export interface RtUnit {
   lastReviewAt: number;
   /** Its last few decisions — Jev's, the rules' or the crew's own drill — and where it stood then. */
   history: DecisionMemory[];
+  /**
+   * The vehicles (or teams) in it. A round knocks out one vehicle, not
+   * "3 combat strength"; strength follows from how many are still fit.
+   */
+  vehicles: { total: number; fit: number };
 }
 
 /** One unit's fire on one target, since it started. */

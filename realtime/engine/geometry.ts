@@ -152,3 +152,73 @@ export function positionsFor(
 
   return out;
 }
+
+// ── Hull-down, from the elevation data ─────────────────────────────────────
+//
+// The raster has no vegetation height or buildings, so cover from them cannot
+// be real. GROUND defilade can: the DEM says whether a crest between a
+// vehicle and the enemy hides its hull while its turret can still see and
+// shoot over it. That is what hull-down is.
+
+/** DECLARED. Heights above ground of a vehicle's turret (sights, gun) and of its hull top. */
+const TURRET_M = 2.4;
+const HULL_M = 1.2;
+/** The crest must be close in front of the vehicle to be ITS hull-down position, not a distant ridge. */
+const CREST_WITHIN_M = 250;
+
+/**
+ * Is a vehicle at `at` hull-down against an enemy at `from`? The enemy can
+ * see its turret but the ground, close in front of it, hides its hull.
+ */
+export function hullDownAgainst(at: LatLng, from: LatLng, config: RtConfig): boolean {
+  const turret = lineOfSight(config.terrain, { from, to: at, targetHeightM: TURRET_M });
+  if (!turret.visible) return false;
+  const hull = lineOfSight(config.terrain, { from, to: at, targetHeightM: HULL_M, sampleSpacingM: 25 });
+  return !hull.visible && hull.reason === "ground" && hull.blockedAt != null && distanceM(hull.blockedAt, at) <= CREST_WITHIN_M;
+}
+
+/** The nearest hull-down position against `threat` within `radius`, if the ground offers one. */
+export function hullDownSpot(fe: ForceElement, threat: LatLng, config: RtConfig, radius = 200): LatLng | null {
+  if (hullDownAgainst(fe.position, threat, config)) return fe.position;
+  const rings = [radius / 4, radius / 2, (3 * radius) / 4, radius];
+  for (const ring of rings) {
+    const found = Array.from({ length: 8 }, (_, i) => offsetBy(fe.position, i * 45, ring))
+      .filter((point) => allowanceAt(fe, point, config) > 0)
+      .filter((point) => hullDownAgainst(point, threat, config))
+      .sort((a, b) => distanceM(a, threat) - distanceM(b, threat))[0];
+    if (found) return found;
+  }
+  return null;
+}
+
+// ── Speed, per platform ────────────────────────────────────────────────────
+
+/** DECLARED. The stat-card speed the ruleset's allowance table corresponds to, by move type. */
+const BASELINE_KMH: Record<string, number> = { T: 60, W: 90 };
+
+/**
+ * How much faster or slower than the ground-class table this platform is,
+ * from its stat-card speed (L7 `statcard_speed_kmh`). 1 when the source is
+ * silent, so nothing changes for platforms without the figure.
+ */
+export function platformSpeedFactor(fe: ForceElement): number {
+  const base = BASELINE_KMH[fe.moveType];
+  if (fe.speedKmh == null || base == null) return 1;
+  return Math.max(0.6, Math.min(1.4, fe.speedKmh / base));
+}
+
+/** DECLARED. Uphill slowing, for a vehicle of 20 hp/t; a weaker one slows more. */
+const SLOPE_PENALTY = 6;
+
+/**
+ * Uphill costs speed, more for an under-powered vehicle (L7 `hp_per_tonne`).
+ * From the DEM between here and the next step; downhill and flat cost nothing.
+ */
+export function slopeFactor(fe: ForceElement, from: LatLng, to: LatLng, config: RtConfig): number {
+  const run = distanceM(from, to);
+  if (run <= 0) return 1;
+  const rise = config.terrain.groundHeightM(to) - config.terrain.groundHeightM(from);
+  if (!Number.isFinite(rise) || rise <= 0) return 1;
+  const power = (fe.hpPerTonne ?? 20) / 20;
+  return 1 / (1 + ((rise / run) * SLOPE_PENALTY) / Math.max(0.3, power));
+}
