@@ -110,6 +110,8 @@ export function realtimeSideState(
       id: self.id,
       unit: self.label,
       strength: `${self.combatStrength}/${self.combatStrengthStart}`,
+      ...(unit ? { vehicles: `${unit.vehicles.fit} of ${unit.vehicles.total} fighting` } : {}),
+      ...(unit && unit.posture === "hullDown" ? { hullDown: true } : {}),
       troopQuality: self.troopQuality,
       ...(unit
         ? {
@@ -158,6 +160,10 @@ export function realtimeSideState(
       })
       .map((fe) => fe.id),
     damageYouHaveDoneToIt: knownDamage(state, side, contact.id),
+    // Knocked-out vehicles are seen to burn; only when it is identified.
+    ...(contact.sighting === "full" && state.units[contact.id]
+      ? { vehiclesStillFighting: `${state.units[contact.id].vehicles.fit} of ${state.units[contact.id].vehicles.total}` }
+      : {}),
     ...(contact.sighting === "full" && state.units[contact.id]?.cohesion !== "steady"
       ? { visiblyBreaking: state.units[contact.id]?.cohesion === "broken" ? "falling back" : "shaken" }
       : {}),

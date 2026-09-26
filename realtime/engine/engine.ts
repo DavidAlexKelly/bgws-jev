@@ -54,7 +54,18 @@ import { hitsFor, type FireResult } from "../../rules/ruleset";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
-import { allowanceAt, compass, offsetBy, towards } from "./geometry";
+import { rangeModifiers, strikeChance } from "./fire";
+import {
+  allowanceAt,
+  compass,
+  hullDownAgainst,
+  hullDownSpot,
+  offsetBy,
+  platformSpeedFactor,
+  slopeFactor,
+  towards,
+} from "./geometry";
+import { describeStrike, rollStrike, strikeOdds, type StrikeResult } from "./lethality";
 import {
   ASSAULT_CONTACT_M,
   ATTACKER_BREAK_AT,
@@ -105,8 +116,6 @@ const RETURN_FIRE_S = 5;
 const ATTACKING_S = 120;
 /** No incoming fire for this long before a rally can be tried. */
 const QUIET_S = 30;
-/** Higher than the threat by this much, and settled, a vehicle is hull-down. */
-const HULL_DOWN_RISE_M = 5;
 /** A friend's loss shakes nerves for this long. */
 const FRIEND_LOST_S = 60;
 /** How far a broken unit will go to reach its rally point, and how far if there is none. */
@@ -211,8 +220,22 @@ export function knownEnemies(state: Pick<RtState, "game" | "units">, id: string)
 }
 
 /** Cover, or hull-down, at a unit's position: what the fire table calls "target in cover". */
-export function isCovered(state: Pick<RtState, "units">, fe: ForceElement, config: RtConfig): boolean {
-  return state.units[fe.id]?.posture === "hullDown" || inCover(config.terrain, fe.position);
+export function isCovered(
+  state: Pick<RtState, "units">,
+  fe: ForceElement,
+  config: RtConfig,
+  from?: LatLng,
+): boolean {
+  if (inCover(config.terrain, fe.position)) return true;
+  if (from == null) return state.units[fe.id]?.posture === "hullDown";
+  return hullDownFrom(state, fe, from, config);
+}
+
+/** Hull-down against fire from `from`: halted behind a crest that hides the hull (from the DEM). */
+export function hullDownFrom(state: Pick<RtState, "units">, fe: ForceElement, from: LatLng, config: RtConfig): boolean {
+  const posture = state.units[fe.id]?.posture;
+  if (posture === "moving") return false;
+  return hullDownAgainst(fe.position, from, config);
 }
 
 /** Identified enemies that can already reach this element where it stands. */
@@ -261,7 +284,19 @@ function freshUnit(fe: ForceElement): RtUnit {
     dealt: 0,
     lastReviewAt: 0,
     history: [],
+    vehicles: { total: vehiclesIn(fe), fit: vehiclesIn(fe) },
   };
+}
+
+/** How many vehicles an element is: its platform count, or, for elements built without one, about one per 2.5 strength. */
+export function vehiclesIn(fe: ForceElement): number {
+  return Math.max(1, fe.platformCount ?? Math.round(fe.combatStrengthStart / 2.5));
+}
+
+/** Combat strength from the vehicles still fit: the fire table's column follows the losses. */
+export function strengthFor(fe: ForceElement, vehicles: { total: number; fit: number }): number {
+  if (vehicles.fit <= 0) return 0;
+  return Math.max(1, Math.round((fe.combatStrengthStart * vehicles.fit) / vehicles.total));
 }
 
 /** Add a decision to a unit's memory, keeping the last few. */
@@ -496,6 +531,20 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         )} for cover (${config.terrain.classify(cover)})`;
       }
     }
+    // No cover close by: a fold in the ground that hides the hull will do.
+    if (threat && !inCover(config.terrain, self.position)) {
+      const spot = hullDownSpot(self, threat.position, config, DRILL_COVER_M);
+      if (spot && distanceM(spot, self.position) > 5) {
+        setUnit(id, {
+          order: routed({ kind: "move", to: spot, mode: "march", dash: true }, self, config),
+          bound: undefined,
+        });
+        return `; returning fire and backing ${Math.round(distanceM(self.position, spot))} m ${compass(
+          self.position,
+          spot,
+        )} into a hull-down position`;
+      }
+    }
     setUnit(id, {
       order: known(id, threatId) !== "none" ? { kind: "engage", targetId: threatId } : { kind: "hold" },
       bound: undefined,
@@ -532,7 +581,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     if (order.kind === "move" && (unit.cohesion !== "steady" || !canAdvance(self.morale))) continue;
 
     const factor = order.kind === "move" ? SPEED[order.mode] : SPEED.withdraw;
-    const perSecond = (allowanceAt(self, self.position, config) / timing.turnS) * factor;
+    // The ground's allowance, how the unit is moving, the platform's own
+    // speed (L7 stat card) and, uphill, its power to weight.
+    const perSecond =
+      (allowanceAt(self, self.position, config) / timing.turnS) *
+      factor *
+      platformSpeedFactor(self) *
+      slopeFactor(self, self.position, towards(self.position, order.route?.[0] ?? order.to, 50), config);
 
     // Bounding overwatch: move a bound, then cover while the partner moves.
     if (order.kind === "move" && order.mode === "bound" && !order.dash) {
@@ -879,8 +934,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           penetrationMm: weapon.penetrationMm,
           munition: weapon.munition,
           topAttack: weapon.topAttack,
-          targetInCover: isCovered({ units }, target, config),
+          targetInCover: isCovered({ units }, target, config, self.position),
           flank: isFlankShot([self], target, config.ruleset),
+          // Real time only: closer is easier (see fire.ts).
+          extraModifiers: rangeModifiers(rangeM),
         },
         config.ruleset,
         rng,
@@ -915,10 +972,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   //
   // The table was written for one result per 15-minute turn. Here a hit costs
   // strength only with probability hits × lethalityPerTurn × shotIntervalS /
-  // turnS, so a quarter-hour of steady fire does what `lethalityPerTurn`
-  // turn-game results would. Every shot, misses included, suppresses.
-  const perHit = (timing.lethalityPerTurn * timing.shotIntervalS) / timing.turnS;
+  // turnS × the range's lethality factor (fire.ts), so a quarter-hour of
+  // steady fire does about what `lethalityPerTurn` turn-game results would —
+  // much more at point-blank range, less at the limit of the gun's reach.
+  // Every shot, misses included, suppresses.
   const newAttacker = new Map<string, string>();
+  const labels = new Map<(typeof planned)[number], string>();
   for (const shot of planned) {
     const firer = snapshot.forceElements[shot.firerId];
     const target = fe(shot.targetId);
@@ -926,30 +985,63 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     if (target.combatStrength <= 0) continue;
     const result = shot.outcome.event.result as FireResult;
     const hits = hitsFor(result);
-    const damaged = hits > 0 && rng.int(1_000_000) < Math.min(1, hits * perHit) * 1_000_000;
+    // Each fire-table hit is a round on target with a range-scaled chance
+    // (fire.ts); each round on target is then intercepted, stopped by the
+    // armour on the face it strikes, or penetrates and may knock a vehicle out
+    // (lethality.ts).
+    const weapon = weaponFor(firer, target, shot.rangeM);
+    const odds = weapon
+      ? strikeOdds(weapon, target, firer.position, shot.rangeM, config.ruleset, hullDownFrom({ units }, target, firer.position, config))
+      : null;
+    const outcomes: StrikeResult[] = [];
+    for (let k = 0; k < hits; k += 1) {
+      if (rng.int(1_000_000) >= strikeChance(shot.rangeM, timing) * 1_000_000 || !odds) continue;
+      outcomes.push(rollStrike(odds, rng));
+    }
+    const vehicles = units[target.id].vehicles;
+    const knocked = Math.min(vehicles.fit, outcomes.filter((one) => one === "knockedOut").length);
+    const damaged = knocked > 0;
+    let lostNow = 0;
     if (damaged) {
-      const lost = config.ruleset.lethality.strengthPerHit;
+      const next = { ...vehicles, fit: vehicles.fit - knocked };
+      const strength = strengthFor(target, next);
+      lostNow = target.combatStrength - strength;
+      setUnit(target.id, { vehicles: next });
       game = applyEffects(game, [
-        { kind: "combatStrength", feId: target.id, delta: -lost },
-        ...(target.combatStrength - lost <= 0 ? [{ kind: "eliminated" as const, feId: target.id }] : []),
+        { kind: "combatStrength", feId: target.id, delta: -lostNow },
+        ...(strength <= 0 ? [{ kind: "eliminated" as const, feId: target.id }] : []),
       ]);
     }
+    const struck = outcomes.length > 0;
+    const face = odds ? describeStrike(odds) : "";
+    const label =
+      knocked > 0
+        ? `knocked out ${knocked} (${face}); ${vehicles.fit - knocked}/${vehicles.total} left`
+        : outcomes.includes("survived")
+          ? `penetrated (${face}), crew fighting on`
+          : outcomes.includes("noPenetration")
+            ? `struck, did not penetrate (${face})`
+            : outcomes.includes("intercepted")
+              ? "intercepted by active protection"
+              : hits > 0 || result === "suppress"
+                ? "near miss, suppressed"
+                : "missed";
+    labels.set(shot, label);
 
     const base =
-      (hits > 0 ? SUPPRESSION_FOR.hit : result === "suppress" ? SUPPRESSION_FOR.suppress : SUPPRESSION_FOR.miss) +
+      (struck ? SUPPRESSION_FOR.hit : hits > 0 || result === "suppress" ? SUPPRESSION_FOR.suppress : SUPPRESSION_FOR.miss) +
       (damaged ? SUPPRESSION_FOR.damaged : 0);
-    const lostNow = damaged ? Math.min(target.combatStrength, config.ruleset.lethality.strengthPerHit) : 0;
     const firerUnit = units[firer.id];
     if (firerUnit?.engagement && firerUnit.engagement.targetId === target.id) {
       const e = firerUnit.engagement;
-      const struck = hits > 0 ? 1 : 0;
+      const struckCount = struck ? 1 : 0;
       setUnit(firer.id, {
         dealt: firerUnit.dealt + lostNow,
         engagement: {
           ...e,
-          hits: e.hits + struck,
+          hits: e.hits + struckCount,
           damage: e.damage + lostNow,
-          window: { ...e.window, hits: e.window.hits + struck, damage: e.window.damage + lostNow },
+          window: { ...e.window, hits: e.window.hits + struckCount, damage: e.window.damage + lostNow },
         },
       });
     }
@@ -961,7 +1053,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           ? { ...had, shots: had.shots + 1, damage: had.damage + lostNow, last: time }
           : { shots: 1, damage: lostNow, since: time, last: time },
     };
-    const cover = isCovered({ units }, target, config) ? 0.6 : 1;
+    const cover = isCovered({ units }, target, config, firer.position) ? 0.6 : 1;
     const quality = Math.max(0.5, 1.2 - target.troopQuality * 0.05);
     const recent = time - (targetUnit.attackers[firer.id] ?? -Infinity) <= FIRED_UPON_MEMORY_S;
     if (!recent && !newAttacker.has(target.id)) newAttacker.set(target.id, firer.id);
@@ -976,7 +1068,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       time,
       firerId: firer.id,
       targetId: target.id,
-      result: damaged ? `${result}, damaged` : hits > 0 ? `${result}, no damage` : result,
+      result: label,
       narrative: shot.outcome.event.narrative,
     });
 
@@ -1004,12 +1096,15 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       continue;
     }
     const by = firers
-      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${shot.outcome.event.result})`)
+      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? shot.outcome.event.result})`)
       .join(", ");
     const shooter = newAttacker.get(targetId);
     const did = shooter ? drill(targetId, shooter) : "";
     emit(targetId, "underFire", `fired on by ${by}${did}`, hurt || shooter != null);
-    if (hurt) emit(targetId, "hit", `lost strength: ${after.combatStrength}/${after.combatStrengthStart}`, true);
+    if (hurt) {
+      const v = units[targetId].vehicles;
+      emit(targetId, "hit", `vehicle knocked out: ${v.fit} of ${v.total} still fighting`, true);
+    }
   }
 
   // ── 7. Suppression fades; posture ─────────────────────────────────────────
@@ -1029,11 +1124,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       const nearest = knownEnemies({ game, units }, id).sort(
         (a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position),
       )[0];
-      const above =
-        nearest != null &&
-        config.terrain.groundHeightM(self.position) - config.terrain.groundHeightM(nearest.position) >=
-          HULL_DOWN_RISE_M;
-      if (inCover(config.terrain, self.position) || above) posture = "hullDown";
+      const defilade = nearest != null && hullDownAgainst(self.position, nearest.position, config);
+      if (inCover(config.terrain, self.position) || defilade) posture = "hullDown";
     }
     if (suppression !== unit.suppression || pinnedSince !== unit.pinnedSince || posture !== unit.posture) {
       setUnit(id, { suppression, pinnedSince, posture });
@@ -1050,7 +1142,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const self = fe(id);
     const unit = units[id];
     if (!unit || self.combatStrength <= 0 || unit.cohesion === "broken") continue;
-    const losses = 1 - self.combatStrength / Math.max(1, self.combatStrengthStart);
+    const losses = 1 - unit.vehicles.fit / Math.max(1, unit.vehicles.total);
     const attacking =
       (unit.order.kind === "move" && !unit.order.dash) ||
       (unit.mission.task === "take" && time - unit.lastMovedAt <= ATTACKING_S);
