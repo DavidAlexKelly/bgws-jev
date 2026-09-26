@@ -253,6 +253,9 @@ export function stepsVisibleTo(
       out.push({ index, step, label: step.label });
       continue;
     }
+    // An enemy's DECISION is not observable, only what it leads to. "R1
+    // held fire" shown to blue would reveal an overwatch blue cannot see.
+    if (step.decision) continue;
 
     const actorId = step.actorId;
     if (!actorId) continue;
@@ -298,4 +301,46 @@ export function eventsVisibleTo(
   return events.filter(
     (event) => event.actorIds.some(mine) || event.targetIds.some(mine),
   );
+}
+
+/** What a decider last chose for one element, for a marker on its counter. */
+export interface DecisionMark {
+  actorId: string;
+  /** Short enough to sit beside a counter: "hold 22%", "press", "fire B1". */
+  text: string;
+  /** The full step label, for the tooltip. */
+  title: string;
+  /** Jev could not decide and the rule did. Drawn differently. */
+  fallback: boolean;
+}
+
+/**
+ * The latest in-the-moment decision per element, up to a point in the turn.
+ *
+ * `upTo` is a step index; -1 means the whole turn. Only steps the viewpoint
+ * may see count — the same rule as the timeline — so a side's own map never
+ * carries a mark that tells it what the enemy decided.
+ */
+export function decisionMarksFor(
+  steps: readonly TurnStep[],
+  upTo: number,
+  viewpoint: Side | "both",
+): Map<string, DecisionMark> {
+  const marks = new Map<string, DecisionMark>();
+  const last = upTo < 0 ? steps.length - 1 : Math.min(upTo, steps.length - 1);
+
+  for (const { index, step } of stepsVisibleTo(steps, viewpoint)) {
+    if (index > last) break;
+    const decision = step.decision;
+    if (!decision || !step.actorId) continue;
+    const words = decision.mark ?? decision.chosenId;
+    const short = words.length > 18 ? `${words.slice(0, 17)}\u2026` : words;
+    marks.set(step.actorId, {
+      actorId: step.actorId,
+      text: decision.p != null && !decision.fallback ? `${short} ${Math.round(decision.p * 100)}%` : short,
+      title: step.label,
+      fallback: decision.fallback != null,
+    });
+  }
+  return marks;
 }

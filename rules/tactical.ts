@@ -105,7 +105,11 @@ export interface TacticalTrace {
   question: string;
   options: DecisionOption[];
   chosenId: string;
-  chosenBy: "heuristic" | "jev";
+  /**
+   * Who actually decided. "llm" when Jev was unsure and the question was
+   * escalated to the side's language model; "heuristic" when the rule did.
+   */
+  chosenBy: "heuristic" | "jev" | "llm";
   rationale?: string;
   /** Per-option probability, where the decider has one. */
   probabilities?: Record<string, number>;
@@ -115,6 +119,41 @@ export interface TacticalTrace {
   costUsd?: number;
   /** Set when the decider could not answer and the rule decided instead. */
   fallback?: "timeout" | "error" | "lowConfidence" | "vetoed";
+  /** A few words for a marker beside the counter: "holds fire", "presses on". */
+  mark?: string;
+}
+
+/**
+ * One element that has orders left to carry out this turn, as it stands now.
+ *
+ * `options` are generated from the CURRENT board, not the one the orders were
+ * written against — that is the point of asking at the moment.
+ */
+export interface ActivationCandidate {
+  actorId: string;
+  options: ActionOption[];
+  /** The option the commander ordered, if it is still on offer. */
+  orderedOptionId?: string;
+  /** The order as given, in words, even when it is no longer possible. */
+  orderedSummary?: string;
+}
+
+/**
+ * "Whose turn is it, and what do they do?" — the activation, decided when it
+ * comes rather than when the turn was planned.
+ *
+ * The commander's plan fixes WHICH elements are committed (command capacity
+ * is spent at planning). The decider chooses the order they act in and may
+ * adapt what each does to what has happened since — a different target, a
+ * halt, a hold — from the options the rules offer now.
+ */
+export interface ActivationMoment {
+  state: GameState;
+  config: PhaseConfig;
+  turn: number;
+  side: Side;
+  candidates: ActivationCandidate[];
+  intent?: CommanderIntent;
 }
 
 /** Who on the watching side attempts to sight a Concealed element that activated. */
@@ -176,6 +215,19 @@ export interface TacticalDecider {
   chooseObserver?(
     moment: ObserverMoment,
   ): Promise<{ observerId: string | null; traces: TacticalTrace[] }>;
+  /**
+   * Optional: choose the next activation from the commander's remaining
+   * orders. `undefined` means "carry out the next order as written".
+   */
+  chooseActivation?(
+    moment: ActivationMoment,
+  ): Promise<{ pick?: { actorId: string; optionId: string }; traces: TacticalTrace[] }>;
+  /**
+   * Optional: ask ahead about reactions that are likely to be needed, in one
+   * request, so the answers are waiting when the moment comes. A moment that
+   * turns out differently from the prefetched one is simply asked again.
+   */
+  prefetchReactions?(moments: ReactionMoment[]): Promise<void>;
   /** Optional: absent means the engine's heuristic picks, as before. */
   /**
    * `optionId` is the choice; `null` is a deliberate pass; `undefined` means

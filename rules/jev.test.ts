@@ -7,7 +7,7 @@
  * decide can be asserted without one.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { distanceM, metresPerDegreeLon, type LatLng } from "../lib/board";
 import { flatTerrain } from "../lib/lineOfSight";
@@ -34,12 +34,21 @@ import { fireOdds, reactionState } from "./jevState";
 import type { OrdersRequest, StandingOrders } from "./orders";
 import { HOUSE_V1, withModules } from "./ruleset";
 import { runTrial } from "./commanderTrial";
+import { withPersistentCache } from "../data/jevCache";
+import { decisionMarksFor } from "../lib/stepVisuals";
+import { withJevAssessments } from "./jevAssess";
+import { buildOrdersPrompt } from "./llmCommander";
+import { recentEvents } from "./jevState";
+import { executePlannedTurn, planOrdersTurn } from "./orders";
+import type { TurnStep } from "./turnLoop";
 import { heuristicOrdersCommander } from "./orders";
 import type { TacticalDecider } from "./tactical";
 import {
   attemptSightingInterruptLive,
   chooseOptionLive,
   noStandingOrders,
+  optionsFor,
+  prefetchReactionsFor,
   reactiveFireLive,
   resolveAction,
   resolveMoveLive,
@@ -47,6 +56,17 @@ import {
   runReactiveFire,
   type PhaseConfig,
 } from "./turnLoop";
+
+// Every decision is printed to the console by default. Useful in a browser,
+// noise in a test run — silenced here, and asserted on where it matters.
+beforeEach(() => {
+  vi.spyOn(console, "groupCollapsed").mockImplementation(() => {});
+  vi.spyOn(console, "groupEnd").mockImplementation(() => {});
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(console, "table").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -139,6 +159,26 @@ const everyNoul = (p: number) => (questions: Record<string, JevQuestion>) =>
   Object.fromEntries(
     Object.keys(questions).map((key) => [key, { type: "noul", noul: p } as JevAnswer]),
   );
+
+/**
+ * A Jev that answers every choice question the same way. `choice` may be a
+ * key, or a function that picks a key from the criteria it was offered.
+ */
+function answers(
+  choice: string | ((criteria: Record<string, string>) => string),
+  confidence = 0.8,
+  p = 0.8,
+): JevCall & { requests: JevRequest[] } {
+  return fakeJev((questions) =>
+    Object.fromEntries(
+      Object.entries(questions).map(([key, question]): [string, JevAnswer] => {
+        if (question.type === "noul") return [key, { type: "noul", noul: p }];
+        const picked = typeof choice === "string" ? choice : choice(question.criteria);
+        return [key, { type: "choice", choice: picked, probabilities: { [picked]: p }, confidence }];
+      }),
+    ),
+  );
+}
 
 const failing: JevCall = async () => {
   throw new Error("proxy said no");
@@ -267,7 +307,7 @@ describe("Jev deciding reactive fire", () => {
   });
 
   it("holds fire the declared rules would have taken, when Jev says no", async () => {
-    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: fakeJev(everyNoul(0.1)) }) } });
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: answers("none", 0.8, 0.9) }) } });
     const next = await reactiveFireLive(
       board([mover(), watcher()]),
       "B1",
@@ -280,13 +320,13 @@ describe("Jev deciding reactive fire", () => {
     expect(reactions(cfg.log)).toHaveLength(0);
     expect(next.forceElements.R1.markers).not.toContain("fired");
     const [decision] = decisions(cfg.log);
-    expect(decision).toMatchObject({ chosenBy: "jev", chosenId: "hold", actorId: "R1" });
-    expect(decision.probabilities?.fire).toBeCloseTo(0.1);
+    expect(decision).toMatchObject({ chosenBy: "jev", chosenId: "none", actorId: "R1" });
+    expect(decision.probabilities?.none).toBeCloseTo(0.9);
   });
 
   it("takes a shot the declared rules would have let pass, when Jev says yes", async () => {
     // ifFiredUpon, and the mover is only moving: the rule holds. Jev may not.
-    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: fakeJev(everyNoul(0.9)) }) } });
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: answers("f0") }) } });
     await reactiveFireLive(
       board([mover(), watcher()]),
       "B1",
@@ -325,8 +365,12 @@ describe("Jev deciding reactive fire", () => {
     expect(call.requests).toHaveLength(0);
   });
 
-  it("asks about every eligible reactor in ONE request", async () => {
-    const call = fakeJev(everyNoul(0.8));
+  it("asks for a fire PLAN in one question: nobody, each alone, or each pair", async () => {
+    // Pick the pair R2+R3 — the only way to get two shots is to be asked
+    // about them together, which is the point: a plan, not three votes.
+    const call = answers((criteria) =>
+      Object.keys(criteria).find((key) => /^R2 .* and R3 /.test(criteria[key]))!,
+    );
     const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call }) } });
     await reactiveFireLive(
       board([mover(), watcher(), fe("R2", "red", at(300, 1000)), fe("R3", "red", at(-300, 1000))]),
@@ -338,7 +382,10 @@ describe("Jev deciding reactive fire", () => {
       "actionReaction",
     );
     expect(call.requests).toHaveLength(1);
-    expect(Object.keys(call.requests[0].questions)).toHaveLength(3);
+    const [question] = Object.values(call.requests[0].questions);
+    // none + 3 alone + 3 pairs (the cap is two reactors).
+    expect(question.type === "choice" && Object.keys(question.criteria)).toHaveLength(7);
+    expect(reactions(cfg.log).map((event) => event.actorIds[0]).sort()).toEqual(["R2", "R3"]);
   });
 
   it("falls back to the declared rules when Jev cannot be reached, and says so", async () => {
@@ -587,11 +634,16 @@ describe("whole games with Jev deciding everything", () => {
         blue: jevTacticalDecider({ side: "blue", call: opinionated("bt") }),
         red: jevTacticalDecider({ side: "red", call: opinionated("rt") }),
       },
+      tacticalPositions: { blue: true, red: true },
       rng: createRng("jev:dice"),
       log,
       maxTurns: 12,
     };
     while (!game.over) game = await advanceTurn(game, cfg);
+    // Jev took activations and the new positions were on offer.
+    const all = game.turns.flatMap((turn) => turn.decisions);
+    expect(all.some((d) => d.question === "which element acts now, and how?")).toBe(true);
+    expect(all.some((d) => d.options.some((o) => o.id.includes(":pos:")))).toBe(true);
 
     expect(game.turns.length).toBeGreaterThan(0);
     const jevCalls = game.turns.flatMap((turn) => turn.decisions).filter((d) => d.chosenBy === "jev");
@@ -645,7 +697,7 @@ describe("Jev choosing who tries to spot a concealed element", () => {
   it("lets Jev pick a different observer", async () => {
     // Observers are keyed nearest first: w0 = Rnear, w1 = Rfar.
     const call = fakeJev(() => ({
-      observer: { type: "choice", choice: "w1", probabilities: { w0: 0.2, w1: 0.8 }, confidence: 0.6 },
+      decision: { type: "choice", choice: "w1", probabilities: { w0: 0.2, w1: 0.8 }, confidence: 0.6 },
     }));
     const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call }) } }, CONCEALMENT);
     await attemptSightingInterruptLive(scene(), "B1", "blue", cfg, 2);
@@ -678,7 +730,7 @@ describe("a choice the engine used to make by heuristic", () => {
         tactical: {
           blue: jevTacticalDecider({
             side: "blue",
-            call: call ?? fakeJev((): Record<string, JevAnswer> => (answer ? { option: answer } : {})),
+            call: call ?? fakeJev((): Record<string, JevAnswer> => (answer ? { decision: answer } : {})),
           }),
         },
       }),
@@ -711,10 +763,10 @@ describe("Jev's calls in the turn's playback", () => {
     const labels: string[] = [];
     const cfg = config({
       onStep: (step) => labels.push(step.label),
-      tactical: { red: jevTacticalDecider({ side: "red", call: fakeJev(everyNoul(0.2)) }) },
+      tactical: { red: jevTacticalDecider({ side: "red", call: answers("none") }) },
     });
     await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
-    expect(labels.some((label) => label.includes("hold") && label.includes("Jev 80%"))).toBe(true);
+    expect(labels.some((label) => label.includes("none") && label.includes("Jev 80%"))).toBe(true);
   });
 });
 
@@ -747,4 +799,330 @@ describe("a trial with Jev on the challenger's side", () => {
     expect(result.tacticalCalls).toBeGreaterThan(0);
     expect(result.tacticalFallbacks).toBe(0);
   }, 60_000);
+});
+
+// ── The console ────────────────────────────────────────────────────────────
+
+describe("every decision is printed to the console", () => {
+  it("prints a headline saying who decided what, and how sure", async () => {
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: answers("none") }) } });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    const lines = vi.mocked(console.groupCollapsed).mock.calls.map((call) => String(call[0]));
+    expect(lines.some((line) => line.includes("[Jev red]") && line.includes("who fires at B1?") && line.includes("Jev 80%"))).toBe(true);
+  });
+
+  it("prints nothing when told not to", async () => {
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call: answers("none"), log: false }) } });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    expect(console.groupCollapsed).not.toHaveBeenCalled();
+  });
+});
+
+// ── Escalation and sampling (item 5) ───────────────────────────────────────
+
+describe("when Jev is unsure", () => {
+  it("asks the side's language model, and says so", async () => {
+    const escalate = vi.fn(async () => '{"choice":"f0","why":"the flank shot is worth it"}');
+    const cfg = config({
+      tactical: { red: jevTacticalDecider({ side: "red", call: answers("none", 0.05), escalate }) },
+    });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    expect(escalate).toHaveBeenCalledOnce();
+    expect(reactions(cfg.log)).toHaveLength(1);
+    expect(decisions(cfg.log)[0]).toMatchObject({ chosenBy: "llm", chosenId: "R1" });
+    expect(decisions(cfg.log)[0].rationale).toMatch(/flank shot/);
+  });
+
+  it("falls back to the rule if the model's answer is not one of the options", async () => {
+    const cfg = config({
+      tactical: {
+        red: jevTacticalDecider({ side: "red", call: answers("none", 0.05), escalate: async () => "attack!" }),
+      },
+    });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, standing("red", "R1", "always"), "actionReaction");
+    expect(decisions(cfg.log)[0]).toMatchObject({ chosenBy: "heuristic", fallback: "lowConfidence" });
+    expect(reactions(cfg.log)).toHaveLength(1);
+  });
+});
+
+describe("sampling from Jev's probabilities", () => {
+  const even = fakeJev((): Record<string, JevAnswer> => ({
+    decision: { type: "choice", choice: "none", probabilities: { none: 0.5, f0: 0.5 }, confidence: 0.5 },
+  }));
+  const run = async (seed: string) => {
+    const cfg = config({
+      tactical: { red: jevTacticalDecider({ side: "red", call: even, sampleRng: createRng(seed) }) },
+    });
+    await reactiveFireLive(board([mover(), watcher()]), "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    return decisions(cfg.log)[0].chosenId;
+  };
+
+  it("takes a 50/50 call both ways across seeds", async () => {
+    const outcomes = new Set<string>();
+    for (let i = 0; i < 20; i += 1) outcomes.add(await run(`s${i}`));
+    expect([...outcomes].sort()).toEqual(["R1", "none"]);
+  });
+
+  it("takes it the same way every time for the same seed", async () => {
+    expect(await run("fixed")).toBe(await run("fixed"));
+  });
+});
+
+// ── Richer state (item 3) ──────────────────────────────────────────────────
+
+describe("what Jev is told about the wider situation", () => {
+  it("includes the threat to each reactor, the objective and who can support it", () => {
+    const state = {
+      ...board([mover(), watcher(), fe("R2", "red", at(100, 1000))]),
+      objectives: { blue: at(0, 3000), red: at(0, 1100) },
+    };
+    const picture = reactionState({
+      state,
+      config: config(),
+      turn: 2,
+      round: "actionReaction",
+      side: "red",
+      actorId: "B1",
+      wasFiredUpon: false,
+      candidates: [{ reactorId: "R1", rangeM: 1000, capability: "atk", engage: "always", ruleSaysReact: true }],
+      maxReactors: 1,
+    });
+    const r1 = picture.reactors[0] as Record<string, unknown>;
+    expect(r1.threatsToYou).toEqual([expect.objectContaining({ from: "B1" })]);
+    expect(r1.objective).toMatchObject({ distanceM: expect.any(Number) });
+    expect(r1.canActTogetherWith).toEqual(["R2"]);
+  });
+
+  it("recalls recent exchanges without naming an enemy nobody has seen", () => {
+    const cfg = config();
+    cfg.log.append({
+      type: "resolution",
+      turn: 1,
+      phase: "arcAction",
+      kind: "directFire",
+      rulesetId: "x",
+      actorIds: ["R1"],
+      targetIds: ["B1"],
+      modifiers: [],
+      result: "oneHit",
+      effects: [],
+    });
+    const unseenByBlue = board([mover(), watcher()], false);
+    expect(recentEvents(unseenByBlue, cfg, "blue")).toEqual([
+      expect.objectContaining({ by: ["unseen enemy"], at: ["B1"], result: "oneHit" }),
+    ]);
+  });
+});
+
+// ── Terrain-aware positions (item 2) ───────────────────────────────────────
+
+describe("terrain-aware move options", () => {
+  const terrain = proceduralTerrain(STANDARD_GROUND);
+  const scene = () => board([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1800))]);
+
+  it("are not offered unless asked for, so the measured game is unchanged", () => {
+    const options = optionsFor(scene(), scene().forceElements.B1, config({ terrain }));
+    expect(options.some((option) => option.id.includes(":pos:"))).toBe(false);
+  });
+
+  it("are offered per side when asked for, each a real move somewhere else", () => {
+    const cfg = config({ terrain, tacticalPositions: { blue: true } });
+    const positions = optionsFor(scene(), scene().forceElements.B1, cfg).filter((option) =>
+      option.id.includes(":pos:"),
+    );
+    expect(positions.length).toBeGreaterThan(0);
+    for (const option of positions) {
+      expect(option.kind).toBe("move");
+      expect(distanceM(option.destination!, at(0, 0))).toBeGreaterThan(40);
+    }
+    // Red was not given them.
+    const red = optionsFor(scene(), scene().forceElements.R1, cfg);
+    expect(red.some((option) => option.id.includes(":pos:"))).toBe(false);
+  });
+});
+
+// ── Jev taking the activations (item 1) ────────────────────────────────────
+
+describe("the commander plans, Jev picks each activation", () => {
+  const RULES = withModules(HOUSE_V1, {});
+  const setup = () =>
+    board([
+      fe("B1", "blue", at(0, 0)),
+      fe("B2", "blue", at(150, 0)),
+      fe("R1", "red", at(0, 2500)),
+    ]);
+  const base = () => ({
+    ruleset: RULES,
+    terrain: flatTerrain(),
+    commanders: { blue: heuristicOrdersCommander("blue"), red: heuristicOrdersCommander("red") },
+    rng: createRng("act"),
+    log: new EventLog(),
+    maxTurns: 10,
+  });
+
+  it("may adapt an order to what has happened — here, B2 holds instead", async () => {
+    const cfg = base();
+    const planned = await planOrdersTurn(setup(), cfg);
+    expect(planned.accepted.blue.map((intent) => intent.actorId)).toContain("B2");
+
+    const call = answers((criteria) =>
+      Object.keys(criteria).find((key) => criteria[key].startsWith("B2 acts now: B2 holds"))!,
+    );
+    await executePlannedTurn(planned, { ...cfg, tactical: { blue: jevTacticalDecider({ side: "blue", call }) } });
+
+    const picked = decisions(cfg.log).find((d) => d.question === "which element acts now, and how?");
+    expect(picked).toMatchObject({ chosenBy: "jev", chosenId: "B2::B2:hold", side: "blue" });
+  });
+
+  it("carries out the orders as written when Jev cannot answer", async () => {
+    const cfg = base();
+    const planned = await planOrdersTurn(setup(), cfg);
+    await executePlannedTurn(planned, {
+      ...cfg,
+      tactical: { blue: jevTacticalDecider({ side: "blue", call: failing }) },
+    });
+    const ordered = decisions(cfg.log)
+      .filter((d) => d.question === "orders for the turn" && d.side === "blue")
+      .map((d) => d.chosenId);
+    expect(ordered).toEqual(planned.accepted.blue.map((intent) => intent.optionId));
+  });
+});
+
+// ── Speed and memory (item 7) ──────────────────────────────────────────────
+
+describe("reactions asked ahead of time", () => {
+  it("answers the moment from the prefetch, without asking again", async () => {
+    const call = answers("none");
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call }) } });
+    const state = board([mover(), watcher()]);
+
+    await prefetchReactionsFor(state, cfg, noStandingOrders(), [{ actorId: "B1", side: "blue" }], 2);
+    expect(call.requests).toHaveLength(1);
+    expect(Object.keys(call.requests[0].questions)).toEqual(["m0"]);
+
+    await reactiveFireLive({ ...state, phase: "arcReaction" }, "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    expect(call.requests).toHaveLength(1);
+    expect(decisions(cfg.log)[0].rationale).toMatch(/ahead of time/);
+  });
+
+  it("asks live when the moment turned out differently", async () => {
+    const call = answers("none");
+    const cfg = config({ tactical: { red: jevTacticalDecider({ side: "red", call }) } });
+    await prefetchReactionsFor(board([mover(), watcher()]), cfg, noStandingOrders(), [{ actorId: "B1", side: "blue" }], 2);
+    // B1 is somewhere else by the time it acts.
+    const moved = board([fe("B1", "blue", at(0, 300)), watcher()]);
+    await reactiveFireLive(moved, "B1", "blue", cfg, 2, noStandingOrders(), "actionReaction");
+    expect(call.requests).toHaveLength(2);
+  });
+});
+
+describe("the persistent answer cache", () => {
+  const memory = () => {
+    const store = new Map<string, string>();
+    return { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+  };
+  const request: JevRequest = { state: { a: 1 }, questions: { q: { type: "noul", instructions: "?" } } };
+
+  it("asks once, across page loads, and does not charge twice", async () => {
+    const storage = memory();
+    const call = vi.fn(async () => ({ answers: { q: { type: "noul", noul: 0.7 } as JevAnswer }, latencyMs: 90, costUsd: 0.0001 }));
+    await withPersistentCache(call, { namespace: "m", storage })(request);
+    const again = await withPersistentCache(call, { namespace: "m", storage })(request);
+    expect(call).toHaveBeenCalledOnce();
+    expect(again).toEqual({ answers: { q: { type: "noul", noul: 0.7 } }, latencyMs: 0 });
+  });
+
+  it("keeps models apart", async () => {
+    const storage = memory();
+    const call = vi.fn(async () => ({ answers: {}, latencyMs: 1 }));
+    await withPersistentCache(call, { namespace: "jev-1.13", storage })(request);
+    await withPersistentCache(call, { namespace: "jev-2", storage })(request);
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("decision marks on the map", () => {
+  const step = (side: Side, actorId: string, extra: Partial<TurnStep> = {}): TurnStep => ({
+    turn: 2,
+    phase: "arcReaction",
+    label: `${actorId}: who fires? \u2192 none (Jev 80%)`,
+    state: board([mover(), watcher()]),
+    side,
+    actorId,
+    decision: { chosenId: "none", chosenBy: "jev", p: 0.8, mark: "holds fire on B1" },
+    ...extra,
+  });
+
+  it("shows a side its own decisions", () => {
+    const marks = decisionMarksFor([step("red", "R1")], -1, "red");
+    expect(marks.get("R1")).toMatchObject({ text: "holds fire on B1 80%", fallback: false });
+  });
+
+  it("never shows a side what the enemy decided", () => {
+    expect(decisionMarksFor([step("red", "R1")], -1, "blue").size).toBe(0);
+  });
+
+  it("only counts decisions up to the step on screen", () => {
+    const steps = [step("red", "R1", { label: "Sighting", decision: undefined, actorId: undefined, side: undefined }), step("red", "R1")];
+    expect(decisionMarksFor(steps, 0, "both").size).toBe(0);
+    expect(decisionMarksFor(steps, 1, "both").size).toBe(1);
+  });
+});
+
+// ── Jev's read, handed to the planner (item 5) ─────────────────────────────
+
+describe("Jev's assessment for the planner", () => {
+  it("puts a danger and opportunity score for each element in front of the planner", async () => {
+    const state = board([mover(), watcher()]);
+    const call = fakeJev((questions) =>
+      Object.fromEntries(
+        Object.keys(questions).map((key): [string, JevAnswer] => [
+          key,
+          { type: "score", score: key.endsWith("danger") ? 4.2 : 1.5, probabilities: {}, confidence: 0.6 },
+        ]),
+      ),
+    );
+    let seen: OrdersRequest | undefined;
+    const inner = {
+      kind: "llm" as const,
+      name: "planner",
+      planTurn: async (request: OrdersRequest) => {
+        seen = request;
+        return { side: "blue" as const, intents: [] };
+      },
+    };
+    const request: OrdersRequest = {
+      side: "blue",
+      turn: 2,
+      view: projectForSide(state, "blue"),
+      optionsByElement: {},
+      activationBudget: 2,
+      reserveLimit: 0,
+    };
+    await withJevAssessments(inner, { side: "blue", call }).planTurn(request);
+
+    expect(seen?.assessments).toEqual({ B1: { danger: 4.2, opportunity: 1.5 } });
+    expect(buildOrdersPrompt(seen!)).toContain("B1  danger 4.2  opportunity 1.5");
+  });
+
+  it("plans without it when Jev cannot be reached", async () => {
+    let seen: OrdersRequest | undefined;
+    const inner = {
+      kind: "llm" as const,
+      name: "planner",
+      planTurn: async (request: OrdersRequest) => {
+        seen = request;
+        return { side: "blue" as const, intents: [] };
+      },
+    };
+    await withJevAssessments(inner, { side: "blue", call: failing }).planTurn({
+      side: "blue",
+      turn: 2,
+      view: projectForSide(board([mover(), watcher()]), "blue"),
+      optionsByElement: {},
+      activationBudget: 2,
+      reserveLimit: 0,
+    });
+    expect(seen?.assessments).toBeUndefined();
+  });
 });

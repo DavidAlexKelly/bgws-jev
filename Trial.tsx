@@ -35,6 +35,8 @@ import { AppSwitcher } from "@/components/AppSwitcher";
 
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "./data/commanderClient";
 import { jevConfigured, openRouterJevCall } from "./data/jevClient";
+import { withPersistentCache } from "./data/jevCache";
+import { JEV_MODEL } from "./rules/jev";
 import { jevTacticalDecider } from "./rules/jevDecider";
 import { scenarioFactory } from "./lib/forceBuilder";
 import { proceduralTerrain, STANDARD_GROUND } from "./lib/proceduralTerrain";
@@ -86,7 +88,11 @@ export default function BgwsTrial() {
     setOutput("");
     setProgress([`starting: ${seeds * 2} games, up to ${maxTurns} turns each`]);
 
-    const jevCall = useJev ? openRouterJevCall() : undefined;
+    // Persistent: re-running a trial asks Jev nothing it has been asked before,
+    // so a re-run reproduces the first run's decisions and costs nothing.
+    const jevCall = useJev
+      ? withPersistentCache(openRouterJevCall(), { namespace: JEV_MODEL })
+      : undefined;
     const label = `${model}${useJev ? " + Jev" : ""}`;
 
     try {
@@ -106,8 +112,18 @@ export default function BgwsTrial() {
                 name: `${model}-${side}`,
               }),
         challengerTactics: jevCall
-          ? (side: Side) => jevTacticalDecider({ side, call: jevCall, directive })
+          ? (side: Side) =>
+              jevTacticalDecider({
+                side,
+                call: jevCall,
+                directive,
+                escalate: model === "heuristic" ? undefined : foundryModelCall(model, directive),
+                // A trial prints nothing per decision: hundreds of groups would
+                // bury the progress lines. The JSON result has them all.
+                log: false,
+              })
           : undefined,
+        challengerPositions: useJev,
         // The baseline keeps formation, because combinedFire is on and a
         // commander that cannot mass is not the yardstick anybody wants.
         baseline: (side: Side) =>
@@ -200,9 +216,10 @@ export default function BgwsTrial() {
             Use Jev for decisions (challenger&rsquo;s side)
           </label>
           <div style={note}>
-            Jev makes the challenger&rsquo;s in-the-moment calls: reactive fire,
-            contact, spotting, reserve follow-ups. The baseline plays by the
-            rules. Heuristic + Jev against heuristic measures Jev alone.
+            Jev makes the challenger&rsquo;s in-the-moment calls — which ordered
+            unit acts next, reactive fire, contact, spotting, reserve follow-ups —
+            and the challenger alone gets terrain-aware moves. The baseline plays
+            by the rules. Heuristic + Jev against heuristic measures Jev alone.
             {useJev && !jevConfigured() && (
               <strong> No OpenRouter key: every call will fall back.</strong>
             )}

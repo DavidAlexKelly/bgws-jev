@@ -98,6 +98,7 @@ import {
   eventsVisibleTo,
   maySeeRoute,
   stepsVisibleTo,
+  decisionMarksFor,
   visibleIdsFor,
   wrecksIn,
 } from "./lib/stepVisuals";
@@ -117,10 +118,13 @@ import type { ForceElement, GameState, Side } from "./lib/state";
 import { opposing } from "./lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "./data/commanderClient";
 import { jevConfigured, openRouterJevCall } from "./data/jevClient";
+import { withPersistentCache } from "./data/jevCache";
 import { createRng } from "./rules/dice";
 import { describeVerdict } from "./rules/victory";
 import { EventLog, type DecisionEvent } from "./rules/events";
 import { jevTacticalDecider } from "./rules/jevDecider";
+import { withJevAssessments } from "./rules/jevAssess";
+import { JEV_MODEL } from "./rules/jev";
 import type { TacticalDecider } from "./rules/tactical";
 import {
   FORCE_LISTS,
@@ -404,8 +408,16 @@ export default function BgwsPlay() {
    * from it afterwards would be about either.
    */
   const [useJev, setUseJev] = useState(false);
+  /**
+   * Sample from Jev's probabilities instead of always taking its top choice.
+   * Seeded from the game seed, so a game still replays exactly; a close call
+   * then goes either way in proportion, the way two commanders would differ.
+   */
+  const [jevSample, setJevSample] = useState(false);
 
   const [game, setGame] = useState<LiveGame | null>(null);
+  const liveGameRef = useRef<LiveGame | null>(null);
+  liveGameRef.current = game;
   const [index, setIndex] = useState(0);
   /**
    * Which moment WITHIN the selected turn is on screen.
@@ -634,7 +646,15 @@ export default function BgwsPlay() {
 
   // One client for the whole screen, so its answer cache is shared: the same
   // moment asked twice — a discarded and regenerated turn — gets the same call.
-  const jevCall = useMemo(() => openRouterJevCall(), []);
+  // Answers persist across page loads (see data/jevCache.ts), so a replayed
+  // game or a re-run trial is asked nothing it was asked before.
+  const jevCall = useMemo(
+    () => withPersistentCache(openRouterJevCall(), { namespace: JEV_MODEL }),
+    [],
+  );
+  // The live board, for Jev's assessments before a model plans. A ref,
+  // because the commander is built once and the board changes every turn.
+  const gameRef = liveGameRef;
 
   const commanders = useMemo((): Record<Side, OrdersCommander> => {
     const make = (
@@ -650,11 +670,27 @@ export default function BgwsPlay() {
         modules.combinedFire ? { coLocatedM: ruleset.coLocatedM } : undefined,
       );
       if (kind === "heuristic") return heuristic;
-      return llmCommander({
+      const planner = llmCommander({
         side: s,
         call: foundryModelCall(model, directive),
         directive,
         name: `${model}-${s}`,
+      });
+      // With Jev on, the planner is handed Jev's read of every element —
+      // danger and opportunity, 1 to 5 — before it writes its orders.
+      if (!useJev) return planner;
+      return withJevAssessments(planner, {
+        side: s,
+        call: jevCall,
+        context: () => {
+          const runtime = runtimeRef.current;
+          const current = gameRef.current?.current;
+          if (!runtime || !current) return undefined;
+          return {
+            state: current,
+            config: { ruleset, terrain, rng: runtime.rng, log: runtime.log, maxTurns: MAX_TURNS },
+          };
+        },
       });
     };
     return {
@@ -674,15 +710,40 @@ export default function BgwsPlay() {
     redModel,
     modules.combinedFire,
     ruleset,
+    useJev,
+    jevCall,
+    terrain,
   ]);
 
   const tactical = useMemo((): Partial<Record<Side, TacticalDecider>> => {
     if (!useJev) return {};
+    const make = (s: Side, kind: CommanderKind, directive: string, model: CommanderModelName) =>
+      jevTacticalDecider({
+        side: s,
+        call: jevCall,
+        directive,
+        // When Jev is unsure, an LLM-commanded side asks its own model — the
+        // slow expert for the hard calls only. A heuristic side has no one to
+        // ask, and the declared rules decide.
+        escalate: kind === "llm" ? foundryModelCall(model, directive) : undefined,
+        sampleRng: jevSample ? createRng(`${gameSeed}:jev:${s}`) : undefined,
+      });
     return {
-      blue: jevTacticalDecider({ side: "blue", call: jevCall, directive: blueDirective }),
-      red: jevTacticalDecider({ side: "red", call: jevCall, directive: redDirective }),
+      blue: make("blue", blueKind, blueDirective, blueModel),
+      red: make("red", redKind, redDirective, redModel),
     };
-  }, [useJev, blueDirective, redDirective, jevCall]);
+  }, [
+    useJev,
+    jevSample,
+    gameSeed,
+    blueKind,
+    redKind,
+    blueModel,
+    redModel,
+    blueDirective,
+    redDirective,
+    jevCall,
+  ]);
 
   const strength = placedStrength(placed, ruleset);
 
@@ -741,11 +802,14 @@ export default function BgwsPlay() {
       routePlanner,
       commanders,
       tactical,
+      // Jev chooses well among many options; the heuristic does not need them
+      // and the measured game must not change, so they come with Jev only.
+      tacticalPositions: useJev ? { blue: true, red: true } : undefined,
       rng: runtime.rng,
       log: runtime.log,
       maxTurns: MAX_TURNS,
     };
-  }, [commanders, tactical, routePlanner, ruleset, terrain]);
+  }, [commanders, tactical, useJev, routePlanner, ruleset, terrain]);
 
   /**
    * STEP ONE: ask both commanders what they intend, and stop.
@@ -1487,6 +1551,12 @@ export default function BgwsPlay() {
         ? planBadgesFor(planGeometry)
         : new Map();
 
+    // What was decided in the moment, beside the counter it was decided for:
+    // "holds fire 78%", "presses on". A held shot leaves nothing else on the
+    // board, so without this it is invisible. Up to the step on screen, and
+    // only the viewpoint's own decisions — see decisionMarksFor.
+    const marks = index > 0 ? decisionMarksFor(steps, step, viewpoint) : new Map();
+
     for (const element of shown.elements) {
       const node = document.createElement("div");
       node.style.cursor = "pointer";
@@ -1643,6 +1713,23 @@ export default function BgwsPlay() {
           strip.appendChild(chipEl);
         }
         inner.appendChild(strip);
+      }
+
+      const mark = marks.get(element.id);
+      if (mark) {
+        const tag = document.createElement("div");
+        tag.textContent = mark.text;
+        tag.title = mark.title;
+        tag.style.cssText =
+          "position:absolute;right:100%;bottom:100%;transform:translate(4px,4px);" +
+          "font-size:8px;line-height:1;padding:1px 3px;border-radius:2px;white-space:nowrap;" +
+          "pointer-events:none;background:rgba(13,16,23,0.9);" +
+          // Dashed and dim when the rule decided rather than Jev: the two must
+          // never look the same.
+          (mark.fallback
+            ? "color:#8a91a8;border:1px dashed rgba(255,255,255,0.3)"
+            : "color:#e8c547;border:1px solid rgba(232,197,71,0.5)");
+        inner.appendChild(tag);
       }
 
       node.addEventListener("click", (event) => {
@@ -2127,6 +2214,20 @@ export default function BgwsPlay() {
               Use Jev for decisions
             </label>
             {useJev && (
+              <label
+                style={{ ...row, gap: 6, marginTop: 2, paddingLeft: 18, ...subtle }}
+                title="Seeded from the game seed, so the game still replays exactly."
+              >
+                <input
+                  type="checkbox"
+                  checked={jevSample}
+                  onChange={(e) => setJevSample(e.target.checked)}
+                  disabled={phase !== "placing"}
+                />
+                vary decisions (sample from Jev&rsquo;s probabilities)
+              </label>
+            )}
+            {useJev && (
               <div
                 style={{
                   ...subtle,
@@ -2135,12 +2236,16 @@ export default function BgwsPlay() {
                 }}
               >
                 {jevConfigured()
-                  ? "Jev (typesafe/jev-1.13, via OpenRouter) makes every in-the-moment " +
-                    "call for both sides: who fires on a unit crossing its arc, whether a " +
-                    "move presses on through contact, who tries to spot a concealed " +
-                    "element, and what a reserve does when it arrives. The commanders " +
-                    "above still plan each turn. If Jev cannot answer in time, the " +
-                    "declared rules decide and the turn says so. Fixed once the game starts."
+                  ? "Jev (typesafe/jev-1.13) decides in the moment for both sides. The " +
+                    "commanders above plan each turn; Jev then picks which ordered unit " +
+                    "acts next and may adapt its action to what has happened, decides who " +
+                    "fires on a unit crossing its arc (as one fire plan), whether a move " +
+                    "presses on through contact, who tries to spot a concealed unit and " +
+                    "what an arriving reserve does. Units also get terrain-aware moves " +
+                    "(cover, overwatch, pull back, flank). An LLM commander is handed " +
+                    "Jev's danger/opportunity read before planning, and is asked when " +
+                    "Jev is unsure. Every call is printed to the browser console. Fixed " +
+                    "once the game starts."
                   : "No OpenRouter key: set VITE_OPENROUTER_API_KEY. Until then every Jev " +
                     "decision will fall back to the declared rules."}
               </div>
