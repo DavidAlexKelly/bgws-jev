@@ -346,3 +346,27 @@ and the prefetch batch size (8).
 
 With Jev off, event logs are still byte-identical to the original engine over
 72 seeded games.
+
+
+## 11. Checkpoints inside a move
+
+A move no longer runs blind once it starts. With Jev on, it stops to ask
+"carry on, halt, or break for cover?" whenever something happens to it:
+
+| Trigger | When | Rule if Jev can't answer |
+|---|---|---|
+| `underFire` | shot at by Reactive Fire as it set off, and still able to move | carry on |
+| `setback` | a friend within 1 km destroyed or broken this turn (asked once per unit per turn) | carry on |
+| `contact` | sights an enemy it had not seen | commander's preset |
+| `exposed` | walks into an identified enemy's sight and weapon reach that it was not in at the start (once per enemy per move; checked every 200 m) | carry on |
+
+"Break for cover" is offered only when there is cover within reach (searched
+up to 700 m, and no further than the rest of the move) that the ground lets it
+actually arrive in. It ends the move there.
+
+Checkpoints are event-driven on purpose, not every N% of the move: a question
+asked when nothing has changed has the same answer and only costs time.
+
+Code: `resolveMoveLive`, `exposureAlarm`, `setbackNear`, `coverMove` in
+`rules/turnLoop.ts`; the walk's `alarm` hook in `rules/contact.ts`;
+`decideContact` in `rules/jevDecider.ts`. With Jev off the engine is unchanged.

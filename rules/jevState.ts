@@ -422,10 +422,17 @@ export function contactState(moment: ContactMoment) {
     .map((id) => view.contacts.find((contact) => contact.id === id))
     .filter((contact): contact is ObservedForceElement => contact != null);
 
+  const why: Record<typeof moment.trigger, string> = {
+    contact: "Your element was moving and has just made contact with the enemy. It has halted.",
+    underFire: "Your element was fired on as it set off. It can still move.",
+    exposed: "Your element is moving into an identified enemy's sight and range.",
+    setback: "A friend close to your element has been destroyed or broken this turn.",
+  };
   return {
-    situation:
-      "Your element was moving and has just made contact with the enemy. " +
-      "It has halted. Decide whether it presses on to its destination or stays here.",
+    situation: `${why[moment.trigger]} Decide whether it carries on, halts, or breaks for cover.`,
+    trigger: moment.trigger,
+    ...(moment.detail ? { detail: moment.detail } : {}),
+    ...(moment.cover ? { nearestCover: moment.cover } : { nearestCover: "none within reach" }),
     turn: moment.turn,
     you: side,
     ...(moment.intent?.plan ? { commandersPlan: moment.intent.plan } : {}),

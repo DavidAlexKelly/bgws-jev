@@ -82,6 +82,8 @@ export interface ContactWalk {
   events: ResolutionEvent[];
   /** The sighting levels this move established, as effects ready to apply. */
   sighted: StateDelta[];
+  /** Why the walk stopped, when an `alarm` stopped it rather than contact. */
+  alarm?: string;
 }
 
 /**
@@ -110,6 +112,15 @@ export function walkUntilContact(
      * no preference should get.
      */
     haltOnContact?: boolean;
+    /**
+     * Checked at every step, after contact: a reason to stop here, or null.
+     *
+     * How a TacticalDecider gets to reconsider a move part-way — when it
+     * walks into an identified enemy's sight and range, say — without the
+     * walk having to know what counts as a reason. Absent means no check,
+     * and the walk is exactly what it always was.
+     */
+    alarm?: (at: LatLng) => string | null;
   },
 ): ContactWalk {
   const { terrain, ruleset, rng, turn, phase } = options;
@@ -135,7 +146,7 @@ export function walkUntilContact(
   const candidates = forceElementsOf(state, opposing(actor.side)).filter(
     (enemy) => enemy.combatStrength > 0 && sightingOf(state, actor.side, enemy.id) === "none",
   );
-  if (candidates.length === 0) return nothing;
+  if (candidates.length === 0 && !options.alarm) return nothing;
 
   const events: ResolutionEvent[] = [];
   const sighted: ContactWalk["sighted"] = [];
@@ -185,6 +196,20 @@ export function walkUntilContact(
           };
         }
       }
+    }
+
+    // Not the last step: arriving is not a reason to stop.
+    const reason = step < steps ? options.alarm?.(at) : null;
+    if (reason) {
+      return {
+        end: at,
+        distanceM: distanceM(from, at),
+        halted: true,
+        contacts,
+        events,
+        sighted,
+        alarm: reason,
+      };
     }
   }
 

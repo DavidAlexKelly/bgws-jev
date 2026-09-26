@@ -76,6 +76,16 @@ export interface ReactionMoment {
   intent?: CommanderIntent;
 }
 
+/**
+ * Why a move has stopped to ask.
+ *
+ *   contact    it has just sighted an enemy it had not seen (7.1.3)
+ *   underFire  it was shot at as it set off, and can still go on
+ *   exposed    it is walking into an identified enemy's sight and range
+ *   setback    a friend close by has been destroyed or broken this turn
+ */
+export type MoveTrigger = "contact" | "underFire" | "exposed" | "setback";
+
 export interface ContactMoment {
   state: GameState;
   config: PhaseConfig;
@@ -91,6 +101,12 @@ export interface ContactMoment {
   remainingM: number;
   /** What the commander pre-committed to on the option, if anything. */
   preferred: "halt" | "press";
+  /** What stopped the move. Contact, unless one of the other triggers fired. */
+  trigger: MoveTrigger;
+  /** The trigger in words: "fired on by R1", "enters R2's sight at 1,400 m". */
+  detail?: string;
+  /** The nearest cover it could break for from here, if there is any. */
+  cover?: { metres: number; ground: string };
   intent?: CommanderIntent;
 }
 
@@ -196,7 +212,10 @@ export interface ReactionVerdict {
 }
 
 export interface ContactVerdict {
+  /** Carry on to the destination. */
   press: boolean;
+  /** Break off to the nearest cover instead (only when some was offered). */
+  cover?: boolean;
   traces: TacticalTrace[];
 }
 
@@ -256,6 +275,11 @@ export const ruleDecider: TacticalDecider = {
     };
   },
   async decideContact(moment) {
-    return { press: moment.preferred === "press", traces: [] };
+    // Only contact was ever a reason to stop. For the others the rule is what
+    // the engine always did: carry on.
+    return {
+      press: moment.trigger === "contact" ? moment.preferred === "press" : true,
+      traces: [],
+    };
   },
 };

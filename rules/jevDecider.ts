@@ -492,38 +492,83 @@ export function jevTacticalDecider(options: JevDeciderOptions): TacticalDecider 
     },
 
     async decideContact(moment): Promise<ContactVerdict> {
+      const what: Record<typeof moment.trigger, { question: string; situation: string; mark: string }> = {
+        contact: {
+          question: "contact while moving: press on or halt?",
+          situation:
+            `has just made contact with ${moment.newContacts.join(", ") || "the enemy"} ` +
+            "while moving, and has halted",
+          mark: "halts on contact",
+        },
+        underFire: {
+          question: "under fire: carry on, halt, or break for cover?",
+          situation: `was ${moment.detail ?? "fired on"} as it set off, and can still move`,
+          mark: "stops under fire",
+        },
+        exposed: {
+          question: "moving into enemy sight: carry on, halt, or break for cover?",
+          situation: `is ${moment.detail ?? "moving into an enemy's sight and range"}`,
+          mark: "stops short",
+        },
+        setback: {
+          question: "setback nearby: carry on, halt, or break for cover?",
+          situation: `is about to move, and ${moment.detail ?? "a friend nearby has been lost"}`,
+          mark: "holds after setback",
+        },
+      };
+      const here = what[moment.trigger];
+      // The rule: at contact, the commander's preset; otherwise the move goes
+      // on, which is all the engine ever did.
+      const fallbackId = moment.trigger === "contact" ? moment.preferred : "press";
+
       const { id, trace } = await decide({
-        question: "contact while moving: press on or halt?",
+        question: here.question,
         actorId: moment.actorId,
         state: contactState(moment),
         instructions:
-          `Your element ${moment.actorId} has just made contact with ` +
-          `${moment.newContacts.join(", ") || "the enemy"} while moving and has halted. ` +
+          `Your element ${moment.actorId} ${here.situation}. Decide what it does now. ` +
           "Weigh its orders, the objective and your commander's plan against what it " +
-          "now faces: the threats to it here, the cover here versus at the " +
+          "faces: the threats to it here, the cover here, on the way and at the " +
           "destination, and its own strength and morale.",
         choices: [
           {
-            key: "halt",
-            id: "halt",
-            summary: "halt here and go to ground",
-            criterion:
-              "Stop here. Stay where it is, take whatever cover this ground offers, and do not complete the move.",
-            mark: "halts on contact",
-          },
-          {
             key: "press",
             id: "press",
-            summary: `press on the remaining ${Math.round(moment.remainingM)} m`,
-            criterion: "Keep going to the ordered destination despite the contact, accepting the exposure.",
-            mark: "presses on",
+            summary: `carry on the remaining ${Math.round(moment.remainingM)} m`,
+            criterion: "Keep going to the ordered destination, accepting the exposure.",
+            mark: moment.trigger === "contact" ? "presses on" : "carries on",
           },
+          {
+            key: "halt",
+            id: "halt",
+            summary: "halt here",
+            criterion:
+              "Stop here. Stay where it is, take whatever cover this ground offers, and do not complete the move.",
+            mark: here.mark,
+          },
+          ...(moment.cover
+            ? [
+                {
+                  key: "cover",
+                  id: "cover",
+                  summary: `break for cover (${moment.cover.ground}, ${moment.cover.metres} m)`,
+                  criterion:
+                    `Abandon the move and break off ${moment.cover.metres} m into the nearest ` +
+                    `cover (${moment.cover.ground}), ending the move there.`,
+                  mark: "breaks for cover",
+                },
+              ]
+            : []),
         ],
-        fallbackId: moment.preferred,
-        fallbackWhy: `commander's preset (${moment.preferred}) decided`,
+        fallbackId,
+        fallbackWhy:
+          moment.trigger === "contact"
+            ? `commander's preset (${moment.preferred}) decided`
+            : "the move carried on, as it always did",
       });
-      return { press: id === "press", traces: [trace] };
+      return { press: id === "press", cover: id === "cover", traces: [trace] };
     },
+
 
     async chooseObserver(moment: ObserverMoment) {
       const nearest = moment.observers[0]?.observerId ?? null;

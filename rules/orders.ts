@@ -46,6 +46,7 @@ import {
   activationBudget,
   attemptSightingInterruptLive,
   chooseOptionLive,
+  firersSince,
   logTraces,
   prefetchReactionsFor,
   counteractionFireOptionsFor,
@@ -561,6 +562,7 @@ export async function executePlannedTurn(
     // THE R (7.1.3), BEFORE THE MOVE IT INTERRUPTS. An answer that Disrupts
     // or Breaks the mover stops the move happening at all.
     const interruptible = chosen.kind === "move";
+    const logged = config.log.all().length;
     if (interruptible) {
       next = await reactiveFireLive(
         { ...next, phase: "arcReaction" },
@@ -578,7 +580,16 @@ export async function executePlannedTurn(
     }
 
     const stopped = interruptible && !mayProceed(next, actorId);
-    if (!stopped) next = await resolveMoveLive(next, chosen, config, turn, {}, intents);
+    if (!stopped) {
+      next = await resolveMoveLive(
+        next,
+        chosen,
+        config,
+        turn,
+        { tookFire: firersSince(config.log, logged, actorId) },
+        intents,
+      );
+    }
 
     next = applyEffects(next, [
       { kind: "marker", feId: actorId, marker: "activated", added: true },

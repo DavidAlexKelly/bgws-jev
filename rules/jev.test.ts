@@ -1126,3 +1126,138 @@ describe("Jev's assessment for the planner", () => {
     expect(seen?.assessments).toBeUndefined();
   });
 });
+
+// ── Checkpoints inside a move ──────────────────────────────────────────────
+
+describe("a move stops to ask when something happens to it", () => {
+  const eastward = (to = 3000) => ({
+    id: "B1:move",
+    kind: "move" as const,
+    actorId: "B1",
+    destination: at(to, 0),
+    summary: "B1 advances east",
+  });
+  /** A Jev that answers every move question with `answer`, and records the questions. */
+  const moveJev = (answer: "press" | "halt" | "cover") => answers(answer);
+  const asked = (log: EventLog) => decisions(log).map((d) => d.question);
+
+  describe("walking into an identified enemy's sight and range", () => {
+    // R1 is identified, 5.5 km east: out of reach at the start (3 km guns),
+    // in reach about 2.5 km into the move.
+    const scene = () => board([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(5500, 0))]);
+
+    it("stops where it comes into reach when Jev says halt", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("halt") }) } }, HOUSE_V1);
+      const next = await resolveMoveLive(scene(), eastward(), cfg, 2);
+      const stoppedAt = distanceM(next.forceElements.B1.position, at(0, 0));
+      expect(stoppedAt).toBeGreaterThan(2000);
+      expect(stoppedAt).toBeLessThan(2900);
+      expect(decisions(cfg.log)[0]).toMatchObject({
+        question: "moving into enemy sight: carry on, halt, or break for cover?",
+        chosenBy: "jev",
+        chosenId: "halt",
+      });
+    });
+
+    it("asks once per enemy, and goes all the way when Jev says carry on", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("press") }) } }, HOUSE_V1);
+      const next = await resolveMoveLive(scene(), eastward(), cfg, 2);
+      expect(distanceM(next.forceElements.B1.position, at(3000, 0))).toBeLessThan(5);
+      expect(asked(cfg.log)).toHaveLength(1);
+    });
+
+    it("carries on, as it always did, when Jev cannot answer", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: failing }) } }, HOUSE_V1);
+      const next = await resolveMoveLive(scene(), eastward(), cfg, 2);
+      expect(distanceM(next.forceElements.B1.position, at(3000, 0))).toBeLessThan(5);
+      expect(decisions(cfg.log)[0]).toMatchObject({ chosenId: "press", fallback: "error" });
+    });
+
+    it("does not ask about an enemy that could already reach it where it started", async () => {
+      const near = board([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(2000, 0))]);
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("halt") }) } }, HOUSE_V1);
+      const next = await resolveMoveLive(near, eastward(1000), cfg, 2);
+      expect(asked(cfg.log)).toHaveLength(0);
+      expect(distanceM(next.forceElements.B1.position, at(1000, 0))).toBeLessThan(5);
+    });
+  });
+
+  describe("shot at as it set off", () => {
+    const scene = () => board([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1500))]);
+
+    it("changes nothing without a decider", async () => {
+      const plain = config({}, HOUSE_V1);
+      const live = config({}, HOUSE_V1);
+      const a = resolveAction(scene(), eastward(), plain, 2);
+      const b = await resolveMoveLive(scene(), eastward(), live, 2, { tookFire: ["R1"] });
+      expect(b).toEqual(a);
+    });
+
+    it("stays put when Jev says halt", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("halt") }) } }, HOUSE_V1);
+      const next = await resolveMoveLive(scene(), eastward(), cfg, 2, { tookFire: ["R1"] });
+      expect(next.forceElements.B1.position).toEqual(at(0, 0));
+      expect(decisions(cfg.log)[0]).toMatchObject({
+        question: "under fire: carry on, halt, or break for cover?",
+        chosenId: "halt",
+      });
+    });
+
+    it("breaks off into the nearest cover when Jev says so", async () => {
+      // A wood 300 m north of the start; open ground everywhere else.
+      const woods = {
+        groundHeightM: () => 0,
+        classify: (point: LatLng) => (point.lat > at(0, 250).lat && point.lat < at(0, 900).lat ? "woodsLight" : "open"),
+      } as const;
+      const cfg = config(
+        { terrain: woods, tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("cover") }) } },
+        HOUSE_V1,
+      );
+      const next = await resolveMoveLive(scene(), eastward(), cfg, 2, { tookFire: ["R1"] });
+      const end = next.forceElements.B1.position;
+      expect(woods.classify(end)).toBe("woodsLight");
+      expect(distanceM(end, at(0, 0))).toBeLessThan(750);
+      expect(decisions(cfg.log)[0].options.map((o) => o.id)).toContain("cover");
+    });
+
+    it("does not offer cover when there is none", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("halt") }) } }, HOUSE_V1);
+      await resolveMoveLive(scene(), eastward(), cfg, 2, { tookFire: ["R1"] });
+      expect(decisions(cfg.log)[0].options.map((o) => o.id)).toEqual(["press", "halt"]);
+    });
+  });
+
+  describe("a friend lost close by this turn", () => {
+    const scene = () =>
+      board([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(300, 0), { combatStrength: 0 }), fe("R1", "red", at(0, 9000))]);
+    const lost = (cfg: PhaseConfig) =>
+      cfg.log.append({
+        type: "resolution",
+        turn: 2,
+        phase: "arcAction",
+        kind: "directFire",
+        rulesetId: "x",
+        actorIds: ["R1"],
+        targetIds: ["B2"],
+        modifiers: [],
+        result: "threeHits",
+        effects: [{ kind: "eliminated", feId: "B2" }],
+      });
+
+    it("asks before setting off, and only once a turn", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("press") }) } }, HOUSE_V1);
+      lost(cfg);
+      const once = await resolveMoveLive(scene(), eastward(1000), cfg, 2);
+      await resolveMoveLive(once, { ...eastward(1500), id: "B1:again" }, cfg, 2);
+      expect(asked(cfg.log).filter((q) => q.startsWith("setback nearby"))).toHaveLength(1);
+      expect(decisions(cfg.log)[0].rationale ?? "").not.toMatch(/Jev unavailable/);
+    });
+
+    it("ignores losses from earlier turns", async () => {
+      const cfg = config({ tactical: { blue: jevTacticalDecider({ side: "blue", call: moveJev("halt") }) } }, HOUSE_V1);
+      lost(cfg);
+      await resolveMoveLive(scene(), eastward(1000), cfg, 3);
+      expect(asked(cfg.log)).toHaveLength(0);
+    });
+  });
+});
