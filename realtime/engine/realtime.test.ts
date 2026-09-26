@@ -140,7 +140,7 @@ describe("the autopilot", () => {
     expect(events.some((e) => e.kind === "arrived" && e.unitId === "B1")).toBe(true);
   });
 
-  it("stops at ground it cannot cross, and says so", () => {
+  it("never enters ground it cannot cross: it goes as far as it can and stops", () => {
     // "steep" has no allowance for tracks: impassable.
     const lake: TerrainSampler = {
       groundHeightM: () => 0,
@@ -150,8 +150,9 @@ describe("the autopilot", () => {
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
     state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
     const { state: after, events } = run(state, cfg, 600);
-    expect(events.some((e) => e.kind === "blocked")).toBe(true);
+    expect(events.some((e) => e.unitId === "B1" && (e.kind === "blocked" || e.kind === "arrived"))).toBe(true);
     expect(after.game.forceElements.B1.position.lat).toBeLessThanOrEqual(at(0, 101).lat);
+    expect(after.units.B1.order.kind).toBe("hold");
   });
 
   it("sights what is in view, and says so", () => {
@@ -220,6 +221,92 @@ describe("the autopilot", () => {
     };
     expect(await play()).toBe(await play());
   }, 60_000);
+});
+
+// ── Meeting the enemy ──────────────────────────────────────────────────────
+
+describe("meeting the enemy", () => {
+  const column = (roe: "never" | "withinShortRange" = "withinShortRange") => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 4000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 6000) }, cfg, { roe });
+    state = setOrder(state, "R1", { kind: "move", to: at(0, -2000) }, cfg, { roe });
+    return { cfg, state };
+  };
+
+  it("fires on the move rather than driving past", () => {
+    const { cfg, state } = column();
+    const { shots } = run(state, cfg, 900);
+    expect(shots).toBeGreaterThan(0);
+  });
+
+  it("halts on running into the enemy, and says so", () => {
+    const { cfg, state } = column("never");
+    const { state: after, events } = run(state, cfg, 900);
+    const contact = events.find((e) => e.kind === "contact");
+    expect(contact).toBeDefined();
+    // Nobody drove through: they are still on their own sides of each other.
+    expect(after.game.forceElements.B1.position.lat).toBeLessThan(after.game.forceElements.R1.position.lat);
+    expect(distanceM(after.game.forceElements.B1.position, after.game.forceElements.R1.position)).toBeGreaterThan(200);
+  });
+
+  it("sees anything close in the open without a roll", () => {
+    const cfg = config();
+    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 400))]));
+    const after = tick(state, cfg).state;
+    expect(after.game.sighting.blue.R1).toBe("full");
+  });
+
+  it("the rules engage what they sight instead of carrying on", async () => {
+    const cfg = config();
+    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
+    const moving = setOrder(state, "B1", { kind: "move", to: at(0, 3000) }, cfg);
+    const [decision] = await ruleDecider.decide(
+      moving,
+      "blue",
+      [
+        {
+          unitId: "B1",
+          events: [{ time: 1, unitId: "B1", kind: "sighted", detail: "R1", severe: true }],
+          options: optionsFor(moving, "B1", cfg),
+        },
+      ],
+      cfg,
+    );
+    expect(decision.optionId).toBe("engage:R1");
+  });
+});
+
+// ── Routes ─────────────────────────────────────────────────────────────────
+
+describe("routes", () => {
+  it("follows the planner's waypoints instead of a straight line", () => {
+    // A planner that goes round by the east.
+    const planner = {
+      kind: "raster" as const,
+      plan: (_from: LatLng, to: LatLng) => [at(1000, 0), at(1000, 1000), to],
+    };
+    const cfg = config({ planner });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
+    let furthestEast = 0;
+    for (let i = 0; i < 2000 && state.units.B1.order.kind === "move"; i += 1) {
+      state = tick(state, cfg).state;
+      const east = distanceM(ORIGIN, { lat: ORIGIN.lat, lng: state.game.forceElements.B1.position.lng });
+      furthestEast = Math.max(furthestEast, east);
+    }
+    expect(furthestEast).toBeGreaterThan(900);
+    expect(distanceM(state.game.forceElements.B1.position, at(0, 1000))).toBeLessThan(1);
+  });
+
+  it("never steps onto ground the raster says is impassable, even where the land cover would let it ford", () => {
+    const river = (p: LatLng) => !(p.lat > at(0, 200).lat && p.lat < at(0, 260).lat);
+    const cfg = config({ isPassable: river, planner: { kind: "raster", plan: () => null } });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, -30_000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000) }, cfg);
+    const { state: after } = run(state, cfg, 900);
+    expect(after.game.forceElements.B1.position.lat).toBeLessThanOrEqual(at(0, 200).lat);
+  });
 });
 
 // ── When decisions are asked and take effect ───────────────────────────────
@@ -320,7 +407,7 @@ describe("Jev in real time", () => {
 
   it("asks for a side's units in ONE request and takes Jev's orders", async () => {
     const { cfg, state } = scene();
-    const call = fakeJev((criteria) => keyWhere(criteria, /^engage/));
+    const call = fakeJev((criteria) => keyWhere(criteria, /engage/));
     const decisions = await jevRealtimeDecider({ side: "blue", call }).decide(state, "blue", requests(state, cfg), cfg);
     expect(call.requests).toHaveLength(1);
     expect(Object.keys(call.requests[0].questions)).toEqual(["u0", "u1"]);
@@ -330,7 +417,7 @@ describe("Jev in real time", () => {
 
   it("carries on when Jev is unsure", async () => {
     const { cfg, state } = scene();
-    const call = fakeJev((criteria) => keyWhere(criteria, /^engage/), 0.05);
+    const call = fakeJev((criteria) => keyWhere(criteria, /engage/), 0.05);
     const decisions = await jevRealtimeDecider({ side: "blue", call }).decide(state, "blue", requests(state, cfg), cfg);
     expect(decisions.every((d) => d.optionId === "keep" && d.trace.fallback === "lowConfidence")).toBe(true);
   });
@@ -395,7 +482,10 @@ describe("initial orders", () => {
       "blue",
       cfg,
     );
-    expect(state.units.B1.order).toEqual({ kind: "move", to: at(0, 5000) });
+    expect(state.units.B1.order.kind).toBe("move");
+    const order = state.units.B1.order as { to: LatLng; route?: LatLng[] };
+    expect(distanceM(order.to, at(0, 5000))).toBeLessThan(5);
+    expect(order.route?.length).toBeGreaterThan(0);
     expect(state.units.B1.purpose).toBe("take the objective");
   });
 

@@ -32,6 +32,7 @@ export function towards(from: LatLng, to: LatLng, metres: number): LatLng {
 
 /** Metres per turn this element may cover on the ground at `at`. Zero is impassable. */
 export function allowanceAt(fe: ForceElement, at: LatLng, config: RtConfig): number {
+  if (config.isPassable && !config.isPassable(at)) return 0;
   const terrain = config.terrain.classify(at);
   return config.ruleset.movement[fe.moveType]?.[terrain] ?? 0;
 }

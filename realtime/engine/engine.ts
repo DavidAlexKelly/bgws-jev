@@ -37,8 +37,9 @@ import { applyEffects } from "../../rules/apply";
 import { canAdvance, canEngage, resolveDirectFire, resolveSighting } from "../../rules/resolvers";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
+import { bearingRoutePlanner } from "../../lib/routePlan";
 import { allowanceAt, offsetBy, towards } from "./geometry";
-import { metresPerTick } from "./timing";
+import { AUTO_SIGHT_M, CLOSE_CONTACT_M, metresPerTick } from "./timing";
 import type { RtConfig, RtEvent, RtOrder, RtShot, RtState, RtUnit } from "./types";
 
 const SIGHT_RANK: Record<SightingLevel, number> = { none: 0, veryPartial: 1, partial: 2, full: 3 };
@@ -121,6 +122,26 @@ export function createRealtimeState(game: GameState): RtState {
   };
 }
 
+/**
+ * The route for a move, from where the unit stands.
+ *
+ * Planned once, when the order is given — the raster's A* on real ground,
+ * the bearing planner otherwise — and then followed waypoint by waypoint.
+ * A plan that cannot be made leaves the order without a route, and the unit
+ * walks straight and stops at the first ground it cannot enter.
+ */
+export function routed(order: RtOrder, fe: ForceElement, config: RtConfig): RtOrder {
+  if (order.kind !== "move" && order.kind !== "withdraw") return order;
+  if (order.route) return order;
+  const planner = config.planner ?? bearingRoutePlanner(config.terrain, config.ruleset.movement);
+  const waypoints = planner.plan(fe.position, order.to, fe.moveType);
+  if (!waypoints || waypoints.length === 0) return order;
+  // A goal on impassable ground is snapped by the planner to the nearest
+  // ground it can reach; that is where the unit is really going.
+  const last = waypoints[waypoints.length - 1];
+  return { ...order, to: last, route: waypoints };
+}
+
 /** Give a unit a new order. Resets what it is already exposed to. */
 export function setOrder(
   state: RtState,
@@ -130,8 +151,10 @@ export function setOrder(
   extra: Partial<RtUnit> = {},
 ): RtState {
   const unit = state.units[id];
-  if (!unit) return state;
-  const next = { ...state, units: { ...state.units, [id]: { ...unit, ...extra, order } } };
+  const fe = state.game.forceElements[id];
+  if (!unit || !fe) return state;
+  const planned = routed(order, fe, config);
+  const next = { ...state, units: { ...state.units, [id]: { ...unit, ...extra, order: planned } } };
   return {
     ...next,
     units: { ...next.units, [id]: { ...next.units[id], exposedTo: exposureOf(next, id, config) } },
@@ -203,10 +226,20 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       : game.objectives
         ? (bearingDeg(game.objectives[self.side], self.position) + 360) % 360
         : 180;
-    setUnit(id, { order: { kind: "withdraw", to: offsetBy(self.position, away, 1000) }, roe: "never" });
+    setUnit(id, {
+      order: routed({ kind: "withdraw", to: offsetBy(self.position, away, 1000) }, self, config),
+      roe: "never",
+    });
   }
 
   // ── 2. Movement ───────────────────────────────────────────────────────────
+  //
+  // ⚠ SIMULTANEOUS, like fire. Every unit steps from where it stood at the
+  // start of the tick, and only then does anyone look at where everyone
+  // ended up. Checking contact inside the loop let the first unit in the list
+  // see the enemy where it WAS and halt first, which was enough to tip
+  // identical engagements to blue.
+  const moving: string[] = [];
   for (const id of ids) {
     const self = fe(id);
     const unit = units[id];
@@ -221,8 +254,11 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     // An advance needs a steady unit; a withdrawal only needs to be alive.
     if (order.kind === "move" && !canAdvance(self.morale)) continue;
 
+    // Head for the next waypoint of the route, or straight for the goal.
+    const route = order.route ?? [];
+    const aim = route[0] ?? order.to;
     const step = metresPerTick(allowanceAt(self, self.position, config), timing);
-    const next = step > 0 ? towards(self.position, order.to, step) : self.position;
+    const next = step > 0 ? towards(self.position, aim, step) : self.position;
     if (step <= 0 || allowanceAt(self, next, config) <= 0) {
       setUnit(id, { order: { kind: "hold" } });
       emit(id, "blocked", `cannot move on through ${config.terrain.classify(next)}`);
@@ -231,32 +267,66 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
     setFe(id, {
       position: next,
-      facing: bearingDeg(self.position, order.to),
+      facing: bearingDeg(self.position, aim),
       markers: self.markers.includes("moved") ? self.markers : [...self.markers, "moved"],
     });
-    setUnit(id, { lastMovedAt: time });
+    const reachedWaypoint = route.length > 0 && distanceM(next, aim) < 1;
+    setUnit(id, {
+      lastMovedAt: time,
+      ...(reachedWaypoint ? { order: { ...order, route: route.slice(1) } } : {}),
+    });
 
     if (distanceM(next, order.to) < 1) {
       setUnit(id, { order: { kind: "hold" } });
       emit(id, "arrived", order.kind === "withdraw" ? "withdrawal complete" : "reached its destination");
       continue;
     }
+    moving.push(id);
+  }
+
+  // Now that everyone has moved: who has run into whom, and who has walked
+  // into an identified enemy's reach.
+  const contacts: { id: string; enemyId: string; range: number }[] = [];
+  for (const id of moving) {
+    const self = fe(id);
+    const order = units[id].order;
+
+    // Run into the enemy and you stop: nobody drives through a troop at
+    // point-blank range. A withdrawal keeps going — that is what it is for.
+    if (order.kind === "move") {
+      const close = forceElementsOf(game, opposing(self.side))
+        .filter((enemy) => enemy.combatStrength > 0)
+        .map((enemy) => ({ enemy, range: distanceM(enemy.position, self.position) }))
+        .filter(({ range }) => range <= CLOSE_CONTACT_M)
+        .filter(({ enemy }) => lineOfSight(config.terrain, { from: self.position, to: enemy.position }).visible)
+        .sort((a, b) => a.range - b.range)[0];
+      if (close) {
+        contacts.push({ id, enemyId: close.enemy.id, range: close.range });
+        continue;
+      }
+    }
 
     // Walking into an identified enemy's reach, once per enemy per order.
-    const moved = fe(id);
-    for (const enemy of forceElementsOf(game, opposing(moved.side))) {
+    for (const enemy of forceElementsOf(game, opposing(self.side))) {
       if (enemy.combatStrength <= 0) continue;
       if (units[id].exposedTo.includes(enemy.id)) continue;
-      if (sightingOf(game, moved.side, enemy.id) !== "full") continue;
-      if (!canHit(enemy, moved, moved.position, config)) continue;
+      if (sightingOf(game, self.side, enemy.id) !== "full") continue;
+      if (!canHit(enemy, self, self.position, config)) continue;
       setUnit(id, { exposedTo: [...units[id].exposedTo, enemy.id] });
       emit(
         id,
         "exposed",
-        `moving into ${enemy.id}'s sight and range at ${Math.round(distanceM(enemy.position, moved.position))} m`,
+        `moving into ${enemy.id}'s sight and range at ${Math.round(distanceM(enemy.position, self.position))} m`,
       );
       break;
     }
+  }
+  for (const { id, enemyId, range } of contacts) {
+    const enemy = fe(enemyId);
+    game = applyEffects(game, [{ kind: "sighting", viewer: fe(id).side, feId: enemyId, to: "full" }]);
+    lastSeen[fe(id).side][enemyId] = time;
+    setUnit(id, { order: { kind: "engage", targetId: enemyId } });
+    emit(id, "contact", `ran into ${enemy.label} (${enemyId}) at ${Math.round(range)} m and halted`, true);
   }
 
   // ── 3. Sighting ───────────────────────────────────────────────────────────
@@ -266,11 +336,34 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
     for (const enemyId of enemies) {
       for (const observerId of observers) {
-        if ((time + stagger(`${observerId}>${enemyId}`, timing.sightingIntervalS)) % timing.sightingIntervalS !== 0) {
-          continue;
-        }
         const observer = fe(observerId);
         const enemy = fe(enemyId);
+
+        // Close enough that nobody fails to see it: no roll, every tick.
+        if (distanceM(observer.position, enemy.position) <= AUTO_SIGHT_M) {
+          if (lineOfSight(config.terrain, { from: observer.position, to: enemy.position }).visible) {
+            lastSeen[side][enemyId] = time;
+            const was = sightingOf(game, side, enemyId);
+            if (was !== "full") {
+              game = applyEffects(game, [{ kind: "sighting", viewer: side, feId: enemyId, to: "full" }]);
+              if (was === "none") {
+                emit(observerId, "sighted", `${enemy.label} (${enemyId}) at ${Math.round(distanceM(observer.position, enemy.position))} m, close`, true);
+              }
+            }
+          }
+          continue;
+        }
+
+        // Seeded per game: an unseeded stagger gave the same side the earlier
+        // look in every game, whatever the seed — enough to tip identical
+        // engagements 44 to 15.
+        if (
+          (time + stagger(`${config.rng.seed}:${observerId}>${enemyId}`, timing.sightingIntervalS)) %
+            timing.sightingIntervalS !==
+          0
+        ) {
+          continue;
+        }
         if (distanceM(observer.position, enemy.position) > LOS_CAP_M) continue;
         if (!lineOfSight(config.terrain, { from: observer.position, to: enemy.position }).visible) continue;
 
@@ -294,12 +387,14 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
         game = applyEffects(game, [{ kind: "sighting", viewer: side, feId: enemyId, to: level }]);
         if (before === "none") {
+          // A new enemy is worth a decision at once, not after the cooldown.
           emit(
             observerId,
             "sighted",
             `${level === "full" ? enemy.label : "an unidentified contact"} (${enemyId}) at ${Math.round(
               distanceM(observer.position, enemy.position),
             )} m`,
+            true,
           );
         }
       }
@@ -341,7 +436,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     if (!unit || self.combatStrength <= 0 || !canEngage(self.morale)) continue;
     if (unit.weaponReadyAt > time) continue;
     const order = unit.order;
-    if (order.kind === "move" || order.kind === "withdraw") continue;
+    // A withdrawal does not stop to fight. A move fires ON the move, within
+    // its rules of engagement and at the fire table's moving penalty — two
+    // columns that meet exchange fire rather than drive past each other.
+    if (order.kind === "withdraw") continue;
 
     const reachable = forceElementsOf(snapshot, opposing(self.side))
       .filter((enemy) => enemy.combatStrength > 0)

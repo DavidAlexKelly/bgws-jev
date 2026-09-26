@@ -19,6 +19,11 @@
 
 import type { RtTiming } from "./types";
 
+/** Closer than this, a moving unit halts: it has run into the enemy. */
+export const CLOSE_CONTACT_M = 300;
+/** Closer than this, with a line of sight, nobody fails to see a unit. */
+export const AUTO_SIGHT_M = 500;
+
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,

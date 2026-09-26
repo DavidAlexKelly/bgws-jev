@@ -29,14 +29,27 @@ import ms from "milsymbol";
 import { DechoBasemap } from "@acc/decho-basemap/react";
 import { AppSwitcher } from "@/components/AppSwitcher";
 import { planetStore } from "@/shared/map/dechoBasemapSetup";
+import { foundryFileClient } from "@/shared/routing/foundryFileClient";
+import { DEFAULT_TERRAIN } from "@/shared/routing/terrainDatasets";
+import { useTerrainRaster } from "@/shared/routing/useTerrainRaster";
 
-import { boardBounds, boardRing, isOnBoard, type LatLng } from "../lib/board";
+import { boardBounds, boardRing, isOnBoard, metresPerDegreeLon, type LatLng } from "../lib/board";
 import {
   DEFAULT_ORIGIN,
+  offsetToLatLng,
   placedFromList,
   toGameStateFromPlaced,
   type PlacedElement,
 } from "../lib/forceBuilder";
+import {
+  centreOf,
+  coversBoard,
+  describeTerrainSource,
+  rasterTerrain,
+  type TerrainSource,
+} from "../lib/rasterTerrain";
+import { rasterRoutePlanner } from "../lib/routePlan";
+import { mobilityClassFor } from "../lib/terrainAdapter";
 import { projectForSide } from "../lib/fogOfWar";
 import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
@@ -71,6 +84,29 @@ const FIRE_LINE_S = 12;
 /** How long a decision's tag stays beside its counter, in simulated seconds. */
 const DECISION_TAG_S = 40;
 const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
+
+/** The ground choices offered here: real land cover, or generated. */
+type GroundChoice = Extract<TerrainSource, "generated" | "raster+relief" | "raster">;
+
+/**
+ * A force list, moved onto wherever the board is.
+ *
+ * The lists are laid out around DEFAULT_ORIGIN. On real ground the board
+ * recentres onto the raster's coverage, which may be a long way off — so the
+ * list keeps its shape and moves with the board, rather than being placed off
+ * the edge of it.
+ */
+function onBoard(placed: PlacedElement[], origin: LatLng): PlacedElement[] {
+  if (origin.lat === DEFAULT_ORIGIN.lat && origin.lng === DEFAULT_ORIGIN.lng) return placed;
+  return placed.map((element) => ({
+    ...element,
+    position: offsetToLatLng(
+      origin,
+      (element.position.lng - DEFAULT_ORIGIN.lng) * metresPerDegreeLon(DEFAULT_ORIGIN.lat),
+      (element.position.lat - DEFAULT_ORIGIN.lat) * 111_320,
+    ),
+  }));
+}
 
 let counter = 0;
 const nextId = () => `rt-${(counter += 1)}`;
@@ -107,7 +143,10 @@ export default function RealtimePlay() {
   const [count, setCount] = useState(4);
   const [quality, setQuality] = useState<TroopQualityName>("regular");
 
-  // Setup.
+  // Setup. Real land cover by default: the basemap under the counters is the
+  // real world, and a game on generated ground over it has units crossing
+  // rivers the rules do not know are there.
+  const [groundChoice, setGroundChoice] = useState<GroundChoice>("raster+relief");
   const [groundSeed, setGroundSeed] = useState(STANDARD_GROUND.seed ?? "baltic-v1");
   const [gameSeed, setGameSeed] = useState("1");
   const [useJev, setUseJev] = useState(true);
@@ -135,8 +174,40 @@ export default function RealtimePlay() {
   const viewpointRef = useRef(viewpoint);
   viewpointRef.current = viewpoint;
 
-  const bounds = useMemo(() => boardBounds(DEFAULT_ORIGIN), []);
-  const terrain = useMemo(() => proceduralTerrain({ ...STANDARD_GROUND, seed: groundSeed }), [groundSeed]);
+  // ── Ground ──────────────────────────────────────────────────────────────
+  // The same raster, router and recentring the turn game uses, so a board
+  // on real ground is the same board in either mode.
+  const wantsRaster = groundChoice !== "generated";
+  const { raster, isLoaded: rasterLoaded, error: rasterError } = useTerrainRaster(
+    wantsRaster ? foundryFileClient : null,
+    DEFAULT_TERRAIN.rasterRid,
+  );
+  const origin = useMemo(() => {
+    if (!wantsRaster || !rasterLoaded || !raster?.bounds) return DEFAULT_ORIGIN;
+    const centre = centreOf(raster.bounds);
+    return coversBoard(raster, centre) ? centre : DEFAULT_ORIGIN;
+  }, [wantsRaster, rasterLoaded, raster]);
+  const rasterUsable = wantsRaster && rasterLoaded && !!raster && coversBoard(raster, origin);
+  const effectiveGround: GroundChoice = rasterUsable ? groundChoice : "generated";
+  const bounds = useMemo(() => boardBounds(origin), [origin]);
+  const terrain = useMemo(() => {
+    if (rasterUsable && raster) {
+      return rasterTerrain(raster, {
+        relief: groundChoice === "raster+relief" ? { ...STANDARD_GROUND, seed: groundSeed, origin } : null,
+      });
+    }
+    return proceduralTerrain({ ...STANDARD_GROUND, seed: groundSeed, origin });
+  }, [rasterUsable, raster, groundChoice, groundSeed, origin]);
+  /** A* on the raster when there is one; otherwise the engine's bearing planner. */
+  const planner = useMemo(
+    () => (rasterUsable && raster ? rasterRoutePlanner(raster, mobilityClassFor) : undefined),
+    [rasterUsable, raster],
+  );
+  /** Rivers are rivers: the raster's own passability, where it offers one. */
+  const isPassable = useMemo(() => {
+    const check = rasterUsable ? (raster as { isPassable?: (lat: number, lon: number) => boolean } | null)?.isPassable : undefined;
+    return check ? (point: LatLng) => check.call(raster, point.lat, point.lng) : undefined;
+  }, [rasterUsable, raster]);
   const jevCall = useMemo(
     () => withPersistentCache(openRouterJevCall(), { namespace: `${JEV_MODEL}:realtime` }),
     [],
@@ -149,8 +220,10 @@ export default function RealtimePlay() {
       terrain,
       rng: createRng(`${gameSeed}:realtime`),
       timing: DEFAULT_TIMING,
+      planner,
+      isPassable,
     }),
-    [terrain, gameSeed],
+    [terrain, gameSeed, planner, isPassable],
   );
 
   // ── Placement ─────────────────────────────────────────────────────────────
@@ -425,16 +498,15 @@ export default function RealtimePlay() {
       const fe = state.game.forceElements[id];
       if (!fe || fe.combatStrength <= 0 || !own(fe.side)) return [];
       if (unit.order.kind !== "move" && unit.order.kind !== "withdraw") return [];
+      // The route it will actually walk, not a straight line to the goal.
+      const path = [fe.position, ...(unit.order.route ?? []), unit.order.to];
       return [
         {
           type: "Feature" as const,
           properties: { side: fe.side },
           geometry: {
             type: "LineString" as const,
-            coordinates: [
-              [fe.position.lng, fe.position.lat],
-              [unit.order.to.lng, unit.order.to.lat],
-            ],
+            coordinates: path.map((point) => [point.lng, point.lat]),
           },
         },
       ];
@@ -489,6 +561,19 @@ export default function RealtimePlay() {
       markersRef.current.set(fe.id, entry);
     }
   }, [placed, phase, mapEpoch, makeMarker]);
+
+  // The board follows the data: on real ground it recentres on the raster's
+  // coverage, and the outline and the camera have to come along.
+  useEffect(() => {
+    const map = liveMap(mapRef.current);
+    if (!map) return;
+    (map.getSource(BOARD_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: [boardRing(bounds)] },
+    });
+    map.flyTo({ center: [origin.lng, origin.lat], zoom: 12, duration: 600 });
+  }, [bounds, origin, mapEpoch]);
 
   // Orders generated or the viewpoint changed: redraw once.
   useEffect(() => {
@@ -586,7 +671,7 @@ export default function RealtimePlay() {
               Click the map to place; click a counter to remove it. Or start from a force list:
             </div>
             {Object.values(FORCE_LISTS).map((list) => (
-              <button key={list.id} onClick={() => setPlaced(placedFromList(list))} style={{ ...chip, display: "block", width: "100%", textAlign: "left", marginBottom: 2 }}>
+              <button key={list.id} onClick={() => setPlaced(onBoard(placedFromList(list), origin))} style={{ ...chip, display: "block", width: "100%", textAlign: "left", marginBottom: 2 }}>
                 {list.name}
               </button>
             ))}
@@ -628,7 +713,35 @@ export default function RealtimePlay() {
 
             <div style={{ ...groupTitle, marginTop: 14 }}>3 &middot; Ground and dice</div>
             <div style={row}>
-              <span style={{ ...subtle, width: 46 }}>ground</span>
+              <span style={{ ...subtle, width: 46 }}>terrain</span>
+              <select
+                value={groundChoice}
+                onChange={(e) => setGroundChoice(e.target.value as GroundChoice)}
+                style={select}
+              >
+                <option value="raster+relief">real cover + generated relief</option>
+                <option value="raster">real cover, flat</option>
+                <option value="generated">generated ground</option>
+              </select>
+            </div>
+            <div style={{ ...subtle, lineHeight: 1.5, paddingBottom: 4 }}>
+              {describeTerrainSource(effectiveGround, DEFAULT_TERRAIN.label, groundSeed)}
+              {effectiveGround !== "generated"
+                ? " \u2014 routes are planned on the raster, and rivers are impassable."
+                : " \u2014 not the map underneath: routes are planned on the generated ground."}
+              {wantsRaster && !rasterLoaded && !rasterError && " \u2014 loading the raster\u2026"}
+              {rasterError && (
+                <span style={{ color: "#e8945a" }}>
+                  {" "}&mdash; raster unavailable ({rasterError.message}); using generated ground. The app
+                  needs {DEFAULT_TERRAIN.label} added as a permitted resource in Developer Console.
+                </span>
+              )}
+              {wantsRaster && rasterLoaded && !rasterUsable && !rasterError && (
+                <span style={{ color: "#e8945a" }}> &mdash; the raster does not cover a full board; using generated ground.</span>
+              )}
+            </div>
+            <div style={row}>
+              <span style={{ ...subtle, width: 46 }}>relief</span>
               <input value={groundSeed} onChange={(e) => setGroundSeed(e.target.value)} style={select} />
             </div>
             <div style={row}>

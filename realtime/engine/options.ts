@@ -62,9 +62,12 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
   const unit = state.units[id];
   if (!self || !unit || self.combatStrength <= 0) return [];
 
-  const options: RtOption[] = [
-    { id: "keep", summary: `carry on (${describeOrder(unit.order)})`, order: unit.order },
-  ];
+  const keep =
+    unit.order.kind === "move"
+      ? `carry on moving (${Math.round(distanceM(self.position, unit.order.to))} m to go; ` +
+        `fires on the move only ${unit.roe === "never" ? "never" : `if ${unit.roe}`}, at a penalty)`
+      : `carry on (${describeOrder(unit.order)})`;
+  const options: RtOption[] = [{ id: "keep", summary: keep, order: unit.order }];
   if (unit.order.kind !== "hold") {
     options.push({ id: "hold", summary: "halt and hold here", order: { kind: "hold" } });
   }
@@ -88,7 +91,7 @@ export function optionsFor(state: RtState, id: string, config: RtConfig): RtOpti
     options.push({
       id: `engage:${enemy.id}`,
       summary:
-        `engage ${identified ? enemy.label : "the contact"} ${enemy.id} at ` +
+        `halt and engage ${identified ? enemy.label : "the contact"} ${enemy.id} at ` +
         `${Math.round(distanceM(self.position, enemy.position))} m` +
         (odds ? ` (${Math.round(odds.pHit * 100)}% to hit)` : ""),
       order: { kind: "engage", targetId: enemy.id },
