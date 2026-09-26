@@ -326,3 +326,47 @@ before the change.
 The key goes directly from the browser to OpenRouter, so it is visible in the
 bundle. Use a key with a spend limit, or swap `openRouterJevCall` for a
 Foundry-function `JevCall` (Phase 1 above) later. Nothing else changes.
+
+
+## 10. Second round: making the most of Jev
+
+| # | Improvement | Where |
+|---|---|---|
+| — | Every Jev decision printed to the browser console: a one-line headline (who, what, probability, confidence, latency), expandable to the probabilities, the options and the exact state sent | `rules/jevConsole.ts` |
+| 1 | **Commander plans, Jev acts.** In the orders sequence, the commander's orders fix which units are committed; Jev picks which of them acts next and may adapt the action to the current board. Falls back to the written order. | `rules/orders.ts` (`executePlannedTurn`), `chooseActivation` in `rules/jevDecider.ts` |
+| 2 | **Terrain-aware moves:** into cover, overwatch (sees the most known enemies in range), pull back out of sight, onto a flank. Per side, only with Jev on. | `tacticalMoveOptions` in `rules/turnLoop.ts` |
+| 3 | **Richer state:** objective distance and bearing, units able to act together, threat odds from each identified enemy, height above the nearest enemy, the last few exchanges (fog-safe: unsighted enemies are "unseen enemy") | `situationOf`, `recentEvents` in `rules/jevState.ts` |
+| 4 | **Coordinated reactive fire:** one choice over "nobody", each unit alone and each pair (up to the cap) — a fire plan, not independent votes | `reactionAsk` in `rules/jevDecider.ts` |
+| 5 | **Using the probabilities:** unsure answers escalate to the side's LLM (LLM commanders only); optional seeded sampling ("vary decisions"); Jev's danger/opportunity score per unit is put into the LLM's orders prompt | `rules/jevDecider.ts`, `rules/jevAssess.ts`, `rules/llmCommander.ts` |
+| 7 | **Speed and memory:** reactions to the planned moves are prefetched in one request per side; answers persist across page loads; the latest decision is marked on each counter (own side only, dashed when the rules decided) | `prefetchReactionsFor`, `data/jevCache.ts`, `decisionMarksFor` in `lib/stepVisuals.ts`, `Play.tsx` |
+
+Item 6 (tuning thresholds) is deliberately left until there are real logs.
+The thresholds to tune are `minConfidence` (0.25) in `jevTacticalDecider`,
+and the prefetch batch size (8).
+
+With Jev off, event logs are still byte-identical to the original engine over
+72 seeded games.
+
+
+## 11. Checkpoints inside a move
+
+A move no longer runs blind once it starts. With Jev on, it stops to ask
+"carry on, halt, or break for cover?" whenever something happens to it:
+
+| Trigger | When | Rule if Jev can't answer |
+|---|---|---|
+| `underFire` | shot at by Reactive Fire as it set off, and still able to move | carry on |
+| `setback` | a friend within 1 km destroyed or broken this turn (asked once per unit per turn) | carry on |
+| `contact` | sights an enemy it had not seen | commander's preset |
+| `exposed` | walks into an identified enemy's sight and weapon reach that it was not in at the start (once per enemy per move; checked every 200 m) | carry on |
+
+"Break for cover" is offered only when there is cover within reach (searched
+up to 700 m, and no further than the rest of the move) that the ground lets it
+actually arrive in. It ends the move there.
+
+Checkpoints are event-driven on purpose, not every N% of the move: a question
+asked when nothing has changed has the same answer and only costs time.
+
+Code: `resolveMoveLive`, `exposureAlarm`, `setbackNear`, `coverMove` in
+`rules/turnLoop.ts`; the walk's `alarm` hook in `rules/contact.ts`;
+`decideContact` in `rules/jevDecider.ts`. With Jev off the engine is unchanged.

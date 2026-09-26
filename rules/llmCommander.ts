@@ -107,6 +107,22 @@ export function buildOrdersPrompt(request: OrdersRequest, directive?: string): s
     "",
   );
 
+  // A fast decision model's read of each element, when one was asked. Given
+  // as advice with its source named, because it is a second opinion, not a
+  // fact — the numbers above it are the facts.
+  const assessed = Object.entries(request.assessments ?? {});
+  if (assessed.length > 0) {
+    lines.push(
+      "JEV ASSESSMENT (a fast decision model's read of each element, 1 low – 5 high;",
+      "advice, not fact)",
+      "",
+      ...assessed.map(
+        ([id, a]) => `  ${id}  danger ${a.danger.toFixed(1)}  opportunity ${a.opportunity.toFixed(1)}`,
+      ),
+      "",
+    );
+  }
+
   const entries = Object.entries(request.optionsByElement);
   if (entries.length === 0) {
     lines.push("(No element has a decision to make this turn.)");

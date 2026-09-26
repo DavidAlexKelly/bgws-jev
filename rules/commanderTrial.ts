@@ -57,6 +57,8 @@ export interface TrialOptions {
    * dice, and the only difference is who made the calls inside the turn.
    */
   challengerTactics?: (side: Side) => TacticalDecider;
+  /** Give the challenger's side the terrain-aware move options too. */
+  challengerPositions?: boolean;
   /**
    * Called after each game, so a caller can show progress.
    *
@@ -133,6 +135,7 @@ async function playOne(
     tactical: options.challengerTactics
       ? { [challengerSide]: options.challengerTactics(challengerSide) }
       : undefined,
+    tacticalPositions: options.challengerPositions ? { [challengerSide]: true } : undefined,
     // The dice are seeded identically for both orientations, so the only
     // thing that differs between the pair is which commander sat on which
     // side. They diverge once a decision differs — that IS the measurement.

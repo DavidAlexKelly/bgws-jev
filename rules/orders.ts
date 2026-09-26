@@ -41,10 +41,14 @@ import { forceElementsOf, hasMarker, opposing } from "../lib/state";
 import { applyEffects, clearAllMarkers } from "./apply";
 import type { ActionOption, FormationPreference } from "./commander";
 import { resolveInitiative } from "./resolvers";
+import type { ActivationCandidate } from "./tactical";
 import {
   activationBudget,
   attemptSightingInterruptLive,
   chooseOptionLive,
+  firersSince,
+  logTraces,
+  prefetchReactionsFor,
   counteractionFireOptionsFor,
   endStaleMelees,
   mayProceed,
@@ -170,6 +174,19 @@ export interface OrdersRequest {
   activationBudget: number;
   /** How many elements may be held in Reserve this turn (2.1.13). Zero when off. */
   reserveLimit: number;
+  /**
+   * A fast decision model's read of each element, 1 (low) to 5 (high), when
+   * one was asked before planning. Advice for the planner, never acted on by
+   * the rules. See rules/jevAssess.ts.
+   */
+  assessments?: Record<string, ElementAssessment>;
+}
+
+export interface ElementAssessment {
+  /** How much danger the element is in where it stands. */
+  danger: number;
+  /** How good its chances are of hurting the enemy this turn. */
+  opportunity: number;
 }
 
 /**
@@ -497,8 +514,129 @@ export async function executePlannedTurn(
     red: [...planned.accepted.red],
   };
 
+  // Ask ahead about the reactions the planned moves will probably provoke, in
+  // one request per side, so most answers are waiting when their moment comes.
+  await prefetchReactionsFor(
+    next,
+    config,
+    standing,
+    (["blue", "red"] as const).flatMap((side) =>
+      planned.accepted[side]
+        .filter((intent) =>
+          requests[side].optionsByElement[intent.actorId]?.some(
+            (option) => option.id === intent.optionId && option.kind === "move",
+          ),
+        )
+        .map((intent) => ({ actorId: intent.actorId, side })),
+    ),
+    turn,
+    intents,
+  );
+
+  /** One activation, carried out: the same sequence whoever chose it. */
+  const carryOut = async (side: Side, actorId: string, chosen: ActionOption): Promise<void> => {
+    // 7.1, in the order it lists them. One enemy element may try to make
+    // out what is activating (10.0), which can reveal it and so bring it
+    // within reach of the Reactive Fire that follows.
+    next = await attemptSightingInterruptLive(next, actorId, side, config, turn, intents);
+
+    // An assault runs its own sequence (9.3.4): Surprise, then Reactive
+    // Fire from outside the objective and Defensive Fire from on it.
+    if (chosen.kind === "assault") {
+      next = await resolveAssaultActionLive(
+        next,
+        chosen,
+        config,
+        turn,
+        standing,
+        "actionReaction",
+        "arcAction",
+        intents,
+      );
+      next = applyEffects(next, [
+        { kind: "marker", feId: actorId, marker: "activated", added: true },
+      ]);
+      return;
+    }
+
+    // THE R (7.1.3), BEFORE THE MOVE IT INTERRUPTS. An answer that Disrupts
+    // or Breaks the mover stops the move happening at all.
+    const interruptible = chosen.kind === "move";
+    const logged = config.log.all().length;
+    if (interruptible) {
+      next = await reactiveFireLive(
+        { ...next, phase: "arcReaction" },
+        actorId,
+        side,
+        config,
+        turn,
+        standing,
+        "actionReaction",
+        undefined,
+        undefined,
+        intents,
+      );
+      next = { ...next, phase: "arcAction" };
+    }
+
+    const stopped = interruptible && !mayProceed(next, actorId);
+    if (!stopped) {
+      next = await resolveMoveLive(
+        next,
+        chosen,
+        config,
+        turn,
+        { tookFire: firersSince(config.log, logged, actorId) },
+        intents,
+      );
+    }
+
+    next = applyEffects(next, [
+      { kind: "marker", feId: actorId, marker: "activated", added: true },
+      // An element shot to a standstill has still spent its activation.
+      ...(stopped
+        ? [{ kind: "marker" as const, feId: actorId, marker: "held", added: true }]
+        : []),
+    ]);
+  };
+
   while (queues.blue.length > 0 || queues.red.length > 0) {
     for (const side of order) {
+      if (queues[side].length === 0) continue;
+
+      // ── Decided at the moment ──────────────────────────────────────────
+      // With a decider that takes activations, the commander's orders say
+      // WHO is committed; which of them acts next, and exactly how, is asked
+      // now, against the board as it stands after everything so far.
+      const decider = config.tactical?.[side];
+      if (decider?.chooseActivation) {
+        const candidates = activationCandidates(next, side, queues[side], requests[side], config);
+        // Anything no longer able to act has its orders struck.
+        const able = new Set(candidates.map((candidate) => candidate.actorId));
+        queues[side] = queues[side].filter((intent) => able.has(intent.actorId));
+        if (candidates.length === 0) continue;
+
+        const { pick, traces } = await decider.chooseActivation({
+          state: next,
+          config,
+          turn,
+          side,
+          candidates,
+          intent: intents[side],
+        });
+        logTraces(config, turn, "arcAction", side, traces, next);
+
+        const candidate = pick && candidates.find((one) => one.actorId === pick.actorId);
+        const chosen = candidate?.options.find((option) => option.id === pick?.optionId);
+        if (pick && chosen) {
+          const index = queues[side].findIndex((intent) => intent.actorId === pick.actorId);
+          if (index >= 0) queues[side].splice(index, 1);
+          await carryOut(side, pick.actorId, chosen);
+          continue;
+        }
+        // No pick: the next order is carried out as written, below.
+      }
+
       const intent = queues[side].shift();
       if (!intent) continue;
 
@@ -532,59 +670,7 @@ export async function executePlannedTurn(
         rationale: intent.rationale,
       });
 
-      // 7.1, in the order it lists them. One enemy element may try to make
-      // out what is activating (10.0), which can reveal it and so bring it
-      // within reach of the Reactive Fire that follows.
-      next = await attemptSightingInterruptLive(next, intent.actorId, side, config, turn, intents);
-
-      // An assault runs its own sequence (9.3.4): Surprise, then Reactive
-      // Fire from outside the objective and Defensive Fire from on it.
-      if (chosen.kind === "assault") {
-        next = await resolveAssaultActionLive(
-          next,
-          chosen,
-          config,
-          turn,
-          standing,
-          "actionReaction",
-          "arcAction",
-          intents,
-        );
-        next = applyEffects(next, [
-          { kind: "marker", feId: intent.actorId, marker: "activated", added: true },
-        ]);
-        continue;
-      }
-
-      // THE R (7.1.3), BEFORE THE MOVE IT INTERRUPTS. An answer that Disrupts
-      // or Breaks the mover stops the move happening at all.
-      const interruptible = chosen.kind === "move";
-      if (interruptible) {
-        next = await reactiveFireLive(
-          { ...next, phase: "arcReaction" },
-          intent.actorId,
-          side,
-          config,
-          turn,
-          standing,
-          "actionReaction",
-          undefined,
-          undefined,
-          intents,
-        );
-        next = { ...next, phase: "arcAction" };
-      }
-
-      const stopped = interruptible && !mayProceed(next, intent.actorId);
-      if (!stopped) next = await resolveMoveLive(next, chosen, config, turn, {}, intents);
-
-      next = applyEffects(next, [
-        { kind: "marker", feId: intent.actorId, marker: "activated", added: true },
-        // An element shot to a standstill has still spent its activation.
-        ...(stopped
-          ? [{ kind: "marker" as const, feId: intent.actorId, marker: "held", added: true }]
-          : []),
-      ]);
+      await carryOut(side, intent.actorId, chosen);
     }
   }
 
@@ -692,6 +778,47 @@ export async function executePlannedTurn(
     rejected: planned.rejected,
     counteraction,
   };
+}
+
+/**
+ * The elements a side still has orders for, with what they can do NOW.
+ *
+ * One entry per element, in the order the commander listed them. Options are
+ * generated from the current board; the ordered one is flagged only if it is
+ * still among them.
+ */
+function activationCandidates(
+  state: GameState,
+  side: Side,
+  queue: readonly Intent[],
+  request: OrdersRequest,
+  config: PhaseConfig,
+): ActivationCandidate[] {
+  const seen = new Set<string>();
+  const candidates: ActivationCandidate[] = [];
+  for (const intent of queue) {
+    if (seen.has(intent.actorId)) continue;
+    seen.add(intent.actorId);
+
+    const actor = state.forceElements[intent.actorId];
+    if (!actor || actor.side !== side || actor.combatStrength <= 0) continue;
+    if (hasMarker(actor, "fired") || hasMarker(actor, "held")) continue;
+
+    const options = optionsFor(state, actor, config);
+    if (options.length === 0) continue;
+    const ordered = request.optionsByElement[intent.actorId]?.find(
+      (option) => option.id === intent.optionId,
+    );
+    candidates.push({
+      actorId: intent.actorId,
+      options,
+      orderedOptionId: options.some((option) => option.id === intent.optionId)
+        ? intent.optionId
+        : undefined,
+      orderedSummary: ordered?.summary,
+    });
+  }
+  return candidates;
 }
 
 /**

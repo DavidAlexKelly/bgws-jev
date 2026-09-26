@@ -45,6 +45,7 @@ import { judgeVictory, type Verdict } from "./victory";
 import { walkUntilContact } from "./contact";
 import type {
   CommanderIntent,
+  MoveTrigger,
   ReactionCandidate,
   TacticalDecider,
   TacticalTrace,
@@ -88,6 +89,21 @@ export interface TurnStep {
    * Usually one. A Combined Fire or an assault can produce several.
    */
   events?: ResolutionEvent[];
+  /**
+   * Set when this step is a DECISION rather than an event — a TacticalDecider
+   * choosing, at the moment, what an element does. Nothing on the board
+   * changes, which is why it needs saying: "R1 held fire" is otherwise
+   * invisible. A decision is private to the side that made it.
+   */
+  decision?: {
+    chosenId: string;
+    /** A few words for the map, where the decider supplied them. */
+    mark?: string;
+    chosenBy: "heuristic" | "jev" | "llm";
+    /** Probability of the chosen option, where there was one. */
+    p?: number;
+    fallback?: string;
+  };
 }
 
 export interface GameConfig {
@@ -118,6 +134,17 @@ export interface GameConfig {
    * decide, exactly as before. See rules/tactical.ts.
    */
   tactical?: Partial<Record<Side, TacticalDecider>>;
+  /**
+   * Offer terrain-aware positions as move options: into cover, overwatch,
+   * pulling back out of sight, a flank. Off by default, because every option
+   * added is a choice the heuristic makes differently, and the measured game
+   * must stay the measured game. The play screen turns it on with Jev, whose
+   * whole job is choosing well among options like these.
+   *
+   * Per side, so a trial can give them to the challenger only and still be
+   * measuring the challenger rather than a changed option list on both sides.
+   */
+  tacticalPositions?: Partial<Record<Side, boolean>>;
   rng: Rng;
   log: EventLog;
   /** Stop after this many turns even if neither side has broken. */
@@ -161,7 +188,12 @@ function recordStep(
   turn: number,
   phase: Phase,
   label: string,
-  who: { side?: Side; actorId?: string; events?: ResolutionEvent[] } = {},
+  who: {
+    side?: Side;
+    actorId?: string;
+    events?: ResolutionEvent[];
+    decision?: TurnStep["decision"];
+  } = {},
 ): void {
   config.onStep?.({ turn, phase, label, state, ...who });
 }
@@ -407,6 +439,151 @@ export function activationBudget(state: GameState, side: Side, config: PhaseConf
 
   // No HQ is not no activations: a leaderless force still fights, badly.
   return Math.max(activationsWithoutHq, commanded);
+}
+
+// ── Tactical positions ─────────────────────────────────────────────────────
+
+/** Rings, in metres, on which candidate positions are looked for. */
+const POSITION_RINGS_M = [300, 700, 1200];
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+function offsetBy(from: LatLng, bearing: number, metres: number): LatLng {
+  const rad = (bearing * Math.PI) / 180;
+  const north = Math.cos(rad) * metres;
+  const east = Math.sin(rad) * metres;
+  return {
+    lat: from.lat + north / 111_320,
+    lng: from.lng + east / (111_320 * Math.cos((from.lat * Math.PI) / 180)),
+  };
+}
+
+/**
+ * Moves chosen for what the ground offers, not just for where the enemy is.
+ *
+ * ⚠ THE DEFAULT MOVE OPTIONS KNOW NOTHING ABOUT THE GROUND. They go towards an
+ * enemy, towards a friend or towards the objective — so a commander, however
+ * clever, could never choose "the wood line with a view of the road" unless
+ * it happened to lie on one of those three lines. A decision model is only as
+ * good as the list it chooses from, and the list was the limit.
+ *
+ * Up to four more, each the best of 24 candidate points (three rings, eight
+ * bearings) for one purpose:
+ *
+ *   cover      the nearest point in cover, when this element is not in any
+ *   overwatch  the point that sees the most known enemies within weapon range
+ *   withdraw   further from the nearest enemy, out of every known line of sight
+ *   flank      a point outside a known enemy's frontal arc, in range and sight
+ *
+ * Every one then goes through moveBound like any other move, so the ground
+ * still decides how far it gets, and the summary says what the destination
+ * actually is — judged at the point the element will really reach.
+ */
+function tacticalMoveOptions(
+  state: GameState,
+  fe: ForceElement,
+  config: PhaseConfig,
+): ActionOption[] {
+  const known = forceElementsOf(state, opposing(fe.side)).filter(
+    (enemy) => enemy.combatStrength > 0 && sightingOf(state, fe.side, enemy.id) !== "none",
+  );
+  const reach = Math.max(0, ...fe.capabilities.map((capability) => capability.maxRangeM));
+  const sees = (from: LatLng) =>
+    known.filter(
+      (enemy) =>
+        distanceM(from, enemy.position) <= reach &&
+        lineOfSight(config.terrain, { from, to: enemy.position }).visible,
+    );
+  const seenBy = (at: LatLng) =>
+    known.filter(
+      (enemy) =>
+        distanceM(enemy.position, at) <= 3000 &&
+        lineOfSight(config.terrain, { from: enemy.position, to: at }).visible,
+    ).length;
+  const nearestEnemyM = (at: LatLng) =>
+    known.length ? Math.min(...known.map((enemy) => distanceM(at, enemy.position))) : Infinity;
+
+  const points = POSITION_RINGS_M.flatMap((ring) =>
+    Array.from({ length: 8 }, (_, i) => offsetBy(fe.position, i * 45, ring)),
+  );
+
+  const picks: { purpose: string; point: LatLng }[] = [];
+
+  if (!inCover(config.terrain, fe.position)) {
+    const cover = points
+      .filter((point) => inCover(config.terrain, point))
+      .sort((a, b) => distanceM(fe.position, a) - distanceM(fe.position, b))[0];
+    if (cover) picks.push({ purpose: "cover", point: cover });
+  }
+
+  if (known.length > 0) {
+    const scored = points.map((point) => ({
+      point,
+      sees: sees(point).length,
+      cover: inCover(config.terrain, point) ? 1 : 0,
+      seenBy: seenBy(point),
+      nearest: nearestEnemyM(point),
+    }));
+
+    const overwatch = scored
+      .filter((one) => one.sees > 0)
+      .sort((a, b) => b.sees - a.sees || b.cover - a.cover || a.seenBy - b.seenBy)[0];
+    if (overwatch) picks.push({ purpose: "overwatch", point: overwatch.point });
+
+    const here = nearestEnemyM(fe.position);
+    const withdraw = scored
+      .filter((one) => one.nearest > here + 200)
+      .sort((a, b) => a.seenBy - b.seenBy || b.cover - a.cover || b.nearest - a.nearest)[0];
+    if (withdraw) picks.push({ purpose: "withdraw", point: withdraw.point });
+
+    const flank = scored
+      .map((one) => ({
+        ...one,
+        flanked: known.filter(
+          (enemy) =>
+            enemy.facing != null &&
+            distanceM(one.point, enemy.position) <= reach &&
+            bearingDeltaDeg(enemy.facing, bearingDeg(enemy.position, one.point)) >
+              config.ruleset.frontArcDeg &&
+            lineOfSight(config.terrain, { from: one.point, to: enemy.position }).visible,
+        ),
+      }))
+      .filter((one) => one.flanked.length > 0)
+      .sort((a, b) => b.flanked.length - a.flanked.length || b.cover - a.cover)[0];
+    if (flank) picks.push({ purpose: "flank", point: flank.point });
+  }
+
+  const options: ActionOption[] = [];
+  for (const { purpose, point } of picks) {
+    const bound = moveBound(config, fe, point);
+    if (!bound) continue;
+    const at = bound.destination;
+    const metres = Math.round(distanceM(fe.position, at));
+    const way = COMPASS[Math.round(bearingDeg(fe.position, at) / 45) % 8];
+    const ground = config.terrain.classify(at);
+    const covered = inCover(config.terrain, at);
+    const inSight = sees(at).map((enemy) => enemy.id);
+    const watchedBy = seenBy(at);
+
+    const what =
+      purpose === "cover"
+        ? `into cover (${ground})`
+        : purpose === "overwatch"
+          ? `to overwatch${covered ? ` from ${ground}` : ""}, seeing ${inSight.join(", ") || "nothing"}`
+          : purpose === "withdraw"
+            ? `back${covered ? ` into ${ground}` : ""}, ${watchedBy === 0 ? "out of known sight" : `seen by ${watchedBy}`}`
+            : `onto the flank, seeing ${inSight.join(", ") || "nothing"}`;
+
+    options.push(
+      ...withContactChoice(state, fe, config, {
+        id: `${fe.id}:pos:${purpose}`,
+        kind: "move",
+        actorId: fe.id,
+        destination: at,
+        summary: `${fe.label} moves ${metres} m ${way} ${what}${bound.note}`,
+      }),
+    );
+  }
+  return options;
 }
 
 /**
@@ -666,6 +843,10 @@ export function optionsFor(
         });
       }
     }
+  }
+
+  if (config.tacticalPositions?.[fe.side] && !hasMarker(fe, "moved") && canAdvance(fe.morale)) {
+    options.push(...tacticalMoveOptions(state, fe, config));
   }
 
   if (!sightedAnything && objective && !hasMarker(fe, "moved") && canAdvance(fe.morale)) {
@@ -1036,12 +1217,17 @@ async function activate(
   // offers the enemy a shot; if that shot Disrupts or Breaks the mover, the
   // move does not happen at all.
   const interruptible = chosen.kind === "move";
+  const logged = config.log.all().length;
   if (interruptible && chosen.actorId) {
     next = await reactiveFireLive(next, chosen.actorId, side, config, turn, standing, "actionReaction");
   }
 
   const stopped = interruptible && chosen.actorId != null && !mayProceed(next, chosen.actorId);
-  if (!stopped) next = await resolveMoveLive(next, chosen, config, turn);
+  if (!stopped) {
+    next = await resolveMoveLive(next, chosen, config, turn, {
+      tookFire: chosen.actorId ? firersSince(config.log, logged, chosen.actorId) : [],
+    });
+  }
 
   next = markActivated(next, chosen.actorId ?? "");
   if (stopped && chosen.actorId) {
@@ -1073,7 +1259,14 @@ export interface ResolveContext {
    * signature — this is how resolveMoveLive learns there is a decision to
    * make without walking the move twice.
    */
-  report?: { halted?: boolean; contacts?: string[] };
+  report?: { halted?: boolean; contacts?: string[]; alarm?: string };
+  /** Passed to the move's walk. See walkUntilContact's `alarm`. */
+  alarm?: (at: LatLng) => string | null;
+  /**
+   * Who shot at this element as it set off (Reactive Fire just before the
+   * move). Read by resolveMoveLive, which may ask whether to go on at all.
+   */
+  tookFire?: string[];
 }
 
 /**
@@ -1322,6 +1515,7 @@ function resolveActionInner(
             turn,
             phase,
             haltOnContact: !mayPressOn,
+            alarm: context.alarm,
           })
         : null;
       for (const event of walk?.events ?? []) config.log.append(event);
@@ -1331,6 +1525,7 @@ function resolveActionInner(
       if (context.report) {
         context.report.halted = halted;
         context.report.contacts = walk?.contacts ?? [];
+        context.report.alarm = walk?.alarm;
       }
 
       return applyEffects(state, [
@@ -2264,11 +2459,9 @@ export function resolveAssaultAction(
 // test, calibration and fixed-seed replay still describes the game that is
 // played when `config.tactical` is absent.
 
-/** How many times one move may stop for contact and be asked about it. */
-const MAX_CONTACT_DECISIONS = 3;
 
 /** Put a decider's reasoning in the log, in sequence with what it caused. */
-function logTraces(
+export function logTraces(
   config: PhaseConfig,
   turn: number,
   phase: Phase,
@@ -2291,10 +2484,22 @@ function logTraces(
         `${trace.actorId ?? side}: ${trace.question} \u2192 ${trace.chosenId}` +
           (trace.fallback
             ? ` (rules; Jev ${trace.fallback})`
-            : p != null
-              ? ` (Jev ${Math.round(p * 100)}%)`
-              : " (Jev)"),
-        { side, actorId: trace.actorId },
+            : trace.chosenBy === "llm"
+              ? " (escalated to the commander)"
+              : p != null
+                ? ` (Jev ${Math.round(p * 100)}%)`
+                : " (Jev)"),
+        {
+          side,
+          actorId: trace.actorId,
+          decision: {
+            chosenId: trace.chosenId,
+            mark: trace.mark,
+            chosenBy: trace.chosenBy,
+            p,
+            fallback: trace.fallback,
+          },
+        },
       );
     }
     config.log.append({
@@ -2467,15 +2672,145 @@ export async function resolveAssaultActionLive(
   );
 }
 
+/** Who has shot at an element since a point in the log. */
+export function firersSince(log: EventLog, from: number, targetId: string): string[] {
+  return log
+    .all()
+    .slice(from)
+    .filter(
+      (event): event is ResolutionEvent =>
+        event.type === "resolution" &&
+        event.kind === "directFire" &&
+        event.targetIds.includes(targetId),
+    )
+    .flatMap((event) => event.actorIds);
+}
+
 /**
- * A move, with the mover asked what to do the moment it makes contact.
+ * A check for the walk: has the mover just come into an identified enemy's
+ * sight AND reach?
  *
- * The rulebook gives the moving player that choice at that moment (7.1.3);
- * the engine used to take it in advance, on the option, because a move
- * resolved synchronously. Here the move is walked with halt-on-contact, and
- * if it halts the side's decider is asked whether to press on. If it does,
- * the rest of the move is walked from where it stopped — and may stop again
- * for someone else, up to MAX_CONTACT_DECISIONS times.
+ * Only enemies that could NOT already hit it where it started count — the
+ * commander chose the move knowing about those — and each raises the alarm
+ * once per move. Only identified enemies, because a contact's weapons are
+ * exactly what nobody knows yet.
+ */
+function exposureAlarm(
+  state: GameState,
+  actor: ForceElement,
+  config: PhaseConfig,
+): (at: LatLng) => string | null {
+  const threats = forceElementsOf(state, opposing(actor.side)).filter(
+    (enemy) => enemy.combatStrength > 0 && sightingOf(state, actor.side, enemy.id) === "full",
+  );
+  const canHit = (enemy: ForceElement, at: LatLng) =>
+    weaponFor(enemy, actor, distanceM(enemy.position, at)) != null &&
+    lineOfSight(config.terrain, { from: enemy.position, to: at }).visible;
+
+  const already = new Set(
+    threats.filter((enemy) => canHit(enemy, actor.position)).map((enemy) => enemy.id),
+  );
+  const raised = new Set<string>();
+
+  return (at) => {
+    for (const enemy of threats) {
+      if (already.has(enemy.id) || raised.has(enemy.id)) continue;
+      if (!canHit(enemy, at)) continue;
+      raised.add(enemy.id);
+      return `moving into ${enemy.id}'s sight and range at ${Math.round(distanceM(enemy.position, at))} m`;
+    }
+    return null;
+  };
+}
+
+/** How far a setback is felt: a friend lost within this distance. */
+const SETBACK_RADIUS_M = 1000;
+
+/**
+ * A friend destroyed or broken this turn, close by — the other reason to
+ * reconsider before setting off. Asked once per element per turn.
+ */
+function setbackNear(
+  state: GameState,
+  actor: ForceElement,
+  config: PhaseConfig,
+  turn: number,
+): string | null {
+  const events = config.log.all();
+  const alreadyAsked = events.some(
+    (event) =>
+      event.type === "decision" &&
+      event.turn === turn &&
+      event.actorId === actor.id &&
+      event.question.startsWith("setback nearby"),
+  );
+  if (alreadyAsked) return null;
+
+  for (const event of events) {
+    if (event.type !== "resolution" || event.turn !== turn) continue;
+    for (const effect of event.effects) {
+      const lost =
+        effect.kind === "eliminated" || (effect.kind === "morale" && effect.to === "broken");
+      if (!lost || effect.feId === actor.id) continue;
+      const friend = state.forceElements[effect.feId];
+      if (!friend || friend.side !== actor.side) continue;
+      const metres = distanceM(friend.position, actor.position);
+      if (metres > SETBACK_RADIUS_M) continue;
+      return `${friend.id} ${effect.kind === "eliminated" ? "destroyed" : "broken"} ${Math.round(metres)} m away`;
+    }
+  }
+  return null;
+}
+
+/**
+ * The nearest point in cover within reach, and the move that gets there.
+ *
+ * Searched on four rings of eight bearings, no further than `maxM`, and kept
+ * only if the ground lets the element actually arrive in cover.
+ */
+function coverMove(
+  fe: ForceElement,
+  config: PhaseConfig,
+  maxM: number,
+): { destination: LatLng; metres: number; ground: string } | null {
+  const rings = [100, 200, 400, 700].filter((ring) => ring <= Math.max(100, maxM));
+  const points = rings
+    .flatMap((ring) => Array.from({ length: 8 }, (_, i) => offsetBy(fe.position, i * 45, ring)))
+    .filter((point) => inCover(config.terrain, point))
+    .sort((a, b) => distanceM(fe.position, a) - distanceM(fe.position, b));
+
+  for (const point of points.slice(0, 4)) {
+    const bound = moveBound(config, fe, point);
+    if (!bound || !inCover(config.terrain, bound.destination)) continue;
+    return {
+      destination: bound.destination,
+      metres: Math.round(distanceM(fe.position, bound.destination)),
+      ground: config.terrain.classify(bound.destination),
+    };
+  }
+  return null;
+}
+
+/** How many times one move may stop and ask. */
+const MAX_MOVE_DECISIONS = 4;
+
+/**
+ * A move, with the mover asked what to do whenever something happens to it.
+ *
+ * The rulebook gives the moving player a choice at contact (7.1.3); the
+ * engine used to take it in advance, on the option, because a move resolved
+ * synchronously. With a decider configured, the move is walked in legs and
+ * stops to ask whenever one of four things happens (see MoveTrigger):
+ *
+ *   before setting off  it has just been shot at, or a friend close by has
+ *                       been lost this turn
+ *   along the way       it sights a new enemy (contact), or it walks into an
+ *                       identified enemy's sight and range (exposed)
+ *
+ * The answer is to carry on, to stop where it is, or — when there is cover
+ * within reach — to break off into it. These are checkpoints placed where
+ * something happened rather than at fixed fractions of the move: a question
+ * asked when nothing has changed has the same answer, and only costs time.
  *
  * ⚠ THE ONE PLACE A DECIDER CHANGES THE DICE. A continued walk re-attempts
  * sighting against enemies the first leg looked for and missed, which the
@@ -2504,20 +2839,20 @@ export async function resolveMoveLive(
 
   const destination = option.destination;
   const preferred = option.onContact ?? "halt";
+  const phase = context.phase ?? "arcAction";
+  const alarm = exposureAlarm(state, actor, config);
+  const { tookFire, ...rest } = context;
   let next = state;
-  let leg: ActionOption = { ...option, onContact: "halt" };
 
-  for (let asked = 0; asked <= MAX_CONTACT_DECISIONS; asked += 1) {
-    const report: NonNullable<ResolveContext["report"]> = {};
-    next = resolveAction(next, leg, config, turn, { ...context, report });
-    if (!report.halted || asked === MAX_CONTACT_DECISIONS) return next;
-
-    // A shaken element has no choice to make and goes to ground (7.1.3).
-    const moved = next.forceElements[actor.id];
-    if (!moved || moved.combatStrength <= 0 || !canAdvance(moved.morale)) return next;
-    const remainingM = distanceM(moved.position, destination);
-    if (remainingM < MIN_USEFUL_MOVE_M) return next;
-
+  /** Put the moment to the decider: "press", "halt" or "cover". */
+  const ask = async (
+    trigger: MoveTrigger,
+    detail: string | undefined,
+    newContacts: string[],
+  ): Promise<{ answer: "press" | "halt" | "cover"; cover: ReturnType<typeof coverMove> }> => {
+    const here = next.forceElements[actor.id];
+    const remainingM = here ? distanceM(here.position, destination) : 0;
+    const cover = here ? coverMove(here, config, remainingM) : null;
     const verdict = await decider.decideContact({
       state: next,
       config,
@@ -2525,18 +2860,72 @@ export async function resolveMoveLive(
       side: actor.side,
       option,
       actorId: actor.id,
-      newContacts: report.contacts ?? [],
+      newContacts,
       remainingM,
       preferred,
+      trigger,
+      detail,
+      cover: cover ? { metres: cover.metres, ground: cover.ground } : undefined,
       intent: intents?.[actor.side],
     });
-    logTraces(config, turn, context.phase ?? "arcAction", actor.side, verdict.traces, next);
-    if (!verdict.press) return next;
+    logTraces(config, turn, phase, actor.side, verdict.traces, next);
+    return {
+      answer: verdict.cover && cover ? "cover" : verdict.press ? "press" : "halt",
+      cover,
+    };
+  };
+
+  /** Break off into cover: one last leg, which ends the move. */
+  const breakForCover = (cover: NonNullable<ReturnType<typeof coverMove>>) =>
+    resolveAction(
+      next,
+      {
+        id: `${option.id}:cover`,
+        kind: "move",
+        actorId: actor.id,
+        destination: cover.destination,
+        onContact: "halt",
+        summary: `${actor.label} breaks off into cover (${cover.ground}, ${cover.metres} m)`,
+      },
+      config,
+      turn,
+      rest,
+    );
+
+  // Before the first step: shot at as it set off, or a friend lost close by.
+  const setback = setbackNear(state, actor, config, turn);
+  const before: [MoveTrigger, string] | null =
+    tookFire && tookFire.length > 0
+      ? ["underFire", `fired on by ${[...new Set(tookFire)].join(", ")}`]
+      : setback
+        ? ["setback", setback]
+        : null;
+  if (before) {
+    const { answer, cover } = await ask(before[0], before[1], []);
+    if (answer === "halt") return next;
+    if (answer === "cover" && cover) return breakForCover(cover);
+  }
+
+  let leg: ActionOption = { ...option, onContact: "halt" };
+  for (let asked = 0; asked <= MAX_MOVE_DECISIONS; asked += 1) {
+    const report: NonNullable<ResolveContext["report"]> = {};
+    next = resolveAction(next, leg, config, turn, { ...rest, report, alarm });
+    if (!report.halted || asked === MAX_MOVE_DECISIONS) return next;
+
+    // A shaken element has no choice to make and goes to ground (7.1.3).
+    const moved = next.forceElements[actor.id];
+    if (!moved || moved.combatStrength <= 0 || !canAdvance(moved.morale)) return next;
+    if (distanceM(moved.position, destination) < MIN_USEFUL_MOVE_M) return next;
+
+    const trigger: MoveTrigger = report.alarm ? "exposed" : "contact";
+    const { answer, cover } = await ask(trigger, report.alarm, report.contacts ?? []);
+    if (answer === "halt") return next;
+    if (answer === "cover" && cover) return breakForCover(cover);
 
     leg = {
       ...option,
       id: `${option.id}:press`,
-      summary: `${option.summary} (pressed on through contact)`,
+      summary: `${option.summary} (${trigger === "contact" ? "pressed on through contact" : "carried on"})`,
       onContact: "halt",
     };
   }
@@ -2630,6 +3019,58 @@ export async function chooseOptionLive(
   if (verdict.optionId === undefined) return undefined;
   if (verdict.optionId === null) return allowPass ? null : undefined;
   return options.find((option) => option.id === verdict.optionId);
+}
+
+/**
+ * Ask each side's decider, ahead of time, about the reactions its enemy's
+ * planned moves are likely to provoke — one request per side instead of one
+ * per move, while nothing is waiting on the answer.
+ *
+ * Built against the board the orders were planned on. A moment that plays out
+ * differently (someone else fired first, the mover was already hit) does not
+ * match its prefetched key and is simply asked live.
+ */
+export async function prefetchReactionsFor(
+  state: GameState,
+  config: PhaseConfig,
+  standing: StandingOrders,
+  moves: readonly { actorId: string; side: Side }[],
+  turn: number,
+  intents?: SideIntents,
+): Promise<void> {
+  if (!config.ruleset.modules.reactionFire) return;
+  await Promise.all(
+    (["blue", "red"] as const).map(async (reacting) => {
+      const decider = config.tactical?.[reacting];
+      if (!decider?.prefetchReactions) return;
+      const moments = moves
+        .filter((move) => move.side !== reacting)
+        .map((move) => {
+          const eligible = eligibleReactors(
+            state,
+            move.actorId,
+            move.side,
+            config,
+            standing,
+            "actionReaction",
+          );
+          return {
+            state: { ...state, phase: "arcReaction" as const },
+            config,
+            turn,
+            round: "actionReaction" as const,
+            side: reacting,
+            actorId: move.actorId,
+            wasFiredUpon: false,
+            candidates: toCandidates(eligible),
+            maxReactors: config.ruleset.reaction.maxReactorsPerAction,
+            intent: intents?.[reacting],
+          };
+        })
+        .filter((moment) => moment.candidates.length > 0);
+      if (moments.length > 0) await decider.prefetchReactions(moments);
+    }),
+  );
 }
 
 /**
@@ -2944,6 +3385,7 @@ export async function runCounteractionRound(
       // shoot at it. "A Reserve Move can be subject to Reactive Fire by any
       // enemy FE/Group in Range and LoS that does not have a FIRED marker."
       next = await attemptSightingInterruptLive(next, chosen.actorId, side, config, turn, intents);
+      const logged = config.log.all().length;
       next = await reactiveFireLive(
         next,
         chosen.actorId,
@@ -2970,7 +3412,7 @@ export async function runCounteractionRound(
         chosen,
         config,
         turn,
-        { phase: "arcCounteraction" },
+        { phase: "arcCounteraction", tookFire: firersSince(config.log, logged, chosen.actorId) },
         intents,
       );
 

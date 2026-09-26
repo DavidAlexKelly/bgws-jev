@@ -128,6 +128,8 @@ export interface LiveGameConfig {
   commanders: Record<Side, OrdersCommander>;
   /** Per-side in-the-moment decisions. Absent means the declared rules. */
   tactical?: Partial<Record<Side, TacticalDecider>>;
+  /** Per side: offer terrain-aware move options. See GameConfig. */
+  tacticalPositions?: Partial<Record<Side, boolean>>;
   rng: Rng;
   log: EventLog;
   maxTurns: number;

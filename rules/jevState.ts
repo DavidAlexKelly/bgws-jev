@@ -21,13 +21,15 @@
 import { bearingDeg, distanceM, type LatLng } from "../lib/board";
 import { projectForSide, type ObservedForceElement, type SideView } from "../lib/fogOfWar";
 import { inCover } from "../lib/proceduralTerrain";
-import type { ForceElement } from "../lib/state";
+import { sightingOf, type ForceElement, type GameState, type Side } from "../lib/state";
+import type { ResolutionEvent } from "./events";
 import { lineOfSight } from "../lib/lineOfSight";
 import type { ActionOption } from "./commander";
 import type { Rng } from "./dice";
 import { resolveDirectFire, type FireContext } from "./resolvers";
 import type { RuleSet } from "./ruleset";
 import type {
+  ActivationMoment,
   CommanderIntent,
   ContactMoment,
   ObserverMoment,
@@ -184,6 +186,132 @@ function exposure(fe: ForceElement, view: SideView, config: PhaseConfig) {
   };
 }
 
+// ── The wider situation of one element ─────────────────────────────────────
+
+/**
+ * What one of my elements faces, beyond what it can see this instant.
+ *
+ * Five things a crew would know and the earlier state left out:
+ *   objective  how far, which way, and whether it is already held
+ *   support    friends close enough to fire or assault together (9.2.1)
+ *   threats    what each IDENTIFIED enemy in sight would do to it, as odds —
+ *              the mirror of oddsIfFiring, and the half of the trade that was
+ *              missing. Unidentified contacts are not scored: their weapons
+ *              are exactly what nobody knows yet.
+ *   height     relative to the nearest known enemy, because being above
+ *              someone is most of what a good position is
+ */
+export function situationOf(
+  fe: ForceElement,
+  state: GameState,
+  view: SideView,
+  config: PhaseConfig,
+) {
+  const objective = state.objectives?.[fe.side];
+  const objectiveM = objective ? distanceM(fe.position, objective) : undefined;
+
+  const support = view.own
+    .filter(
+      (friend) =>
+        friend.id !== fe.id && distanceM(friend.position, fe.position) <= config.ruleset.coLocatedM,
+    )
+    .map((friend) => friend.id);
+
+  const threats = view.contacts
+    .filter((contact) => contact.sighting === "full")
+    .map((contact) => ({ contact, rangeM: distanceM(contact.position, fe.position) }))
+    .filter(({ rangeM }) => rangeM <= 3000)
+    .sort((a, b) => a.rangeM - b.rangeM)
+    .slice(0, 4)
+    .flatMap(({ contact, rangeM }) => {
+      const enemy = state.forceElements[contact.id];
+      if (!enemy) return [];
+      if (!lineOfSight(config.terrain, { from: contact.position, to: fe.position }).visible) return [];
+      const weapon = weaponFor(enemy, fe, rangeM);
+      if (!weapon) return [];
+      const odds = fireOdds(
+        [asObserved(enemy, contact)],
+        fe,
+        {
+          rangeM,
+          maxRangeM: weapon.maxRangeM,
+          penetrationMm: weapon.penetrationMm,
+          munition: weapon.munition,
+          topAttack: weapon.topAttack,
+          targetInCover: inCover(config.terrain, fe.position),
+          flank: isFlankShot([enemy], fe, config.ruleset),
+          smoke: smokeOnLine(state, contact.position, fe.position, config.ruleset),
+        },
+        config.ruleset,
+      );
+      return [{ from: contact.id, rangeM: round0(rangeM), pHitOnYou: odds.pHit, expectedHits: odds.expectedHits }];
+    });
+
+  const nearest = view.contacts
+    .map((contact) => ({ contact, rangeM: distanceM(contact.position, fe.position) }))
+    .sort((a, b) => a.rangeM - b.rangeM)[0];
+
+  return {
+    ...(objective && objectiveM != null
+      ? {
+          objective: {
+            distanceM: round0(objectiveM),
+            bearing: compass(bearingDeg(fe.position, objective)),
+            onIt: objectiveM <= config.ruleset.victory.holdWithinM,
+          },
+        }
+      : {}),
+    canActTogetherWith: support,
+    ...(threats.length ? { threatsToYou: threats } : {}),
+    ...(nearest
+      ? {
+          heightAboveNearestEnemyM: round0(
+            config.terrain.groundHeightM(fe.position) -
+              config.terrain.groundHeightM(nearest.contact.position),
+          ),
+        }
+      : {}),
+  };
+}
+
+/**
+ * The last few exchanges this side took part in, as this side saw them.
+ *
+ * Jev keeps nothing between calls, so without this every question is asked
+ * of a commander with no memory of the shot that just missed. Built from the
+ * log, and FOG-SAFE: an enemy this side has not sighted is "unseen", never
+ * named, even when the log knows perfectly well who it was.
+ */
+export function recentEvents(state: GameState, config: PhaseConfig, side: Side, limit = 6) {
+  const name = (id: string) => {
+    const fe = state.forceElements[id];
+    if (!fe) return id;
+    if (fe.side === side) return id;
+    return sightingOf(state, side, id) === "none" ? "unseen enemy" : id;
+  };
+  const involved = (event: ResolutionEvent) =>
+    [...event.actorIds, ...event.targetIds].some(
+      (id) => state.forceElements[id]?.side === side,
+    );
+
+  return config.log
+    .all()
+    .filter(
+      (event): event is ResolutionEvent =>
+        event.type === "resolution" &&
+        (event.kind === "directFire" || event.kind === "indirectFire" || event.kind === "assault"),
+    )
+    .filter(involved)
+    .slice(-limit)
+    .map((event) => ({
+      turn: event.turn,
+      what: event.kind,
+      by: event.actorIds.map(name),
+      at: event.targetIds.map(name),
+      result: event.result,
+    }));
+}
+
 function intentFor(intent: CommanderIntent | undefined, feId: string) {
   if (!intent) return undefined;
   const order = intent.orders?.[feId];
@@ -241,6 +369,7 @@ export function reactionState(moment: ReactionMoment) {
       rulesOfEngagementSays: candidate.ruleSaysReact ? "fire" : "hold",
       ...(odds ? { oddsIfFiring: odds } : {}),
       ...(fe ? exposure(fe, view, config) : {}),
+      ...(fe ? situationOf(fe, state, view, config) : {}),
       ...(intentFor(moment.intent, candidate.reactorId)
         ? { orders: intentFor(moment.intent, candidate.reactorId) }
         : {}),
@@ -267,6 +396,7 @@ export function reactionState(moment: ReactionMoment) {
         "If the mover is Disrupted or Broken by reactive fire, its move does not happen.",
     },
     reactors,
+    recentEvents: recentEvents(state, config, side),
     otherKnownEnemies: view.contacts
       .filter((contact) => contact.id !== moment.actorId)
       .map((contact) => ({
@@ -292,10 +422,17 @@ export function contactState(moment: ContactMoment) {
     .map((id) => view.contacts.find((contact) => contact.id === id))
     .filter((contact): contact is ObservedForceElement => contact != null);
 
+  const why: Record<typeof moment.trigger, string> = {
+    contact: "Your element was moving and has just made contact with the enemy. It has halted.",
+    underFire: "Your element was fired on as it set off. It can still move.",
+    exposed: "Your element is moving into an identified enemy's sight and range.",
+    setback: "A friend close to your element has been destroyed or broken this turn.",
+  };
   return {
-    situation:
-      "Your element was moving and has just made contact with the enemy. " +
-      "It has halted. Decide whether it presses on to its destination or stays here.",
+    situation: `${why[moment.trigger]} Decide whether it carries on, halts, or breaks for cover.`,
+    trigger: moment.trigger,
+    ...(moment.detail ? { detail: moment.detail } : {}),
+    ...(moment.cover ? { nearestCover: moment.cover } : { nearestCover: "none within reach" }),
     turn: moment.turn,
     you: side,
     ...(moment.intent?.plan ? { commandersPlan: moment.intent.plan } : {}),
@@ -303,6 +440,7 @@ export function contactState(moment: ContactMoment) {
       ? {
           ...ownBrief(mover, config),
           ...exposure(mover, view, config),
+          ...situationOf(mover, state, view, config),
           order: moment.option.summary,
           commanderPreferredOnContact: moment.preferred,
           ...(intentFor(moment.intent, moment.actorId)
@@ -313,6 +451,7 @@ export function contactState(moment: ContactMoment) {
     remainingMoveM: round0(moment.remainingM),
     ...(destination ? { destinationGround: groundAt(config, destination) } : {}),
     newContacts: mover ? newly.map((contact) => contactFrom(contact, mover.position, config)) : [],
+    recentEvents: recentEvents(state, config, side),
     otherKnownEnemies: mover
       ? view.contacts
           .filter((contact) => !moment.newContacts.includes(contact.id))
@@ -358,7 +497,7 @@ export function optionState(moment: OptionMoment) {
   return {
     situation: moment.question,
     ...(moment.intent?.plan ? { commandersPlan: moment.intent.plan } : {}),
-    ...sideState(view, moment.config),
+    ...sideState(view, moment.config, moment.state),
     deciding: [...actorIds].map((id) => {
       const order = moment.intent?.orders?.[id as string];
       return { id, ...(order ? { order: order.summary, why: order.why } : {}) };
@@ -366,17 +505,50 @@ export function optionState(moment: OptionMoment) {
   };
 }
 
+// ── Activations ────────────────────────────────────────────────────────────
+
+/**
+ * The state for "which of your committed elements acts now, and how?"
+ *
+ * The whole side's picture plus, for each element still holding orders, what
+ * it was told to do. The options themselves are the question's criteria, not
+ * part of the state, so they are not repeated here.
+ */
+export function activationState(moment: ActivationMoment) {
+  const view = projectForSide(moment.state, moment.side);
+  return {
+    situation:
+      "Your commander planned this turn. The turn is now being fought, one " +
+      "activation at a time, alternating with the enemy. Choose which of your " +
+      "committed elements acts now, and what it does.",
+    ...(moment.intent?.plan ? { commandersPlan: moment.intent.plan } : {}),
+    stillToAct: moment.candidates.map((candidate) => ({
+      id: candidate.actorId,
+      orderedTo: candidate.orderedSummary ?? "no specific order",
+      orderStillPossible: candidate.orderedOptionId != null,
+      ...(moment.intent?.orders?.[candidate.actorId]?.why
+        ? { why: moment.intent.orders[candidate.actorId].why }
+        : {}),
+    })),
+    ...sideState(view, moment.config, moment.state),
+  };
+}
+
 // ── Whole-side decisions ───────────────────────────────────────────────────
 
 /** A side's picture of the battle, for commanding the whole of it. */
-export function sideState(view: SideView, config?: PhaseConfig) {
+export function sideState(view: SideView, config?: PhaseConfig, state?: GameState) {
   return {
     turn: view.turn,
     you: view.side,
     initiative: view.initiative,
     yourElements: view.own.map((fe) =>
       config
-        ? { ...ownBrief(fe, config), ...exposure(fe, view, config) }
+        ? {
+            ...ownBrief(fe, config),
+            ...exposure(fe, view, config),
+            ...(state ? situationOf(fe, state, view, config) : {}),
+          }
         : {
             id: fe.id,
             unit: fe.label,
@@ -395,6 +567,7 @@ export function sideState(view: SideView, config?: PhaseConfig) {
         ? round0(Math.min(...view.own.map((fe) => distanceM(fe.position, contact.position))))
         : null,
     })),
+    ...(state && config ? { recentEvents: recentEvents(state, config, view.side) } : {}),
     note:
       "Enemy elements you have not sighted are not listed; their absence is not " +
       "evidence that they are not there.",
