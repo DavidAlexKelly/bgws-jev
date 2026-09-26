@@ -20,7 +20,7 @@ import { jevRealtimeDecider } from "./jevDecider";
 import { damageEffect, describeEffect, oddsAgainst, optionsFor } from "./options";
 import { penetrationAt, strikeOdds } from "./lethality";
 import { hullDownAgainst, hullDownSpot, platformSpeedFactor, slopeFactor } from "./geometry";
-import { HIT_FACTORS, hitAtRange, hitChance } from "./fire";
+import { aimedIntervalS, errorBudget, hitChance } from "./fire";
 import { RealtimeRunner } from "./runner";
 import { DEFAULT_TIMING, perTick } from "./timing";
 import type { RtConfig, RtEvent, RtState } from "./types";
@@ -186,7 +186,8 @@ describe("the autopilot", () => {
     let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 1000))], true));
     state = setOrder(state, "B1", { kind: "overwatch" }, cfg);
     state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
-    const { shots } = run(state, cfg, DEFAULT_TIMING.shotIntervalS * 2 + 1);
+    const interval = aimedIntervalS(state.game.forceElements.B1.capabilities[0], DEFAULT_TIMING.shotIntervalS);
+    const { shots } = run(state, cfg, interval * 2 + 1);
     expect(shots).toBeGreaterThanOrEqual(2);
     expect(shots).toBeLessThanOrEqual(3);
 
@@ -812,11 +813,13 @@ describe("context for decisions", () => {
   };
 
   it("keeps a record of each unit's fire, and raises 'ineffective' when it is doing nothing", () => {
-    const { cfg, state } = longRange(0);
+    const { cfg, state: start } = longRange(0);
+    // R1 holds its fire, so B1 is not pinned (and handed to the autopilot) first.
+    const state = setOrder(start, "R1", { kind: "hold" }, cfg, { roe: "never" });
     const { state: after, events } = run(state, cfg, 200);
     const e = after.units.B1.engagement!;
     expect(e.targetId).toBe("R1");
-    expect(e.shots).toBeGreaterThanOrEqual(Math.floor(180 / DEFAULT_TIMING.shotIntervalS));
+    expect(e.shots).toBeGreaterThanOrEqual(Math.floor(180 / aimedIntervalS(state.game.forceElements.B1.capabilities[0], DEFAULT_TIMING.shotIntervalS)));
     expect(e.damage).toBe(0);
     const ineffective = events.find((ev) => ev.unitId === "B1" && ev.kind === "ineffective");
     expect(ineffective?.detail).toMatch(/fire not working .* shots/);
@@ -829,8 +832,10 @@ describe("context for decisions", () => {
     expect(engage.summary).toMatch(/%\/min to knock out one of its vehicles/);
     expect(engage.summary).not.toMatch(/to hit/);
     const odds = oddsAgainst(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
-    // Per minute of real-time fire, far below the table's per-shot hit chance.
-    expect(engage.effect!).toBeLessThan(odds.pHit);
+    const effect = damageEffect(state.game.forceElements.R1, state.game.forceElements.B2, state, cfg)!;
+    // A hit is not a knock-out: per round, the chance of one is the hit chance × getting through × killing.
+    expect(effect.strike!.pKnockOut).toBeLessThan(1);
+    expect(effect.perShot).toBeLessThan(1 - Math.pow(1 - odds.pHit, odds.rounds));
   });
 
   it("offers closing to effective range, with who would cover the move, and the rules take it when fire is not working", async () => {
@@ -908,7 +913,7 @@ describe("range", () => {
   it("makes point-blank fire far more accurate and lethal than long-range fire", () => {
     const cfg = config();
     const state = createRealtimeState(
-      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(1000, 1500))], true),
+      game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 300)), fe("R2", "red", at(0, 2900))], true),
     );
     const [b1, r1, r2] = ["B1", "R1", "R2"].map((id) => state.game.forceElements[id]);
     const close = oddsAgainst(b1, r1, state, cfg)!;
@@ -919,17 +924,29 @@ describe("range", () => {
     expect(farEffect.minutesToKnockOut!).toBeGreaterThan(closeEffect.minutesToKnockOut! * 1.5);
   });
 
-  it("hits almost every time close in, less with range, and less still moving, in cover or under fire", () => {
-    expect(hitAtRange(300)).toBeGreaterThan(0.95);
-    expect(hitAtRange(1000)).toBeGreaterThan(hitAtRange(2500));
-    expect(hitAtRange(750)).toBeCloseTo((hitAtRange(500) + hitAtRange(1000)) / 2, 5);
+  it("works hit chance out from an error budget: range, motion, cover and the gun's own ballistics", () => {
     const t = DEFAULT_TIMING;
-    expect(hitChance(600, {}, t)).toBeGreaterThan(0.9);
-    expect(hitChance(600, { firerMoving: true, targetCovered: true }, t)).toBeCloseTo(
-      hitAtRange(600) * HIT_FACTORS.firerMoving * HIT_FACTORS.targetCovered,
-      6,
-    );
-    expect(hitChance(600, {}, { ...t, strikeScale: 0 })).toBe(0);
+    const g = scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)();
+    const tank = g.forceElements["red-1"];
+    const gun = g.forceElements["blue-1"].capabilities.find((c) => c.kind === "atk")!;
+    const p = (range: number, c = {}) => hitChance(gun, tank, range, { aspect: "front", ...c }, t);
+    // Stationary, modern fire control: near-certain close in, falling continuously with range.
+    expect(p(1000)).toBeGreaterThan(0.95);
+    expect(p(2000)).toBeGreaterThan(0.85);
+    expect(p(1500)).toBeGreaterThan(p(2000));
+    expect(p(2000)).toBeGreaterThan(p(2500));
+    expect(p(2500)).toBeGreaterThan(p(3000));
+    // Each degrades it, more at range.
+    for (const c of [{ targetMoving: true }, { firerMoving: true }, { targetHullDown: true, aspect: "turret" }, { targetInCover: true }, { firerSuppressed: true }]) {
+      expect(p(2500, c)).toBeLessThan(p(2500));
+    }
+    // A slow round leads a moving target worse than a fast one: flight time from muzzle velocity.
+    const heat = { ...gun, munition: "ce" as const, muzzleVelocityMs: 900 };
+    expect(errorBudget(heat, 2000, {}).timeOfFlightS).toBeGreaterThan(errorBudget(gun, 2000, {}).timeOfFlightS * 1.5);
+    expect(hitChance(heat, tank, 2000, { aspect: "front", targetMoving: true }, t)).toBeLessThan(p(2000, { targetMoving: true }));
+    // Rate of fire from the data: the Challenger's gun sustains 6 aimed rounds a minute.
+    expect(aimedIntervalS(gun, t.shotIntervalS)).toBe(10);
+    expect(hitChance(gun, tank, 600, {}, { ...t, strikeScale: 0 })).toBe(0);
   });
 
   it("says what a shot did: a hit that did no damage is not reported as a hit", () => {

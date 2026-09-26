@@ -294,6 +294,9 @@ export const PINNED_PLATFORMS: Record<string, PlatformSnapshot> = {
         maxRangeM: 3000,
         shortRangeM: 3000,
         penetrationMm: 657,
+        // L7 bgws_capability_profile: the L30A1 120 mm rifled gun.
+        muzzleVelocityMs: 1530,
+        rofSustained: 6,
         // L7 bgws_munition_profile m_l27a1 (L27A1 CHARM 3 APFSDS).
         penetrationCurveMm: [
           { rangeM: 0, mm: 676 },
@@ -302,7 +305,8 @@ export const PINNED_PLATFORMS: Record<string, PlatformSnapshot> = {
           { rangeM: 3000, mm: 583 },
         ],
       },
-      { kind: "apers", maxRangeM: 2000, shortRangeM: 1000 },
+      // L7 bgws_capability_profile: the L94A1 chain gun / L7A2 GPMG group, as ONE weapon.
+      { kind: "apers", maxRangeM: 2000, shortRangeM: 1000, muzzleVelocityMs: 840, rofSustained: 200 },
     ],
   },
   /**

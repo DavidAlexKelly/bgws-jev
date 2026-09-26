@@ -174,6 +174,14 @@ export interface Capability {
    * reads it; absent, it falls back to `penetrationMm` at 1 km.
    */
   penetrationCurveMm?: readonly { rangeM: number; mm: number }[];
+  /**
+   * Ballistics of the ONE weapon behind this capability (L7
+   * bgws_capability_profile: the best-penetrating, else largest-calibre, of
+   * its group — never a mix of two weapons). Real-time mode only.
+   */
+  muzzleVelocityMs?: number;
+  /** Aimed rounds a minute the weapon sustains. Real-time mode only. */
+  rofSustained?: number;
   /** Under 51% of Max Range is short range (BGWS 2.1.8). */
   shortRangeM: number;
   /**

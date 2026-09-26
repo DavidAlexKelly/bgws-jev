@@ -238,3 +238,45 @@ Built from the L7 curated profiles. Real-time only; the turn game is unchanged (
 - Troops starting 1.6 km apart in plain view on open ground now decide it in 2–3 minutes, as they would. The time in a game is spent getting there: approach, cover, hull-down and flank, which is where the decisions are.
 
 **The map** now shows the turn game's strength bar under each of your own counters: side colour, length for vehicles still fighting ("3/4"), dimmed below a third, and a thin amber line for suppression. As in the turn game, enemies get no bar.
+
+## 10. Hit chance from an error budget
+
+§9's per-round model used one declared hit-against-range curve for every weapon. It is replaced by the method engagement models use (AMSAA, Janus, the DTIC tank models in §2): an error budget against the target's presented size (`fire.ts`).
+
+**Where a round lands** is off by independent errors:
+
+| Error | Grows with | Value | Source |
+|---|---|---|---|
+| Fire-control bias | range (mils) | 0.2 mil | DECLARED, one "modern" class until `optics_class` has a dictionary |
+| Round-to-round dispersion | range (mils) | sabot 0.2, HEAT 0.35, automatic weapons 1.5 mil | DECLARED |
+| Firer motion after stabilisation | range (mils) | 0.5 mil | DECLARED |
+| Range-estimate error (vertical) | range × g ÷ muzzle velocity² | 10 m laser | DECLARED; **muzzle velocity from L7** |
+| Lead error against a moving target | time of flight = range ÷ muzzle velocity | 1 m/s speed error | DECLARED; **muzzle velocity from L7** |
+
+Suppressed, pinned or shaken crews multiply the error by 1.4, 2.2 and 1.8.
+
+**What they aim at:**
+- A declared size by target class; an armoured vehicle is 3.6 m wide, 7.5 m long (hull only) and 2.4 m high.
+- Side-on it presents its length; hull-down, only a 1.0 m turret shows; in woods, 70% of the width and 50% of the height.
+- The L7 length column is not used, because it mixes gun-forward and hull-only conventions, and neither is `signature_class`, which is derived from it.
+
+**Hit chance** is the probability the errors land inside that rectangle. Guided missiles (`atm`) are not ballistic: 0.9, lower against moving targets, 0.3 when fired on the move (DECLARED).
+
+**Rate of fire** comes from the weapon's `rof_sustained` (L7): a Challenger's L30A1 fires 6 aimed rounds a minute, one every 10 s. `timing.shotIntervalS` (8 s) is only the floor: the shortest possible engagement cycle. Automatic weapons fire a burst every 6 s. Weapons without data use declared defaults: gun 6/min, missile 2/min.
+
+**Challenger 2, L30A1, against a peer tank, from the model:**
+
+| | 300 m | 1 km | 2 km | 3 km |
+|---|---|---|---|---|
+| Both halted | 100% | 100% | 96% | 81% |
+| Target moving | 100% | 99% | 77% | 50% |
+| Firer moving | 100% | 96% | 62% | 36% |
+| Target hull-down | 100% | 92% | 62% | 43% |
+| HEAT at 900 m/s, target moving | 100% | 87% | 47% | 26% |
+
+A sabot's 1.3 s flight to 2 km, against a HEAT round's 2.2 s, is why it hits a moving target so much more often.
+
+**Measured:**
+- symmetric-control: 74 / 74 / 2 over 150 games; 75% of rounds hit.
+- Troops that meet in the open settle it in about **30 seconds** of fire; combined arms is the same.
+- This is the real rate of fire meeting real accuracy. What slows real engagements that the model does not have yet: target acquisition time, fire distribution (several tanks picking the same target) and the time to spot the enemy on real ground. See the PR notes.

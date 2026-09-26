@@ -6,23 +6,13 @@
 //
 //   CHANCES    something that happens with probability p in a turn happens
 //              with probability 1 − (1 − p)^(dt / turnS) in a tick of dt.
-//   ACTIONS    a shot is an action, not a chance. A unit that is engaging
-//              gets an aimed shot away every `shotIntervalS` — acquiring,
-//              laying, firing, observing. The fire table says how many rounds
-//              are hits; fire.ts how many of those are really on target at
-//              that range; lethality.ts what each one does to the face it
-//              strikes. Every shot, misses included, adds suppression.
-//
-// ⚠ `shotIntervalS` IS THE CALIBRATION KNOB for how long fights last. It was
-// once the chance of a hit that did the calibrating, which reported rounds
-// at 600 m as "near misses" three times in four; hits are now as likely as
-// the fire control makes them, and the pace comes from how often a troop
-// gets an aimed round away: one per vehicle per minute, allowing for
-// acquiring, laying, firing and observing. With hits that land, a fight in
-// the open between peer troops is decided in two or three minutes, as it
-// would be; time goes on getting there — approach, cover, hull-down, flank —
-// which is where the decisions are. See the balance and decisiveness checks
-// in realtime.test.ts.
+//   ACTIONS    a shot is an action, not a chance. Each vehicle fires at its
+//              weapon's own sustained rate (L7 rof_sustained) — a Challenger's
+//              gun six aimed rounds a minute — with `shotIntervalS` as the
+//              least an engagement cycle (acquire, lay, fire, observe) can
+//              take. fire.ts's error budget says whether each round hits;
+//              lethality.ts what it does to the face it strikes. Every shot,
+//              misses included, adds suppression.
 
 import type { RtTiming } from "./types";
 
@@ -72,7 +62,7 @@ export const HISTORY_LENGTH = 4;
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,
   turnS: 15 * 60,
-  shotIntervalS: 60,
+  shotIntervalS: 8,
   strikeScale: 1,
   sightingIntervalS: 30,
   contactMemoryS: 120,

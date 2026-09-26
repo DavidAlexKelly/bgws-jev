@@ -248,12 +248,16 @@ export interface RtTiming {
   tickS: number;
   /** One turn of the turn-based game, in seconds — what the rules' rates are per. */
   turnS: number;
-  /** How often a unit engaging something fires. */
-  shotIntervalS: number;
+  /**
+   * The least time between aimed shots for one vehicle: an engagement cycle
+   * (acquire, lay, fire, observe). Each weapon's own rate of fire (fire.ts,
+   * from L7) is slower still for most guns.
+   */
+    shotIntervalS: number;
   /**
    * Multiplies the chance a fire-table hit is a round on target (fire.ts).
    * 1 is the realistic figure; tests set 0 to guarantee nothing lands.
-   * Fight length is set by `shotIntervalS`, not by this.
+   * Not a pacing knob: rates of fire come from the data.
    */
   strikeScale: number;
   /** How often each observer gets a sighting attempt at each enemy it can see. */

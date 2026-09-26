@@ -21,7 +21,7 @@
 //   4. sighting: certain at close range (how close depends on the target's
 //      posture), otherwise staggered rolls; a unit knows what it saw at once,
 //      its side after `reportDelayS`; faded contacts leave a last-known position
-//   5. fire, simultaneous: one shot per `shotIntervalS`, targets by threat,
+//   5. fire, simultaneous: each weapon at its own rate of fire, targets by threat,
 //      self-defence always allowed unless the ROE is "never"
 //   6. what the fire did: rounds on target, penetration, knock-outs, suppression,
 //      the drill for a new attacker
@@ -53,7 +53,7 @@ import { canAdvance, resolveSighting } from "../../rules/resolvers";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
-import { hitChance, type HitConditions } from "./fire";
+import { aimedIntervalS, hitChance, type HitConditions } from "./fire";
 import {
   allowanceAt,
   compass,
@@ -64,7 +64,7 @@ import {
   slopeFactor,
   towards,
 } from "./geometry";
-import { describeStrike, rollStrike, strikeOdds, type StrikeResult } from "./lethality";
+import { aspectOf, describeStrike, rollStrike, strikeOdds, type StrikeResult } from "./lethality";
 import {
   ASSAULT_CONTACT_M,
   ATTACKER_BREAK_AT,
@@ -245,10 +245,13 @@ export function hitConditions(
   const own = state.units[firer.id];
   const their = state.units[target.id];
   const suppression = own?.suppression ?? 0;
+  const hullDown = hullDownFrom(state, target, from, config);
   return {
+    aspect: aspectOf(target, from, config.ruleset, { hullDown }),
     firerMoving: from === firer.position && own?.lastMovedAt === state.time,
     targetMoving: their?.lastMovedAt === state.time,
-    targetCovered: isCovered(state, target, config, from),
+    targetInCover: inCover(config.terrain, target.position),
+    targetHullDown: hullDown,
     firerSuppressed: suppression >= SUPPRESSED_AT && suppression < PINNED_AT,
     firerPinned: suppression >= PINNED_AT,
     firerShaken: own?.cohesion === "shaken",
@@ -947,12 +950,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
 
     const rangeM = distanceM(self.position, target.position);
+    const weapon = weaponFor(self, target, rangeM)!;
     planned.push({
       firerId: id,
       targetId: target.id,
       rangeM,
       rounds: Math.max(1, unit.vehicles.fit),
-      pHit: hitChance(rangeM, hitConditions({ units, time }, self, target, config), timing),
+      pHit: hitChance(weapon, target, rangeM, hitConditions({ units, time }, self, target, config), timing),
     });
     // Its fire on this target, for "is this working?". A new target, or a
     // pause of a minute, starts a new record.
@@ -970,7 +974,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           window: { since: time, shots: 1, hits: 0, damage: 0 },
         };
     setUnit(id, {
-      weaponReadyAt: time + timing.shotIntervalS,
+      // From the weapon's sustained rate of fire (L7), not one figure for all.
+      weaponReadyAt: time + aimedIntervalS(weapon, timing.shotIntervalS),
       lastShotAt: time,
       engagement,
       ...(same ? {} : { lastReviewAt: time }),

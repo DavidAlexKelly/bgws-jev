@@ -9,7 +9,7 @@ import type { ForceElement, Side } from "../../lib/state";
 import { inCover } from "../../lib/proceduralTerrain";
 import { weaponFor } from "../../rules/turnLoop";
 import { canHit, describeOrder, hitConditions, hullDownFrom, knownEnemies, knownTo, vehiclesIn } from "./engine";
-import { hitChance } from "./fire";
+import { aimedIntervalS, hitChance } from "./fire";
 import { describeStrike, strikeOdds, type StrikeOdds } from "./lethality";
 import {
   allowanceAt,
@@ -43,8 +43,9 @@ export function oddsAgainst(
   from: LatLng = self.position,
 ): { pHit: number; expectedHits: number; rounds: number } | null {
   const rangeM = distanceM(from, enemy.position);
-  if (!weaponFor(self, enemy, rangeM)) return null;
-  const pHit = hitChance(rangeM, hitConditions(state, self, enemy, config, from), config.timing);
+  const weapon = weaponFor(self, enemy, rangeM);
+  if (!weapon) return null;
+  const pHit = hitChance(weapon, enemy, rangeM, hitConditions(state, self, enemy, config, from), config.timing);
   const rounds = Math.max(1, state.units[self.id]?.vehicles.fit ?? vehiclesIn(self));
   return { pHit, expectedHits: pHit * rounds, rounds };
 }
@@ -95,7 +96,7 @@ export function damageEffect(
   const perRound = odds.pHit * strike.pKnockOut;
   const perShot = 1 - Math.pow(1 - perRound, odds.rounds);
   const expectedPerShot = perRound * odds.rounds;
-  const shotsPerMinute = 60 / timing.shotIntervalS;
+  const shotsPerMinute = 60 / aimedIntervalS(weapon, timing.shotIntervalS);
   const perMinute = 1 - Math.pow(1 - perShot, shotsPerMinute);
   // Knocked-out vehicles are seen to be knocked out.
   const vehiclesLeft = state.units[target.id]?.vehicles.fit ?? 1;
