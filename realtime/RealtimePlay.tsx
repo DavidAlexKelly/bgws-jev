@@ -62,7 +62,6 @@ import { projectForSide } from "../lib/fogOfWar";
 import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "../data/commanderClient";
-import { withPersistentCache } from "../data/jevCache";
 import { jevConfigured, openRouterJevCall } from "../data/jevClient";
 import { createRng } from "../rules/dice";
 import {
@@ -72,7 +71,6 @@ import {
   TROOP_QUALITY,
   type TroopQualityName,
 } from "../rules/forceList";
-import { JEV_MODEL } from "../rules/jev";
 import { HOUSE_V1 } from "../rules/ruleset";
 import { activityOf, createRealtimeState } from "./engine/engine";
 import { jevRealtimeDecider } from "./engine/jevDecider";
@@ -214,7 +212,7 @@ function EndOverlay(props: {
   state: RtState;
   decisions: number;
   byJev: number;
-  onReplay: () => void;
+  onRunAgain: () => void;
   onEdit: () => void;
   onNew: () => void;
   onClose: () => void;
@@ -247,8 +245,12 @@ function EndOverlay(props: {
           {props.decisions} decisions, {props.byJev} by Jev
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={props.onReplay} style={{ ...primary, marginTop: 0, flex: 1 }} title="The same units, orders and seed, from the start">
-            ↻ Replay scenario
+          <button
+            onClick={props.onRunAgain}
+            style={{ ...primary, marginTop: 0, flex: 1 }}
+            title="Start again from the same setup and opening orders, with fresh dice: anything can go differently"
+          >
+            ↻ Run scenario again
           </button>
           <button onClick={props.onEdit} style={{ ...overlayButton, flex: 1 }} title="Back to placement with these units where they started">
             ✎ Edit scenario
@@ -349,17 +351,17 @@ export default function RealtimePlay() {
     const check = rasterUsable ? (raster as { isPassable?: (lat: number, lon: number) => boolean } | null)?.isPassable : undefined;
     return check ? (point: LatLng) => check.call(raster, point.lat, point.lng) : undefined;
   }, [rasterUsable, raster]);
-  const jevCall = useMemo(
-    () => withPersistentCache(openRouterJevCall(), { namespace: `${JEV_MODEL}:realtime` }),
-    [],
-  );
+  // Not cached, here or across page loads: a moment that recurs in another
+  // run is asked afresh, so running a scenario again can go differently.
+  const jevCall = useMemo(() => openRouterJevCall({ cache: false }), []);
   const platforms = useMemo(() => playablePlatforms(), []);
 
+  /** `run` > 0: another run of the same scenario, with its own dice. */
   const makeConfig = useCallback(
-    (): RtConfig => ({
+    (run = 0): RtConfig => ({
       ruleset: HOUSE_V1,
       terrain,
-      rng: createRng(`${gameSeed}:realtime`),
+      rng: createRng(run > 0 ? `${gameSeed}:realtime:run${run}:${Math.random().toString(36).slice(2)}` : `${gameSeed}:realtime`),
       timing: DEFAULT_TIMING,
       planner,
       isPassable,
@@ -478,10 +480,13 @@ export default function RealtimePlay() {
     setPlaying(true);
   }, [draft]);
 
+  /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
+  const runsRef = useRef(0);
   const start = useCallback(() => {
     const initial = orderedRef.current;
     if (!initial) return;
-    const config = makeConfig();
+    const config = makeConfig(runsRef.current);
+    runsRef.current += 1;
     const deciders = useJev
       ? {
           blue: jevRealtimeDecider({ side: "blue", call: jevCall, directive: blueDirective }),
@@ -497,6 +502,7 @@ export default function RealtimePlay() {
   }, [makeConfig, useJev, jevCall, blueDirective, redDirective]);
 
   const reset = useCallback(() => {
+    runsRef.current = 0;
     setPlaying(false);
     runnerRef.current = null;
     orderedRef.current = null;
@@ -505,8 +511,12 @@ export default function RealtimePlay() {
     setPhase("setup");
   }, []);
 
-  /** Same units, same orders, same seed: the battle again from the start. */
-  const replay = useCallback(() => {
+  /**
+   * The same scenario again: the same units where they started, with the same
+   * opening orders, but fresh dice and Jev asked afresh — not a replay, so
+   * anything may go differently. Nothing from the last run is kept.
+   */
+  const runAgain = useCallback(() => {
     setEndDismissed(false);
     setError(null);
     start();
@@ -1269,7 +1279,7 @@ export default function RealtimePlay() {
           state={state}
           decisions={decisions.length}
           byJev={byJev}
-          onReplay={replay}
+          onRunAgain={runAgain}
           onEdit={reset}
           onNew={newScenario}
           onClose={() => setEndDismissed(true)}
