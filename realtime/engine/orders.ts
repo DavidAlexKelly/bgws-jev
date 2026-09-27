@@ -258,8 +258,11 @@ export function ordersPrompt(
     '  "now" (it breaks off at once; use it only when the timing is the point).',
     '- roe: "never" (weapons hold), "ifFiredUpon", "withinShortRange", "always".',
     '- onContact: "engage", "observe" (report, do not fire), "avoid" (pull back), "bypass" (carry on).',
-    '- constraints: lines not to cross, {"stay": "north"|"south"|"east"|"west", "of": <point>, "label": "..."}.',
-    "  The game enforces them; leave the list empty if there are none.",
+    '- constraints: fixed lines on the ground not to cross, {"stay": "north"|"south"|"east"|"west", "of": <point>,',
+    '  "label": "a few words, e.g. the river line"}. The line runs east-west (for north/south) or north-south',
+    '  (for east/west) through that point, and it does NOT move: place it from OBJECTIVE, e.g. {"ref":',
+    '  "OBJECTIVE", "bearingDeg": 90, "distanceM": 1500}, never from a unit. Spacing and formation ("stay behind',
+    '  B2") are not constraints: put them in the intent. The game enforces lines; leave the list empty if there are none.',
   ].join("\n");
 }
 
@@ -332,6 +335,13 @@ export function parseOrders(text: string, state: RtState, side: Side): OrdersRes
     const boundaries: Boundary[] = [];
     for (const c of Array.isArray(raw.constraints) ? raw.constraints : []) {
       const line = c as { stay?: unknown; of?: unknown; label?: unknown };
+      // A line placed on a unit is really "stay behind B2", which moves with B2;
+      // frozen where B2 happens to be now, it strands the unit. Drop it.
+      const ref = typeof line.of === "string" ? line.of : (line.of as { ref?: unknown } | null)?.ref;
+      if (typeof ref === "string" && state.game.forceElements[ref]) {
+        warnings.push(`${id}: a line placed on ${ref} was dropped: lines are fixed on the ground and do not move with units`);
+        continue;
+      }
       const at = pointOf(line.of, refs);
       if (!at || !["north", "south", "east", "west"].includes(line.stay as string)) {
         warnings.push(`${id}: a constraint could not be read and was dropped`);
