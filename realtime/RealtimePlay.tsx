@@ -62,7 +62,6 @@ import { projectForSide } from "../lib/fogOfWar";
 import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "../data/commanderClient";
-import { withPersistentCache } from "../data/jevCache";
 import { jevConfigured, openRouterJevCall } from "../data/jevClient";
 import { createRng } from "../rules/dice";
 import {
@@ -72,7 +71,6 @@ import {
   TROOP_QUALITY,
   type TroopQualityName,
 } from "../rules/forceList";
-import { JEV_MODEL } from "../rules/jev";
 import { HOUSE_V1 } from "../rules/ruleset";
 import { activityOf, createRealtimeState } from "./engine/engine";
 import { jevRealtimeDecider } from "./engine/jevDecider";
@@ -111,6 +109,15 @@ function emptyCollection(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features: [] };
 }
 
+/** Why a Jev call failed, from the trace: the error it reported, or that it did not answer. */
+function jevFailure(rationale: string | undefined): string {
+  const text = rationale ?? "";
+  const reported = /Jev unavailable \((.*)\) — the rules decided/.exec(text)?.[1];
+  if (reported) return reported;
+  if (/gave no answer/.test(text)) return "no answer for this unit in the reply";
+  return "unknown";
+}
+
 /** One line of the feed, in words. */
 function describeEntry(entry: RtLogEntry): string {
   const at = clock(entry.time);
@@ -120,7 +127,9 @@ function describeEntry(entry: RtLogEntry): string {
   const d = entry.decision;
   const p = d.trace.probabilities?.[d.optionId];
   const who =
-    d.trace.chosenBy === "jev" ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}` : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback}` : ""}`;
+    d.trace.chosenBy === "jev"
+      ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}`
+      : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback === "error" ? `failed: ${jevFailure(d.trace.rationale)}` : d.trace.fallback}` : ""}`;
   const point = d.trace.question?.split(" ")[0] ?? "";
   return `${at}  ${d.unitId} ${point} → ${entry.summary} (${who}; asked ${clock(entry.askedAt)})`;
 }
@@ -152,6 +161,109 @@ function OrdersReview({ results, state }: { results: OrdersResult[]; state: RtSt
         </div>
       ))}
     </>
+  );
+}
+
+/** How one side ended: vehicles destroyed, and strength destroyed or broken, of what it started with. */
+function sideTally(state: RtState, side: Side) {
+  const own = Object.values(state.game.forceElements).filter((fe) => fe.side === side);
+  const start = Math.max(1, state.startStrength?.[side] ?? own.reduce((sum, fe) => sum + fe.combatStrengthStart, 0));
+  const alive = own.filter((fe) => fe.combatStrength > 0);
+  const destroyed = 1 - alive.reduce((sum, fe) => sum + fe.combatStrength, 0) / start;
+  const broken = alive.filter((fe) => state.units[fe.id]?.cohesion === "broken").reduce((sum, fe) => sum + fe.combatStrength, 0) / start;
+  const vehicles = own.reduce(
+    (sum, fe) => {
+      const v = state.units[fe.id]?.vehicles;
+      return { total: sum.total + (v?.total ?? 1), lost: sum.lost + (v ? v.total - v.fit : fe.combatStrength > 0 ? 0 : 1) };
+    },
+    { total: 0, lost: 0 },
+  );
+  const units = { total: own.length, destroyed: own.length - alive.length, broken: alive.filter((fe) => state.units[fe.id]?.cohesion === "broken").length };
+  return { destroyed, broken, vehicles, units };
+}
+
+/** Why the loser lost, in a sentence. */
+function howItEnded(state: RtState): { headline: string; why: string } {
+  const over = state.over!;
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const why = (side: Side) => {
+    const t = sideTally(state, side);
+    const parts = [
+      ...(t.destroyed > 0.005 ? [`${pct(t.destroyed)} destroyed`] : []),
+      ...(t.broken > 0.005 ? [`${pct(t.broken)} broken and falling back`] : []),
+    ];
+    const what =
+      t.destroyed >= 0.5 && t.broken < 0.005 ? "destroyed" : t.broken > 0.005 && t.destroyed < 0.005 ? "broken" : "destroyed and broken";
+    return `${side} was ${what}: ${parts.join(", ") || "past its breakpoint"} of its strength.`;
+  };
+  if (over.reason === "time limit") {
+    return {
+      headline: over.winner ? `${over.winner.toUpperCase()} wins on time` : "Time ran out: a draw",
+      why: `Neither side reached its breakpoint before the time limit; ${over.winner ? `${over.winner} held the better position` : "neither held the better position"}.`,
+    };
+  }
+  if (!over.winner) return { headline: "Both sides broke: a draw", why: `${why("blue")} ${why("red")}` };
+  const loser: Side = over.winner === "blue" ? "red" : "blue";
+  return { headline: `${over.winner.toUpperCase()} WINS`, why: why(loser) };
+}
+
+/** The end of a game: who won and why, over the whole screen, with what to do next. */
+function EndOverlay(props: {
+  state: RtState;
+  decisions: number;
+  byJev: number;
+  onRunAgain: () => void;
+  onEdit: () => void;
+  onNew: () => void;
+  onClose: () => void;
+}) {
+  const { state } = props;
+  const { headline, why } = howItEnded(state);
+  const colour = state.over?.winner ? SIDE_COLOUR[state.over.winner] : "#e8c547";
+  return (
+    <div style={overlay} role="dialog" aria-modal="true" aria-label="Game ended">
+      <div style={overlayCard}>
+        <div style={{ ...groupTitle, borderBottom: "none", marginBottom: 2 }}>Game ended · {clock(state.time)}</div>
+        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "0.06em", color: colour, margin: "4px 0 8px" }}>{headline}</div>
+        <div style={{ fontSize: 12, color: "#c7ccdb", lineHeight: 1.5, marginBottom: 14 }}>{why}</div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          {(["blue", "red"] as const).map((side) => {
+            const t = sideTally(state, side);
+            return (
+              <div key={side} style={{ flex: 1, padding: 8, border: `1px solid ${SIDE_COLOUR[side]}55`, borderRadius: 3 }}>
+                <div style={{ ...subtle, color: SIDE_COLOUR[side], fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{side}</div>
+                <div style={{ ...subtle, color: "#c7ccdb", lineHeight: 1.6 }}>
+                  {t.vehicles.lost} of {t.vehicles.total} vehicles lost
+                  <br />
+                  {t.units.destroyed} of {t.units.total} units destroyed{t.units.broken ? `, ${t.units.broken} broken` : ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ ...subtle, marginBottom: 14 }}>
+          {props.decisions} decisions, {props.byJev} by Jev
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={props.onRunAgain}
+            style={{ ...primary, marginTop: 0, flex: 1 }}
+            title="Start again from the same setup and opening orders, with fresh dice: anything can go differently"
+          >
+            ↻ Run scenario again
+          </button>
+          <button onClick={props.onEdit} style={{ ...overlayButton, flex: 1 }} title="Back to placement with these units where they started">
+            ✎ Edit scenario
+          </button>
+          <button onClick={props.onNew} style={{ ...overlayButton, flex: 1 }} title="Back to placement with nothing placed">
+            + New scenario
+          </button>
+        </div>
+        <button onClick={props.onClose} style={{ ...linkButton, marginTop: 12, color: "#8a91a8" }}>
+          close and look at the battlefield
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -188,6 +300,8 @@ export default function RealtimePlay() {
   const [viewpoint, setViewpoint] = useState<Viewpoint>("both");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The end-of-game overlay, closed to look at the battlefield. */
+  const [endDismissed, setEndDismissed] = useState(false);
   /** Bumped a few times a second so the panel reads the runner again. */
   const [, setFrame] = useState(0);
 
@@ -237,17 +351,17 @@ export default function RealtimePlay() {
     const check = rasterUsable ? (raster as { isPassable?: (lat: number, lon: number) => boolean } | null)?.isPassable : undefined;
     return check ? (point: LatLng) => check.call(raster, point.lat, point.lng) : undefined;
   }, [rasterUsable, raster]);
-  const jevCall = useMemo(
-    () => withPersistentCache(openRouterJevCall(), { namespace: `${JEV_MODEL}:realtime` }),
-    [],
-  );
+  // Not cached, here or across page loads: a moment that recurs in another
+  // run is asked afresh, so running a scenario again can go differently.
+  const jevCall = useMemo(() => openRouterJevCall({ cache: false }), []);
   const platforms = useMemo(() => playablePlatforms(), []);
 
+  /** `run` > 0: another run of the same scenario, with its own dice. */
   const makeConfig = useCallback(
-    (): RtConfig => ({
+    (run = 0): RtConfig => ({
       ruleset: HOUSE_V1,
       terrain,
-      rng: createRng(`${gameSeed}:realtime`),
+      rng: createRng(run > 0 ? `${gameSeed}:realtime:run${run}:${Math.random().toString(36).slice(2)}` : `${gameSeed}:realtime`),
       timing: DEFAULT_TIMING,
       planner,
       isPassable,
@@ -366,10 +480,13 @@ export default function RealtimePlay() {
     setPlaying(true);
   }, [draft]);
 
+  /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
+  const runsRef = useRef(0);
   const start = useCallback(() => {
     const initial = orderedRef.current;
     if (!initial) return;
-    const config = makeConfig();
+    const config = makeConfig(runsRef.current);
+    runsRef.current += 1;
     const deciders = useJev
       ? {
           blue: jevRealtimeDecider({ side: "blue", call: jevCall, directive: blueDirective }),
@@ -378,18 +495,38 @@ export default function RealtimePlay() {
       : undefined;
     const runner = new RealtimeRunner(initial, config, { deciders });
     runnerRef.current = runner;
+    setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
   }, [makeConfig, useJev, jevCall, blueDirective, redDirective]);
 
   const reset = useCallback(() => {
+    runsRef.current = 0;
     setPlaying(false);
     runnerRef.current = null;
     orderedRef.current = null;
     setDraft([]);
+    setEndDismissed(false);
     setPhase("setup");
   }, []);
+
+  /**
+   * The same scenario again: the same units where they started, with the same
+   * opening orders, but fresh dice and Jev asked afresh — not a replay, so
+   * anything may go differently. Nothing from the last run is kept.
+   */
+  const runAgain = useCallback(() => {
+    setEndDismissed(false);
+    setError(null);
+    start();
+  }, [start]);
+
+  /** Nothing placed, nothing ordered: a blank board. */
+  const newScenario = useCallback(() => {
+    reset();
+    setPlaced([]);
+  }, [reset]);
 
   // The loop: wall time × speed → simulated seconds. One advance in flight at
   // a time; if the runner is waiting on a decision, frames simply pass.
@@ -771,6 +908,12 @@ export default function RealtimePlay() {
   const counts = { blue: placed.filter((p) => p.side === "blue").length, red: placed.filter((p) => p.side === "red").length };
   const decisions = (runner?.log ?? []).filter((entry) => entry.type === "decision");
   const byJev = decisions.filter((entry) => entry.type === "decision" && entry.decision.trace.chosenBy === "jev").length;
+  // The latest decision, if Jev failed on it: the reason, on screen rather than only in the console.
+  const lastDecision = decisions[decisions.length - 1];
+  const jevProblem =
+    useJev && lastDecision?.type === "decision" && lastDecision.decision.trace.fallback === "error"
+      ? jevFailure(lastDecision.decision.trace.rationale)
+      : null;
   const view = state && viewpoint !== "both" ? projectForSide(state.game, viewpoint) : null;
 
   return (
@@ -796,6 +939,11 @@ export default function RealtimePlay() {
             : `${clock(state?.time ?? 0)} · blue ${strength("blue")} · red ${strength("red")} CS`}
         </span>
         {runner?.thinking && <span style={{ ...subtle, color: "#e8c547" }}>Jev deciding&hellip;</span>}
+        {jevProblem && (
+          <span style={{ ...subtle, color: "#e07a5f", maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={jevProblem}>
+            Jev not answering: {jevProblem}
+          </span>
+        )}
         {state?.over && (
           <span style={{ ...subtle, color: "#e8c547" }}>
             {state.over.winner ?? "drawn"} &mdash; {state.over.reason}
@@ -980,9 +1128,17 @@ export default function RealtimePlay() {
                     disabled={!!state?.over || busy}
                     style={{ ...primary, flex: 1, marginTop: 0 }}
                   >
-                    {playing ? "❚❚ Pause" : draft.length ? "▶ Issue orders and resume" : "▶ Play"}
+                    {state?.over ? "Game over" : playing ? "❚❚ Pause" : draft.length ? "▶ Issue orders and resume" : "▶ Play"}
                   </button>
                 </div>
+                {state?.over && (
+                  <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid rgba(232,197,71,0.5)", borderRadius: 3, ...subtle, color: "#e8c547", lineHeight: 1.5 }}>
+                    Game over at {clock(state.time)}: {state.over.winner ? `${state.over.winner} wins` : "drawn"} — {state.over.reason}.
+                    {state.over.reason.includes("breakpoint")
+                      ? " A side is beaten when half its strength is destroyed or broken; with one troop a side, one troop breaking ends it."
+                      : ""}
+                  </div>
+                )}
                 {!playing && !state?.over && (
                   <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid #191e37", borderRadius: 3 }}>
                     <div style={{ ...subtle, color: "#c7ccdb", marginBottom: 4 }}>Paused: new orders?</div>
@@ -1028,7 +1184,8 @@ export default function RealtimePlay() {
                   ))}
                 </div>
                 <div style={{ ...subtle, lineHeight: 1.5 }}>
-                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev)
+                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
+                  {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
                 </div>
                 <button onClick={reset} style={{ ...chip, marginTop: 6 }}>
@@ -1067,7 +1224,12 @@ export default function RealtimePlay() {
             )}
           </>
         )}
-        {error && <div style={{ ...subtle, color: "#e07a5f", marginTop: 6, lineHeight: 1.5 }}>{error}</div>}
+        {error && (
+          <div style={{ ...subtle, color: "#e07a5f", marginTop: 6, lineHeight: 1.5 }}>
+            {phase === "running" ? "The clock stopped because of an error: " : ""}
+            {error}
+          </div>
+        )}
       </div>
 
       {phase === "running" && (
@@ -1111,6 +1273,17 @@ export default function RealtimePlay() {
             </div>
           ))}
         </div>
+      )}
+      {phase === "running" && state?.over && !endDismissed && (
+        <EndOverlay
+          state={state}
+          decisions={decisions.length}
+          byJev={byJev}
+          onRunAgain={runAgain}
+          onEdit={reset}
+          onNew={newScenario}
+          onClose={() => setEndDismissed(true)}
+        />
       )}
     </DechoBasemap>
   );
@@ -1209,6 +1382,41 @@ const primary: React.CSSProperties = {
   border: "1px solid rgba(232,197,71,0.5)",
   borderRadius: 3,
   color: "#e8c547",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const overlay: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 10,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+  background: "rgba(4,8,15,0.72)",
+  backdropFilter: "blur(2px)",
+  font: MONO,
+};
+
+const overlayCard: React.CSSProperties = {
+  width: "min(520px, 100%)",
+  padding: "18px 20px",
+  background: "rgba(10,16,28,0.98)",
+  border: "1px solid #2a3150",
+  borderRadius: 4,
+  boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+  color: "#e9ecfb",
+};
+
+const overlayButton: React.CSSProperties = {
+  padding: "7px 10px",
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: 3,
+  color: "#e9ecfb",
   cursor: "pointer",
   font: "inherit",
   fontSize: 11,

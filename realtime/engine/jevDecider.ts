@@ -151,6 +151,11 @@ export function unitPicture(state: RtState, id: string, config: RtConfig) {
 
 /** What happened, in words: the event that raised the decision point. */
 export function situationWords(state: RtState, request: RtDecisionRequest): string {
+  const text = situationText(state, request);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function situationText(state: RtState, request: RtDecisionRequest): string {
   const { event, point } = request;
   const unit = state.units[request.unitId];
   const self = state.game.forceElements[request.unitId];
@@ -186,7 +191,7 @@ export function situationWords(state: RtState, request: RtDecisionRequest): stri
     case "D8":
       return `It has been firing on ${unit?.engagement?.targetId ?? "its target"} for minutes and has knocked nothing out.`;
     case "D9":
-      return `A friend close by needs help: ${event.detail}${where}.`;
+      return `A friend close by needs help: ${event.detail}, ${where.trim()}.`;
     case "D10":
       return event.kind === "arrived"
         ? "It has reached where it was going."
@@ -263,6 +268,10 @@ export function jevRealtimeDecider(options: JevRealtimeOptions): RtDecider {
       try {
         response = await withDeadline(options.call({ state: stateSent, questions }), timeoutMs);
       } catch (err) {
+        // Out in the open, not folded away: this is the one thing to see when Jev "does nothing".
+        if (options.log !== false && typeof console !== "undefined") {
+          console.warn?.(`[Jev ${side}] call failed, the rules decided ${requests.length} unit(s): ${describe(err)}`);
+        }
         return requests.map((request) => {
           const trace = rulesTrace(
             request,
@@ -289,7 +298,7 @@ export function jevRealtimeDecider(options: JevRealtimeOptions): RtDecider {
           rationale:
             (confident
               ? item.events.map((event) => event.detail).join("; ")
-              : `Jev ${answer ? `was unsure (${picked?.id ?? answer.choice} at ${Math.round((answer.confidence ?? 0) * 100)}% confidence)` : "gave no answer"} — the rules chose`) +
+              : `Jev ${answer ? `was unsure (${picked?.id ?? answer.choice} at ${Math.round((answer.confidence ?? 0) * 100)}% confidence)` : "gave no answer for this unit in its reply"} — the rules chose`) +
             `. ${exactOf(item)}`,
           probabilities: answer
             ? Object.fromEntries(choices.map((choice) => [choice.id, answer.probabilities[choice.key] ?? 0]))
