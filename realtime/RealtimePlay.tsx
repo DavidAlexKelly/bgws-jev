@@ -111,6 +111,15 @@ function emptyCollection(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features: [] };
 }
 
+/** Why a Jev call failed, from the trace: the error it reported, or that it did not answer. */
+function jevFailure(rationale: string | undefined): string {
+  const text = rationale ?? "";
+  const reported = /Jev unavailable \((.*)\) — the rules decided/.exec(text)?.[1];
+  if (reported) return reported;
+  if (/gave no answer/.test(text)) return "no answer for this unit in the reply";
+  return "unknown";
+}
+
 /** One line of the feed, in words. */
 function describeEntry(entry: RtLogEntry): string {
   const at = clock(entry.time);
@@ -120,7 +129,9 @@ function describeEntry(entry: RtLogEntry): string {
   const d = entry.decision;
   const p = d.trace.probabilities?.[d.optionId];
   const who =
-    d.trace.chosenBy === "jev" ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}` : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback}` : ""}`;
+    d.trace.chosenBy === "jev"
+      ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}`
+      : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback === "error" ? `failed: ${jevFailure(d.trace.rationale)}` : d.trace.fallback}` : ""}`;
   const point = d.trace.question?.split(" ")[0] ?? "";
   return `${at}  ${d.unitId} ${point} → ${entry.summary} (${who}; asked ${clock(entry.askedAt)})`;
 }
@@ -771,6 +782,12 @@ export default function RealtimePlay() {
   const counts = { blue: placed.filter((p) => p.side === "blue").length, red: placed.filter((p) => p.side === "red").length };
   const decisions = (runner?.log ?? []).filter((entry) => entry.type === "decision");
   const byJev = decisions.filter((entry) => entry.type === "decision" && entry.decision.trace.chosenBy === "jev").length;
+  // The latest decision, if Jev failed on it: the reason, on screen rather than only in the console.
+  const lastDecision = decisions[decisions.length - 1];
+  const jevProblem =
+    useJev && lastDecision?.type === "decision" && lastDecision.decision.trace.fallback === "error"
+      ? jevFailure(lastDecision.decision.trace.rationale)
+      : null;
   const view = state && viewpoint !== "both" ? projectForSide(state.game, viewpoint) : null;
 
   return (
@@ -796,6 +813,11 @@ export default function RealtimePlay() {
             : `${clock(state?.time ?? 0)} · blue ${strength("blue")} · red ${strength("red")} CS`}
         </span>
         {runner?.thinking && <span style={{ ...subtle, color: "#e8c547" }}>Jev deciding&hellip;</span>}
+        {jevProblem && (
+          <span style={{ ...subtle, color: "#e07a5f", maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={jevProblem}>
+            Jev not answering: {jevProblem}
+          </span>
+        )}
         {state?.over && (
           <span style={{ ...subtle, color: "#e8c547" }}>
             {state.over.winner ?? "drawn"} &mdash; {state.over.reason}
@@ -1028,7 +1050,8 @@ export default function RealtimePlay() {
                   ))}
                 </div>
                 <div style={{ ...subtle, lineHeight: 1.5 }}>
-                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev)
+                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
+                  {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
                 </div>
                 <button onClick={reset} style={{ ...chip, marginTop: 6 }}>
