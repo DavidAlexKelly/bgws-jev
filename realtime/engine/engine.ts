@@ -291,6 +291,10 @@ export function exposureOf(state: RtState, id: string, config: RtConfig): string
 /** Is the unit doing what it is for? A unit that is not, and is quiet, is asked again. */
 export function onMission(unit: RtUnit, fe: ForceElement): boolean {
   const { mission, order } = unit;
+  // With standing orders, "on its mission" means carrying out the step it is
+  // on (or having finished them) — not standing on the place the mission was
+  // worked out from, which a blocked or skipped step may never reach.
+  if (unit.orders) return unit.orders.done === true || order.phase === unit.orders.phase;
   const at = mission.at;
   if (mission.task === "take") return at != null && distanceM(fe.position, at) <= ON_OBJECTIVE_M;
   if (mission.task === "hold") return at == null || distanceM(fe.position, at) <= ON_POSITION_M;

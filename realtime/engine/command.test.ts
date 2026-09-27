@@ -410,6 +410,25 @@ describe("orders it cannot carry out", () => {
   });
 });
 
+describe("a unit carrying out its orders is left alone", () => {
+  it("is not called idle on a stationary step, wherever its mission was worked out from", async () => {
+    const cfg = config();
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = applyOrders(
+      state,
+      { side: "blue", orders: { B1: ordersOf([{ label: "observe the eastern approaches", order: { kind: "observe" } }]) }, plan: "", warnings: [], by: "claude" },
+      cfg,
+    );
+    // As after a skipped step: the mission's place is somewhere it never got to.
+    state = { ...state, units: { ...state.units, B1: { ...state.units.B1, mission: { task: "hold", at: at(2000, 2000), purpose: "reserve" } } } };
+    const decider = recording();
+    const runner = new RealtimeRunner(state, cfg, { deciders: { blue: decider } });
+    await runner.advance(600);
+    expect(runner.log.some((e) => e.type === "event" && e.event.kind === "idle")).toBe(false);
+    expect(decider.asked).toHaveLength(0);
+  });
+});
+
 describe("a unit standing on ground it cannot move on", () => {
   it("gets out to the nearest ground it can move on, then follows its route", () => {
     const water = (p: LatLng) => p.lat > at(0, 200).lat && p.lat < at(0, 260).lat;
@@ -511,7 +530,9 @@ describe("the commander's orders", () => {
    "phases": [{"label": "hull-down west", "do": "move", "to": {"ref": "B1", "bearingDeg": 270, "distanceM": 300}, "mode": "tactical"},
               {"label": "overwatch R1", "do": "overwatch"},
               {"label": "never reached", "do": "hold"}],
-   "constraints": [{"stay": "south", "of": {"ref": "R1"}, "label": "R1's line"}, {"stay": "north", "of": "R1", "label": "wrong side"}]},
+   "constraints": [{"stay": "south", "of": {"ref": "OBJECTIVE", "bearingDeg": 180, "distanceM": 3000}, "label": "the road"},
+                   {"stay": "north", "of": {"ref": "OBJECTIVE"}, "label": "wrong side"},
+                   {"stay": "west", "of": "B2", "label": "behind B2"}]},
   {"unit": "B2", "phases": [{"do": "teleport"}, {"label": "flank", "do": "move", "to": "NOWHERE"}]},
   {"unit": "R1", "phases": [{"do": "hold"}]}
  ]}`;
@@ -527,6 +548,7 @@ describe("the commander's orders", () => {
     expect(result.orders.R1).toBeUndefined();
     expect(result.warnings.join("\n")).toMatch(/phases after "overwatch R1" dropped/);
     expect(result.warnings.join("\n")).toMatch(/already on the other side/);
+    expect(result.warnings.join("\n")).toMatch(/placed on B2 was dropped: lines are fixed on the ground/);
     expect(result.warnings.join("\n")).toMatch(/unknown step "teleport"/);
     expect(result.warnings.join("\n")).toMatch(/"R1": not one of your units/);
   });

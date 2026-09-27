@@ -211,6 +211,8 @@ export function resumeOrder(state: RtState, id: string): { order: RtOrder; summa
     const phase = unit.orders.phases[unit.orders.phase];
     // A phase it found it cannot carry out is not offered again.
     if (!phase || unit.orders.blocked?.phase === unit.orders.phase) return null;
+    // Already doing it: "back to its orders" would change nothing.
+    if (unit.order.phase === unit.orders.phase) return null;
     return { order: { ...phase.order, phase: unit.orders.phase }, summary: `back to its orders: ${phase.label}` };
   }
   const { mission } = unit;
