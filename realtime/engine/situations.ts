@@ -348,6 +348,32 @@ export const SITUATIONS: Situation[] = [
     }),
   },
   {
+    id: "D12-fire-request",
+    point: "D12",
+    story: "B2, 800 m away, asks over the radio for B1 to engage the troop firing on it; B1 can see and reach it.",
+    sensible: ["comply", "partly"],
+    build: scene({
+      red: [{ at: at(800, 1400) }],
+      friends: [at(800, 0)],
+      unit: { requests: [{ id: 1, time: 60, from: "B2", kind: "fire", enemyId: "R1", text: "B2 asks B1 to engage R1" }] },
+      event: { kind: "request", about: "R1", requestId: 1, severe: true },
+    }),
+  },
+  {
+    id: "D12-busy",
+    point: "D12",
+    story: "B1 is in its own firefight when B2, out of its sight, asks for cover against an enemy B1 knows nothing of.",
+    sensible: ["keep", "partly"],
+    build: scene({
+      red: [{ at: at(0, 1500) }],
+      friends: [at(-2500, 0)],
+      order: { kind: "engage", targetId: "R1" },
+      prepare: firedOnBy("R1"),
+      unit: { requests: [{ id: 2, time: 60, from: "B2", kind: "cover", text: "B2 pulling back: asks B1 to cover" }] },
+      event: { kind: "request", requestId: 2, severe: true },
+    }),
+  },
+  {
     id: "D0-when-able",
     point: "D0",
     story: "B1 is in a firefight when orders come to fall back; the order says 'when able'.",

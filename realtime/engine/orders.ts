@@ -234,6 +234,7 @@ export function ordersPrompt(
             urgency: "whenAble",
             roe: "withinShortRange",
             onContact: "engage",
+            supports: "<optional: the id of the unit it supports>",
             phases: [
               { label: "advance to the ridge", do: "move", to: { ref: "OBJECTIVE", bearingDeg: 270, distanceM: 800 }, mode: "tactical" },
               { label: "overwatch the objective", do: "overwatch" },
@@ -258,6 +259,8 @@ export function ordersPrompt(
     '  "now" (it breaks off at once; use it only when the timing is the point).',
     '- roe: "never" (weapons hold), "ifFiredUpon", "withinShortRange", "always".',
     '- onContact: "engage", "observe" (report, do not fire), "avoid" (pull back), "bypass" (carry on).',
+    '- supports (optional): another of your units this one supports. Units ask each other for cover and fire',
+    "  over the radio; that unit's requests come to this one first, and helping it is part of this one's orders.",
     '- constraints: fixed lines on the ground not to cross, {"stay": "north"|"south"|"east"|"west", "of": <point>,',
     '  "label": "a few words, e.g. the river line"}. The line runs east-west (for north/south) or north-south',
     '  (for east/west) through that point, and it does NOT move: place it from OBJECTIVE, e.g. {"ref":',
@@ -364,6 +367,10 @@ export function parseOrders(text: string, state: RtState, side: Side): OrdersRes
     const urgency: Urgency = raw.urgency === "now" ? "now" : "whenAble";
     const roe = ROES.includes(raw.roe as Roe) ? (raw.roe as Roe) : "withinShortRange";
     const onContact = ON_CONTACT.includes(raw.onContact as OnContact) ? (raw.onContact as OnContact) : "engage";
+    const supported = typeof raw.supports === "string" ? state.game.forceElements[raw.supports] : undefined;
+    if (typeof raw.supports === "string" && raw.supports && !raw.supports.startsWith("<") && (!supported || supported.side !== side || supported.id === id)) {
+      warnings.push(`${id}: "supports ${raw.supports}" dropped: not another of your units`);
+    }
     orders[id] = {
       task: typeof raw.task === "string" && raw.task.trim() ? raw.task.trim() : phases.map((p) => p.label).join(", then "),
       phases,
@@ -373,6 +380,7 @@ export function parseOrders(text: string, state: RtState, side: Side): OrdersRes
       roe,
       onContact,
       boundaries,
+      ...(supported && supported.side === side && supported.id !== id ? { supports: supported.id } : {}),
       by: "claude",
       issuedAt: state.time,
     };

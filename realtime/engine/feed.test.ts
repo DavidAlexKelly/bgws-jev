@@ -38,16 +38,18 @@ const COLUMNS: Record<string, [string, boolean]> = {
   shot: ["object", true],
   decision: ["object", true],
   flag: ["object", true],
+  message: ["object", true],
 };
 const STRUCTS: Record<string, string[]> = {
   event: ["kind", "detail", "severe", "info", "aboutId", "located", "bearingDeg"],
   shot: ["firerId", "targetId", "targetSide", "result", "narrative", "rangeM", "rounds", "hits", "knockedOut", "pHit"],
   decision: ["decisionPoint", "question", "optionId", "summary", "chosenBy", "fallback", "confidence", "latencyMs", "askedAtS", "rationale", "options"],
   flag: ["kind", "text"],
+  message: ["kind", "fromId", "senderId", "toIds", "viaId", "hop", "sentAtS", "enemyId", "text"],
 };
 
 async function playedGame(): Promise<{ rows: StreamRow[]; entries: RtLogEntry[] }> {
-  const cfg = { ruleset: HOUSE_V1, terrain: flatTerrain(), rng: createRng("feed"), timing: DEFAULT_TIMING };
+  const cfg = { ruleset: HOUSE_V1, terrain: flatTerrain(), rng: createRng("feed"), timing: DEFAULT_TIMING, comms: "radio" as const };
   let state: RtState = createRealtimeState(scenarioFactory(SYMMETRIC_CONTROL_V1, HOUSE_V1)());
   state = heuristicInitialOrders(heuristicInitialOrders(state, "blue", cfg), "red", cfg);
   const rows: StreamRow[] = [];
@@ -67,7 +69,7 @@ async function playedGame(): Promise<{ rows: StreamRow[]; entries: RtLogEntry[] 
 describe("the event stream's rows", () => {
   it("fit the schema: every column, the right types, one struct per row matching its type", async () => {
     const { rows, entries } = await playedGame();
-    expect(new Set(rows.map((r) => r.entryType))).toEqual(new Set(["event", "shot", "decision", "flag"]));
+    expect(new Set(rows.map((r) => r.entryType))).toEqual(new Set(["event", "shot", "decision", "flag", "message"]));
     rows.forEach((row, index) => {
       expect(Object.keys(row).sort()).toEqual(Object.keys(COLUMNS).sort());
       for (const [column, [type, nullable]] of Object.entries(COLUMNS)) {
