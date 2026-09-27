@@ -1002,9 +1002,17 @@ export default function RealtimePlay() {
                     disabled={!!state?.over || busy}
                     style={{ ...primary, flex: 1, marginTop: 0 }}
                   >
-                    {playing ? "❚❚ Pause" : draft.length ? "▶ Issue orders and resume" : "▶ Play"}
+                    {state?.over ? "Game over" : playing ? "❚❚ Pause" : draft.length ? "▶ Issue orders and resume" : "▶ Play"}
                   </button>
                 </div>
+                {state?.over && (
+                  <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid rgba(232,197,71,0.5)", borderRadius: 3, ...subtle, color: "#e8c547", lineHeight: 1.5 }}>
+                    Game over at {clock(state.time)}: {state.over.winner ? `${state.over.winner} wins` : "drawn"} — {state.over.reason}.
+                    {state.over.reason.includes("breakpoint")
+                      ? " A side is beaten when half its strength is destroyed or broken; with one troop a side, one troop breaking ends it."
+                      : ""}
+                  </div>
+                )}
                 {!playing && !state?.over && (
                   <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid #191e37", borderRadius: 3 }}>
                     <div style={{ ...subtle, color: "#c7ccdb", marginBottom: 4 }}>Paused: new orders?</div>
@@ -1090,7 +1098,12 @@ export default function RealtimePlay() {
             )}
           </>
         )}
-        {error && <div style={{ ...subtle, color: "#e07a5f", marginTop: 6, lineHeight: 1.5 }}>{error}</div>}
+        {error && (
+          <div style={{ ...subtle, color: "#e07a5f", marginTop: 6, lineHeight: 1.5 }}>
+            {phase === "running" ? "The clock stopped because of an error: " : ""}
+            {error}
+          </div>
+        )}
       </div>
 
       {phase === "running" && (
