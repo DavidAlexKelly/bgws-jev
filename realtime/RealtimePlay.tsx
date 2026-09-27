@@ -263,6 +263,9 @@ export default function RealtimePlay() {
   const [groundChoice, setGroundChoice] = useState<GroundChoice>("raster+relief");
   const [groundSeed, setGroundSeed] = useState(STANDARD_GROUND.seed ?? "baltic-v1");
   const [gameSeed, setGameSeed] = useState("1");
+  /** Win conditions: a side is beaten at this % of its strength destroyed or broken; the game ends at this many minutes. */
+  const [breakpointPct, setBreakpointPct] = useState(50);
+  const [timeLimitMin, setTimeLimitMin] = useState(90);
   const [useJev, setUseJev] = useState(true);
   const [useCommander, setUseCommander] = useState(true);
   /** Stream the feed to the Foundry event stream as it happens. */
@@ -343,11 +346,11 @@ export default function RealtimePlay() {
       ruleset: HOUSE_V1,
       terrain,
       rng: createRng(run > 0 ? `${gameSeed}:realtime:run${run}:${Math.random().toString(36).slice(2)}` : `${gameSeed}:realtime`),
-      timing: DEFAULT_TIMING,
+      timing: { ...DEFAULT_TIMING, breakpoint: breakpointPct / 100, maxDurationS: timeLimitMin * 60 },
       planner,
       isPassable,
     }),
-    [terrain, gameSeed, planner, isPassable],
+    [terrain, gameSeed, planner, isPassable, breakpointPct, timeLimitMin],
   );
 
   // ── Placement ─────────────────────────────────────────────────────────────
@@ -1096,6 +1099,37 @@ export default function RealtimePlay() {
               <input value={gameSeed} onChange={(e) => setGameSeed(e.target.value)} style={select} />
             </div>
 
+            <div style={{ ...groupTitle, marginTop: 14 }}>4 &middot; Win conditions</div>
+            <div style={row}>
+              <span style={{ ...subtle, width: 96 }}>breakpoint %</span>
+              <input
+                type="number"
+                min={10}
+                max={100}
+                step={5}
+                value={breakpointPct}
+                onChange={(e) => setBreakpointPct(Math.max(10, Math.min(100, Number(e.target.value) || 50)))}
+                style={select}
+              />
+            </div>
+            <div style={row}>
+              <span style={{ ...subtle, width: 96 }}>time limit min</span>
+              <input
+                type="number"
+                min={5}
+                max={600}
+                step={5}
+                value={timeLimitMin}
+                onChange={(e) => setTimeLimitMin(Math.max(5, Math.min(600, Number(e.target.value) || 90)))}
+                style={select}
+              />
+            </div>
+            <div style={{ ...subtle, lineHeight: 1.5 }}>
+              A side is beaten once {breakpointPct}% of its starting strength is destroyed or broken (a broken unit counts in
+              full). If neither is by {timeLimitMin} min, the ground and what is left decide: holding your objective
+              uncontested wins, then a broken enemy, then a clear lead in strength.
+            </div>
+
             <button
               onClick={generateOrders}
               disabled={busy || counts.blue === 0 || counts.red === 0}
@@ -1144,7 +1178,7 @@ export default function RealtimePlay() {
                   <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid rgba(232,197,71,0.5)", borderRadius: 3, ...subtle, color: "#e8c547", lineHeight: 1.5 }}>
                     Game over at {clock(state.time)}: {state.over.winner ? `${state.over.winner} wins` : "drawn"} — {state.over.reason}.
                     {state.over.reason.includes("breakpoint")
-                      ? " A side is beaten when half its strength is destroyed or broken; with one troop a side, one troop breaking ends it."
+                      ? ` A side is beaten when ${breakpointPct}% of its strength is destroyed or broken; with one troop a side, one troop breaking can end it.`
                       : ""}
                   </div>
                 )}
@@ -1235,7 +1269,7 @@ export default function RealtimePlay() {
                   const start = Math.max(1, state.startStrength?.[side] ?? 1);
                   return `${side} ${Math.round((fighting / start) * 100)}%`;
                 }).join(" · ")}{" "}
-                fighting strength (a side breaks below 50%)
+                fighting strength (a side breaks below {100 - breakpointPct}%)
               </div>
             )}
           </>

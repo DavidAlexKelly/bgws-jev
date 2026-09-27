@@ -585,3 +585,28 @@ describe("flags for the player", () => {
     expect(runner.flags[0].text).toMatch(/blue has lost 25%/);
   });
 });
+
+describe("win conditions", () => {
+  const twoEach = () => {
+    let state = createRealtimeState(
+      game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(500, 0)), fe("R1", "red", at(0, 30_000)), fe("R2", "red", at(500, 30_000))]),
+    );
+    // Half of blue has broken.
+    state = { ...state, units: { ...state.units, B1: { ...state.units.B1, cohesion: "broken" } } };
+    return state;
+  };
+
+  it("ends at the breakpoint set for the game, not a fixed half", () => {
+    expect(tick(twoEach(), config()).state.over?.winner).toBe("red");
+    const lenient = config({ timing: { ...DEFAULT_TIMING, breakpoint: 0.75 } });
+    expect(tick(twoEach(), lenient).state.over).toBeUndefined();
+  });
+
+  it("ends at the time limit set for the game", () => {
+    const cfg = config({ timing: { ...DEFAULT_TIMING, maxDurationS: 60 } });
+    const state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    const { state: after } = runUntil(state, cfg, (s) => s.over != null, 200);
+    expect(after.time).toBe(60);
+    expect(after.over?.reason).toBe("time limit");
+  });
+});

@@ -434,6 +434,11 @@ export interface RtTiming {
   reactionS: (troopQuality: number) => number;
   /** The game stops here and is judged on the ground and what is left. */
   maxDurationS: number;
+  /**
+   * A side is beaten when this fraction of its starting strength is destroyed
+   * or broken. Optional so older configs keep the default (SIDE_BREAKPOINT).
+   */
+  breakpoint?: number;
 }
 
 export interface RtConfig {
