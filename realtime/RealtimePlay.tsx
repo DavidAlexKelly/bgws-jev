@@ -166,6 +166,105 @@ function OrdersReview({ results, state }: { results: OrdersResult[]; state: RtSt
   );
 }
 
+/** How one side ended: vehicles destroyed, and strength destroyed or broken, of what it started with. */
+function sideTally(state: RtState, side: Side) {
+  const own = Object.values(state.game.forceElements).filter((fe) => fe.side === side);
+  const start = Math.max(1, state.startStrength?.[side] ?? own.reduce((sum, fe) => sum + fe.combatStrengthStart, 0));
+  const alive = own.filter((fe) => fe.combatStrength > 0);
+  const destroyed = 1 - alive.reduce((sum, fe) => sum + fe.combatStrength, 0) / start;
+  const broken = alive.filter((fe) => state.units[fe.id]?.cohesion === "broken").reduce((sum, fe) => sum + fe.combatStrength, 0) / start;
+  const vehicles = own.reduce(
+    (sum, fe) => {
+      const v = state.units[fe.id]?.vehicles;
+      return { total: sum.total + (v?.total ?? 1), lost: sum.lost + (v ? v.total - v.fit : fe.combatStrength > 0 ? 0 : 1) };
+    },
+    { total: 0, lost: 0 },
+  );
+  const units = { total: own.length, destroyed: own.length - alive.length, broken: alive.filter((fe) => state.units[fe.id]?.cohesion === "broken").length };
+  return { destroyed, broken, vehicles, units };
+}
+
+/** Why the loser lost, in a sentence. */
+function howItEnded(state: RtState): { headline: string; why: string } {
+  const over = state.over!;
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const why = (side: Side) => {
+    const t = sideTally(state, side);
+    const parts = [
+      ...(t.destroyed > 0.005 ? [`${pct(t.destroyed)} destroyed`] : []),
+      ...(t.broken > 0.005 ? [`${pct(t.broken)} broken and falling back`] : []),
+    ];
+    const what =
+      t.destroyed >= 0.5 && t.broken < 0.005 ? "destroyed" : t.broken > 0.005 && t.destroyed < 0.005 ? "broken" : "destroyed and broken";
+    return `${side} was ${what}: ${parts.join(", ") || "past its breakpoint"} of its strength.`;
+  };
+  if (over.reason === "time limit") {
+    return {
+      headline: over.winner ? `${over.winner.toUpperCase()} wins on time` : "Time ran out: a draw",
+      why: `Neither side reached its breakpoint before the time limit; ${over.winner ? `${over.winner} held the better position` : "neither held the better position"}.`,
+    };
+  }
+  if (!over.winner) return { headline: "Both sides broke: a draw", why: `${why("blue")} ${why("red")}` };
+  const loser: Side = over.winner === "blue" ? "red" : "blue";
+  return { headline: `${over.winner.toUpperCase()} WINS`, why: why(loser) };
+}
+
+/** The end of a game: who won and why, over the whole screen, with what to do next. */
+function EndOverlay(props: {
+  state: RtState;
+  decisions: number;
+  byJev: number;
+  onReplay: () => void;
+  onEdit: () => void;
+  onNew: () => void;
+  onClose: () => void;
+}) {
+  const { state } = props;
+  const { headline, why } = howItEnded(state);
+  const colour = state.over?.winner ? SIDE_COLOUR[state.over.winner] : "#e8c547";
+  return (
+    <div style={overlay} role="dialog" aria-modal="true" aria-label="Game ended">
+      <div style={overlayCard}>
+        <div style={{ ...groupTitle, borderBottom: "none", marginBottom: 2 }}>Game ended · {clock(state.time)}</div>
+        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "0.06em", color: colour, margin: "4px 0 8px" }}>{headline}</div>
+        <div style={{ fontSize: 12, color: "#c7ccdb", lineHeight: 1.5, marginBottom: 14 }}>{why}</div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          {(["blue", "red"] as const).map((side) => {
+            const t = sideTally(state, side);
+            return (
+              <div key={side} style={{ flex: 1, padding: 8, border: `1px solid ${SIDE_COLOUR[side]}55`, borderRadius: 3 }}>
+                <div style={{ ...subtle, color: SIDE_COLOUR[side], fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{side}</div>
+                <div style={{ ...subtle, color: "#c7ccdb", lineHeight: 1.6 }}>
+                  {t.vehicles.lost} of {t.vehicles.total} vehicles lost
+                  <br />
+                  {t.units.destroyed} of {t.units.total} units destroyed{t.units.broken ? `, ${t.units.broken} broken` : ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ ...subtle, marginBottom: 14 }}>
+          {props.decisions} decisions, {props.byJev} by Jev
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={props.onReplay} style={{ ...primary, marginTop: 0, flex: 1 }} title="The same units, orders and seed, from the start">
+            ↻ Replay scenario
+          </button>
+          <button onClick={props.onEdit} style={{ ...overlayButton, flex: 1 }} title="Back to placement with these units where they started">
+            ✎ Edit scenario
+          </button>
+          <button onClick={props.onNew} style={{ ...overlayButton, flex: 1 }} title="Back to placement with nothing placed">
+            + New scenario
+          </button>
+        </div>
+        <button onClick={props.onClose} style={{ ...linkButton, marginTop: 12, color: "#8a91a8" }}>
+          close and look at the battlefield
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RealtimePlay() {
   const [, setParams] = useSearchParams();
   const [phase, setPhase] = useState<Phase>("setup");
@@ -199,6 +298,8 @@ export default function RealtimePlay() {
   const [viewpoint, setViewpoint] = useState<Viewpoint>("both");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The end-of-game overlay, closed to look at the battlefield. */
+  const [endDismissed, setEndDismissed] = useState(false);
   /** Bumped a few times a second so the panel reads the runner again. */
   const [, setFrame] = useState(0);
 
@@ -389,6 +490,7 @@ export default function RealtimePlay() {
       : undefined;
     const runner = new RealtimeRunner(initial, config, { deciders });
     runnerRef.current = runner;
+    setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
@@ -399,8 +501,22 @@ export default function RealtimePlay() {
     runnerRef.current = null;
     orderedRef.current = null;
     setDraft([]);
+    setEndDismissed(false);
     setPhase("setup");
   }, []);
+
+  /** Same units, same orders, same seed: the battle again from the start. */
+  const replay = useCallback(() => {
+    setEndDismissed(false);
+    setError(null);
+    start();
+  }, [start]);
+
+  /** Nothing placed, nothing ordered: a blank board. */
+  const newScenario = useCallback(() => {
+    reset();
+    setPlaced([]);
+  }, [reset]);
 
   // The loop: wall time × speed → simulated seconds. One advance in flight at
   // a time; if the runner is waiting on a decision, frames simply pass.
@@ -1148,6 +1264,17 @@ export default function RealtimePlay() {
           ))}
         </div>
       )}
+      {phase === "running" && state?.over && !endDismissed && (
+        <EndOverlay
+          state={state}
+          decisions={decisions.length}
+          byJev={byJev}
+          onReplay={replay}
+          onEdit={reset}
+          onNew={newScenario}
+          onClose={() => setEndDismissed(true)}
+        />
+      )}
     </DechoBasemap>
   );
 }
@@ -1245,6 +1372,41 @@ const primary: React.CSSProperties = {
   border: "1px solid rgba(232,197,71,0.5)",
   borderRadius: 3,
   color: "#e8c547",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const overlay: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 10,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+  background: "rgba(4,8,15,0.72)",
+  backdropFilter: "blur(2px)",
+  font: MONO,
+};
+
+const overlayCard: React.CSSProperties = {
+  width: "min(520px, 100%)",
+  padding: "18px 20px",
+  background: "rgba(10,16,28,0.98)",
+  border: "1px solid #2a3150",
+  borderRadius: 4,
+  boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+  color: "#e9ecfb",
+};
+
+const overlayButton: React.CSSProperties = {
+  padding: "7px 10px",
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: 3,
+  color: "#e9ecfb",
   cursor: "pointer",
   font: "inherit",
   fontSize: 11,
