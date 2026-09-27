@@ -394,12 +394,36 @@ export function routed(order: RtOrder, fe: ForceElement, config: RtConfig): RtOr
   if (order.kind !== "move" && order.kind !== "withdraw") return order;
   if (order.route) return order;
   const planner = config.planner ?? bearingRoutePlanner(config.terrain, config.ruleset.movement);
-  const waypoints = planner.plan(fe.position, order.to, fe.moveType);
+  // Standing on ground it cannot move over (placed on a riverbank the raster
+  // calls water, say): no route starts there, and it cannot take a step. So
+  // it first gets out to the nearest ground it can move on, and the route is
+  // planned from there.
+  const out = allowanceAt(fe, fe.position, config) > 0 ? null : nearestPassable(fe, config, order.to);
+  const from = out ?? fe.position;
+  const planned = planner.plan(from, order.to, fe.moveType);
+  const waypoints = out ? [out, ...(planned ?? [order.to])] : planned;
   if (!waypoints || waypoints.length === 0) return order;
   // A goal on impassable ground is snapped by the planner to the nearest
   // ground it can reach; that is where the unit is really going.
   const last = waypoints[waypoints.length - 1];
   return { ...order, to: last, route: waypoints };
+}
+
+/**
+ * The nearest point within 400 m that this unit can move on, or null. Of
+ * points equally near, the one towards `toward` (where it is going), so it
+ * does not climb out on the wrong bank.
+ */
+export function nearestPassable(fe: ForceElement, config: RtConfig, toward?: LatLng): LatLng | null {
+  for (const ring of [15, 30, 60, 100, 150, 220, 300, 400]) {
+    const points = Array.from({ length: 16 }, (_, i) => offsetBy(fe.position, i * 22.5, ring)).filter(
+      (point) => allowanceAt(fe, point, config) > 0,
+    );
+    if (points.length) {
+      return toward ? points.sort((a, b) => distanceM(a, toward) - distanceM(b, toward))[0] : points[0];
+    }
+  }
+  return null;
 }
 
 /** Give a unit a new order. Resets what it is already exposed to, and any bounding. */
@@ -751,8 +775,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const factor = order.kind === "move" ? SPEED[order.mode] : SPEED.withdraw;
     // The ground's allowance, how the unit is moving, the platform's own
     // speed (L7 stat card) and, uphill, its power to weight.
+    // Getting out of ground it cannot move on, to the first point of its
+    // route (see `routed`): it moves at the pace of the ground it is heading for.
+    const hereAllowance = allowanceAt(self, self.position, config);
+    const escapeTo = hereAllowance <= 0 ? order.route?.[0] : undefined;
+    const escaping = escapeTo != null && allowanceAt(self, escapeTo, config) > 0 && distanceM(self.position, escapeTo) <= 450;
     const perSecond =
-      (allowanceAt(self, self.position, config) / timing.turnS) *
+      ((escaping ? allowanceAt(self, escapeTo, config) : hereAllowance) / timing.turnS) *
       factor *
       platformSpeedFactor(self) *
       slopeFactor(self, self.position, towards(self.position, order.route?.[0] ?? order.to, 50), config);
@@ -807,8 +836,15 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       emit(id, "blocked", why);
       continue;
     }
-    if (step <= 0 || allowanceAt(self, next, config) <= 0) {
-      const why = `cannot move on through ${config.terrain.classify(next)}`;
+    if (step <= 0 || (allowanceAt(self, next, config) <= 0 && !escaping)) {
+      // Say which: standing on it, no route found, or the route itself led there.
+      const where =
+        step <= 0
+          ? "it is standing on it and there is no ground it can move on close by"
+          : !order.route?.length
+            ? "no route could be planned from here, so it went straight"
+            : "on its planned route";
+      const why = `cannot move on through ${config.terrain.classify(next)} (${where})`;
       setUnit(id, { order: { kind: "hold" }, bound: undefined, ...(broken ? { fellBack: true } : {}), ...stuck(why) });
       emit(id, "blocked", why);
       continue;

@@ -410,6 +410,27 @@ describe("orders it cannot carry out", () => {
   });
 });
 
+describe("a unit standing on ground it cannot move on", () => {
+  it("gets out to the nearest ground it can move on, then follows its route", () => {
+    const water = (p: LatLng) => p.lat > at(0, 200).lat && p.lat < at(0, 260).lat;
+    const cfg = config({ isPassable: (p) => !water(p) });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 230)), fe("R1", "red", at(0, 30_000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, -500), mode: "tactical" }, cfg);
+    const { state: after, events } = runUntil(state, cfg, (s) => s.units.B1.order.kind !== "move", 900);
+    expect(events.filter((e) => e.kind === "blocked")).toHaveLength(0);
+    expect(distanceM(after.game.forceElements.B1.position, at(0, -500))).toBeLessThan(5);
+  });
+
+  it("says why when it is blocked, so a stuck unit can be diagnosed", () => {
+    const water = (p: LatLng) => p.lat > at(0, 200).lat && p.lat < at(0, 260).lat;
+    const cfg = config({ isPassable: (p) => !water(p), planner: { kind: "raster", plan: () => null } });
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 30_000))]));
+    state = setOrder(state, "B1", { kind: "move", to: at(0, 1000), mode: "tactical" }, cfg);
+    const { events } = runUntil(state, cfg, (_s, e) => e.some((x) => x.kind === "blocked"), 900);
+    expect(events.find((e) => e.kind === "blocked")?.detail).toMatch(/no route could be planned from here/);
+  });
+});
+
 describe("new orders while the clock runs (D0)", () => {
   const fight = () => {
     const cfg = noHits();
