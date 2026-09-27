@@ -71,7 +71,7 @@ export interface CommsContext {
     kind: RtEvent["kind"],
     detail: string,
     severe?: boolean,
-    extra?: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info" | "requestId">>,
+    extra?: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info" | "requestId" | "reported">>,
   ) => void;
   known: (id: string, enemyId: string) => SightingLevel;
 }
@@ -225,7 +225,7 @@ function receive(ctx: CommsContext, id: string, message: RtMessage): void {
             distanceM(self.position, c.at),
           )} m ${compassWord(bearingDeg(self.position, c.at))}`,
           false,
-          { about: c.enemyId },
+          { about: c.enemyId, reported: true },
         );
       }
       return;

@@ -691,7 +691,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     kind: RtEvent["kind"],
     detail: string,
     severe = false,
-    extra: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info">> = {},
+    extra: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info" | "requestId" | "reported">> = {},
   ) => {
     if (!alive(unitId)) return;
     events.push({ time, unitId, kind, detail, severe, ...extra });
@@ -1568,6 +1568,18 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       hits,
       knockedOut: knocked,
       pHit: shot.pHit,
+      outcome:
+        knocked > 0
+          ? "knockedOut"
+          : outcomes.includes("survived")
+            ? "penetrated"
+            : outcomes.includes("noPenetration")
+              ? "bounced"
+              : outcomes.includes("intercepted")
+                ? "intercepted"
+                : "miss",
+      firerAt: firer.position,
+      targetAt: target.position,
     });
 
     // THE LOCATE ROLL (knowledge.ts). The target always learns a bearing;

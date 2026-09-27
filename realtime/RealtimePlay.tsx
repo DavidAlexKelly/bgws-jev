@@ -80,6 +80,16 @@ import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from
 import { EVENT_STREAM_RID, STREAM_MESSAGES, foundryStreamPublisher } from "../data/eventStream";
 import { EventStreamQueue } from "../data/eventStreamQueue";
 import { describeEntry, jevFailure, streamRow } from "./engine/feed";
+import { OVERLAY_SOURCES, overlayLayerSpecs, SOURCE } from "./overlayLayers";
+import {
+  fireOverlay,
+  newWrecks,
+  planOverlay,
+  radioOverlay,
+  spottingOverlay,
+  wreckOverlay,
+  type Wreck,
+} from "./overlays";
 import { RealtimeRunner, type RunnerOptions } from "./engine/runner";
 import { clock, DEFAULT_TIMING, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
@@ -88,21 +98,28 @@ type Phase = "setup" | "ordered" | "running";
 type Viewpoint = Side | "both";
 
 const BOARD_SOURCE = "rt-board";
-const FIRE_SOURCE = "rt-fire";
 const ORDER_SOURCE = "rt-orders";
 /** Where faded contacts were last seen. */
 const LAST_KNOWN_SOURCE = "rt-last-known";
 /** The selected unit's own picture: where it believes each enemy is, and how sure. */
 const PICTURE_SOURCE = "rt-picture";
 const SPEEDS = [1, 5, 10, 30, 60];
-/** How long a shot's line stays on the map, in simulated seconds. */
-const FIRE_LINE_S = 12;
 /** How long a decision's tag stays beside its counter, in simulated seconds. */
 const DECISION_TAG_S = 40;
 const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
 
 /** The ground choices offered here: real land cover, or generated. */
 type GroundChoice = Extract<TerrainSource, "generated" | "raster+relief" | "raster">;
+
+/** The counter shake when a vehicle is knocked out: defined once for the page. */
+if (typeof document !== "undefined" && !document.getElementById("rt-keyframes")) {
+  const style = document.createElement("style");
+  style.id = "rt-keyframes";
+  style.textContent =
+    "@keyframes rt-shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-3px,1px)}40%{transform:translate(3px,-1px)}" +
+    "60%{transform:translate(-2px,-1px)}80%{transform:translate(2px,1px)}}";
+  document.head.appendChild(style);
+}
 
 let counter = 0;
 const nextId = () => `rt-${(counter += 1)}`;
@@ -247,6 +264,58 @@ function EndOverlay(props: {
         </button>
       </div>
     </div>
+  );
+}
+
+/** What the map's marks mean (overlayLayers.ts). Collapsible, and remembered closed for the page. */
+function MapKey() {
+  const [open, setOpen] = useState(true);
+  const swatch = (style: React.CSSProperties) => (
+    <span style={{ display: "inline-block", width: 22, height: 10, marginRight: 6, verticalAlign: "middle", ...style }} />
+  );
+  const lineSwatch = (colour: string, dashed = false, width = 2) =>
+    swatch({ borderTop: `${width}px ${dashed ? "dashed" : "solid"} ${colour}`, height: 0, marginTop: 5 });
+  const dot = (colour: string, ring = false) =>
+    swatch({
+      width: 10,
+      borderRadius: "50%",
+      background: ring ? "transparent" : colour,
+      border: `2px solid ${colour}`,
+      marginLeft: 6,
+      marginRight: 12,
+    });
+  const rows: [React.ReactNode, string][] = [
+    [lineSwatch("#c7ccdb", true, 1), "shot that missed"],
+    [lineSwatch("#c7ccdb", false, 2), "shot that struck"],
+    [dot("#d7dbe6", true), "round bounced off"],
+    [dot("#ff9f43", true), "round got through"],
+    [dot("#ff4d4d"), "vehicle knocked out"],
+    [dot("#8a8f99"), "wreck (smoke for a minute)"],
+    [lineSwatch("#e8c547", true), "spotted an enemy"],
+    [lineSwatch("#ff6b6b", true), "found who was firing on it"],
+    [swatch({ background: "rgba(255,159,67,0.35)" }), "fired on from here, shooter unseen"],
+    [lineSwatch("#5fd4c0", true, 1), "radio: contact report (faint: to all)"],
+    [lineSwatch("#ff9f43", true, 1), "radio: under fire"],
+    [lineSwatch("#e879f9", true, 2), "radio: request for help"],
+    [lineSwatch("#c4b5fd", true, 2), "radio: reply"],
+    [lineSwatch("#ffffff", false, 2), "selected: what it is doing now"],
+    [lineSwatch("#ffffff", true, 2), "selected: its next steps"],
+    [lineSwatch("#ff6b6b", true, 2), "selected: a line it may not cross"],
+    [swatch({ border: "1px dashed #e8c547", background: "rgba(232,197,71,0.1)" }), "selected: its trigger"],
+  ];
+  return (
+    <>
+      <div style={{ ...groupTitle, marginTop: 10, cursor: "pointer" }} onClick={() => setOpen((o) => !o)}>
+        Map key {open ? "▾" : "▸"}
+      </div>
+      {open &&
+        rows.map(([mark, text]) => (
+          <div key={text} style={{ ...subtle, color: "#b8bdd0", lineHeight: 1.7, display: "flex", alignItems: "center" }}>
+            {mark}
+            {text}
+          </div>
+        ))}
+    </>
   );
 }
 
@@ -476,6 +545,8 @@ export default function RealtimePlay() {
 
   // Running.
   const [speed, setSpeed] = useState(10);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
   const [playing, setPlaying] = useState(false);
   const [viewpoint, setViewpoint] = useState<Viewpoint>("both");
   const [error, setError] = useState<string | null>(null);
@@ -492,6 +563,10 @@ export default function RealtimePlay() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapEpoch, setMapEpoch] = useState(0);
   const markersRef = useRef(new Map<string, { marker: maplibregl.Marker; update: (s: RtState) => void }>());
+  /** Wrecks seen so far this run, kept though the feed drops old lines. */
+  const wrecksRef = useRef<{ list: Wreck[]; after: number }>({ list: [], after: -1 });
+  /** The selected unit's step labels on the map. */
+  const planLabelsRef = useRef<{ key: string; markers: maplibregl.Marker[] }>({ key: "", markers: [] });
   const runnerRef = useRef<RealtimeRunner | null>(null);
   const orderedRef = useRef<RtState | null>(null);
   const phaseRef = useRef(phase);
@@ -705,6 +780,7 @@ export default function RealtimePlay() {
         }
       : undefined;
     const runner = new RealtimeRunner(initial, config, { deciders, onEntry });
+    wrecksRef.current = { list: [], after: -1 };
     runnerRef.current = runner;
     setEndDismissed(false);
     setDraft([]);
@@ -714,6 +790,8 @@ export default function RealtimePlay() {
 
   const reset = useCallback(() => {
     stopStream();
+    for (const m of planLabelsRef.current.markers) m.remove();
+    planLabelsRef.current = { key: "", markers: [] };
     runsRef.current = 0;
     setPlaying(false);
     runnerRef.current = null;
@@ -857,18 +935,10 @@ export default function RealtimePlay() {
             paint: { "circle-radius": 4, "circle-color": "#e8c547", "circle-stroke-color": "#0d1017", "circle-stroke-width": 1 },
           });
         }
-        if (!map.getSource(FIRE_SOURCE)) {
-          map.addSource(FIRE_SOURCE, { type: "geojson", data: emptyCollection() });
-          map.addLayer({
-            id: `${FIRE_SOURCE}-line`,
-            type: "line",
-            source: FIRE_SOURCE,
-            paint: {
-              "line-color": ["match", ["get", "side"], "blue", SIDE_COLOUR.blue, SIDE_COLOUR.red],
-              "line-width": 2.5,
-              "line-opacity": ["get", "opacity"],
-            },
-          });
+        // The overlays (overlayLayers.ts): impacts, wrecks, spotting, bearings, radio, the selected unit's plan.
+        for (const id of OVERLAY_SOURCES) if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyCollection() });
+        for (const spec of overlayLayerSpecs(SIDE_COLOUR)) {
+          if (!map.getLayer(spec.id as string)) map.addLayer(spec as unknown as maplibregl.LayerSpecification);
         }
       };
       if (map.isStyleLoaded()) draw();
@@ -957,6 +1027,10 @@ export default function RealtimePlay() {
       const own = view === "both" || fe.side === view;
       const unit = state.units[id];
       node.style.opacity = unit?.cohesion === "broken" ? "0.45" : unit?.cohesion === "shaken" ? "0.7" : "1";
+      // A vehicle just knocked out: the counter shakes, for a moment.
+      const lastLoss = unit?.losses.length ? Math.max(...unit.losses) : -Infinity;
+      const shaking = state.time - lastLoss <= 2 * Math.max(1, speedRef.current / 5);
+      inner.style.animation = shaking ? "rt-shake 0.35s ease-in-out 3" : "";
       // The unit in the inspector is ringed.
       inner.style.outline = selectedRef.current === id ? "2px solid #e8c547" : "none";
       inner.style.outlineOffset = "3px";
@@ -1099,34 +1173,54 @@ export default function RealtimePlay() {
       features: pictureFeatures,
     });
 
+    // ── What happens, where it happens (overlays.ts) ──────────────────────
     const runner = runnerRef.current;
-    const fire = (runner?.log ?? [])
-      .filter((entry) => entry.type === "shot" && state.time - entry.time <= FIRE_LINE_S)
-      .flatMap((entry) => {
-        if (entry.type !== "shot") return [];
-        const from = state.game.forceElements[entry.shot.firerId];
-        const to = state.game.forceElements[entry.shot.targetId];
-        if (!from || !to) return [];
-        // A shot is seen by its target's side as well as its own.
-        if (!own(from.side) && !own(to.side)) return [];
-        return [
-          {
-            type: "Feature" as const,
-            properties: { side: from.side, opacity: 1 - (state.time - entry.time) / FIRE_LINE_S },
-            geometry: {
-              type: "LineString" as const,
-              coordinates: [
-                [from.position.lng, from.position.lat],
-                [to.position.lng, to.position.lat],
-              ],
-            },
-          },
-        ];
-      });
-    (map.getSource(FIRE_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
-      type: "FeatureCollection",
-      features: fire,
-    });
+    const log = runner?.log ?? [];
+    const overlay = {
+      own,
+      // At high speed an effect lasts longer in simulated time, so the eye still catches it.
+      life: (baseS: number) => baseS * Math.max(1, speedRef.current / 5),
+    };
+    const set = (source: string, data: unknown) =>
+      (map.getSource(source) as maplibregl.GeoJSONSource | undefined)?.setData(data as GeoJSON.FeatureCollection);
+    const fire = fireOverlay(state, log, overlay);
+    set(SOURCE.fire, fire.lines);
+    set(SOURCE.impact, fire.impacts);
+    // Wrecks stay for the whole game, though the feed drops old lines.
+    const fresh = newWrecks(state, log, wrecksRef.current.after);
+    if (fresh.length) {
+      wrecksRef.current.list.push(...fresh);
+      wrecksRef.current.after = Math.max(...fresh.map((w) => w.time));
+    }
+    // Every wreck is seen by one side or the other: the one that lost it, or the one that knocked it out.
+    set(SOURCE.wreck, wreckOverlay(state, wrecksRef.current.list));
+    const spotting = spottingOverlay(state, log, overlay);
+    set(SOURCE.spot, spotting.lines);
+    set(SOURCE.pop, spotting.pops);
+    set(SOURCE.wedge, spotting.wedges);
+    const radioTraffic = radioOverlay(state, log, overlay);
+    set(SOURCE.radio, radioTraffic.lines);
+    set(SOURCE.pulse, radioTraffic.pulses);
+    const plan = planOverlay(state, selectedRef.current, overlay);
+    set(SOURCE.plan, plan.lines);
+    set(SOURCE.planZone, plan.zones);
+    // Step numbers as small labels (map text needs fonts the basemap may not have).
+    const key = plan.steps.map((s) => `${s.label}@${s.at.lat.toFixed(5)},${s.at.lng.toFixed(5)}${s.current ? "*" : ""}`).join("|");
+    if (key !== planLabelsRef.current.key) {
+      for (const m of planLabelsRef.current.markers) m.remove();
+      planLabelsRef.current = {
+        key,
+        markers: plan.steps.map((step) => {
+          const node = document.createElement("div");
+          node.textContent = step.label;
+          node.style.cssText =
+            "font:600 9px/1 var(--font-mono, monospace);padding:2px 4px;border-radius:8px;pointer-events:none;" +
+            `background:${step.current ? "#e8c547" : "rgba(13,16,23,0.9)"};color:${step.current ? "#0d1017" : "#f2f4fa"};` +
+            "border:1px solid rgba(255,255,255,0.6)";
+          return new maplibregl.Marker({ element: node }).setLngLat([step.at.lng, step.at.lat]).addTo(map);
+        }),
+      };
+    }
   }, [makeMarker]);
   const drawRef = useRef(draw);
   drawRef.current = draw;
@@ -1531,6 +1625,8 @@ export default function RealtimePlay() {
                 </button>
               </>
             )}
+
+            {phase === "running" && <MapKey />}
 
             <div style={{ ...groupTitle, marginTop: 10 }}>View</div>
             <div style={row}>
