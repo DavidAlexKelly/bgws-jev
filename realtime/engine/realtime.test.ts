@@ -271,9 +271,15 @@ describe("meeting the enemy", () => {
   });
 
   it("halts on running into the enemy, and says so", () => {
-    const { cfg, state } = column("never");
-    const { state: after, events } = run(state, cfg, 900);
-    const contact = events.find((e) => e.kind === "contact");
+    const { cfg, state: start } = column("never");
+    // Until they meet, however fast the ground lets them close.
+    let after = start;
+    let contact: RtEvent | undefined;
+    for (let s = 0; s < 3600 && !contact && !after.over; s += 1) {
+      const r = tick(after, cfg);
+      after = r.state;
+      contact = r.events.find((e) => e.kind === "contact");
+    }
     expect(contact).toBeDefined();
     // Nobody drove through: they are still on their own sides of each other.
     expect(after.game.forceElements.B1.position.lat).toBeLessThan(after.game.forceElements.R1.position.lat);
