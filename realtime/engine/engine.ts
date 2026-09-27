@@ -1422,6 +1422,11 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       narrative:
         `${firer.label} fired ${shot.rounds} at ${target.label} at ${Math.round(shot.rangeM)} m, ` +
         `${Math.round(shot.pHit * 100)}% each to hit: ${label}.`,
+      rangeM: Math.round(shot.rangeM),
+      rounds: shot.rounds,
+      hits,
+      knockedOut: knocked,
+      pHit: shot.pHit,
     });
 
     // THE LOCATE ROLL (knowledge.ts). The target always learns a bearing;

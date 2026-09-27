@@ -389,6 +389,15 @@ export interface RtShot {
   targetId: string;
   result: string;
   narrative?: string;
+  rangeM?: number;
+  /** Rounds fired: one per fit vehicle. */
+  rounds?: number;
+  /** Rounds that struck. */
+  hits?: number;
+  /** Vehicles it knocked out. */
+  knockedOut?: number;
+  /** The chance each round had of hitting. */
+  pHit?: number;
 }
 
 /** How time maps onto the rules. See timing.ts. */

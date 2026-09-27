@@ -80,6 +80,8 @@ export interface RunnerOptions {
   deciders?: Partial<Record<Side, RtDecider>>;
   /** How many feed entries to keep. */
   logLimit?: number;
+  /** Called with every feed entry as it is made — to stream the log elsewhere. Must not throw. */
+  onEntry?: (entry: RtLogEntry, state: RtState) => void;
 }
 
 const DEFAULT_LOG_LIMIT = 500;
@@ -258,6 +260,11 @@ export class RealtimeRunner {
 
   private push(entry: RtLogEntry): void {
     this.log.push(entry);
+    try {
+      this.options.onEntry?.(entry, this.state);
+    } catch {
+      // A listener's failure is never the game's.
+    }
     const limit = this.options.logLimit ?? DEFAULT_LOG_LIMIT;
     if (this.log.length > limit) this.log.splice(0, this.log.length - limit);
   }

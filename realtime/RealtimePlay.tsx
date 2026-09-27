@@ -75,7 +75,10 @@ import { HOUSE_V1 } from "../rules/ruleset";
 import { activityOf, createRealtimeState } from "./engine/engine";
 import { jevRealtimeDecider } from "./engine/jevDecider";
 import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from "./engine/orders";
-import { RealtimeRunner, type RtLogEntry } from "./engine/runner";
+import { EVENT_STREAM_RID, foundryStreamPublisher } from "../data/eventStream";
+import { EventStreamQueue } from "../data/eventStreamQueue";
+import { describeEntry, jevFailure, streamRow } from "./engine/feed";
+import { RealtimeRunner, type RunnerOptions } from "./engine/runner";
 import { clock, DEFAULT_TIMING, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
 
@@ -109,30 +112,6 @@ function emptyCollection(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features: [] };
 }
 
-/** Why a Jev call failed, from the trace: the error it reported, or that it did not answer. */
-function jevFailure(rationale: string | undefined): string {
-  const text = rationale ?? "";
-  const reported = /Jev unavailable \((.*)\) — the rules decided/.exec(text)?.[1];
-  if (reported) return reported;
-  if (/gave no answer/.test(text)) return "no answer for this unit in the reply";
-  return "unknown";
-}
-
-/** One line of the feed, in words. */
-function describeEntry(entry: RtLogEntry): string {
-  const at = clock(entry.time);
-  if (entry.type === "shot") return `${at}  ${entry.shot.firerId} fires on ${entry.shot.targetId}: ${entry.shot.result}`;
-  if (entry.type === "event") return `${at}  ${entry.event.unitId} ${entry.event.kind}: ${entry.event.detail}`;
-  if (entry.type === "flag") return `${at}  ⚑ ${entry.flag.text}`;
-  const d = entry.decision;
-  const p = d.trace.probabilities?.[d.optionId];
-  const who =
-    d.trace.chosenBy === "jev"
-      ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}`
-      : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback === "error" ? `failed: ${jevFailure(d.trace.rationale)}` : d.trace.fallback}` : ""}`;
-  const point = d.trace.question?.split(" ")[0] ?? "";
-  return `${at}  ${d.unitId} ${point} → ${entry.summary} (${who}; asked ${clock(entry.askedAt)})`;
-}
 
 /** Orders for review, one unit a line. */
 function OrdersReview({ results, state }: { results: OrdersResult[]; state: RtState | null }) {
@@ -286,6 +265,8 @@ export default function RealtimePlay() {
   const [gameSeed, setGameSeed] = useState("1");
   const [useJev, setUseJev] = useState(true);
   const [useCommander, setUseCommander] = useState(true);
+  /** Stream the feed to the Foundry event stream as it happens. */
+  const [streamLog, setStreamLog] = useState(true);
   const [model, setModel] = useState<CommanderModelName>(COMMANDER_MODELS[0]);
   const [blueDirective, setBlueDirective] = useState("");
   const [redDirective, setRedDirective] = useState("");
@@ -482,26 +463,46 @@ export default function RealtimePlay() {
 
   /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
   const runsRef = useRef(0);
+  /** The current run's stream queue: rows waiting to go to Foundry. */
+  const streamRef = useRef<EventStreamQueue | null>(null);
+  const stopStream = useCallback(() => {
+    void streamRef.current?.stop();
+    streamRef.current = null;
+  }, []);
+  useEffect(() => stopStream, [stopStream]);
+
   const start = useCallback(() => {
     const initial = orderedRef.current;
     if (!initial) return;
     const config = makeConfig(runsRef.current);
     runsRef.current += 1;
+    // Every run is its own run in the stream, "Run scenario again" included.
+    stopStream();
+    let onEntry: RunnerOptions["onEntry"];
+    if (streamLog) {
+      const queue = new EventStreamQueue(foundryStreamPublisher());
+      queue.start();
+      streamRef.current = queue;
+      const run = { runId: `${gameSeed}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, gameSeed };
+      let sequence = 0;
+      onEntry = (entry, state) => queue.push(streamRow(entry, state, run, sequence++));
+    }
     const deciders = useJev
       ? {
           blue: jevRealtimeDecider({ side: "blue", call: jevCall, directive: blueDirective }),
           red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }),
         }
       : undefined;
-    const runner = new RealtimeRunner(initial, config, { deciders });
+    const runner = new RealtimeRunner(initial, config, { deciders, onEntry });
     runnerRef.current = runner;
     setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
-  }, [makeConfig, useJev, jevCall, blueDirective, redDirective]);
+  }, [makeConfig, useJev, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream]);
 
   const reset = useCallback(() => {
+    stopStream();
     runsRef.current = 0;
     setPlaying(false);
     runnerRef.current = null;
@@ -509,7 +510,7 @@ export default function RealtimePlay() {
     setDraft([]);
     setEndDismissed(false);
     setPhase("setup");
-  }, []);
+  }, [stopStream]);
 
   /**
    * The same scenario again: the same units where they started, with the same
@@ -1048,6 +1049,15 @@ export default function RealtimePlay() {
               />
             ))}
 
+            <label style={{ ...row, gap: 6, marginTop: 8, color: streamLog ? "#e8c547" : "#8a91a8", cursor: "pointer" }}>
+              <input type="checkbox" checked={streamLog} onChange={(e) => setStreamLog(e.target.checked)} />
+              Stream the event log to Foundry
+            </label>
+            <div style={{ ...subtle, lineHeight: 1.5 }}>
+              Every line of the feed, as it happens, to <code>{EVENT_STREAM_RID.slice(-12)}</code>: one run per Play or
+              &ldquo;Run scenario again&rdquo;.
+            </div>
+
             <div style={{ ...groupTitle, marginTop: 14 }}>3 &middot; Ground and dice</div>
             <div style={row}>
               <span style={{ ...subtle, width: 46 }}>terrain</span>
@@ -1186,6 +1196,13 @@ export default function RealtimePlay() {
                   {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
                   {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
+                  {streamRef.current && (
+                    <span style={{ color: streamRef.current.lastError ? "#e07a5f" : undefined }}>
+                      {" "}&middot; streamed {streamRef.current.sent}
+                      {streamRef.current.dropped ? `, ${streamRef.current.dropped} dropped` : ""}
+                      {streamRef.current.lastError ? ` — stream failing: ${streamRef.current.lastError}` : ""}
+                    </span>
+                  )}
                 </div>
                 <button onClick={reset} style={{ ...chip, marginTop: 6 }}>
                   back to setup
