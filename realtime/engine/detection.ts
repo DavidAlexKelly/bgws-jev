@@ -39,6 +39,10 @@ const FACTORS = {
   observerMoving: 0.5,
   observerSuppressed: 0.5,
   observerPinned: 0.2,
+  /** Searching the bearing it was fired on from (D3): spotting doubled there. */
+  observerSearching: 2,
+  /** Still and watching, not firing: observing, or waiting for a trigger. */
+  observerWatching: 1.5,
 } as const;
 
 export type DetectionConditions = Partial<Record<keyof typeof FACTORS, boolean>>;

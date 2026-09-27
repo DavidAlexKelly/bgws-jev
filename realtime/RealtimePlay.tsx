@@ -1,10 +1,18 @@
 /**
  * RealtimePlay — the real-time mode.
  *
- * Place units, give initial orders, press Play. Every unit moves, looks and
- * shoots on one clock; whenever something happens to a unit, its side's
- * decider (Jev, or the rules) chooses what it does next, and the answer takes
- * effect after the unit's reaction time.
+ * Place units, have the commander write orders, press Play. Every unit
+ * moves, looks and shoots on one clock. docs/REALTIME_COMMAND_DESIGN.html:
+ *
+ *   commander (Claude)   writes mission orders, ONLY when the player pauses
+ *                        and presses "Generate orders" (or before the start)
+ *   unit leader (Jev)    makes the call at a decision point, inside them
+ *   game logic           everything else, every second
+ *
+ * While the clock runs, the game raises flags for the player — a unit out of
+ * orders, heavy losses, an objective taken — and never calls the commander on
+ * its own. Pause, generate, review, resume: a unit in a fight is asked how to
+ * comply (D0); one out of contact takes its new orders at once.
  *
  * A separate screen from the turn game on purpose — see Play.tsx. It shares
  * the rules (fire, sighting, terrain, fog of war) and the Jev client, and no
@@ -53,6 +61,7 @@ import { moveBoard, onBoard } from "./board";
 import { projectForSide } from "../lib/fogOfWar";
 import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
+import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "../data/commanderClient";
 import { withPersistentCache } from "../data/jevCache";
 import { jevConfigured, openRouterJevCall } from "../data/jevClient";
 import { createRng } from "../rules/dice";
@@ -65,9 +74,9 @@ import {
 } from "../rules/forceList";
 import { JEV_MODEL } from "../rules/jev";
 import { HOUSE_V1 } from "../rules/ruleset";
-import { createRealtimeState, describeOrder } from "./engine/engine";
-import { heuristicInitialOrders, jevInitialOrders } from "./engine/initialOrders";
+import { activityOf, createRealtimeState } from "./engine/engine";
 import { jevRealtimeDecider } from "./engine/jevDecider";
+import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from "./engine/orders";
 import { RealtimeRunner, type RtLogEntry } from "./engine/runner";
 import { clock, DEFAULT_TIMING, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
@@ -107,11 +116,43 @@ function describeEntry(entry: RtLogEntry): string {
   const at = clock(entry.time);
   if (entry.type === "shot") return `${at}  ${entry.shot.firerId} fires on ${entry.shot.targetId}: ${entry.shot.result}`;
   if (entry.type === "event") return `${at}  ${entry.event.unitId} ${entry.event.kind}: ${entry.event.detail}`;
+  if (entry.type === "flag") return `${at}  ⚑ ${entry.flag.text}`;
   const d = entry.decision;
   const p = d.trace.probabilities?.[d.optionId];
   const who =
     d.trace.chosenBy === "jev" ? `Jev${p != null ? ` ${Math.round(p * 100)}%` : ""}` : `rules${d.trace.fallback ? `, Jev ${d.trace.fallback}` : ""}`;
-  return `${at}  ${d.unitId} → ${entry.summary} (${who}; asked ${clock(entry.askedAt)})`;
+  const point = d.trace.question?.split(" ")[0] ?? "";
+  return `${at}  ${d.unitId} ${point} → ${entry.summary} (${who}; asked ${clock(entry.askedAt)})`;
+}
+
+/** Orders for review, one unit a line. */
+function OrdersReview({ results, state }: { results: OrdersResult[]; state: RtState | null }) {
+  return (
+    <>
+      {results.map((result) => (
+        <div key={result.side} style={{ marginBottom: 8 }}>
+          <div style={{ ...subtle, color: SIDE_COLOUR[result.side], lineHeight: 1.5 }}>
+            {result.side} · {result.by === "claude" ? "commander" : "heuristic"}: {result.plan}
+          </div>
+          {Object.entries(result.orders).map(([id, orders]) => (
+            <div key={id} style={{ ...subtle, color: "#c7ccdb", lineHeight: 1.45, margin: "2px 0 4px 6px" }}>
+              <b>{state?.game.forceElements[id]?.label ?? id}</b>: {orders.task}
+              {orders.intent ? <span style={{ color: "#8a91a8" }}> — {orders.intent}</span> : null}
+              <div style={{ color: "#6a7292" }}>
+                {orders.urgency === "now" ? "NOW" : "when able"} · ROE {orders.roe} · on contact {orders.onContact}
+                {orders.boundaries.length ? ` · stay ${orders.boundaries.map((b) => `${b.keep} of ${b.label}`).join(", ")}` : ""}
+              </div>
+            </div>
+          ))}
+          {result.warnings.map((warning, index) => (
+            <div key={index} style={{ ...subtle, color: "#e8945a", lineHeight: 1.45 }}>
+              ⚠ {warning}
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 export default function RealtimePlay() {
@@ -132,8 +173,14 @@ export default function RealtimePlay() {
   const [groundSeed, setGroundSeed] = useState(STANDARD_GROUND.seed ?? "baltic-v1");
   const [gameSeed, setGameSeed] = useState("1");
   const [useJev, setUseJev] = useState(true);
+  const [useCommander, setUseCommander] = useState(true);
+  const [model, setModel] = useState<CommanderModelName>(COMMANDER_MODELS[0]);
   const [blueDirective, setBlueDirective] = useState("");
   const [redDirective, setRedDirective] = useState("");
+  /** Orders written and waiting for review: at the start, or while paused. */
+  const [draft, setDraft] = useState<OrdersResult[]>([]);
+  const [orderSides, setOrderSides] = useState<Viewpoint>("both");
+  const [guidance, setGuidance] = useState("");
 
   // Running.
   const [speed, setSpeed] = useState(10);
@@ -253,50 +300,85 @@ export default function RealtimePlay() {
 
   // ── Orders and the clock ──────────────────────────────────────────────────
 
-  /** Build the game from what is placed and give every unit its opening order. */
+  /**
+   * Orders for one side: the commander's (Claude, through the published
+   * query) or the heuristic's. Never throws: an unreachable commander means
+   * the heuristic's orders, with a warning saying so.
+   */
+  const ordersFor = useCallback(
+    async (state: RtState, s: Side, config: RtConfig, extra: { guidance?: string; recent?: { time: number; text: string }[] }) => {
+      if (!useCommander) return heuristicOrders(state, s);
+      const directive = s === "blue" ? blueDirective : redDirective;
+      return commanderOrders(foundryModelCall(model, directive, "realtime"), state, s, config, extra);
+    },
+    [useCommander, model, blueDirective, redDirective],
+  );
+
+  /** Build the game from what is placed and have the commander write every unit's orders. */
   const generateOrders = useCallback(async () => {
     setError(null);
     setBusy(true);
     try {
       const config = makeConfig();
       let state = createRealtimeState(toGameStateFromPlaced(placed, HOUSE_V1, { gameId: gameSeed }));
-      for (const [s, directive] of [
-        ["blue", blueDirective],
-        ["red", redDirective],
-      ] as const) {
-        state = useJev
-          ? await jevInitialOrders(state, s, config, jevCall, { directive })
-          : heuristicInitialOrders(state, s, config);
+      const results: OrdersResult[] = [];
+      for (const s of ["blue", "red"] as const) {
+        const result = await ordersFor(state, s, config, {});
+        results.push(result);
+        state = applyOrders(state, result, config);
       }
       orderedRef.current = state;
+      setDraft(results);
       setPhase("ordered");
     } catch (thrown) {
       setError(thrown instanceof Error ? thrown.message : String(thrown));
     } finally {
       setBusy(false);
     }
-  }, [makeConfig, placed, gameSeed, useJev, jevCall, blueDirective, redDirective]);
+  }, [makeConfig, placed, gameSeed, ordersFor]);
+
+  /** Paused: new orders for one side or both, for review before the clock resumes. */
+  const generatePausedOrders = useCallback(async () => {
+    const runner = runnerRef.current;
+    if (!runner || playing) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const sides = orderSides === "both" ? (["blue", "red"] as const) : ([orderSides] as const);
+      const results: OrdersResult[] = [];
+      for (const s of sides) {
+        results.push(await ordersFor(runner.state, s, runner.config, { guidance, recent: runner.recentFor(s) }));
+      }
+      setDraft(results);
+    } catch (thrown) {
+      setError(thrown instanceof Error ? thrown.message : String(thrown));
+    } finally {
+      setBusy(false);
+    }
+  }, [playing, orderSides, ordersFor, guidance]);
+
+  /** Resume. Reviewed orders go to the runner first: in contact, each unit is asked how to comply (D0). */
+  const resume = useCallback(() => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    for (const result of draft) runner.issueOrders(result.orders, { side: result.side, text: result.plan });
+    setDraft([]);
+    setPlaying(true);
+  }, [draft]);
 
   const start = useCallback(() => {
     const initial = orderedRef.current;
     if (!initial) return;
     const config = makeConfig();
-    // The recent-events feed a decider reads comes from the runner it is
-    // attached to, which does not exist until the deciders do.
-    const holder: { runner: RealtimeRunner | null } = { runner: null };
     const deciders = useJev
       ? {
-          blue: jevRealtimeDecider({ side: "blue", call: jevCall, directive: blueDirective }, () =>
-            holder.runner?.recentFor("blue") ?? [],
-          ),
-          red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }, () =>
-            holder.runner?.recentFor("red") ?? [],
-          ),
+          blue: jevRealtimeDecider({ side: "blue", call: jevCall, directive: blueDirective }),
+          red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }),
         }
       : undefined;
     const runner = new RealtimeRunner(initial, config, { deciders });
-    holder.runner = runner;
     runnerRef.current = runner;
+    setDraft([]);
     setPhase("running");
     setPlaying(true);
   }, [makeConfig, useJev, jevCall, blueDirective, redDirective]);
@@ -305,6 +387,7 @@ export default function RealtimePlay() {
     setPlaying(false);
     runnerRef.current = null;
     orderedRef.current = null;
+    setDraft([]);
     setPhase("setup");
   }, []);
 
@@ -516,7 +599,10 @@ export default function RealtimePlay() {
             ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),
             ...(unit.suppression >= PINNED_AT ? ["pinned"] : unit.suppression >= SUPPRESSED_AT ? ["suppressed"] : []),
             ...(unit.posture === "hullDown" ? ["hull-down"] : []),
-            describeOrder(unit.order),
+            unit.orders && unit.order.kind === "hold" && unit.orders.phase >= unit.orders.phases.length - 1 &&
+            unit.orders.phases[unit.orders.phase]?.order.kind !== "hold"
+              ? "needs orders"
+              : activityOf(unit),
           ].join(" · ")
         : "";
 
@@ -770,34 +856,50 @@ export default function RealtimePlay() {
             )}
 
             <div style={{ ...groupTitle, marginTop: 14 }}>2 &middot; Who decides</div>
+            <label style={{ ...row, gap: 6, color: useCommander ? "#e8c547" : "#8a91a8", cursor: "pointer" }}>
+              <input type="checkbox" checked={useCommander} onChange={(e) => setUseCommander(e.target.checked)} />
+              Commander writes the orders
+            </label>
+            {useCommander && (
+              <select value={model} onChange={(e) => setModel(e.target.value as CommanderModelName)} style={{ ...select, marginBottom: 4 }}>
+                {COMMANDER_MODELS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div style={{ ...subtle, lineHeight: 1.5, marginBottom: 6 }}>
+              {useCommander
+                ? "The commander writes each unit's mission orders — task, intent, urgency, limits — before the start and " +
+                  "whenever you pause and ask. It never runs while the clock does."
+                : "Simple orders: everyone advances on the objective and holds it."}
+            </div>
             <label style={{ ...row, gap: 6, color: useJev ? "#e8c547" : "#8a91a8", cursor: "pointer" }}>
               <input type="checkbox" checked={useJev} onChange={(e) => setUseJev(e.target.checked)} />
-              Jev in command
+              Jev leads each unit
             </label>
             <div style={{ ...subtle, lineHeight: 1.5, color: useJev && !jevConfigured() ? "#e07a5f" : undefined }}>
               {useJev
                 ? jevConfigured()
-                  ? "Jev chooses every unit's opening order and, once the clock runs, every order after " +
-                    "that — whenever a unit sights something, comes under fire, loses a friend, arrives or " +
-                    "loses its target. Decisions take effect after the unit's reaction time. Every call is " +
-                    "printed to the browser console."
+                  ? "Jev makes the call at each decision point — new contact, fired on, a trigger met, a sign it " +
+                    "has been seen — always inside the orders. Every call is printed to the browser console."
                   : "No OpenRouter key: every Jev decision will fall back to the rules."
-                : "Simple rules decide: take cover when shot at, engage what is in sight, then carry on to the objective."}
+                : "The rules make every call, following each order's actions on contact."}
             </div>
-            {useJev &&
-              ([
-                ["blue", blueDirective, setBlueDirective],
-                ["red", redDirective, setRedDirective],
-              ] as const).map(([s, value, set]) => (
-                <textarea
-                  key={s}
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  placeholder={`${s} directive — mission, doctrine, temperament`}
-                  rows={2}
-                  style={{ ...select, width: "100%", marginTop: 4, resize: "vertical" }}
-                />
-              ))}
+            {([
+              ["blue", blueDirective, setBlueDirective],
+              ["red", redDirective, setRedDirective],
+            ] as const).map(([s, value, set]) => (
+              <textarea
+                key={s}
+                value={value}
+                onChange={(e) => set(e.target.value)}
+                placeholder={`${s} directive — mission, doctrine, temperament`}
+                rows={2}
+                style={{ ...select, width: "100%", marginTop: 4, resize: "vertical" }}
+              />
+            ))}
 
             <div style={{ ...groupTitle, marginTop: 14 }}>3 &middot; Ground and dice</div>
             <div style={row}>
@@ -842,7 +944,7 @@ export default function RealtimePlay() {
               disabled={busy || counts.blue === 0 || counts.red === 0}
               style={{ ...primary, marginTop: 12, opacity: busy || counts.blue === 0 || counts.red === 0 ? 0.5 : 1 }}
             >
-              {busy ? "generating…" : "Generate initial orders"}
+              {busy ? "writing orders…" : "Generate orders"}
             </button>
           </>
         )}
@@ -860,8 +962,9 @@ export default function RealtimePlay() {
             {phase === "ordered" ? (
               <>
                 <div style={{ ...subtle, lineHeight: 1.5, marginBottom: 6 }}>
-                  Opening orders are drawn on the map. Press Play to start the clock, or go back and change them.
+                  Opening orders are drawn on the map. Review them, then press Play to start the clock, or go back and change them.
                 </div>
+                <OrdersReview results={draft} state={state} />
                 <button onClick={start} style={primary}>
                   &#9654; Play
                 </button>
@@ -872,10 +975,51 @@ export default function RealtimePlay() {
             ) : (
               <>
                 <div style={row}>
-                  <button onClick={() => setPlaying((p) => !p)} disabled={!!state?.over} style={{ ...primary, flex: 1, marginTop: 0 }}>
-                    {playing ? "❚❚ Pause" : "▶ Play"}
+                  <button
+                    onClick={() => (playing ? setPlaying(false) : resume())}
+                    disabled={!!state?.over || busy}
+                    style={{ ...primary, flex: 1, marginTop: 0 }}
+                  >
+                    {playing ? "❚❚ Pause" : draft.length ? "▶ Issue orders and resume" : "▶ Play"}
                   </button>
                 </div>
+                {!playing && !state?.over && (
+                  <div style={{ margin: "6px 0 8px", padding: 6, border: "1px solid #191e37", borderRadius: 3 }}>
+                    <div style={{ ...subtle, color: "#c7ccdb", marginBottom: 4 }}>Paused: new orders?</div>
+                    <div style={row}>
+                      {(["both", "blue", "red"] as Viewpoint[]).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setOrderSides(v)}
+                          style={{ ...chip, flex: 1, borderColor: orderSides === v ? "#e8c547" : "transparent", color: orderSides === v ? "#e8c547" : "#8a91a8" }}
+                        >
+                          {v === "both" ? "both sides" : v}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={guidance}
+                      onChange={(e) => setGuidance(e.target.value)}
+                      placeholder="your guidance (optional): hold the bridge; the northern troop is too exposed"
+                      rows={2}
+                      style={{ ...select, width: "100%", resize: "vertical" }}
+                    />
+                    <button onClick={generatePausedOrders} disabled={busy} style={{ ...primary, opacity: busy ? 0.5 : 1 }}>
+                      {busy ? "writing orders…" : "Generate orders"}
+                    </button>
+                    {draft.length > 0 && (
+                      <>
+                        <div style={{ ...subtle, lineHeight: 1.5, margin: "6px 0 4px" }}>
+                          Review, then resume. A unit in a fight will be asked how to comply; one out of contact switches at once.
+                        </div>
+                        <OrdersReview results={draft} state={state} />
+                        <button onClick={() => setDraft([])} style={{ ...chip, marginTop: 2 }}>
+                          discard these orders
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div style={row}>
                   {SPEEDS.map((x) => (
                     <button key={x} onClick={() => setSpeed(x)} style={{ ...chip, flex: 1, borderColor: speed === x ? "#e8c547" : "transparent", color: speed === x ? "#e8c547" : "#8a91a8" }}>
@@ -928,6 +1072,21 @@ export default function RealtimePlay() {
 
       {phase === "running" && (
         <div style={rightPane}>
+          {runner && runner.flags.length > 0 && (
+            <>
+              <div style={groupTitle}>Flags</div>
+              {runner.flags
+                .filter((flag) => viewpoint === "both" || flag.side === viewpoint)
+                .slice(-6)
+                .reverse()
+                .map((flag, index) => (
+                  <div key={`${flag.time}-${index}`} style={{ ...subtle, color: "#e8c547", lineHeight: 1.45 }}>
+                    {clock(flag.time)} ⚑ {flag.text}
+                  </div>
+                ))}
+              <div style={{ ...subtle, lineHeight: 1.45, marginBottom: 8 }}>Pause to give new orders.</div>
+            </>
+          )}
           <div style={groupTitle}>What is happening</div>
           {feed.length === 0 && <div style={subtle}>Nothing yet.</div>}
           {feed.map((entry, index) => (
@@ -943,7 +1102,9 @@ export default function RealtimePlay() {
                       : "#b8bdd0"
                     : entry.type === "shot"
                       ? SIDE_COLOUR[entry.side]
-                      : "#8a91a8",
+                      : entry.type === "flag"
+                        ? "#e8c547"
+                        : "#8a91a8",
               }}
             >
               {describeEntry(entry)}

@@ -35,7 +35,7 @@
 // Everything random comes from `config.rng`, in a fixed order, so the same
 // seed and the same decisions give the same game.
 
-import { bearingDeg, distanceM, LOS_CAP_M, type LatLng } from "../../lib/board";
+import { bearingDeg, bearingDeltaDeg, distanceM, LOS_CAP_M, type LatLng } from "../../lib/board";
 import { lineOfSight } from "../../lib/lineOfSight";
 import { inCover } from "../../lib/proceduralTerrain";
 import {
@@ -86,7 +86,18 @@ import {
   SUPPRESSION_DECAY_PER_S,
   SUPPRESSION_GRACE_S,
 } from "./timing";
+import {
+  CUE_INTERVAL_S,
+  CUE_RANGE_M,
+  HEARD_M,
+  SHOOTER_MOVED_M,
+  compassWord,
+  cueOf,
+  locateChance,
+  tryingToHide,
+} from "./knowledge";
 import type {
+  Boundary,
   Cohesion,
   DecisionMemory,
   MoveMode,
@@ -98,6 +109,7 @@ import type {
   RtShot,
   RtState,
   RtUnit,
+  Trigger,
 } from "./types";
 
 const SIGHT_RANK: Record<SightingLevel, number> = { none: 0, veryPartial: 1, partial: 2, full: 3 };
@@ -136,6 +148,13 @@ const SPEED: Record<MoveMode | "withdraw", number> = {
   bound: 0.8,
   withdraw: 1,
 };
+
+/** A search covers this many degrees either side of its bearing. */
+export const SEARCH_ARC_DEG = 45;
+/** Friends within this are the ones a unit can help (D9). */
+const HELP_RADIUS_M = 1500;
+/** A unit is offered the chance to help the same friend at most this often. */
+const HELP_INTERVAL_S = 60;
 
 /** Suppression one shot adds, before cover and quality. */
 const SUPPRESSION_FOR = { miss: 8, suppress: 18, hit: 30, damaged: 15 };
@@ -306,6 +325,12 @@ function freshUnit(fe: ForceElement): RtUnit {
     history: [],
     vehicles: { total: vehiclesIn(fe), fit: vehiclesIn(fe) },
     losses: [],
+    suspects: {},
+    locating: {},
+    lastCue: null,
+    cueAt: {},
+    helpAt: {},
+    orders: null,
   };
 }
 
@@ -406,10 +431,68 @@ export function describeOrder(order: RtOrder): string {
     case "withdraw":
       return "withdrawing";
     case "engage":
-      return `engaging ${order.targetId}`;
+      return `engaging ${order.targetId}${order.volleys != null ? `, ${order.volleys} more volley${order.volleys === 1 ? "" : "s"}` : ""}`;
+    case "wait":
+      return `waiting on ${order.targetId} until ${describeTrigger(order.trigger)}${order.autoFire ? ", then firing" : ""}`;
+    case "observe":
+      return "observing, not firing";
+    case "search":
+      return "searching a bearing";
     default:
       return order.kind;
   }
+}
+
+/** A trigger, in words. */
+export function describeTrigger(trigger: Trigger): string {
+  switch (trigger.kind) {
+    case "hitChance":
+      return `its hit chance reaches ${Math.round(trigger.atLeast * 100)}% (about ${Math.round(trigger.aboutM / 100) * 100} m)`;
+    case "range":
+      return `it is inside ${trigger.withinM} m`;
+    case "flank":
+      return "it shows its side";
+    case "reaches":
+      return `it reaches ${trigger.label}`;
+  }
+}
+
+/**
+ * What a unit is doing, as one of the design's six activities (§3), for the
+ * screen and for Jev.
+ */
+export function activityOf(unit: Pick<RtUnit, "order" | "cohesion">): string {
+  if (unit.cohesion !== "steady") return unit.cohesion;
+  const order = unit.order;
+  if (order.phase != null) return "executing its order";
+  switch (order.kind) {
+    case "engage":
+      return "engaging";
+    case "wait":
+      return "waiting for a trigger";
+    case "move":
+      return order.dash ? "taking cover" : "manoeuvring";
+    case "withdraw":
+      return "withdrawing";
+    default:
+      return "observing";
+  }
+}
+
+/** Would standing at `at` break one of these lines? */
+export function crosses(boundaries: readonly Boundary[], at: LatLng): Boundary | undefined {
+  return boundaries.find((line) => {
+    switch (line.keep) {
+      case "north":
+        return at.lat < line.at.lat;
+      case "south":
+        return at.lat > line.at.lat;
+      case "east":
+        return at.lng < line.at.lng;
+      case "west":
+        return at.lng > line.at.lng;
+    }
+  });
 }
 
 /** The nearest cover within `radius`, preferring points away from the threat. */
@@ -427,6 +510,36 @@ export function nearestCover(
     distanceM(fe.position, point) -
     (threat ? (distanceM(point, threat) - distanceM(fe.position, threat)) / 2 : 0);
   return points.sort((a, b) => score(a) - score(b))[0] ?? null;
+}
+
+/**
+ * Is a waiting unit's trigger met? Game logic checks it every second (D4).
+ * Nothing is met without a line of sight and a weapon that reaches.
+ */
+export function triggerMet(
+  state: Pick<RtState, "units" | "time">,
+  self: ForceElement,
+  target: ForceElement,
+  trigger: Trigger,
+  config: RtConfig,
+): boolean {
+  if (!canHit(self, target, target.position, config)) return false;
+  const range = distanceM(self.position, target.position);
+  switch (trigger.kind) {
+    case "range":
+      return range <= trigger.withinM;
+    case "reaches":
+      return distanceM(target.position, trigger.at) <= trigger.withinM;
+    case "flank": {
+      const aspect = aspectOf(target, self.position, config.ruleset);
+      return aspect === "side" || aspect === "rear";
+    }
+    case "hitChance": {
+      const weapon = weaponFor(self, target, range);
+      if (!weapon) return false;
+      return hitChance(weapon, target, range, hitConditions(state, self, target, config), config.timing) >= trigger.atLeast;
+    }
+  }
 }
 
 export function tick(prev: RtState, config: RtConfig): TickResult {
@@ -454,10 +567,33 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   const setUnit = (id: string, patch: Partial<RtUnit>) => {
     units[id] = { ...units[id], ...patch };
   };
-  const emit = (unitId: string, kind: RtEvent["kind"], detail: string, severe = false) => {
+  const emit = (
+    unitId: string,
+    kind: RtEvent["kind"],
+    detail: string,
+    severe = false,
+    extra: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info">> = {},
+  ) => {
     if (!alive(unitId)) return;
-    events.push({ time, unitId, kind, detail, severe });
-    setUnit(unitId, { lastEventAt: time });
+    events.push({ time, unitId, kind, detail, severe, ...extra });
+    if (!extra.info) setUnit(unitId, { lastEventAt: time });
+  };
+  /** Switch to what follows an order — its `then`, or hold — routed from where the unit is now. */
+  const follow = (id: string, then: RtOrder | undefined) => {
+    setUnit(id, { order: then ? routed(then, fe(id), config) : { kind: "hold" }, bound: undefined, laying: undefined });
+  };
+  /** A phase of its standing orders is done: on to the next with no decision, or out of orders (D10). */
+  const nextPhase = (id: string, done: number, what: string) => {
+    const orders = units[id].orders;
+    const next = done + 1;
+    if (orders && next < orders.phases.length) {
+      setUnit(id, { orders: { ...orders, phase: next } });
+      follow(id, { ...orders.phases[next].order, phase: next });
+      emit(id, "phaseDone", `${what}; now: ${orders.phases[next].label}`, false, { info: true });
+    } else {
+      setUnit(id, { order: { kind: "hold" }, bound: undefined });
+      emit(id, "outOfOrders", `${what}: its orders are complete`);
+    }
   };
   const friendsNear = (of: ForceElement) =>
     ids.filter(
@@ -489,11 +625,14 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   const observe = (observerId: string, enemyId: string, level: ReportLevel) => {
     const side = fe(observerId).side;
     const own = units[observerId].ownSeen[enemyId];
+    const { [enemyId]: _found, ...suspects } = units[observerId].suspects;
+    const { [enemyId]: _done, ...locating } = units[observerId].locating;
     setUnit(observerId, {
       ownSeen: {
         ...units[observerId].ownSeen,
         [enemyId]: { time, level: own ? higher(own.level, level) : level },
       },
+      ...(_found || _done ? { suspects, locating } : {}),
     });
     lastSeen[side][enemyId] = time;
     if (SIGHT_RANK[sightingOf(game, side, enemyId)] >= SIGHT_RANK[level]) return;
@@ -532,11 +671,19 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const order = unit.order;
     if (order.kind === "withdraw") return "";
     if (order.kind === "move" && order.mode === "assault" && !order.dash) return "; pressing the assault";
-    setUnit(id, { weaponReadyAt: Math.min(unit.weaponReadyAt, time + RETURN_FIRE_S) });
-    if (order.kind !== "move" || order.dash) return "; returning fire";
+    // Return fire only at a shooter it has located; otherwise it only knows a bearing.
+    const located = known(id, threatId) !== "none";
+    const answer = located ? "returning fire" : "shooter not located";
+    if (located) setUnit(id, { weaponReadyAt: Math.min(unit.weaponReadyAt, time + RETURN_FIRE_S) });
+    // Hidden and still, and now found: the crew shoots back at what it can see.
+    if (located && (order.kind === "wait" || order.kind === "observe" || order.kind === "search")) {
+      setUnit(id, { order: { kind: "engage", targetId: threatId } });
+      return "; returning fire";
+    }
+    if (order.kind !== "move" || order.dash) return located ? "; returning fire" : "";
     if (order.mode === "bound") {
       setUnit(id, { bound: { moving: false, until: time + BOUND_COVER_S } });
-      return "; returning fire, halted to cover";
+      return `; ${answer}, halted to cover`;
     }
     const threat = fe(threatId);
     if (!inCover(config.terrain, self.position)) {
@@ -546,7 +693,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           order: routed({ kind: "move", to: cover, mode: "march", dash: true }, self, config),
           bound: undefined,
         });
-        return `; returning fire and dashing ${Math.round(distanceM(self.position, cover))} m ${compass(
+        return `; ${answer} and dashing ${Math.round(distanceM(self.position, cover))} m ${compass(
           self.position,
           cover,
         )} for cover (${config.terrain.classify(cover)})`;
@@ -560,17 +707,17 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           order: routed({ kind: "move", to: spot, mode: "march", dash: true }, self, config),
           bound: undefined,
         });
-        return `; returning fire and backing ${Math.round(distanceM(self.position, spot))} m ${compass(
+        return `; ${answer} and backing ${Math.round(distanceM(self.position, spot))} m ${compass(
           self.position,
           spot,
         )} into a hull-down position`;
       }
     }
     setUnit(id, {
-      order: known(id, threatId) !== "none" ? { kind: "engage", targetId: threatId } : { kind: "hold" },
+      order: located ? { kind: "engage", targetId: threatId } : { kind: "hold" },
       bound: undefined,
     });
-    return "; returning fire and halted";
+    return `; ${answer} and halted`;
   };
 
   // ── 1. Contact reports reach the side ─────────────────────────────────────
@@ -645,6 +792,14 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const step = perSecond * timing.tickS;
     const next = step > 0 ? towards(self.position, aim, step) : self.position;
     const broken = unit.cohesion === "broken";
+    // The standing orders' lines are not crossed, whatever the order says. A
+    // broken unit is running and does not read its orders.
+    const line = !broken && unit.orders ? crosses(unit.orders.boundaries, next) : undefined;
+    if (line && !crosses([line], self.position)) {
+      setUnit(id, { order: { kind: "hold" }, bound: undefined });
+      emit(id, "blocked", `stopped short of ${line.label}: its orders keep it ${line.keep} of it`);
+      continue;
+    }
     if (step <= 0 || allowanceAt(self, next, config) <= 0) {
       setUnit(id, { order: { kind: "hold" }, bound: undefined, ...(broken ? { fellBack: true } : {}) });
       emit(id, "blocked", `cannot move on through ${config.terrain.classify(next)}`);
@@ -663,6 +818,14 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     });
 
     if (distanceM(next, order.to) < 1) {
+      if (!broken && order.then) {
+        follow(id, order.then);
+        continue;
+      }
+      if (!broken && order.phase != null) {
+        nextPhase(id, order.phase, `reached the end of "${units[id].orders?.phases[order.phase]?.label ?? "its move"}"`);
+        continue;
+      }
       setUnit(id, { order: { kind: "hold" }, bound: undefined, ...(broken ? { fellBack: true } : {}) });
       emit(
         id,
@@ -777,6 +940,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
             observerMoving: mine.lastMovedAt === time,
             observerSuppressed: mine.suppression >= SUPPRESSED_AT && mine.suppression < PINNED_AT,
             observerPinned: mine.suppression >= PINNED_AT,
+            observerSearching:
+              mine.order.kind === "search" &&
+              bearingDeltaDeg(mine.order.bearingDeg, bearingDeg(observer.position, enemy.position)) <= SEARCH_ARC_DEG,
+            observerWatching: mine.order.kind === "observe" || mine.order.kind === "wait",
           },
           timing.tickS,
         );
@@ -789,6 +956,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           "sighted",
           `${level === "full" ? enemy.label : "an unidentified contact"} (${enemyId}) at ${Math.round(range)} m`,
           true,
+          { about: enemyId },
         );
       }
     }
@@ -820,10 +988,105 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
     for (const id of observers) {
       const order = units[id].order;
-      if (order.kind === "engage" && known(id, order.targetId) === "none") {
-        setUnit(id, { order: { kind: "hold" } });
-        emit(id, "targetGone", `lost sight of ${order.targetId}`);
+      if ((order.kind === "engage" || order.kind === "wait") && known(id, order.targetId) === "none") {
+        if (order.kind === "engage" && order.then) {
+          // "Finish this fight first" is over: the new order runs, no call.
+          follow(id, order.then);
+          emit(id, "targetGone", `lost sight of ${order.targetId}; on with its orders`, false, { info: true, about: order.targetId });
+        } else {
+          setUnit(id, { order: { kind: "hold" } });
+          emit(id, "targetGone", `lost sight of ${order.targetId}`, false, { about: order.targetId });
+        }
       }
+    }
+    // Bearing-only contacts are forgotten after a while.
+    for (const id of observers) {
+      const suspects = units[id].suspects;
+      const kept = Object.entries(suspects).filter(
+        ([enemyId, s]) => isAlive(game, enemyId) && time - s.time <= timing.contactMemoryS,
+      );
+      if (kept.length !== Object.keys(suspects).length) setUnit(id, { suspects: Object.fromEntries(kept) });
+    }
+  }
+
+  // ── 4b. Cues: does the enemy know we are here? ─────────────────────────────
+  //
+  // A unit trying to stay hidden watches the enemies it can see for a sign it
+  // has been seen: a halt, a turn towards it, a dash for cover, a start its
+  // way. It sees only the behaviour, never the reason (knowledge.ts).
+  for (const id of ids) {
+    const unit = units[id];
+    if (!unit || !alive(id) || unit.cohesion !== "steady" || !tryingToHide(unit, time)) continue;
+    const self = fe(id);
+    for (const [enemyId, seen] of Object.entries(unit.ownSeen)) {
+      if (seen.time !== time || !alive(enemyId)) continue;
+      const enemy = fe(enemyId);
+      const range = distanceM(self.position, enemy.position);
+      if (range > CUE_RANGE_M) continue;
+      if (time - (units[id].cueAt[enemyId] ?? -Infinity) < CUE_INTERVAL_S) continue;
+      const before = prev.units[enemyId];
+      const was = prev.game.forceElements[enemyId];
+      if (!before || !was) continue;
+      const now = units[enemyId];
+      const lastDrill = now.history[now.history.length - 1];
+      const cue = cueOf({
+        wasMoving: before.lastMovedAt === prev.time,
+        isMoving: now.lastMovedAt === time,
+        wasFacing: was.facing,
+        isFacing: enemy.facing,
+        bearingToMe: bearingDeg(enemy.position, self.position),
+        wentToGround: lastDrill?.by === "crew" && time - lastDrill.time <= timing.tickS && /dashing|backing/.test(lastDrill.chose),
+      });
+      if (!cue) continue;
+      setUnit(id, { cueAt: { ...units[id].cueAt, [enemyId]: time }, lastCue: { time, enemyId, cue } });
+      emit(id, "cue", `${enemyId} ${cue} (${Math.round(range)} m ${compass(self.position, enemy.position)})`, true, {
+        about: enemyId,
+      });
+    }
+  }
+
+  // ── 4c. Triggers ──────────────────────────────────────────────────────────
+  //
+  // A waiting unit's trigger, checked every second. Briefed to fire when it
+  // is met, it fires at once — laid on already, as an ambush is. Otherwise it
+  // asks (D4).
+  for (const id of ids) {
+    const unit = units[id];
+    if (!unit || !alive(id) || unit.cohesion !== "steady") continue;
+    const order = unit.order;
+    if (order.kind !== "wait" || order.met) continue;
+    const self = fe(id);
+    const target = fe(order.targetId);
+    if (!target || target.combatStrength <= 0 || known(id, target.id) === "none") continue;
+    if (!triggerMet({ units, time }, self, target, order.trigger, config)) continue;
+    const range = Math.round(distanceM(self.position, target.position));
+    if (order.autoFire) {
+      setUnit(id, {
+        order: { kind: "engage", targetId: target.id },
+        laying: { targetId: target.id, readyAt: time },
+        weaponReadyAt: Math.min(unit.weaponReadyAt, time),
+      });
+      emit(id, "triggerMet", `${describeTrigger(order.trigger)}: firing on ${target.id} at ${range} m, as briefed`, false, {
+        info: true,
+        about: target.id,
+      });
+    } else {
+      setUnit(id, { order: { ...order, met: true } });
+      emit(id, "triggerMet", `${describeTrigger(order.trigger)}: ${target.id} at ${range} m`, true, { about: target.id });
+    }
+  }
+
+  // ── 4d. Time-boxed orders run out ─────────────────────────────────────────
+  for (const id of ids) {
+    const unit = units[id];
+    if (!unit || !alive(id)) continue;
+    const order = unit.order;
+    if (order.kind === "engage" && order.until != null && time >= order.until) {
+      follow(id, order.then);
+      emit(id, "phaseDone", `finished its fight with ${order.targetId} (time is up); on with its orders`, false, { info: true });
+    } else if (order.kind === "search" && time >= order.until) {
+      setUnit(id, { order: { kind: "hold" } });
+      emit(id, "searchDone", `searched ${compassWord(order.bearingDeg)} and found nothing`, false, { bearingDeg: order.bearingDeg });
     }
   }
 
@@ -869,14 +1132,27 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     let target: ForceElement | undefined;
     if (order.kind === "move" && order.mode === "march" && !order.dash) {
       candidates = [];
-    } else if (unit.cohesion === "shaken" || (order.kind === "move" && order.dash)) {
+    } else if (
+      unit.cohesion === "shaken" ||
+      (order.kind === "move" && order.dash) ||
+      order.kind === "wait" ||
+      order.kind === "observe" ||
+      order.kind === "search"
+    ) {
+      // Hiding, watching or searching: holds its fire, but shoots back at a
+      // shooter it has located.
       candidates = selfDefence;
     } else {
       if (order.kind === "engage") {
         target = reachable.find((enemy) => enemy.id === order.targetId);
         if (!target && !isAlive(snapshot, order.targetId)) {
-          setUnit(id, { order: { kind: "hold" } });
-          emit(id, "targetGone", `${order.targetId} is destroyed`);
+          if (order.then) {
+            follow(id, order.then);
+            emit(id, "targetGone", `${order.targetId} is destroyed; on with its orders`, false, { info: true, about: order.targetId });
+          } else {
+            setUnit(id, { order: { kind: "hold" } });
+            emit(id, "targetGone", `${order.targetId} is destroyed`, false, { about: order.targetId });
+          }
         }
       }
       if (!target) {
@@ -965,6 +1241,11 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       engagement,
       ...(same ? {} : { lastReviewAt: time }),
     });
+    // "Fire N volleys, then…": fire and move, fire and move back.
+    if (order.kind === "engage" && order.targetId === target.id && order.volleys != null) {
+      if (order.volleys <= 1) follow(id, order.then);
+      else setUnit(id, { order: { ...order, volleys: order.volleys - 1 } });
+    }
   }
 
   // ── 6. What the fire did ──────────────────────────────────────────────────
@@ -1099,10 +1380,62 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         `${Math.round(shot.pHit * 100)}% each to hit: ${label}.`,
     });
 
-    // Firing gives a position away to whoever it was aimed at, if they can see back.
-    if (known(target.id, firer.id) === "none" && sees(target.position, firer.position)) {
-      observe(target.id, firer.id, "partial");
-      emit(target.id, "sighted", `muzzle flash: fired on from ${Math.round(shot.rangeM)} m (${firer.id})`, true);
+    // THE LOCATE ROLL (knowledge.ts). The target always learns a bearing;
+    // whether it finds the shooter is a roll — easier close, against a
+    // shooter in the open, and with every volley from the same place.
+    if (known(target.id, firer.id) === "none") {
+      const tu = units[target.id];
+      const bearing = bearingDeg(target.position, firer.position);
+      const tries = tu.locating[firer.id];
+      const same =
+        tries != null &&
+        distanceM(tries.at, firer.position) <= SHOOTER_MOVED_M &&
+        time - tries.time <= FIRED_UPON_MEMORY_S;
+      const volleys = same ? tries.volleys + 1 : 1;
+      const searching =
+        tu.order.kind === "search" && bearingDeltaDeg(tu.order.bearingDeg, bearing) <= SEARCH_ARC_DEG;
+      const p = sees(target.position, firer.position)
+        ? locateChance(shot.rangeM, {
+            volleys,
+            shooterInCover: inCover(config.terrain, firer.position),
+            shooterHullDown: hullDownFrom({ units }, firer, target.position, config),
+            targetSearching: searching,
+            targetSuppressed: tu.suppression >= SUPPRESSED_AT && tu.suppression < PINNED_AT,
+            targetPinned: tu.suppression >= PINNED_AT,
+          })
+        : 0;
+      setUnit(target.id, {
+        locating: { ...tu.locating, [firer.id]: { volleys, at: firer.position, time } },
+        suspects: {
+          ...tu.suspects,
+          [firer.id]: { bearingDeg: bearing, time, from: target.position, why: `fired on from the ${compassWord(bearing)}` },
+        },
+      });
+      if (p > 0 && (p >= 1 || rng.int(1_000_000) < p * 1_000_000)) observe(target.id, firer.id, "partial");
+    }
+    // Firing is heard: anyone near who does not know the shooter gets a bearing.
+    for (const other of ids) {
+      if (other === target.id || !alive(other) || fe(other).side === firer.side) continue;
+      if (distanceM(fe(other).position, firer.position) > HEARD_M || known(other, firer.id) !== "none") continue;
+      const bearing = bearingDeg(fe(other).position, firer.position);
+      setUnit(other, {
+        suspects: {
+          ...units[other].suspects,
+          [firer.id]: { bearingDeg: bearing, time, from: fe(other).position, why: `heard firing to the ${compassWord(bearing)}` },
+        },
+      });
+    }
+    // After its first volley at a target, or one that knocks a vehicle out,
+    // the firer weighs what to do next (D6): has it been found yet?
+    const record = units[firer.id]?.engagement;
+    if (record && record.targetId === target.id && (record.shots === 1 || knocked > 0)) {
+      emit(
+        firer.id,
+        "volley",
+        knocked > 0 ? `knocked out ${knocked} of ${target.id}'s vehicles` : `first volley at ${target.id}: ${label}`,
+        knocked > 0,
+        { about: target.id },
+      );
     }
   }
 
@@ -1122,15 +1455,50 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       }
       continue;
     }
-    const by = firers
-      .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? "fired"})`)
-      .join(", ");
     const shooter = newAttacker.get(targetId);
     const did = shooter ? drill(targetId, shooter) : "";
-    emit(targetId, "underFire", `fired on by ${by}${did}`, hurt || shooter != null);
+    // Located, or only a bearing: decision point D2 or D3.
+    const locatedFirer = firers.find((shot) => known(targetId, shot.firerId) !== "none");
+    const unlocated = firers.find((shot) => known(targetId, shot.firerId) === "none");
+    const about = locatedFirer?.firerId ?? unlocated?.firerId;
+    const where = locatedFirer
+      ? {}
+      : { bearingDeg: bearingDeg(after.position, fe(unlocated!.firerId).position) };
+    const unseen = unlocated && !locatedFirer ? ` (shooter not located: fire from the ${compassWord(where.bearingDeg!)})` : "";
+    const by = locatedFirer
+      ? firers
+          .filter((shot) => known(targetId, shot.firerId) !== "none")
+          .map((shot) => `${shot.firerId} (${Math.round(shot.rangeM)} m, ${labels.get(shot) ?? "fired"})`)
+          .join(", ")
+      : firers.map((shot) => labels.get(shot) ?? "fired").join(", ");
+    emit(targetId, "underFire", `fired on by ${locatedFirer ? by : "an unseen enemy"}${unseen}${locatedFirer ? "" : `: ${by}`}${did}`, hurt || shooter != null, {
+      about,
+      located: locatedFirer != null,
+      ...where,
+    });
     if (hurt) {
       const v = units[targetId].vehicles;
-      emit(targetId, "hit", `vehicle knocked out: ${v.fit} of ${v.total} still fighting`, true);
+      emit(targetId, "hit", `vehicle knocked out: ${v.fit} of ${v.total} still fighting`, true, {
+        about,
+        located: locatedFirer != null,
+        ...where,
+      });
+    }
+    // A friend in trouble: those close by who know its attacker may help (D9).
+    if ((hurt || shooter != null) && about) {
+      for (const friend of ids) {
+        if (friend === targetId || !alive(friend) || fe(friend).side !== after.side) continue;
+        const f = units[friend];
+        if (f.cohesion !== "steady" || time - f.lastShotAt <= 30) continue;
+        if (distanceM(fe(friend).position, after.position) > HELP_RADIUS_M) continue;
+        if (time - (f.helpAt[targetId] ?? -Infinity) < HELP_INTERVAL_S) continue;
+        const attacker = firers.map((shot) => shot.firerId).find((id) => known(friend, id) !== "none");
+        if (!attacker) continue;
+        setUnit(friend, { helpAt: { ...f.helpAt, [targetId]: time } });
+        emit(friend, "friendNeedsHelp", `${targetId} is ${hurt ? "losing vehicles" : "under fire"} from ${attacker}`, hurt, {
+          about: attacker,
+        });
+      }
     }
   }
 

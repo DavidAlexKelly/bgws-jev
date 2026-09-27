@@ -43,13 +43,15 @@ export const COMMANDER_QUERY = "bgwsCommanderTurn";
  *   turn     orders carried out exactly as written (Jev off)
  *   turnJev  orders Jev will carry out and may adapt (Jev on)
  *   decide   one escalated decision Jev was unsure about (Jev on)
+ *   realtime a side's mission orders in the real-time mode, while paused
  */
-export type CommanderQueryKind = "turn" | "turnJev" | "decide";
+export type CommanderQueryKind = "turn" | "turnJev" | "decide" | "realtime";
 
 const QUERY_NAMES: Record<CommanderQueryKind, string> = {
   turn: "bgwsCommanderTurn",
   turnJev: "bgwsCommanderTurnJev",
   decide: "bgwsCommanderDecide",
+  realtime: "bgwsCommanderRealtimeOrders",
 };
 
 /**

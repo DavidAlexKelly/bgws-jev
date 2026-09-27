@@ -37,25 +37,64 @@ import type { RuleSet, StandingEngagement } from "../../rules/ruleset";
  */
 export type MoveMode = "march" | "tactical" | "assault" | "bound";
 
+/**
+ * What a waiting unit is waiting FOR (decision point D1 → D4). Concrete, so
+ * game logic can watch it every second and Jev does not have to be asked
+ * "is it close enough yet?".
+ */
+export type Trigger =
+  /** Its chance of a hit reaches this; `aboutM` is the range that roughly gives it, for the words. */
+  | { kind: "hitChance"; atLeast: number; aboutM: number }
+  | { kind: "range"; withinM: number }
+  /** The target shows its side or rear. */
+  | { kind: "flank" }
+  /** The target reaches a place: within `withinM` of `at`. */
+  | { kind: "reaches"; at: LatLng; withinM: number; label: string };
+
+/**
+ * Carried by an order that came from the standing orders (Claude's phases):
+ * when it is done, the next phase follows with no decision (D10).
+ */
+export interface Planned {
+  /** The index of the phase this order carries out. */
+  phase?: number;
+}
+
 /** What a unit is doing. The autopilot carries it out every tick. */
-export type RtOrder =
-  /** Go there, at the ground's speed, along `route` when one was planned. */
-  | {
-      kind: "move";
-      to: LatLng;
-      route?: LatLng[];
-      mode: MoveMode;
-      /** The react-to-contact drill's dash for cover: it does not halt on contact again. */
-      dash?: boolean;
-    }
-  /** Stay. Fire only as the rules of engagement (and self-defence) allow. */
-  | { kind: "hold" }
-  /** Stay and watch: fire at anything in reach, unless the ROE is "never". */
-  | { kind: "overwatch" }
-  /** Stay and fire at this target whenever it can be hit. */
-  | { kind: "engage"; targetId: string }
-  /** Get away. Moves at full speed, and does not fire. */
-  | { kind: "withdraw"; to: LatLng; route?: LatLng[] };
+export type RtOrder = Planned &
+  (
+    /** Go there, at the ground's speed, along `route` when one was planned; then `then`, if given. */
+    | {
+        kind: "move";
+        to: LatLng;
+        route?: LatLng[];
+        mode: MoveMode;
+        /** The react-to-contact drill's dash for cover: it does not halt on contact again. */
+        dash?: boolean;
+        then?: RtOrder;
+      }
+    /** Stay. Fire only as the rules of engagement (and self-defence) allow. */
+    | { kind: "hold" }
+    /** Stay and watch: fire at anything in reach, unless the ROE is "never". */
+    | { kind: "overwatch" }
+    /**
+     * Stay and fire at this target whenever it can be hit. With `volleys`,
+     * only that many; with `until`, only until then; either way, then `then`
+     * (or hold). Also `then` when the target is destroyed or lost.
+     */
+    | { kind: "engage"; targetId: string; volleys?: number; until?: number; then?: RtOrder }
+    /** Get away. Moves at full speed, and does not fire; then `then`, if given. */
+    | { kind: "withdraw"; to: LatLng; route?: LatLng[]; then?: RtOrder }
+    /**
+     * Stay hidden with a target in view, not firing, until the trigger is
+     * met: then fire at once (`autoFire`) or ask (D4). `met` once it has asked.
+     */
+    | { kind: "wait"; targetId: string; trigger: Trigger; autoFire: boolean; met?: boolean }
+    /** Stay still and watch, without firing: what it sees reaches the side. */
+    | { kind: "observe" }
+    /** Hold still and search a bearing for a shooter it has not located: spotting doubled there. */
+    | { kind: "search"; bearingDeg: number; until: number }
+  );
 
 export type Roe = StandingEngagement;
 
@@ -134,6 +173,80 @@ export interface RtUnit {
   laying?: { targetId: string; readyAt: number };
   /** When each of its vehicles was knocked out: fresh wrecks still draw fire for a while. */
   losses: number[];
+
+  // ── What it knows (knowledge.ts) ────────────────────────────────────────
+  /** Enemies it knows only by a bearing: fired on from there, or heard firing. */
+  suspects: Record<string, Suspicion>;
+  /** Locate rolls against each shooter it has not found: volleys so far, and where the shooter fired from. */
+  locating: Record<string, { volleys: number; at: LatLng; time: number }>;
+  /** The last sign that an enemy it can see may have seen it (D5). */
+  lastCue: { time: number; enemyId: string; cue: string } | null;
+  /** When it last had a cue from each enemy: at most one every 30 s. */
+  cueAt: Record<string, number>;
+  /** When it last offered help to each friend (D9). */
+  helpAt: Record<string, number>;
+
+  /** The orders the player's commander (Claude) gave it, or null. */
+  orders: UnitOrders | null;
+}
+
+/** A bearing-only contact: it knows something is there, not where. */
+export interface Suspicion {
+  bearingDeg: number;
+  time: number;
+  /** Where the unit stood when it formed the suspicion. */
+  from: LatLng;
+  why: string;
+}
+
+/**
+ * Knowledge of one enemy, as one unit holds it. Moves up by spotting, a
+ * locate roll when fired on, or a friend's report; down when out of sight.
+ */
+export type Belief = "unaware" | "suspected" | "located" | "identified" | "lost";
+
+/** Whether a unit thinks the enemy knows it is there. From cues, never from the truth. */
+export type SelfBelief = "unobserved" | "possiblySeen" | "knownSeen";
+
+/** What a unit does on contact when nobody decides otherwise: the rules' fallback. */
+export type OnContact = "engage" | "observe" | "avoid" | "bypass";
+
+/** "now" breaks off a fight to comply; "whenAble" lets it finish first (D0). */
+export type Urgency = "now" | "whenAble";
+
+/** A line a unit must not cross: "stay south of the road". */
+export interface Boundary {
+  /** Which side of the line it must stay on. */
+  keep: "north" | "south" | "east" | "west";
+  /** A point on the line (east-west for north/south, north-south for east/west). */
+  at: LatLng;
+  label: string;
+}
+
+/** One step of a task: "advance to the ridge", then "overwatch the bridge". */
+export interface Phase {
+  label: string;
+  order: RtOrder;
+}
+
+/**
+ * Mission orders, written by the player's commander while the clock is
+ * stopped: a task in phases, the intent Jev weighs every decision against,
+ * an urgency, and constraints game logic enforces.
+ */
+export interface UnitOrders {
+  task: string;
+  phases: Phase[];
+  /** The phase being carried out now. */
+  phase: number;
+  intent: string;
+  urgency: Urgency;
+  /** Its rules of engagement: a constraint, enforced by game logic. */
+  roe: Roe;
+  onContact: OnContact;
+  boundaries: Boundary[];
+  by: "claude" | "heuristic" | "rules";
+  issuedAt: number;
 }
 
 /** One unit's fire on one target, since it started. */
@@ -225,7 +338,23 @@ export type RtEventKind =
   /** It has been firing for a while and doing no damage: change something? */
   | "ineffective"
   /** A long exchange of fire: a periodic check that the plan still holds. */
-  | "review";
+  | "review"
+  /** A waiting unit's trigger has been met (D4), or fired automatically. */
+  | "triggerMet"
+  /** An enemy it can see did something that may mean it has been seen (D5). */
+  | "cue"
+  /** It has fired its first volley at a target, or knocked a vehicle out (D6). */
+  | "volley"
+  /** A friend close by is under fire or losing vehicles, and this unit can help (D9). */
+  | "friendNeedsHelp"
+  /** A search of a bearing ran its course without finding the shooter (D3 again). */
+  | "searchDone"
+  /** A phase of its orders is done and the next has begun: no decision. */
+  | "phaseDone"
+  /** Its orders are done: nothing left to carry out (D10, and a flag for the player). */
+  | "outOfOrders"
+  /** New orders from the player's commander, arriving while it is in a fight (D0). */
+  | "newOrders";
 
 /** Something that happened to a unit. What a decider is asked about. */
 export interface RtEvent {
@@ -235,6 +364,14 @@ export interface RtEvent {
   detail: string;
   /** Asked about at once, cooldown or not: hit, broken, under fire at close range. */
   severe: boolean;
+  /** The enemy (or friend, for friendNeedsHelp) it is about. */
+  about?: string;
+  /** Fired on: whether this unit located the shooter (D2) or has only a bearing (D3). */
+  located?: boolean;
+  /** Fired on without locating: the bearing the fire came from. */
+  bearingDeg?: number;
+  /** For the feed only: nobody is asked about it. */
+  info?: boolean;
 }
 
 /** A shot, for the feed and the fire lines on the map. */
@@ -310,4 +447,12 @@ export interface RtOption {
   roe?: Roe;
   /** Chance per minute of damaging the enemy it is about, from where the order leaves it. */
   effect?: number;
+  /** Chance a hit gets through the face it would strike. */
+  penetrate?: number;
+  /** The exact figures behind the words, for the console only: Jev sees bands. */
+  exact?: string;
+  /** Orders other units take at the same moment: a friend's covering fire. */
+  also?: { unitId: string; order: RtOrder }[];
+  /** Standing orders it takes on with this choice (D0). */
+  orders?: UnitOrders;
 }
