@@ -1761,7 +1761,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
   // ── 11. Is it over? ───────────────────────────────────────────────────────
   //
-  // A side is beaten when half its strength is destroyed or broken — a
+  // A side is beaten when its breakpoint (half, by default) of its strength
+  // is destroyed or broken — a
   // breakpoint, not the last tank.
   const lost = (side: Side) => {
     const start = Math.max(1, prev.startStrength?.[side] ?? 0);
@@ -1772,8 +1773,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   };
   const blueLost = lost("blue");
   const redLost = lost("red");
-  const blueBeaten = blueLost >= SIDE_BREAKPOINT;
-  const redBeaten = redLost >= SIDE_BREAKPOINT;
+  const breakpoint = timing.breakpoint ?? SIDE_BREAKPOINT;
+  const blueBeaten = blueLost >= breakpoint;
+  const redBeaten = redLost >= breakpoint;
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   if (blueBeaten || redBeaten) {
     const winner: Side | null =
