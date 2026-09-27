@@ -736,9 +736,8 @@ export default function RealtimePlay() {
             ...(unit.cohesion !== "steady" ? [unit.cohesion.toUpperCase()] : []),
             ...(unit.suppression >= PINNED_AT ? ["pinned"] : unit.suppression >= SUPPRESSED_AT ? ["suppressed"] : []),
             ...(unit.posture === "hullDown" ? ["hull-down"] : []),
-            unit.orders && unit.order.kind === "hold" && unit.orders.phase >= unit.orders.phases.length - 1 &&
-            unit.orders.phases[unit.orders.phase]?.order.kind !== "hold"
-              ? "needs orders"
+            unit.orders && (unit.orders.done || unit.orders.blocked?.phase === unit.orders.phase)
+              ? unit.orders.blocked ? "stuck: needs orders" : "needs orders"
               : activityOf(unit),
           ].join(" · ")
         : "";

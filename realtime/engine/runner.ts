@@ -201,6 +201,13 @@ export class RealtimeRunner {
       for (const event of result.events) {
         const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
         this.push({ type: "event", time: event.time, side, event });
+        const stuck = this.state.units[event.unitId]?.orders?.blocked;
+        if (event.kind === "blocked" && stuck && stuck.time === event.time) {
+          this.flag(
+            { time: event.time, side, unitId: event.unitId, kind: "outOfOrders", text: `${event.unitId} cannot carry out its orders (${stuck.why}) and needs new ones` },
+            `stuck:${event.unitId}:${stuck.phase}:${this.state.units[event.unitId].orders?.issuedAt}`,
+          );
+        }
         if (event.kind === "outOfOrders") {
           this.flag({ time: event.time, side, unitId: event.unitId, kind: "outOfOrders", text: `${event.unitId} has carried out its orders and needs new ones` }, `out:${event.unitId}`);
         }
