@@ -72,7 +72,8 @@ import {
   type TroopQualityName,
 } from "../rules/forceList";
 import { HOUSE_V1 } from "../rules/ruleset";
-import { activityOf, createRealtimeState } from "./engine/engine";
+import { activityOf, createRealtimeState, describeOrder } from "./engine/engine";
+import { agoBand, beliefsOf, selfBeliefOf } from "./engine/knowledge";
 import { jevRealtimeDecider } from "./engine/jevDecider";
 import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from "./engine/orders";
 import { EVENT_STREAM_RID, foundryStreamPublisher } from "../data/eventStream";
@@ -246,6 +247,173 @@ function EndOverlay(props: {
   );
 }
 
+/** One labelled line in the inspector. */
+function Line({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 6, lineHeight: 1.45, marginBottom: 2 }}>
+      <span style={{ ...subtle, width: 74, flex: "0 0 auto" }}>{label}</span>
+      <span style={{ ...subtle, color: "#c7ccdb" }}>{children}</span>
+    </div>
+  );
+}
+
+const ROE_WORDS: Record<string, string> = {
+  never: "weapons hold",
+  ifFiredUpon: "only once fired upon",
+  withinShortRange: "anything inside short range",
+  always: "anything in reach",
+};
+
+/**
+ * One unit, as it stands: what it is doing, its orders and how far it has
+ * got, its state, what it knows and thinks, its fire, and its last decisions.
+ * An enemy seen through one side's eyes shows only what that side knows.
+ */
+function UnitInspector(props: {
+  state: RtState;
+  id: string;
+  viewpoint: Viewpoint;
+  awaitingOrders: boolean;
+  onClose: () => void;
+}) {
+  const { state, id, viewpoint } = props;
+  const fe = state.game.forceElements[id];
+  const unit = state.units[id];
+  if (!fe) return null;
+  const header = (
+    <div style={{ ...row, justifyContent: "space-between", marginBottom: 6 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: SIDE_COLOUR[fe.side] }}>
+        {fe.label} <span style={{ ...subtle }}>({fe.id})</span>
+      </span>
+      <button onClick={props.onClose} style={{ ...linkButton, color: "#8a91a8" }} aria-label="Close">
+        ✕
+      </button>
+    </div>
+  );
+
+  // Fog of war: an enemy is only what this side has seen of it.
+  if (viewpoint !== "both" && fe.side !== viewpoint) {
+    const level = state.game.sighting[viewpoint][id] ?? "none";
+    const lost = state.lastKnown?.[viewpoint]?.[id];
+    return (
+      <>
+        {header}
+        <Line label="known as">
+          {level === "full" ? "identified" : level === "none" ? (lost ? "lost contact" : "not seen") : "located, type unknown"}
+        </Line>
+        {level === "none" && lost && <Line label="last seen">{agoBand(state.time - lost.time)}</Line>}
+        {level === "full" && unit && (
+          <Line label="vehicles">
+            {unit.vehicles.fit} of {unit.vehicles.total} still fighting
+            {unit.cohesion !== "steady" ? ` · visibly ${unit.cohesion}` : ""}
+          </Line>
+        )}
+        <div style={{ ...subtle, lineHeight: 1.5, marginTop: 4 }}>Switch to the umpire view to see its orders and state.</div>
+      </>
+    );
+  }
+
+  if (fe.combatStrength <= 0 || !unit) {
+    return (
+      <>
+        {header}
+        <div style={{ ...subtle, color: "#e07a5f" }}>Destroyed.</div>
+      </>
+    );
+  }
+
+  const orders = unit.orders;
+  const suppression =
+    unit.suppression >= PINNED_AT ? "pinned" : unit.suppression >= SUPPRESSED_AT ? "suppressed" : unit.suppression > 0 ? "under some pressure" : "none";
+  const belief = selfBeliefOf(unit, state.time);
+  const e = unit.engagement;
+  const firing = e && state.time - e.lastShotAt <= 60 ? e : null;
+  const incoming = Object.entries(unit.incoming).filter(([, fire]) => state.time - fire.last <= 120);
+  const knows = beliefsOf(state, id);
+
+  return (
+    <>
+      {header}
+      <Line label="doing">
+        {activityOf(unit)} — {describeOrder(unit.order)}
+      </Line>
+      <Line label="state">
+        {unit.vehicles.fit} of {unit.vehicles.total} vehicles · {unit.cohesion} · suppression {suppression} · {unit.posture}
+      </Line>
+
+      <div style={{ ...groupTitle, marginTop: 8 }}>Orders</div>
+      {orders ? (
+        <>
+          <Line label="task">{orders.task}</Line>
+          <Line label="step">
+            {orders.done
+              ? "all done: needs new orders"
+              : `${orders.phase + 1} of ${orders.phases.length}: ${orders.phases[orders.phase]?.label ?? "—"}`}
+            {orders.blocked?.phase === orders.phase ? ` — blocked (${orders.blocked.why})` : ""}
+          </Line>
+          {orders.phases.length > 1 && (
+            <Line label="then">
+              {orders.phases
+                .slice(orders.phase + 1)
+                .map((p) => p.label)
+                .join(" → ") || "—"}
+            </Line>
+          )}
+          {orders.intent && <Line label="intent">{orders.intent}</Line>}
+          <Line label="urgency">{orders.urgency === "now" ? "now" : "when able"}</Line>
+          <Line label="fires at">{ROE_WORDS[orders.roe] ?? orders.roe}</Line>
+          <Line label="on contact">{orders.onContact}</Line>
+          {orders.boundaries.length > 0 && (
+            <Line label="limits">{orders.boundaries.map((b) => `stay ${b.keep} of ${b.label}`).join("; ")}</Line>
+          )}
+          <Line label="from">
+            {orders.by === "claude" ? "the commander" : orders.by} at {clock(orders.issuedAt)}
+          </Line>
+        </>
+      ) : (
+        <Line label="purpose">{unit.mission.purpose}</Line>
+      )}
+      {props.awaitingOrders && <div style={{ ...subtle, color: "#e8c547" }}>New orders waiting: it is being asked how to comply.</div>}
+
+      <div style={{ ...groupTitle, marginTop: 8 }}>What it knows</div>
+      <Line label="been seen?">
+        {belief === "knownSeen" ? "yes: it has been fired on" : belief === "possiblySeen" ? `perhaps: ${unit.lastCue?.enemyId} ${unit.lastCue?.cue}` : "no sign of it"}
+      </Line>
+      {knows.length === 0 ? (
+        <Line label="enemies">none known</Line>
+      ) : (
+        knows.map((k) => (
+          <Line key={k.id} label={k.belief}>
+            {"unit" in k && k.unit ? `${k.unit} ` : ""}
+            {k.belief === "suspected" ? `to the ${"bearing" in k ? k.bearing : "?"} (${"why" in k ? k.why : ""})` : k.id}
+            {"range" in k && k.range ? ` · ${k.range}` : ""}
+            {"lastSeen" in k && k.lastSeen ? ` · last seen ${k.lastSeen}` : ""}
+          </Line>
+        ))
+      )}
+
+      {(firing || incoming.length > 0) && <div style={{ ...groupTitle, marginTop: 8 }}>Fire</div>}
+      {firing && (
+        <Line label="firing on">
+          {firing.targetId} for {clock(state.time - firing.since)}: {firing.shots} volleys, {firing.hits} hits, {firing.damage} damage
+        </Line>
+      )}
+      {incoming.map(([from, fire]) => (
+        <Line key={from} label="fired on by">
+          {state.game.sighting[fe.side][from] || unit.ownSeen[from] ? from : "an unseen enemy"}: {fire.shots} volleys, {fire.damage} damage
+        </Line>
+      ))}
+
+      {unit.history.length > 0 && <div style={{ ...groupTitle, marginTop: 8 }}>Last decisions</div>}
+      {[...unit.history].reverse().map((memory, index) => (
+        <Line key={index} label={clock(memory.time)}>
+          {memory.chose} <span style={{ color: memory.by === "jev" ? "#e8c547" : "#6a7292" }}>({memory.by}; {memory.because})</span>
+        </Line>
+      ))}
+    </>
+  );
+}
+
 export default function RealtimePlay() {
   const [, setParams] = useSearchParams();
   const [phase, setPhase] = useState<Phase>("setup");
@@ -284,6 +452,10 @@ export default function RealtimePlay() {
   const [viewpoint, setViewpoint] = useState<Viewpoint>("both");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The unit shown in the inspector under the feed; chosen by clicking its counter. */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedRef = useRef<string | null>(null);
+  selectedRef.current = selectedId;
   /** The end-of-game overlay, closed to look at the battlefield. */
   const [endDismissed, setEndDismissed] = useState(false);
   /** Bumped a few times a second so the panel reads the runner again. */
@@ -373,7 +545,10 @@ export default function RealtimePlay() {
 
   const place = useCallback(
     (at: LatLng) => {
-      if (phaseRef.current !== "setup") return;
+      if (phaseRef.current !== "setup") {
+        setSelectedId(null);
+        return;
+      }
       if (!isOnBoard(at, boundsRef.current)) return;
       const brush = brushRef.current;
       const snapshot = PLATFORM_SNAPSHOT[brush.platform];
@@ -512,6 +687,7 @@ export default function RealtimePlay() {
     orderedRef.current = null;
     setDraft([]);
     setEndDismissed(false);
+    setSelectedId(null);
     setPhase("setup");
   }, [stopStream]);
 
@@ -706,6 +882,8 @@ export default function RealtimePlay() {
     node.addEventListener("click", (event) => {
       event.stopPropagation();
       if (phaseRef.current === "setup") setPlaced((current) => current.filter((one) => one.id !== id));
+      // Once the game is built: show this unit in the inspector (again to close it).
+      else setSelectedId((current) => (current === id ? null : id));
     });
 
     const marker = new maplibregl.Marker({ element: node }).setLngLat([at.lng, at.lat]).addTo(map);
@@ -721,6 +899,10 @@ export default function RealtimePlay() {
       const own = view === "both" || fe.side === view;
       const unit = state.units[id];
       node.style.opacity = unit?.cohesion === "broken" ? "0.45" : unit?.cohesion === "shaken" ? "0.7" : "1";
+      // The unit in the inspector is ringed.
+      inner.style.outline = selectedRef.current === id ? "2px solid #e8c547" : "none";
+      inner.style.outlineOffset = "3px";
+      inner.style.borderRadius = "3px";
       name.textContent = own ? label : fe.id;
       const fit = unit?.vehicles.fit ?? fe.combatStrength;
       const total = unit?.vehicles.total ?? fe.combatStrengthStart;
@@ -889,10 +1071,10 @@ export default function RealtimePlay() {
     map.flyTo({ center: [origin.lng, origin.lat], zoom: 12, duration: 600 });
   }, [bounds, origin, mapEpoch]);
 
-  // Orders generated or the viewpoint changed: redraw once.
+  // Orders generated, the viewpoint or the selected unit changed: redraw once.
   useEffect(() => {
     if (phase !== "setup") draw();
-  }, [phase, viewpoint, draw, mapEpoch]);
+  }, [phase, viewpoint, draw, mapEpoch, selectedId]);
 
   // ── Panel ─────────────────────────────────────────────────────────────────
 
@@ -1283,7 +1465,8 @@ export default function RealtimePlay() {
       </div>
 
       {phase === "running" && (
-        <div style={rightPane}>
+        <div style={{ ...rightPane, overflowY: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           {runner && runner.flags.length > 0 && (
             <>
               <div style={groupTitle}>Flags</div>
@@ -1322,6 +1505,20 @@ export default function RealtimePlay() {
               {describeEntry(entry)}
             </div>
           ))}
+          </div>
+          <div style={{ flex: "0 0 auto", maxHeight: "48%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
+            {selectedId && state ? (
+              <UnitInspector
+                state={state}
+                id={selectedId}
+                viewpoint={viewpoint}
+                awaitingOrders={runner?.awaitingOrders.includes(selectedId) ?? false}
+                onClose={() => setSelectedId(null)}
+              />
+            ) : (
+              <div style={{ ...subtle, lineHeight: 1.5 }}>Click a unit on the map to see what it is doing, its orders and what it knows.</div>
+            )}
+          </div>
         </div>
       )}
       {phase === "running" && state?.over && !endDismissed && (
