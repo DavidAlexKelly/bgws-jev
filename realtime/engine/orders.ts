@@ -29,6 +29,7 @@ import { projectForSide } from "../../lib/fogOfWar";
 import { inCover } from "../../lib/proceduralTerrain";
 import type { ForceElement, Side } from "../../lib/state";
 import { activityOf, setOrder } from "./engine";
+import { hqPicture } from "./knowledge";
 import { compass, offsetBy } from "./geometry";
 import { PINNED_AT, SUPPRESSED_AT, clock } from "./timing";
 import type {
@@ -141,7 +142,8 @@ export function referencePoints(state: RtState, side: Side): Record<string, LatL
   if (objective) refs.OBJECTIVE = objective;
   const view = projectForSide(state.game, side);
   for (const fe of view.own) if (fe.combatStrength > 0) refs[fe.id] = fe.position;
-  for (const contact of view.contacts) refs[contact.id] = contact.position;
+  // Enemies where HQ believes they are: where they were seen, not where they are.
+  for (const contact of hqPicture(state, side)) refs[contact.enemyId] = contact.at;
   for (const [id, seen] of Object.entries(state.lastKnown?.[side] ?? {})) if (!refs[id]) refs[id] = seen.at;
   return refs;
 }
@@ -187,15 +189,20 @@ export function ordersPrompt(
         ...(unit && unit.vehicles.fit < unit.vehicles.total ? { lost: unit.vehicles.total - unit.vehicles.fit } : {}),
       };
     });
-  const enemies = view.contacts.map((contact) => ({
-    id: contact.id,
-    unit: contact.sighting === "full" ? contact.label : "unidentified",
-    where: relative(contact.position, refs),
-    ...(contact.sighting === "full" && state.units[contact.id]
-      ? { vehicles: `${state.units[contact.id].vehicles.fit} of ${state.units[contact.id].vehicles.total} still fighting` }
+  // What has reached HQ, with its age and how far off it may be now: the
+  // commander plans on the picture it has, as a real one does.
+  const picture = hqPicture(state, side);
+  const enemies = picture.map((contact) => ({
+    id: contact.enemyId,
+    unit: contact.level === "full" ? (contact.label ?? "identified") : "unidentified",
+    where: relative(contact.at, refs),
+    seen: state.time - contact.seenAt < 5 ? "in sight now" : `${clock(state.time - contact.seenAt)} ago, by ${contact.from}`,
+    ...(contact.errorM >= 100 ? { mayHaveMoved: `up to ${Math.round(contact.errorM / 50) * 50} m since` } : {}),
+    ...(contact.level === "full" && state.units[contact.enemyId]
+      ? { vehicles: `${state.units[contact.enemyId].vehicles.fit} of ${state.units[contact.enemyId].vehicles.total} still fighting` }
       : {}),
   }));
-  const inSight = new Set(view.contacts.map((contact) => contact.id));
+  const inSight = new Set(picture.map((contact) => contact.enemyId));
   const lost = Object.entries(state.lastKnown?.[side] ?? {})
     .filter(([id]) => !inSight.has(id))
     .map(([id, seen]) => ({ id, unit: seen.label ?? "unidentified", lastSeen: `${relative(seen.at, refs)}, ${clock(state.time - seen.time)} ago` }));
@@ -206,7 +213,7 @@ export function ordersPrompt(
     ...(refs.OBJECTIVE ? { objective: "OBJECTIVE" } : {}),
     ...(state.plan[side] ? { currentPlan: state.plan[side] } : {}),
     yourUnits: units,
-    enemiesInSight: enemies,
+    enemiesKnown: enemies,
     ...(lost.length ? { lostContacts: lost } : {}),
     ...(options.recent?.length ? { recentEvents: options.recent.slice(-12).map((r) => `${clock(r.time)} ${r.text}`) } : {}),
     referencePoints: Object.keys(refs),

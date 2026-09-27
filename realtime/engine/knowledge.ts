@@ -269,3 +269,64 @@ const COMPASS_WORDS = ["north", "north-east", "east", "south-east", "south", "so
 export function compassWord(bearingDeg: number): string {
   return COMPASS_WORDS[Math.round((((bearingDeg % 360) + 360) % 360) / 45) % 8];
 }
+
+/** One enemy as a side's HQ knows it: where, when seen, by whom, how sure. */
+export interface HqContact {
+  enemyId: string;
+  level: "veryPartial" | "partial" | "full";
+  at: { lat: number; lng: number };
+  seenAt: number;
+  /** How far off it may be by now, metres. */
+  errorM: number;
+  from: string;
+  label?: string;
+}
+
+/**
+ * What a side's commander knows (docs/REALTIME_COMMS.md): its HQ's picture —
+ * what the HQ has seen and been told — or, with no HQ, the best any unit
+ * knows. Positions are where each enemy was seen, not where it is.
+ */
+export function hqPicture(state: RtState, side: "blue" | "red"): HqContact[] {
+  const own = Object.values(state.game.forceElements).filter(
+    (fe) => fe.side === side && fe.combatStrength > 0 && state.units[fe.id] != null,
+  );
+  const hq = own
+    .filter((fe) => (fe.commandRating ?? 0) > 0 && state.units[fe.id].cohesion !== "broken")
+    .sort((a, b) => (b.commandRating ?? 0) - (a.commandRating ?? 0) || a.id.localeCompare(b.id))[0];
+  const holders = hq ? [hq] : own;
+  const best = new Map<string, HqContact>();
+  const offer = (contact: HqContact) => {
+    const had = best.get(contact.enemyId);
+    if (!had || contact.seenAt > had.seenAt) best.set(contact.enemyId, { ...contact, label: contact.label ?? had?.label });
+  };
+  for (const holder of holders) {
+    const unit = state.units[holder.id];
+    for (const [enemyId, seen] of Object.entries(unit.ownSeen)) {
+      const enemy = state.game.forceElements[enemyId];
+      if (!enemy || enemy.combatStrength <= 0) continue;
+      offer({
+        enemyId,
+        level: seen.level,
+        at: seen.at ?? enemy.position,
+        seenAt: seen.time,
+        errorM: Math.round(trackErrorM({ level: seen.level, at: seen.at ?? enemy.position, seenAt: seen.time, receivedAt: seen.time, from: holder.id, errorM: 25, moving: seen.moving ?? false }, state.time)),
+        from: holder.id,
+        ...(seen.level === "full" ? { label: enemy.label } : {}),
+      });
+    }
+    for (const [enemyId, track] of Object.entries(unit.picture ?? {})) {
+      if ((state.game.forceElements[enemyId]?.combatStrength ?? 0) <= 0) continue;
+      offer({
+        enemyId,
+        level: track.level,
+        at: track.at,
+        seenAt: track.seenAt,
+        errorM: Math.round(trackErrorM(track, state.time)),
+        from: track.from,
+        ...(track.label ? { label: track.label } : {}),
+      });
+    }
+  }
+  return [...best.values()].sort((a, b) => a.enemyId.localeCompare(b.enemyId));
+}

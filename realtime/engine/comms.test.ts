@@ -185,7 +185,7 @@ describe("reports on the radio net", () => {
     expect(first.state.units.B1.ownSeen.R1).toBeUndefined();
   });
 
-  it("a pinned crew sends only 'under fire'", () => {
+  it("a pinned crew sends only 'under fire' and calls for help: no contact reports", () => {
     const cfg = radio();
     let state = quiet(createRealtimeState(layout(false)), cfg);
     state = { ...state, units: { ...state.units, B1: { ...state.units.B1, suppression: 90, lastIncomingAt: 0 } } };

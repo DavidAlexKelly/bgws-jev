@@ -121,7 +121,8 @@ export function queueMessage(comms: CommsState, ctx: CommsContext, draft: Draft)
     comms.pending.push(message);
     return message;
   }
-  if (unit.suppression >= PINNED_AT && draft.kind !== "underFire") return null;
+  // A pinned crew gets out only the short calls: "under fire", and "help".
+  if (unit.suppression >= PINNED_AT && draft.kind !== "underFire" && draft.kind !== "request") return null;
   const underFire = ctx.time - unit.lastIncomingAt <= 10 || unit.suppression >= SUPPRESSED_AT;
   const addressed = draft.to !== "all" ? ctx.game.forceElements[draft.to] : undefined;
   const direct = addressed != null && distanceM(addressed.position, self.position) <= RADIO_RANGE_M;

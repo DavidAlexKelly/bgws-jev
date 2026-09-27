@@ -98,7 +98,8 @@ export interface StreamRow {
     options: { id: string; summary: string; probability: number | null }[];
   } | null;
   flag: { kind: string; text: string } | null;
-  message: {
+  /** Only on message rows: streams created before radio messages have no such column. */
+  message?: {
     kind: string;
     fromId: string;
     senderId: string;
@@ -140,7 +141,6 @@ export function streamRow(entry: RtLogEntry, state: RtState, run: StreamRun, seq
     shot: null,
     decision: null,
     flag: null,
-    message: null,
   };
   switch (entry.type) {
     case "event": {

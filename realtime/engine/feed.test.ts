@@ -71,13 +71,19 @@ describe("the event stream's rows", () => {
     const { rows, entries } = await playedGame();
     expect(new Set(rows.map((r) => r.entryType))).toEqual(new Set(["event", "shot", "decision", "flag", "message"]));
     rows.forEach((row, index) => {
-      expect(Object.keys(row).sort()).toEqual(Object.keys(COLUMNS).sort());
+      // `message` is there only on message rows (older streams have no such column).
+      expect(Object.keys(row).sort()).toEqual(
+        Object.keys(COLUMNS)
+          .filter((c) => c !== "message" || row.entryType === "message")
+          .sort(),
+      );
       for (const [column, [type, nullable]] of Object.entries(COLUMNS)) {
         const value = (row as unknown as Record<string, unknown>)[column];
+        if (value === undefined && column === "message") continue;
         if (value === null) expect(nullable, column).toBe(true);
         else expect(typeof value, column).toBe(type);
       }
-      const structs = Object.keys(STRUCTS).filter((key) => (row as unknown as Record<string, unknown>)[key] !== null);
+      const structs = Object.keys(STRUCTS).filter((key) => (row as unknown as Record<string, unknown>)[key] != null);
       expect(structs).toEqual([row.entryType]);
       expect(Object.keys((row as unknown as Record<string, object>)[row.entryType]).sort()).toEqual([...STRUCTS[row.entryType]].sort());
       expect(row.sequence).toBe(index);

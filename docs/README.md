@@ -8,4 +8,5 @@
 | [REALTIME_REALISM.md](REALTIME_REALISM.md) | Making the real-time mode behave realistically: suppression and nerve, drills, the combat model from the data, spotting. |
 | [REALTIME_COMMAND_DESIGN.html](REALTIME_COMMAND_DESIGN.html) | The real-time command design: who decides what (Claude, Jev, game logic), what each unit knows, the decision points. Open in a browser. |
 | [REALTIME_COMMAND.md](REALTIME_COMMAND.md) | How that design is built: modules, declared figures, calibration, what is not done yet. |
+| [REALTIME_COMMS.md](REALTIME_COMMS.md) | What each unit knows, and how units talk: per-unit pictures, the radio net, asking friends for help (D9, D12). |
 | [EVENT_STREAM.md](EVENT_STREAM.md) | The real-time feed streamed to Foundry: the schema, and how it is sent. |
