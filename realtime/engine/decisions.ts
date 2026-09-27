@@ -42,7 +42,7 @@ import { chanceBand, chanceLocatedAfter, compassWord, rangeBand, selfBeliefOf } 
 import { closePosition, damageEffect, describeEffect, engagedBy, type Effect } from "./options";
 import type { RtConfig, RtEvent, RtOption, RtOrder, RtState, Trigger, UnitOrders } from "./types";
 
-export type DecisionPoint = "D0" | "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7" | "D8" | "D9" | "D10" | "D11";
+export type DecisionPoint = "D0" | "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7" | "D8" | "D9" | "D10" | "D11" | "D12";
 
 export const DECISION_POINTS: Record<DecisionPoint, { title: string; question: string }> = {
   D0: { title: "New orders arrive", question: "New orders have come down while it is in a fight. How does it comply?" },
@@ -57,6 +57,7 @@ export const DECISION_POINTS: Record<DecisionPoint, { title: string; question: s
   D9: { title: "Friend needs help", question: "A friend close by is in trouble and this unit knows its attacker. Help?" },
   D10: { title: "Order step done or blocked", question: "Its current step is done or it cannot go on. What next?" },
   D11: { title: "Rallied", question: "It has pulled itself together and takes orders again. What now?" },
+  D12: { title: "Request received", question: "A friend has asked it for help over the radio. How does it answer?" },
 };
 
 /**
@@ -77,6 +78,7 @@ export function decisionPointOf(events: readonly RtEvent[]): { point: DecisionPo
     ["D2", (e) => fired(e) && e.located === true],
     ["D3", (e) => fired(e) && e.located === false],
     ["D4", (e) => e.kind === "triggerMet"],
+    ["D12", (e) => e.kind === "request"],
     ["D5", (e) => e.kind === "cue"],
     ["D9", (e) => e.kind === "friendNeedsHelp"],
     ["D1", (e) => e.kind === "sighted" || e.kind === "contact"],
@@ -241,6 +243,39 @@ export function inContact(state: RtState, id: string): boolean {
   return currentEnemy(state, id) != null;
 }
 
+// ── Asking friends ────────────────────────────────────────────────────────
+
+/** Friends within this may be asked for help. */
+const ASK_RADIUS_M = 3000;
+
+/**
+ * Who this unit would ask for help against `enemyId`: the friend its orders
+ * say supports it, else the nearest steady friend in reach — preferring one
+ * that knows the enemy.
+ */
+export function helperFor(state: RtState, id: string, enemyId?: string): string | undefined {
+  const self = state.game.forceElements[id];
+  if (!self) return undefined;
+  const ready = Object.values(state.game.forceElements).filter(
+    (f) => f.side === self.side && f.id !== id && f.combatStrength > 0 && state.units[f.id]?.cohesion === "steady",
+  );
+  const supporter = ready.find((f) => state.units[f.id]?.orders?.supports === id);
+  if (supporter) return supporter.id;
+  return ready
+    .filter((f) => distanceM(f.position, self.position) <= ASK_RADIUS_M)
+    .sort(
+      (a, b) =>
+        Number(enemyId != null && knownTo(state.game, state.units, b.id, enemyId) !== "none") -
+          Number(enemyId != null && knownTo(state.game, state.units, a.id, enemyId) !== "none") ||
+        distanceM(a.position, self.position) - distanceM(b.position, self.position),
+    )[0]?.id;
+}
+
+/** A request, carried by an option: sent when the option is taken. */
+function askFor(to: string, kind: "cover" | "fire", enemyId: string | undefined, text: string): NonNullable<RtOption["message"]> {
+  return { kind: "request", to, text, request: { kind, ...(enemyId ? { enemyId } : {}) } };
+}
+
 // ── The options ───────────────────────────────────────────────────────────
 
 export interface DecisionContext {
@@ -356,13 +391,13 @@ export function optionsAt(
               .sort((a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position))[0]
           : undefined;
         if (cover && enemy) {
+          // Asked over the radio: whether and how it covers is its own call (D12).
           push({
             id: "covered",
-            summary: `break off under covering fire: ${cover.id} fires on ${enemy.id} while it pulls out to start ${task}`,
+            summary: `break off under covering fire: ask ${cover.id} to cover it while it pulls out to start ${task}`,
             order: first,
             orders,
-            // The friend covers for 90 s, then goes back to what it was doing.
-            also: [{ unitId: cover.id, order: { kind: "engage", targetId: enemy.id, until: state.time + 90, then: unrouted(state.units[cover.id].order) } }],
+            message: askFor(cover.id, "cover", enemy.id, `${id} asks ${cover.id} to cover it off against ${enemy.id}`),
           });
         }
         if (enemy && hide && canHit(self, enemy, enemy.position, config)) {
@@ -426,6 +461,28 @@ export function optionsAt(
         }
       }
       push(outOfSight(aboutKnown));
+      // With a friend to ask: fire on it together, or pull back under its cover.
+      const friend = helperFor(state, id, aboutKnown.id);
+      if (friend) {
+        const back = out.find((o) => o.id === "pullBack");
+        if (back) {
+          push({
+            ...back,
+            id: "pullBackCovered",
+            summary: `${back.summary}, asking ${friend} to cover the move`,
+            message: askFor(friend, "cover", aboutKnown.id, `${id} pulling back under fire from ${aboutKnown.id}: asks ${friend} to cover`),
+          });
+        }
+        const answer = out.find((o) => o.id === "returnFire");
+        if (answer) {
+          push({
+            ...answer,
+            id: "callFire",
+            summary: `${answer.summary}, and ask ${friend} to engage it too`,
+            message: askFor(friend, "fire", aboutKnown.id, `${id} asks ${friend} to engage ${aboutKnown.id}`),
+          });
+        }
+      }
       if (distanceM(self.position, aboutKnown.position) <= 1500 && allowedTarget(state, id, aboutKnown.id)) {
         push({
           id: "assault",
@@ -519,9 +576,15 @@ export function optionsAt(
       );
       const spot = hiddenSpot(self, aboutKnown.position, config, 400) ?? hullDownSpot(self, aboutKnown.position, config, 300);
       if (spot) {
+        const friend = helperFor(state, id, aboutKnown.id);
         push({
+          ...(friend
+            ? { message: askFor(friend, "cover", aboutKnown.id, `${id} shifting position under ${aboutKnown.id}'s eye: asks ${friend} to cover`) }
+            : {}),
           id: "fireAndMove",
-          summary: `fire and move: one more volley, then shift position (${whereWords(self.position, spot)}) before it finds you, then engage again`,
+          summary: `fire and move: one more volley, then shift position (${whereWords(self.position, spot)}) before it finds you, then engage again${
+            friend ? `, asking ${friend} to cover the move` : ""
+          }`,
           order: {
             kind: "engage",
             targetId: aboutKnown.id,
@@ -577,6 +640,57 @@ export function optionsAt(
       push(keep(`carry on (${describeActivity(state, id)})`));
       break;
     }
+    case "D12": {
+      const request = unit.requests.find((r) => r.id === event.requestId);
+      if (!request) break;
+      const enemy = request.enemyId ? state.game.forceElements[request.enemyId] : undefined;
+      const known = enemy && enemy.combatStrength > 0 && knownTo(state.game, state.units, id, enemy.id) !== "none" ? enemy : undefined;
+      const reply = (answer: "comply" | "cannot" | "partly", text: string) => ({
+        kind: "reply" as const,
+        to: request.from,
+        text,
+        reply: { requestId: request.id, answer },
+      });
+      const what = request.kind === "cover" ? `cover ${request.from}` : `fire on ${request.enemyId ?? "its attacker"}`;
+      if (known && canHit(self, known, known.position, config) && allowedTarget(state, id, known.id)) {
+        const effect = damageEffect(self, known, state, config);
+        push({
+          id: "comply",
+          summary: `comply: ${what} — engage ${nameOf(state, id, known.id)} from here: ${effectWords(effect)}`,
+          order: { kind: "engage", targetId: known.id },
+          answers: request.id,
+          message: reply("comply", `${id} to ${request.from}: complying, engaging ${known.id}`),
+          ...(effect ? { effect: effect.perMinute, exact: describeEffect(effect) } : {}),
+        });
+      } else if (known && allowedTarget(state, id, known.id)) {
+        const spot = betterShot(state, self, known, config);
+        if (spot) {
+          push({
+            id: "comply",
+            summary: `comply: ${what} — move to get a shot (${spot.why}, ${whereWords(self.position, spot.at)}), then engage ${known.id}`,
+            order: move(spot.at, { kind: "engage", targetId: known.id }),
+            answers: request.id,
+            message: reply("comply", `${id} to ${request.from}: complying, moving to engage ${known.id}`),
+          });
+        }
+      }
+      if (unit.order.kind !== "overwatch") {
+        push({
+          id: "partly",
+          summary: `partly: stay here on overwatch and fire at anything in reach, without moving`,
+          order: { kind: "overwatch" },
+          answers: request.id,
+          message: reply("partly", `${id} to ${request.from}: can't move, covering from where it is`),
+        });
+      }
+      const busy = currentEnemy(state, id);
+      push({
+        ...keep(`can't: carry on (${describeActivity(state, id)})${busy ? `, it is fighting ${busy}` : ""}`),
+        answers: request.id,
+        message: reply("cannot", `${id} to ${request.from}: can't${busy ? `, engaged with ${busy}` : ""}`),
+      });
+      break;
+    }
     case "D10": {
       if (resume && event.kind !== "outOfOrders") push({ id: "resume", summary: resume.summary, order: resume.order });
       // Its current phase cannot be done: skip to the next one, if there is one.
@@ -613,15 +727,6 @@ export function optionsAt(
   }
   if (out.length === 0) push(keep(`carry on (${describeActivity(state, id)})`));
   return withinConstraints(out, unit.orders ?? context.orders);
-}
-
-/** An order to take up again later: its planned route is stale by then, so it is planned afresh. */
-function unrouted(order: RtOrder): RtOrder {
-  if (order.kind === "move" || order.kind === "withdraw") {
-    const { route: _stale, ...rest } = order;
-    return rest as RtOrder;
-  }
-  return order;
 }
 
 /** Drop options that would cross one of the orders' lines. "keep" always stays. */
@@ -707,9 +812,10 @@ export function ruleFallback(state: RtState, id: string, point: DecisionPoint, o
       if (onContact === "avoid") return pick("pullBack", "observe");
       return pick("keep");
     case "D2":
-      if (onContact === "avoid") return pick("pullBack", "quiet");
+      if (onContact === "avoid") return pick("pullBackCovered", "pullBack", "quiet");
       if (onContact === "observe") return pick("quiet", "pullBack");
-      return inOpen() ? pick("hullDown", "returnFire", "pullBack") : pick("returnFire", "pullBack");
+      // Fight back, and bring a friend in on it when there is one to ask.
+      return inOpen() ? pick("hullDown", "callFire", "returnFire", "pullBack") : pick("callFire", "returnFire", "pullBack");
     case "D3":
       if (onContact === "avoid") return pick("pullBack", "cover");
       if (onContact === "bypass") return pick("keep");
@@ -735,6 +841,17 @@ export function ruleFallback(state: RtState, id: string, point: DecisionPoint, o
       return onContact === "engage" ? pick("help", "support", "keep") : pick("keep");
     case "D10":
       return pick("resume", "nextPhase", "overwatch");
+    case "D12": {
+      // Help a friend who asks, unless told to avoid a fight or already
+      // fighting its own battle; supporting it is part of its orders if it
+      // was told to support that unit.
+      const request = unit?.requests.find((r) => options.some((o) => o.answers === r.id));
+      const supporting = request != null && unit?.orders?.supports === request.from;
+      if (onContact === "avoid" && !supporting) return pick("partly", "keep");
+      const busy = currentEnemy(state, id);
+      if (busy && !supporting && !options.some((o) => o.id === "comply" && o.order.kind === "engage")) return pick("partly", "keep");
+      return pick("comply", "partly", "keep");
+    }
     case "D11":
       return pick("resume", "hold");
   }

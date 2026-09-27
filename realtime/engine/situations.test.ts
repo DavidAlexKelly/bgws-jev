@@ -20,7 +20,7 @@ beforeEach(() => {
 describe("the calibration set", () => {
   it("covers every decision point", () => {
     const points = new Set(SITUATIONS.map((s) => s.point));
-    for (let i = 0; i <= 11; i += 1) expect(points).toContain(`D${i}`);
+    for (let i = 0; i <= 12; i += 1) expect(points).toContain(`D${i}`);
   });
 
   for (const situation of SITUATIONS) {

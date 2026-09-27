@@ -26,6 +26,12 @@ export function describeEntry(entry: RtLogEntry): string {
   if (entry.type === "shot") return `${at}  ${entry.shot.firerId} fires on ${entry.shot.targetId}: ${entry.shot.result}`;
   if (entry.type === "event") return `${at}  ${entry.event.unitId} ${entry.event.kind}: ${entry.event.detail}`;
   if (entry.type === "flag") return `${at}  ⚑ ${entry.flag.text}`;
+  if (entry.type === "message") {
+    const m = entry.delivery.message;
+    const to = entry.delivery.to.length === 1 ? entry.delivery.to[0] : `${entry.delivery.to.length} units`;
+    const relayed = m.sender !== m.from ? ` (passed on by ${m.sender})` : "";
+    return `${at}  📻 ${m.from} → ${to}${relayed}: ${m.text}`;
+  }
   const d = entry.decision;
   const p = d.trace.probabilities?.[d.optionId];
   const who =
@@ -92,6 +98,18 @@ export interface StreamRow {
     options: { id: string; summary: string; probability: number | null }[];
   } | null;
   flag: { kind: string; text: string } | null;
+  /** Only on message rows: streams created before radio messages have no such column. */
+  message?: {
+    kind: string;
+    fromId: string;
+    senderId: string;
+    toIds: string[];
+    viaId: string | null;
+    hop: number;
+    sentAtS: number;
+    enemyId: string | null;
+    text: string;
+  } | null;
 }
 
 /** A feed entry as a stream row. `state` is the game as it stands when the entry is made. */
@@ -103,7 +121,9 @@ export function streamRow(entry: RtLogEntry, state: RtState, run: StreamRun, seq
         ? entry.shot.firerId
         : entry.type === "decision"
           ? entry.decision.unitId
-          : (entry.flag.unitId ?? null);
+          : entry.type === "message"
+            ? entry.delivery.message.from
+            : (entry.flag.unitId ?? null);
   const at = unitId ? state.game.forceElements[unitId]?.position : undefined;
   const base = {
     runId: run.runId,
@@ -177,6 +197,23 @@ export function streamRow(entry: RtLogEntry, state: RtState, run: StreamRun, seq
             summary: option.summary,
             probability: t.probabilities?.[option.id] ?? null,
           })),
+        },
+      };
+    }
+    case "message": {
+      const m = entry.delivery.message;
+      return {
+        ...base,
+        message: {
+          kind: m.kind,
+          fromId: m.from,
+          senderId: m.sender,
+          toIds: entry.delivery.to,
+          viaId: m.via ?? null,
+          hop: m.hop,
+          sentAtS: Math.round(m.sentAt),
+          enemyId: m.contact?.enemyId ?? m.underFire?.shooterId ?? m.request?.enemyId ?? null,
+          text: m.text,
         },
       };
     }

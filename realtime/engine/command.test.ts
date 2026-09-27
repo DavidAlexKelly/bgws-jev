@@ -509,8 +509,13 @@ describe("the commander's orders", () => {
     const state = createRealtimeState(
       game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(500, 0)), fe("R1", "red", at(0, 2000)), fe("R2", "red", at(0, 9000))]),
     );
-    // Blue has sighted R1 only.
-    return { ...state, game: { ...state.game, sighting: { blue: { R1: "full" as const }, red: {} } } };
+    // Blue has sighted R1 only: B1 saw it a minute ago.
+    return {
+      ...state,
+      time: 60,
+      game: { ...state.game, sighting: { blue: { R1: "full" as const }, red: {} } },
+      units: { ...state.units, B1: { ...state.units.B1, ownSeen: { R1: { time: 0, level: "full" as const, at: at(0, 2000), moving: true } } } },
+    };
   };
 
   it("builds a prompt from what the side knows, with reference points and the player's guidance", () => {
@@ -519,6 +524,9 @@ describe("the commander's orders", () => {
     expect(prompt).toMatch(/Reference points: OBJECTIVE, B1, B2, R1/);
     expect(prompt).toMatch(/The player's guidance, which comes first: hold the bridge/);
     expect(prompt).not.toMatch(/R2/);
+    // HQ's picture: when it was seen, by whom, and how far it may have moved.
+    expect(prompt).toMatch(/"seen": "1:00 ago, by B1"/);
+    expect(prompt).toMatch(/"mayHaveMoved": "up to \d+ m since"/);
   });
 
   it("reads orders, checks every field, and says what it dropped", () => {

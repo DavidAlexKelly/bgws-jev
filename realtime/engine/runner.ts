@@ -37,8 +37,9 @@ import { distanceM } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
 import { ruleDecider } from "./deciders";
+import type { Delivery } from "./comms";
 import { decisionPointOf, inContact, optionsAt, ruleFallback } from "./decisions";
-import { knownEnemies, remember, setOrder, tick } from "./engine";
+import { knownEnemies, remember, sendMessage, setOrder, tick } from "./engine";
 import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
 
 /** Something the player should know about, while the clock runs. */
@@ -63,7 +64,9 @@ export type RtLogEntry =
       /** When it was asked for, and when it took effect. */
       askedAt: number;
     }
-  | { type: "flag"; time: number; side: Side; flag: RtFlag };
+  | { type: "flag"; time: number; side: Side; flag: RtFlag }
+  /** A radio message, as it was heard (comms.ts). */
+  | { type: "message"; time: number; side: Side; delivery: Delivery };
 
 interface InFlight {
   side: Side;
@@ -196,6 +199,9 @@ export class RealtimeRunner {
       await this.applyDue();
       const result = tick(this.state, this.config);
       this.state = result.state;
+      for (const delivery of result.messages) {
+        this.push({ type: "message", time: delivery.time, side: delivery.message.side, delivery });
+      }
       for (const shot of result.shots) {
         const side = this.state.game.forceElements[shot.firerId]?.side ?? "blue";
         this.push({ type: "shot", time: shot.time, side, shot });
@@ -374,6 +380,30 @@ export class RealtimeRunner {
               ? { ...option.order, until: current.until, then: current.then }
               : option.order;
           this.state = setOrder(this.state, unitId, order, this.config, option.roe ? { roe: option.roe } : {});
+        }
+        // A request or reply it sends with this choice goes on the net; a
+        // request it has answered is off its list.
+        if (option.message) {
+          const m = option.message;
+          this.state = sendMessage(
+            this.state,
+            {
+              kind: m.kind,
+              from: unitId,
+              to: m.to,
+              text: m.text,
+              ...(m.request ? { request: { ...m.request, id: this.state.comms.nextId, text: m.text } } : {}),
+              ...(m.reply ? { reply: m.reply } : {}),
+            },
+            this.config,
+          );
+        }
+        if (option.answers != null) {
+          const u = this.state.units[unitId];
+          this.state = {
+            ...this.state,
+            units: { ...this.state.units, [unitId]: { ...u, requests: u.requests.filter((r) => r.id !== option.answers) } },
+          };
         }
         // A friend's covering fire, ordered with it.
         for (const also of option.also ?? []) {

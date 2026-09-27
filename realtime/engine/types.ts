@@ -142,7 +142,24 @@ export interface RtUnit {
   /** Who has fired at THIS unit, and when — for self-defence and threat. */
   attackers: Record<string, number>;
   /** Enemies this unit has seen itself — at once, before any report reaches its side. */
-  ownSeen: Record<string, { time: number; level: ReportLevel }>;
+  ownSeen: Record<string, { time: number; level: ReportLevel; at?: LatLng; moving?: boolean }>;
+  /**
+   * What it has been TOLD about each enemy (comms.ts): where it was reported,
+   * when it was seen, by whom, and how sure. A snapshot that goes stale — not
+   * where the enemy is now. Its own sightings are `ownSeen`.
+   */
+  picture: Record<string, Track>;
+  /** When it last reported each enemy, so it does not repeat itself. */
+  lastReported: Record<string, number>;
+  /** When it last reported being under fire, and last sent a situation report. */
+  lastUnderFireReportAt: number;
+  lastSitrepAt: number;
+  /** The last few messages it heard: friends under fire, requests, replies. */
+  heard: { time: number; from: string; kind: MessageKind; text: string }[];
+  /** What each friend last said about itself (situation reports). */
+  friendStatus: Record<string, { time: number; text: string }>;
+  /** Requests from friends it has not yet answered (D12). */
+  requests: RtRequest[];
   /** Sim time a friend close by was destroyed or broke. */
   lastFriendLostAt: number;
   posture: Posture;
@@ -255,6 +272,8 @@ export interface UnitOrders {
   blocked?: { phase: number; time: number; why: string };
   /** Every phase carried out: it waits for new orders. */
   done?: boolean;
+  /** The unit it supports: that unit's requests come to it first. */
+  supports?: string;
 }
 
 /** One unit's fire on one target, since it started. */
@@ -284,12 +303,65 @@ export interface DecisionMemory {
 
 export type ReportLevel = "veryPartial" | "partial" | "full";
 
-/** A sighting on its way from the unit that made it to the rest of its side. */
-export interface ContactReport {
-  side: Side;
-  enemyId: string;
+/** A reported enemy, as one unit holds it. */
+export interface Track {
   level: ReportLevel;
-  dueAt: number;
+  /** Where it was when seen. */
+  at: LatLng;
+  /** When it was seen (by the observer), and when this unit heard. */
+  seenAt: number;
+  receivedAt: number;
+  /** Who saw it, and which HQ passed it on. */
+  from: string;
+  via?: string;
+  /** How far off the report may be when made, metres; it grows with age. */
+  errorM: number;
+  /** Moving when seen: it may be much further from `at` by now. */
+  moving: boolean;
+  label?: string;
+}
+
+export type MessageKind = "contact" | "underFire" | "sitrep" | "request" | "reply";
+
+/** What a request asks: cover my move, or fire on this enemy. */
+export interface RtRequest {
+  id: number;
+  time: number;
+  from: string;
+  kind: "cover" | "fire";
+  enemyId?: string;
+  text: string;
+}
+
+/** One radio message (comms.ts). Structured, not free text. */
+export interface RtMessage {
+  id: number;
+  side: Side;
+  kind: MessageKind;
+  /** Who sent it first, and who is transmitting it now (an HQ, when relayed). */
+  from: string;
+  sender: string;
+  /** Addressed to one unit, or to everyone on the net. */
+  to: string | "all";
+  /** The HQ that will pass it on, if it goes by way of one. */
+  via?: string;
+  sentAt: number;
+  /** Ready to transmit (composed), and delivered. */
+  readyAt: number;
+  dueAt?: number;
+  hop: 1 | 2;
+  text: string;
+  contact?: { enemyId: string; level: ReportLevel; at: LatLng; seenAt: number; errorM: number; moving: boolean; label?: string };
+  underFire?: { shooterId?: string; bearingDeg?: number; lostNow: number };
+  request?: Omit<RtRequest, "time" | "from">;
+  reply?: { requestId: number; answer: "comply" | "cannot" | "partly" };
+}
+
+/** The radio net: messages waiting or on the air, and when each side's net is next free. */
+export interface CommsState {
+  pending: RtMessage[];
+  nextId: number;
+  busyUntil: Record<Side, number>;
 }
 
 /** Where an enemy was last seen, once nobody can see it any more. */
@@ -314,8 +386,8 @@ export interface RtState {
   lastSeen: Record<Side, Record<string, number>>;
   /** When each enemy last fired at each side, for the "ifFiredUpon" rule. */
   lastFiredOn: Record<Side, Record<string, number>>;
-  /** Sightings made but not yet reported to the side. */
-  reports: ContactReport[];
+  /** The radio nets (comms.ts). */
+  comms: CommsState;
   /** Faded contacts: where they were last seen. */
   lastKnown: Record<Side, Record<string, LastKnown>>;
   /** Combat strength each side started with, for the side breakpoint. */
@@ -362,7 +434,11 @@ export type RtEventKind =
   /** Its orders are done: nothing left to carry out (D10, and a flag for the player). */
   | "outOfOrders"
   /** New orders from the player's commander, arriving while it is in a fight (D0). */
-  | "newOrders";
+  | "newOrders"
+  /** A friend asks for cover or for fire on an enemy (D12). */
+  | "request"
+  /** A friend answered a request: for the feed. */
+  | "reply";
 
 /** Something that happened to a unit. What a decider is asked about. */
 export interface RtEvent {
@@ -380,6 +456,8 @@ export interface RtEvent {
   bearingDeg?: number;
   /** For the feed only: nobody is asked about it. */
   info?: boolean;
+  /** The request it is about (D12). */
+  requestId?: number;
 }
 
 /** A shot, for the feed and the fire lines on the map. */
@@ -458,6 +536,12 @@ export interface RtConfig {
    * raster's own answer is taken when there is one.
    */
   isPassable?: (point: LatLng) => boolean;
+  /**
+   * How information travels (comms.ts). "perfect": every report reaches the
+   * whole side after `reportDelayS`. "radio": a net with HQ relay, delays,
+   * one talker at a time and range. Default "perfect".
+   */
+  comms?: "perfect" | "radio";
 }
 
 /** A choice a decider may make for one unit. Generated by the rules. */
@@ -477,4 +561,14 @@ export interface RtOption {
   also?: { unitId: string; order: RtOrder }[];
   /** Standing orders it takes on with this choice (D0). */
   orders?: UnitOrders;
+  /** A request or reply it sends with this choice: "cover me", "complying" (comms.ts). */
+  message?: {
+    kind: "request" | "reply";
+    to: string;
+    text: string;
+    request?: { kind: "cover" | "fire"; enemyId?: string };
+    reply?: { requestId: number; answer: "comply" | "cannot" | "partly" };
+  };
+  /** D12: the request this choice answers. */
+  answers?: number;
 }

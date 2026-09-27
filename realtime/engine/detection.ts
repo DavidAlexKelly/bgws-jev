@@ -43,6 +43,8 @@ const FACTORS = {
   observerSearching: 2,
   /** Still and watching, not firing: observing, or waiting for a trigger. */
   observerWatching: 1.5,
+  /** Told where to look: a friend's report puts it in that direction (comms.ts). */
+  observerCued: 3,
 } as const;
 
 export type DetectionConditions = Partial<Record<keyof typeof FACTORS, boolean>>;

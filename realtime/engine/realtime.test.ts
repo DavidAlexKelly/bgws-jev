@@ -280,17 +280,17 @@ describe("meeting the enemy", () => {
     expect(distanceM(after.game.forceElements.B1.position, after.game.forceElements.R1.position)).toBeGreaterThan(200);
   });
 
-  it("sees anything close in the open without a roll; the side hears after the report delay", () => {
+  it("sees anything close in the open without a roll; a friend hears after the report delay", () => {
     const cfg = config();
-    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("R1", "red", at(0, 400))]));
-    // Neither fires: the test is about seeing, not about who wins.
-    state = setOrder(state, "B1", { kind: "hold" }, cfg, { roe: "never" });
-    state = setOrder(state, "R1", { kind: "hold" }, cfg, { roe: "never" });
+    // B2 is behind a ridge of distance: it cannot see R1 itself.
+    let state = createRealtimeState(game([fe("B1", "blue", at(0, 0)), fe("B2", "blue", at(0, -2900)), fe("R1", "red", at(0, 400))]));
+    // Nobody fires: the test is about seeing, not about who wins.
+    for (const id of ["B1", "B2", "R1"]) state = setOrder(state, id, { kind: "hold" }, cfg, { roe: "never" });
     const after = tick(state, cfg).state;
     expect(after.units.B1.ownSeen.R1?.level).toBe("full");
-    expect(after.game.sighting.blue.R1 ?? "none").toBe("none");
+    expect(after.units.B2.picture.R1).toBeUndefined();
     const reported = run(after, cfg, DEFAULT_TIMING.reportDelayS).state;
-    expect(reported.game.sighting.blue.R1).toBe("full");
+    expect(reported.units.B2.picture.R1).toMatchObject({ level: "full", from: "B1" });
   });
 
   it("the rules engage what they sight instead of carrying on", async () => {

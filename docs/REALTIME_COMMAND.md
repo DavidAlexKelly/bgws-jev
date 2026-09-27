@@ -6,13 +6,15 @@ The design is in [REALTIME_COMMAND_DESIGN.html](REALTIME_COMMAND_DESIGN.html). O
 
 | Who | Decides | When | Code |
 |---|---|---|---|
-| Commander (Claude) | Each unit's mission orders: task in phases, intent, urgency, rules of engagement, lines not to cross, actions on contact | Only when the player presses **Generate orders**, before the start or while paused. Never on events, never on a timer. | `realtime/engine/orders.ts`; the `bgwsCommanderRealtimeOrders` query in `llmfunctions.ts` |
-| Unit leader (Jev) | One option at a decision point, always inside the orders | Only at decision points D0–D11 | `realtime/engine/decisions.ts`, `jevDecider.ts` |
-| Game logic | Movement, spotting, the locate roll, cues, triggers, fire, hits, morale, drills, phases, constraints | Every second | `realtime/engine/engine.ts`, `knowledge.ts` |
+| Commander (Claude) | Each unit's mission orders: task in phases, intent, urgency, rules of engagement, lines not to cross, actions on contact, and which unit it supports. It plans from its HQ's picture, not the truth. | Only when the player presses **Generate orders**, before the start or while paused. Never on events, never on a timer. | `realtime/engine/orders.ts`; the `bgwsCommanderRealtimeOrders` query in `llmfunctions.ts` |
+| Unit leader (Jev) | One option at a decision point, always inside the orders. This includes answering a friend's request (D12) and asking a friend for help. | Only at decision points D0–D12 | `realtime/engine/decisions.ts`, `jevDecider.ts` |
+| Game logic | Movement, spotting, the locate roll, cues, triggers, fire, hits, morale, drills, phases, constraints. Also each unit's own picture of the enemy, and the radio net that carries reports and requests. | Every second | `realtime/engine/engine.ts`, `knowledge.ts`, `comms.ts` |
+
+Communication between units and what each unit knows are covered in [REALTIME_COMMS.md](REALTIME_COMMS.md).
 
 ## What each unit knows (`knowledge.ts`)
 
-- **About each enemy:** `beliefOf(state, unit, enemy)` returns *unaware*, *suspected* (a bearing only), *located*, *identified* or *lost* (a last known position and its age). Jev sees these beliefs through `beliefsOf`, never the truth.
+- **About each enemy:** `beliefOf(state, unit, enemy)` returns *unaware*, *suspected* (a bearing only), *located*, *identified* or *lost* (a last known position and its age). It comes from what this unit has seen itself or been told by radio, not from what its side knows ([REALTIME_COMMS.md](REALTIME_COMMS.md)). Jev sees these beliefs through `beliefsOf`, never the truth. Each belief says where the information came from: in sight, seen a while ago, or reported by another unit (with its age and how far off it may be).
 - **The locate roll.** It replaces the old automatic muzzle-flash reveal. When fired on by a shooter it does not know, the target always gets a bearing (`suspects`). It then rolls to locate the shooter:
   - The roll is a hazard rate: 0.7 per volley at 1 km, falling with the square of range.
   - Multipliers: ×0.5 if the shooter is hull-down, ×0.4 if it is in cover, ×2 if the target is searching that bearing, ×0.6 if the target is suppressed, ×0.3 if pinned.
@@ -48,7 +50,7 @@ New order kinds:
 
 `decisionPointOf(events)` picks the most pressing point, in this order:
 
-D0 > D2 > D3 > D4 > D5 > D9 > D1 > D6 > D8 > D7 > D10 > D3 (search done) > D11
+D0 > D2 > D3 > D4 > D12 > D5 > D9 > D1 > D6 > D8 > D7 > D10 > D3 (search done) > D11
 
 Anything else asks nobody: `exposed`, `friendLost`, `moraleDrop`, `review`, and informational events.
 
@@ -56,19 +58,20 @@ Anything else asks nobody: `exposed`, `friendLost`, `moraleDrop`, `review`, and 
 
 | DP | Option ids | Rules (onContact = engage) |
 |---|---|---|
-| D0 now | comply · covered · fireAndBack | comply |
+| D0 now | comply · covered (asks a friend by radio to cover it) · fireAndBack | comply |
 | D0 when able | comply · finish (to the target's end or 2 min) · breakContact | finish |
-| D1 | keep · engage · wait*n* / wait*n*:fire · better · observe · pullBack | engage if likely to tell; lie in wait if still, unseen, and the shot is poor or would bounce |
-| D2 | returnFire · hullDown · pullBack · assault · quiet | hull-down, then return fire |
+| D1 | keep · engage · wait*n* / wait*n*:fire · better · observe · pullBack | engage if likely to tell; lie in wait if still, unseen, and the shot is poor or would bounce. Also raised when a report of an enemy it knew nothing of arrives. |
+| D2 | returnFire · hullDown · pullBack · pullBackCovered · callFire · assault · quiet | hull-down, then return fire, asking a friend to engage too (callFire) when there is one |
 | D3 | search · cover · pullBack · keep | cover in the open, else search |
 | D4 | fire · closer · letPass | fire |
 | D5 | fireFirst · keep · relocate · pullBack | fire first only on a good shot, else keep |
-| D6 | keep · fireAndMove · shift · quiet · pullBack | keep |
+| D6 | keep · fireAndMove (asking a friend to cover the move, if there is one) · shift · quiet · pullBack | keep |
 | D7 | resume · watch · regain · shift | shift if there is a target, else resume |
 | D8 | better · shift · quiet · pullBack · keep | better |
-| D9 | help · support · keep | help |
+| D9 | help · support · keep | help. Raised when a friend's "under fire" report arrives by radio. |
 | D10 | resume · hold · overwatch | resume, else overwatch |
 | D11 | resume · hold · join | resume |
+| D12 | comply (engage from here, or move to get a shot) · partly (overwatch from here) · keep (can't) | comply, unless it avoids fights or is in its own fight with nothing to hit; always comply if it supports the asker |
 
 Rules that keep it sane, as built in `runner.ts`:
 
@@ -145,6 +148,5 @@ Set `minConfidence` in `jevDecider.ts` (0.25 today) from that table. It has not 
 
 ## Not yet
 
-- Communication between units (reports up, requests between friends): deferred by decision.
 - The "reaches a place" trigger exists in the engine, but is not yet offered as an option.
 - Jev's confidence threshold is still to be calibrated (above).

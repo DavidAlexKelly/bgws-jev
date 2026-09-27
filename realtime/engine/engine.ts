@@ -87,6 +87,20 @@ import {
   SUPPRESSION_GRACE_S,
 } from "./timing";
 import {
+  ALREADY_REPORTED_S,
+  REREPORT_S,
+  SIGHTED_ERROR_M,
+  SITREP_S,
+  UNDER_FIRE_REPORT_S,
+  emptyComms,
+  queueMessage,
+  stepComms,
+  trackErrorM,
+  type CommsContext,
+  type Delivery,
+  type MessageDraft,
+} from "./comms";
+import {
   CUE_INTERVAL_S,
   CUE_RANGE_M,
   HEARD_M,
@@ -98,6 +112,7 @@ import {
 } from "./knowledge";
 import type {
   Boundary,
+  CommsState,
   Cohesion,
   DecisionMemory,
   MoveMode,
@@ -151,10 +166,6 @@ const SPEED: Record<MoveMode | "withdraw", number> = {
 
 /** A search covers this many degrees either side of its bearing. */
 export const SEARCH_ARC_DEG = 45;
-/** Friends within this are the ones a unit can help (D9). */
-const HELP_RADIUS_M = 1500;
-/** A unit is offered the chance to help the same friend at most this often. */
-const HELP_INTERVAL_S = 60;
 
 /** Suppression one shot adds, before cover and quality. */
 const SUPPRESSION_FOR = { miss: 8, suppress: 18, hit: 30, damaged: 15 };
@@ -163,6 +174,8 @@ export interface TickResult {
   state: RtState;
   events: RtEvent[];
   shots: RtShot[];
+  /** Radio messages delivered this second (comms.ts). */
+  messages: Delivery[];
 }
 
 /** "3:05" for a span of seconds. */
@@ -206,8 +219,9 @@ export function canHit(enemy: ForceElement, target: ForceElement, at: LatLng, co
 }
 
 /**
- * What THIS unit knows of an enemy: its side's picture, or better if it has
- * seen the enemy itself and the report has not gone round yet.
+ * What THIS unit knows of an enemy: what it has seen itself, or what it has
+ * been told (comms.ts) — not what its side as a whole knows. A report takes
+ * time to arrive, and some never do.
  */
 export function knownTo(
   game: GameState,
@@ -216,9 +230,30 @@ export function knownTo(
   enemyId: string,
 ): SightingLevel {
   const fe = game.forceElements[id];
-  if (!fe) return "none";
-  const own: SightingLevel = units[id]?.ownSeen[enemyId]?.level ?? "none";
-  return higher(sightingOf(game, fe.side, enemyId), own);
+  const unit = units[id];
+  if (!fe || !unit) return "none";
+  const own: SightingLevel = unit.ownSeen[enemyId]?.level ?? "none";
+  const told: SightingLevel = unit.picture?.[enemyId]?.level ?? "none";
+  return higher(own, told);
+}
+
+/** Has this unit seen the enemy itself (recently enough to still be tracking it)? It may fire only then. */
+export function seesItself(units: Record<string, RtUnit>, id: string, enemyId: string): boolean {
+  return units[id]?.ownSeen[enemyId] != null;
+}
+
+/** What each side knows, as a whole: the best any of its units knows. For the map and for fog of war. */
+export function sidePictureLevels(game: GameState, units: Record<string, RtUnit>, side: Side): Record<string, SightingLevel> {
+  const out: Record<string, SightingLevel> = {};
+  for (const fe of Object.values(game.forceElements)) {
+    if (fe.side !== side || fe.combatStrength <= 0) continue;
+    for (const enemy of Object.values(game.forceElements)) {
+      if (enemy.side === side || enemy.combatStrength <= 0) continue;
+      const level = knownTo(game, units, fe.id, enemy.id);
+      if (level !== "none" && (!out[enemy.id] || SIGHT_RANK[level] > SIGHT_RANK[out[enemy.id]])) out[enemy.id] = level;
+    }
+  }
+  return out;
 }
 
 /** Living enemies this unit knows about. */
@@ -335,6 +370,13 @@ function freshUnit(fe: ForceElement): RtUnit {
     cueAt: {},
     helpAt: {},
     orders: null,
+    picture: {},
+    lastReported: {},
+    lastUnderFireReportAt: -Infinity,
+    lastSitrepAt: 0,
+    heard: [],
+    friendStatus: {},
+    requests: [],
   };
 }
 
@@ -373,13 +415,26 @@ export function createRealtimeState(game: GameState): RtState {
       if (level !== "none") lastSeen[side][id] = 0;
     }
   }
+  // Contacts on the board at the start are in view of the whole side: each
+  // of its units has them in sight, as if it had spotted them itself.
+  for (const [index, fe] of Object.values(game.forceElements).entries()) {
+    const unit = units[fe.id];
+    // Situation reports are staggered, so a whole side does not call in at once.
+    unit.lastSitrepAt = -((index * 37) % 120);
+    for (const [enemyId, level] of Object.entries(game.sighting[fe.side] ?? {})) {
+      const enemy = game.forceElements[enemyId];
+      if (level === "none" || !enemy) continue;
+      unit.ownSeen[enemyId] = { time: 0, level: level as ReportLevel, at: enemy.position, moving: false };
+      unit.lastReported[enemyId] = 0;
+    }
+  }
   return {
     time: 0,
     game: { ...game, forceElements, phase: "arcAction" },
     units,
     lastSeen,
     lastFiredOn: { blue: {}, red: {} },
-    reports: [],
+    comms: emptyComms(),
     lastKnown: { blue: {}, red: {} },
     startStrength,
     plan: {},
@@ -428,6 +483,36 @@ export function nearestPassable(fe: ForceElement, config: RtConfig, toward?: Lat
     }
   }
   return null;
+}
+
+/**
+ * Send a message from outside the tick — a request or reply that a leader's
+ * choice carries (decisions.ts, applied by the runner). It goes on the net
+ * like any other.
+ */
+export function sendMessage(state: RtState, draft: MessageDraft, config: RtConfig): RtState {
+  const comms: CommsState = {
+    pending: [...state.comms.pending],
+    nextId: state.comms.nextId,
+    busyUntil: { ...state.comms.busyUntil },
+  };
+  // A request is known by the id it is sent under.
+  const withId: MessageDraft =
+    draft.request && draft.request.id == null ? { ...draft, request: { ...draft.request, id: comms.nextId } } : draft;
+  queueMessage(
+    comms,
+    {
+      time: state.time,
+      game: state.game,
+      units: state.units,
+      config,
+      setUnit: () => {},
+      emit: () => {},
+      known: (id, enemyId) => knownTo(state.game, state.units, id, enemyId),
+    },
+    withId,
+  );
+  return { ...state, comms };
 }
 
 /** Give a unit a new order. Resets what it is already exposed to, and any bounding. */
@@ -571,7 +656,7 @@ export function triggerMet(
 }
 
 export function tick(prev: RtState, config: RtConfig): TickResult {
-  if (prev.over) return { state: prev, events: [], shots: [] };
+  if (prev.over) return { state: prev, events: [], shots: [], messages: [] };
 
   const timing = config.timing;
   const rng = config.rng;
@@ -582,7 +667,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   const lastSeen = { blue: { ...prev.lastSeen.blue }, red: { ...prev.lastSeen.red } };
   const lastFiredOn = { blue: { ...prev.lastFiredOn.blue }, red: { ...prev.lastFiredOn.red } };
   const lastKnown = { blue: { ...prev.lastKnown.blue }, red: { ...prev.lastKnown.red } };
-  let reports = [...prev.reports];
+  // The nets: a working copy, changed only here.
+  const comms: CommsState = {
+    pending: [...(prev.comms?.pending ?? [])].map((m) => ({ ...m })),
+    nextId: prev.comms?.nextId ?? 1,
+    busyUntil: { ...(prev.comms?.busyUntil ?? { blue: 0, red: 0 }) },
+  };
+  const messages: Delivery[] = [];
   const events: RtEvent[] = [];
   const shots: RtShot[] = [];
 
@@ -649,26 +740,55 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   };
 
-  /** A unit saw an enemy: it knows at once; its side hears after the report delay. */
+  /** A unit saw an enemy: it knows at once; the rest of its side hears when its report arrives (comms.ts). */
   const observe = (observerId: string, enemyId: string, level: ReportLevel) => {
     const side = fe(observerId).side;
+    const before = known(observerId, enemyId);
     const own = units[observerId].ownSeen[enemyId];
     const { [enemyId]: _found, ...suspects } = units[observerId].suspects;
     const { [enemyId]: _done, ...locating } = units[observerId].locating;
+    const enemy = fe(enemyId);
+    const moving = units[enemyId]?.lastMovedAt === time;
+    const seenLevel = own ? higher(own.level, level) : level;
     setUnit(observerId, {
       ownSeen: {
         ...units[observerId].ownSeen,
-        [enemyId]: { time, level: own ? higher(own.level, level) : level },
+        [enemyId]: { time, level: seenLevel, at: enemy.position, moving },
       },
       ...(_found || _done ? { suspects, locating } : {}),
     });
     lastSeen[side][enemyId] = time;
-    if (SIGHT_RANK[sightingOf(game, side, enemyId)] >= SIGHT_RANK[level]) return;
-    if (reports.some((r) => r.side === side && r.enemyId === enemyId && SIGHT_RANK[r.level] >= SIGHT_RANK[level])) {
-      return;
-    }
-    reports.push({ side, enemyId, level, dueAt: time + timing.reportDelayS });
+    // Report it: news, better news, or an update on one still in sight — not
+    // if a friend has just reported the same.
+    const unit = units[observerId];
+    const isNews = SIGHT_RANK[seenLevel] > SIGHT_RANK[before];
+    const due = time - (unit.lastReported[enemyId] ?? -Infinity) >= REREPORT_S;
+    const told = unit.picture[enemyId];
+    const alreadyHeard =
+      told != null && told.from !== observerId && time - told.seenAt <= ALREADY_REPORTED_S && SIGHT_RANK[told.level] >= SIGHT_RANK[seenLevel];
+    if (!isNews && (!due || alreadyHeard)) return;
+    setUnit(observerId, { lastReported: { ...unit.lastReported, [enemyId]: time } });
+    const where = compassWord(bearingDeg(fe(observerId).position, enemy.position));
+    queueMessage(comms, commsContext(), {
+      kind: "contact",
+      from: observerId,
+      to: "all",
+      text: `contact: ${seenLevel === "full" ? enemy.label : "unidentified"} (${enemyId}), ${Math.round(
+        distanceM(fe(observerId).position, enemy.position),
+      )} m ${where} of ${observerId}${moving ? ", moving" : ""}`,
+      contact: {
+        enemyId,
+        level: seenLevel,
+        at: enemy.position,
+        seenAt: time,
+        errorM: SIGHTED_ERROR_M,
+        moving,
+        ...(seenLevel === "full" ? { label: enemy.label } : {}),
+      },
+    });
   };
+  /** The net's view of this tick. */
+  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known });
 
   /**
    * React to contact (Battle Drill 1): return fire at once, get into the
@@ -748,13 +868,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     return `; ${answer} and halted`;
   };
 
-  // ── 1. Contact reports reach the side ─────────────────────────────────────
-  for (const report of reports.filter((r) => r.dueAt <= time)) {
-    if (!isAlive(game, report.enemyId)) continue;
-    if (SIGHT_RANK[sightingOf(game, report.side, report.enemyId)] >= SIGHT_RANK[report.level]) continue;
-    game = applyEffects(game, [{ kind: "sighting", viewer: report.side, feId: report.enemyId, to: report.level }]);
-  }
-  reports = reports.filter((r) => r.dueAt > time);
+  // ── 1. The radio nets ─────────────────────────────────────────────────────
+  //
+  // Messages that have arrived are delivered — reports into each hearer's
+  // picture, requests and a friend's trouble as events — and the next
+  // message goes on the air (comms.ts).
+  messages.push(...stepComms(comms, commsContext()));
 
   // ── 2. Movement ───────────────────────────────────────────────────────────
   //
@@ -966,13 +1085,17 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         if (range > LOS_CAP_M) continue;
         if (!sees(observer.position, enemy.position)) continue;
 
-        // Already found (by this crew, or reported to it): tracked while in
-        // sight, no roll — and identified once close enough to tell.
-        const before = known(observerId, enemyId);
-        if (before !== "none") {
-          observe(observerId, enemyId, before === "full" || range <= IDENTIFY_M ? "full" : (before as ReportLevel));
+        // Already found by this crew: tracked while in sight, no roll — and
+        // identified once close enough to tell. Only being TOLD of it is not
+        // enough: it still has to be found, though knowing where to look helps.
+        const ownSighting = units[observerId].ownSeen[enemyId];
+        if (ownSighting) {
+          const was = higher(ownSighting.level, (units[observerId].picture[enemyId]?.level ?? "veryPartial") as ReportLevel);
+          observe(observerId, enemyId, was === "full" || range <= IDENTIFY_M ? "full" : was);
           continue;
         }
+        const told = units[observerId].picture[enemyId];
+        const cued = told != null && distanceM(told.at, enemy.position) <= trackErrorM(told, time) + 300;
 
         // Not yet found: a chance per second (detection.ts).
         const mine = units[observerId];
@@ -992,12 +1115,16 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
               mine.order.kind === "search" &&
               bearingDeltaDeg(mine.order.bearingDeg, bearingDeg(observer.position, enemy.position)) <= SEARCH_ARC_DEG,
             observerWatching: mine.order.kind === "observe" || mine.order.kind === "wait",
+            observerCued: cued,
           },
           timing.tickS,
         );
         if (p < 1 && rng.int(1_000_000) >= p * 1_000_000) continue;
-        const level: ReportLevel = range <= IDENTIFY_M ? "full" : "partial";
+        const knewOf = told != null;
+        const level: ReportLevel = range <= IDENTIFY_M || told?.level === "full" ? "full" : "partial";
         observe(observerId, enemyId, level);
+        // Found what it had been told of: no new contact, and nothing to decide.
+        if (knewOf) continue;
         // A new enemy is worth a decision at once, not after the cooldown.
         emit(
           observerId,
@@ -1019,8 +1146,19 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       );
       if (Object.keys(kept).length !== Object.keys(own).length) setUnit(id, { ownSeen: kept });
     }
-    // Where each contact was last seen; and contact fades when nobody has
-    // seen it for a while, leaving that last-known position on the map.
+    // Reports go stale: an enemy nobody has seen for a while drops out of
+    // each unit's picture.
+    for (const id of observers) {
+      const picture = units[id].picture;
+      const kept = Object.entries(picture).filter(
+        ([enemyId, track]) => isAlive(game, enemyId) && time - track.seenAt <= timing.contactMemoryS,
+      );
+      if (kept.length !== Object.keys(picture).length) setUnit(id, { picture: Object.fromEntries(kept) });
+    }
+    // What the side knows as a whole — the best any of its units knows — for
+    // the map and fog of war; and where each contact was last seen, left on
+    // the map once nobody knows of it any more.
+    game = { ...game, sighting: { ...game.sighting, [side]: sidePictureLevels(game, units, side) } };
     for (const enemyId of enemies) {
       const level = sightingOf(game, side, enemyId);
       if (level === "none") continue;
@@ -1031,12 +1169,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
           ...(level === "full" ? { label: fe(enemyId).label } : {}),
         };
       }
-      if (time - (lastSeen[side][enemyId] ?? -Infinity) <= timing.contactMemoryS) continue;
-      game = applyEffects(game, [{ kind: "sighting", viewer: side, feId: enemyId, to: "none" }]);
     }
     for (const id of observers) {
       const order = units[id].order;
-      if ((order.kind === "engage" || order.kind === "wait") && known(id, order.targetId) === "none") {
+      if ((order.kind === "engage" || order.kind === "wait") && !seesItself(units, id, order.targetId)) {
         if (order.kind === "engage" && order.then) {
           // "Finish this fight first" is over: the new order runs, no call.
           follow(id, order.then);
@@ -1169,7 +1305,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
     const reachable = forceElementsOf(snapshot, opposing(self.side))
       .filter((enemy) => enemy.combatStrength > 0)
-      .filter((enemy) => knownTo(snapshot, units, id, enemy.id) !== "none")
+      // Only what it has seen itself: a report says where to look, not where to shoot.
+      .filter((enemy) => seesItself(units, id, enemy.id))
       .filter((enemy) => canHit(self, enemy, enemy.position, config));
     const firedOnMe = (enemyId: string) => time - (unit.attackers[enemyId] ?? -Infinity) <= FIRED_UPON_MEMORY_S;
     // Self-defence: whoever is shooting at this unit may always be shot back,
@@ -1537,21 +1674,24 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         ...where,
       });
     }
-    // A friend in trouble: those close by who know its attacker may help (D9).
-    if ((hurt || shooter != null) && about) {
-      for (const friend of ids) {
-        if (friend === targetId || !alive(friend) || fe(friend).side !== after.side) continue;
-        const f = units[friend];
-        if (f.cohesion !== "steady" || time - f.lastShotAt <= 30) continue;
-        if (distanceM(fe(friend).position, after.position) > HELP_RADIUS_M) continue;
-        if (time - (f.helpAt[targetId] ?? -Infinity) < HELP_INTERVAL_S) continue;
-        const attacker = firers.map((shot) => shot.firerId).find((id) => known(friend, id) !== "none");
-        if (!attacker) continue;
-        setUnit(friend, { helpAt: { ...f.helpAt, [targetId]: time } });
-        emit(friend, "friendNeedsHelp", `${targetId} is ${hurt ? "losing vehicles" : "under fire"} from ${attacker}`, hurt, {
-          about: attacker,
-        });
-      }
+    // It says so on the net: friends who hear it and know the attacker may
+    // help (D9, raised when the message arrives — comms.ts).
+    const tu = units[targetId];
+    if ((hurt || shooter != null) && (hurt || time - tu.lastUnderFireReportAt >= UNDER_FIRE_REPORT_S)) {
+      setUnit(targetId, { lastUnderFireReportAt: time });
+      const lostNow = hurt ? before.combatStrength - after.combatStrength : 0;
+      queueMessage(comms, commsContext(), {
+        kind: "underFire",
+        from: targetId,
+        to: "all",
+        text: `${targetId} under fire from ${locatedFirer ? locatedFirer.firerId : `the ${compassWord(where.bearingDeg ?? 0)}`}${
+          hurt ? `, ${units[targetId].vehicles.fit} of ${units[targetId].vehicles.total} left` : ""
+        }`,
+        underFire: {
+          ...(locatedFirer ? { shooterId: locatedFirer.firerId } : { bearingDeg: where.bearingDeg }),
+          lostNow,
+        },
+      });
     }
   }
 
@@ -1744,6 +1884,22 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     });
   }
 
+  // Situation reports: each unit tells the net how it stands, now and then.
+  // Only on the radio net — with "perfect" comms they would say nothing new.
+  if ((config.comms ?? "perfect") === "radio") {
+    for (const id of ids) {
+      const unit = units[id];
+      if (!unit || !alive(id) || time - unit.lastSitrepAt < SITREP_S) continue;
+      setUnit(id, { lastSitrepAt: time });
+      queueMessage(comms, commsContext(), {
+        kind: "sitrep",
+        from: id,
+        to: "all",
+        text: `${id}: ${activityOf(unit)}, ${unit.vehicles.fit} of ${unit.vehicles.total} fighting${unit.cohesion !== "steady" ? `, ${unit.cohesion}` : ""}`,
+      });
+    }
+  }
+
   // Morale as the shared rules see it.
   for (const id of ids) {
     const unit = units[id];
@@ -1757,7 +1913,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   }
 
-  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, reports };
+  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms };
 
   // ── 11. Is it over? ───────────────────────────────────────────────────────
   //
@@ -1805,5 +1961,5 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     state = { ...state, over: { winner: verdict.winner, reason: "time limit" } };
   }
 
-  return { state, events, shots };
+  return { state, events, shots, messages };
 }

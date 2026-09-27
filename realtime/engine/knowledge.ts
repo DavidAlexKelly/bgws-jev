@@ -37,8 +37,24 @@
 // Every figure here is DECLARED, like detection.ts's.
 
 import { bearingDeltaDeg, distanceM } from "../../lib/board";
-import { sightingOf } from "../../lib/state";
-import type { Belief, RtState, RtUnit, SelfBelief } from "./types";
+import type { Belief, RtState, RtUnit, SelfBelief, Track } from "./types";
+
+/** DECLARED. How fast a reported enemy's position goes stale, metres a second: moving, or still. */
+export const DRIFT_MOVING_MS = 6;
+export const DRIFT_STILL_MS = 0.5;
+
+/** How far a reported enemy may be from where it was reported, by now. */
+export function trackErrorM(track: Track, time: number): number {
+  return track.errorM + Math.max(0, time - track.seenAt) * (track.moving ? DRIFT_MOVING_MS : DRIFT_STILL_MS);
+}
+
+/** How sure a position is, in words. */
+export function spreadWords(m: number): string {
+  if (m < 100) return "precise";
+  if (m < 300) return "within a couple of hundred metres";
+  if (m < 800) return "within a few hundred metres";
+  return "could be a kilometre or more away from there";
+}
 
 /** DECLARED. Locate rate for one volley from a shooter in the open at 1 km: about an even chance. */
 const LOCATE_RATE_AT_1KM = 0.7;
@@ -118,10 +134,11 @@ export function beliefOf(state: Pick<RtState, "game" | "units" | "lastKnown" | "
   const self = state.game.forceElements[unitId];
   const unit = state.units[unitId];
   if (!self || !unit) return "unaware";
+  // Its own sight, or what it has been told — not what its side knows.
   const own: string = unit.ownSeen[enemyId]?.level ?? "none";
-  const side: string = sightingOf(state.game, self.side, enemyId);
-  if (own === "full" || side === "full") return "identified";
-  if (own !== "none" || side !== "none") return "located";
+  const told: string = unit.picture?.[enemyId]?.level ?? "none";
+  if (own === "full" || told === "full") return "identified";
+  if (own !== "none" || told !== "none") return "located";
   const suspect = unit.suspects[enemyId];
   if (suspect && state.time - suspect.time <= SUSPECT_MEMORY_S) return "suspected";
   if (state.lastKnown?.[self.side]?.[enemyId]) return "lost";
@@ -227,11 +244,22 @@ export function beliefsOf(state: RtState, unitId: string) {
           ...(seen.label ? { unit: seen.label } : {}),
         };
       }
+      // Where it is as this unit believes: in sight, or where it was reported.
+      const own = unit.ownSeen[enemy.id];
+      const told = unit.picture?.[enemy.id];
+      const inSight = own != null && state.time - own.time <= 5;
+      const useReport = !own && told != null;
+      const where = useReport ? told.at : own && !inSight && own.at ? own.at : enemy.position;
       return {
         id: enemy.id,
         belief,
-        ...(belief === "identified" ? { unit: enemy.label } : {}),
-        range: rangeBand(distanceM(self.position, enemy.position)),
+        ...(belief === "identified" ? { unit: told?.label ?? enemy.label } : {}),
+        range: rangeBand(distanceM(self.position, where)),
+        source: inSight
+          ? "in sight"
+          : own
+            ? `seen ${agoBand(state.time - own.time)}`
+            : `reported by ${told!.from}${told!.via ? ` (passed on by ${told!.via})` : ""}, seen ${agoBand(state.time - told!.seenAt)}; ${spreadWords(trackErrorM(told!, state.time))}`,
       };
     });
 }
@@ -240,4 +268,65 @@ const COMPASS_WORDS = ["north", "north-east", "east", "south-east", "south", "so
 /** A bearing as a compass word. */
 export function compassWord(bearingDeg: number): string {
   return COMPASS_WORDS[Math.round((((bearingDeg % 360) + 360) % 360) / 45) % 8];
+}
+
+/** One enemy as a side's HQ knows it: where, when seen, by whom, how sure. */
+export interface HqContact {
+  enemyId: string;
+  level: "veryPartial" | "partial" | "full";
+  at: { lat: number; lng: number };
+  seenAt: number;
+  /** How far off it may be by now, metres. */
+  errorM: number;
+  from: string;
+  label?: string;
+}
+
+/**
+ * What a side's commander knows (docs/REALTIME_COMMS.md): its HQ's picture —
+ * what the HQ has seen and been told — or, with no HQ, the best any unit
+ * knows. Positions are where each enemy was seen, not where it is.
+ */
+export function hqPicture(state: RtState, side: "blue" | "red"): HqContact[] {
+  const own = Object.values(state.game.forceElements).filter(
+    (fe) => fe.side === side && fe.combatStrength > 0 && state.units[fe.id] != null,
+  );
+  const hq = own
+    .filter((fe) => (fe.commandRating ?? 0) > 0 && state.units[fe.id].cohesion !== "broken")
+    .sort((a, b) => (b.commandRating ?? 0) - (a.commandRating ?? 0) || a.id.localeCompare(b.id))[0];
+  const holders = hq ? [hq] : own;
+  const best = new Map<string, HqContact>();
+  const offer = (contact: HqContact) => {
+    const had = best.get(contact.enemyId);
+    if (!had || contact.seenAt > had.seenAt) best.set(contact.enemyId, { ...contact, label: contact.label ?? had?.label });
+  };
+  for (const holder of holders) {
+    const unit = state.units[holder.id];
+    for (const [enemyId, seen] of Object.entries(unit.ownSeen)) {
+      const enemy = state.game.forceElements[enemyId];
+      if (!enemy || enemy.combatStrength <= 0) continue;
+      offer({
+        enemyId,
+        level: seen.level,
+        at: seen.at ?? enemy.position,
+        seenAt: seen.time,
+        errorM: Math.round(trackErrorM({ level: seen.level, at: seen.at ?? enemy.position, seenAt: seen.time, receivedAt: seen.time, from: holder.id, errorM: 25, moving: seen.moving ?? false }, state.time)),
+        from: holder.id,
+        ...(seen.level === "full" ? { label: enemy.label } : {}),
+      });
+    }
+    for (const [enemyId, track] of Object.entries(unit.picture ?? {})) {
+      if ((state.game.forceElements[enemyId]?.combatStrength ?? 0) <= 0) continue;
+      offer({
+        enemyId,
+        level: track.level,
+        at: track.at,
+        seenAt: track.seenAt,
+        errorM: Math.round(trackErrorM(track, state.time)),
+        from: track.from,
+        ...(track.label ? { label: track.label } : {}),
+      });
+    }
+  }
+  return [...best.values()].sort((a, b) => a.enemyId.localeCompare(b.enemyId));
 }

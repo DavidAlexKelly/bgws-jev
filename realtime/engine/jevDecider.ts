@@ -83,6 +83,7 @@ export function ordersWords(orders: UnitOrders) {
     rulesOfEngagement: ROE_WORDS[orders.roe] ?? orders.roe,
     onContact: ON_CONTACT_WORDS[orders.onContact] ?? orders.onContact,
     ...(orders.boundaries.length ? { constraints: orders.boundaries.map((b) => `stay ${b.keep} of ${b.label}`) } : {}),
+    ...(orders.supports ? { supports: `${orders.supports}: its requests for help come to you first` } : {}),
   };
 }
 
@@ -144,6 +145,13 @@ export function unitPicture(state: RtState, id: string, config: RtConfig) {
           ? `perhaps: ${unit.lastCue?.enemyId} ${unit.lastCue?.cue}`
           : "no sign of it",
     enemies,
+    ...(unit.heard.some((h) => state.time - h.time <= 180)
+      ? {
+          heardOnTheRadio: unit.heard
+            .filter((h) => state.time - h.time <= 180)
+            .map((h) => ({ when: agoBand(state.time - h.time), from: h.from, said: h.text })),
+        }
+      : {}),
     ...(friends.length ? { friendsNearby: friends } : {}),
     ...(decisions.length ? { lastDecisions: decisions } : {}),
   };
@@ -202,6 +210,13 @@ function situationText(state: RtState, request: RtDecisionRequest): string {
             : `It cannot go on: ${event.detail}.`;
     case "D11":
       return "It has rallied and takes orders again.";
+    case "D12": {
+      const request = unit?.requests.find((r) => r.id === event.requestId);
+      const supporting = request != null && unit?.orders?.supports === request.from;
+      return request
+        ? `${request.from} asks over the radio: "${request.text}".${supporting ? ` Supporting ${request.from} is part of its orders.` : ""}`
+        : `A friend asks for help: ${event.detail}.`;
+    }
   }
 }
 

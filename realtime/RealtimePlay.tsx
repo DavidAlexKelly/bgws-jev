@@ -73,10 +73,11 @@ import {
 } from "../rules/forceList";
 import { HOUSE_V1 } from "../rules/ruleset";
 import { activityOf, createRealtimeState, describeOrder } from "./engine/engine";
-import { agoBand, beliefsOf, selfBeliefOf } from "./engine/knowledge";
+import { agoBand, beliefsOf, selfBeliefOf, trackErrorM } from "./engine/knowledge";
+import { offsetBy } from "./engine/geometry";
 import { jevRealtimeDecider } from "./engine/jevDecider";
 import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from "./engine/orders";
-import { EVENT_STREAM_RID, foundryStreamPublisher } from "../data/eventStream";
+import { EVENT_STREAM_RID, STREAM_MESSAGES, foundryStreamPublisher } from "../data/eventStream";
 import { EventStreamQueue } from "../data/eventStreamQueue";
 import { describeEntry, jevFailure, streamRow } from "./engine/feed";
 import { RealtimeRunner, type RunnerOptions } from "./engine/runner";
@@ -91,6 +92,8 @@ const FIRE_SOURCE = "rt-fire";
 const ORDER_SOURCE = "rt-orders";
 /** Where faded contacts were last seen. */
 const LAST_KNOWN_SOURCE = "rt-last-known";
+/** The selected unit's own picture: where it believes each enemy is, and how sure. */
+const PICTURE_SOURCE = "rt-picture";
 const SPEEDS = [1, 5, 10, 30, 60];
 /** How long a shot's line stays on the map, in simulated seconds. */
 const FIRE_LINE_S = 12;
@@ -363,6 +366,7 @@ function UnitInspector(props: {
           <Line label="urgency">{orders.urgency === "now" ? "now" : "when able"}</Line>
           <Line label="fires at">{ROE_WORDS[orders.roe] ?? orders.roe}</Line>
           <Line label="on contact">{orders.onContact}</Line>
+          {orders.supports && <Line label="supports">{orders.supports}: its requests come here first</Line>}
           {orders.boundaries.length > 0 && (
             <Line label="limits">{orders.boundaries.map((b) => `stay ${b.keep} of ${b.label}`).join("; ")}</Line>
           )}
@@ -388,9 +392,29 @@ function UnitInspector(props: {
             {k.belief === "suspected" ? `to the ${"bearing" in k ? k.bearing : "?"} (${"why" in k ? k.why : ""})` : k.id}
             {"range" in k && k.range ? ` · ${k.range}` : ""}
             {"lastSeen" in k && k.lastSeen ? ` · last seen ${k.lastSeen}` : ""}
+            {"source" in k && k.source ? ` · ${k.source}` : ""}
           </Line>
         ))
       )}
+
+      {(unit.heard.length > 0 || unit.requests.length > 0 || Object.keys(unit.friendStatus).length > 0) && (
+        <div style={{ ...groupTitle, marginTop: 8 }}>Radio</div>
+      )}
+      {unit.requests.map((r) => (
+        <Line key={`r${r.id}`} label="asked">
+          <span style={{ color: "#e8c547" }}>{r.text}</span> ({agoBand(state.time - r.time)})
+        </Line>
+      ))}
+      {[...unit.heard].reverse().map((h, index) => (
+        <Line key={`h${index}`} label={clock(h.time)}>
+          {h.text}
+        </Line>
+      ))}
+      {Object.entries(unit.friendStatus).map(([friend, status]) => (
+        <Line key={`f${friend}`} label={friend}>
+          {status.text.replace(`${friend}: `, "")} <span style={{ color: "#6a7292" }}>({agoBand(state.time - status.time)})</span>
+        </Line>
+      ))}
 
       {(firing || incoming.length > 0) && <div style={{ ...groupTitle, marginTop: 8 }}>Fire</div>}
       {firing && (
@@ -424,6 +448,8 @@ export default function RealtimePlay() {
   const [platform, setPlatform] = useState<string>("var_11_default");
   const [count, setCount] = useState(4);
   const [quality, setQuality] = useState<TroopQualityName>("regular");
+  /** Place it as an HQ: it relays radio traffic for its side (comms). */
+  const [asHq, setAsHq] = useState(false);
 
   // Setup. Real land cover by default: the basemap under the counters is the
   // real world, and a game on generated ground over it has units crossing
@@ -433,6 +459,8 @@ export default function RealtimePlay() {
   const [gameSeed, setGameSeed] = useState("1");
   /** Win conditions: a side is beaten at this % of its strength destroyed or broken; the game ends at this many minutes. */
   const [breakpointPct, setBreakpointPct] = useState(50);
+  /** How information travels between units: a radio net, or the old perfect sharing. */
+  const [commsMode, setCommsMode] = useState<"radio" | "perfect">("radio");
   const [timeLimitMin, setTimeLimitMin] = useState(90);
   const [useJev, setUseJev] = useState(true);
   const [useCommander, setUseCommander] = useState(true);
@@ -468,8 +496,8 @@ export default function RealtimePlay() {
   const orderedRef = useRef<RtState | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  const brushRef = useRef({ side, platform, count, quality });
-  brushRef.current = { side, platform, count, quality };
+  const brushRef = useRef({ side, platform, count, quality, asHq });
+  brushRef.current = { side, platform, count, quality, asHq };
   const viewpointRef = useRef(viewpoint);
   viewpointRef.current = viewpoint;
 
@@ -521,8 +549,9 @@ export default function RealtimePlay() {
       timing: { ...DEFAULT_TIMING, breakpoint: breakpointPct / 100, maxDurationS: timeLimitMin * 60 },
       planner,
       isPassable,
+      comms: commsMode,
     }),
-    [terrain, gameSeed, planner, isPassable, breakpointPct, timeLimitMin],
+    [terrain, gameSeed, planner, isPassable, breakpointPct, timeLimitMin, commsMode],
   );
 
   // ── Placement ─────────────────────────────────────────────────────────────
@@ -557,12 +586,13 @@ export default function RealtimePlay() {
         ...current,
         {
           id: nextId(),
-          label: `${snapshot.displayName} (${brush.count})`,
+          label: `${brush.asHq ? "HQ " : ""}${snapshot.displayName} (${brush.count})`,
           side: brush.side,
           platform: brush.platform,
           platformCount: brush.count,
           troopQuality: brush.quality,
           position: at,
+          ...(brush.asHq ? { commandRating: 3 } : {}),
         },
       ]);
     },
@@ -663,7 +693,10 @@ export default function RealtimePlay() {
       streamRef.current = queue;
       const run = { runId: `${gameSeed}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, gameSeed };
       let sequence = 0;
-      onEntry = (entry, state) => queue.push(streamRow(entry, state, run, sequence++));
+      onEntry = (entry, state) => {
+        if (entry.type === "message" && !STREAM_MESSAGES) return;
+        queue.push(streamRow(entry, state, run, sequence++));
+      };
     }
     const deciders = useJev
       ? {
@@ -797,6 +830,31 @@ export default function RealtimePlay() {
               "circle-stroke-color": ["match", ["get", "side"], "blue", SIDE_COLOUR.blue, SIDE_COLOUR.red],
               "circle-stroke-opacity": ["get", "opacity"],
             },
+          });
+        }
+        if (!map.getSource(PICTURE_SOURCE)) {
+          map.addSource(PICTURE_SOURCE, { type: "geojson", data: emptyCollection() });
+          map.addLayer({
+            id: `${PICTURE_SOURCE}-area`,
+            type: "fill",
+            source: PICTURE_SOURCE,
+            filter: ["==", ["geometry-type"], "Polygon"],
+            paint: { "fill-color": "#e8c547", "fill-opacity": 0.08 },
+          });
+          map.addLayer({
+            id: `${PICTURE_SOURCE}-edge`,
+            type: "line",
+            source: PICTURE_SOURCE,
+            filter: ["==", ["geometry-type"], "Polygon"],
+            paint: { "line-color": "#e8c547", "line-width": 1, "line-dasharray": [2, 2], "line-opacity": 0.7 },
+          });
+          // A dot where it was reported (text needs map fonts the basemap may not have).
+          map.addLayer({
+            id: `${PICTURE_SOURCE}-dot`,
+            type: "circle",
+            source: PICTURE_SOURCE,
+            filter: ["==", ["geometry-type"], "Point"],
+            paint: { "circle-radius": 4, "circle-color": "#e8c547", "circle-stroke-color": "#0d1017", "circle-stroke-width": 1 },
           });
         }
         if (!map.getSource(FIRE_SOURCE)) {
@@ -1012,6 +1070,35 @@ export default function RealtimePlay() {
       features: ghosts,
     });
 
+    // The selected unit's picture: each enemy it only knows by report, where
+    // it was reported, ringed by how far off that may be by now.
+    const chosen = selectedRef.current ? state.units[selectedRef.current] : undefined;
+    const chosenFe = selectedRef.current ? state.game.forceElements[selectedRef.current] : undefined;
+    const pictureFeatures =
+      chosen && chosenFe && own(chosenFe.side)
+        ? Object.entries(chosen.picture ?? {})
+            .filter(([enemyId]) => chosen.ownSeen[enemyId] == null)
+            .flatMap(([enemyId, track]) => {
+              const radius = Math.max(50, trackErrorM(track, state.time));
+              const ring = Array.from({ length: 33 }, (_, i) => {
+                const p = offsetBy(track.at, (i * 360) / 32, radius);
+                return [p.lng, p.lat];
+              });
+              return [
+                { type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [ring] } },
+                {
+                  type: "Feature" as const,
+                  properties: { label: `${enemyId}? (${track.from}, ${clock(state.time - track.seenAt)} ago)` },
+                  geometry: { type: "Point" as const, coordinates: [track.at.lng, track.at.lat] },
+                },
+              ];
+            })
+        : [];
+    (map.getSource(PICTURE_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: pictureFeatures,
+    });
+
     const runner = runnerRef.current;
     const fire = (runner?.log ?? [])
       .filter((entry) => entry.type === "shot" && state.time - entry.time <= FIRE_LINE_S)
@@ -1174,6 +1261,10 @@ export default function RealtimePlay() {
                 ))}
               </select>
             </div>
+            <label style={{ ...row, gap: 6, color: asHq ? "#e8c547" : "#8a91a8", cursor: "pointer" }}>
+              <input type="checkbox" checked={asHq} onChange={(e) => setAsHq(e.target.checked)} />
+              HQ: passes on its side's radio traffic
+            </label>
             <div style={{ ...subtle, lineHeight: 1.5, margin: "4px 0 8px" }}>
               Click the map to place; click a counter to remove it. Or start from a force list:
             </div>
@@ -1281,7 +1372,22 @@ export default function RealtimePlay() {
               <input value={gameSeed} onChange={(e) => setGameSeed(e.target.value)} style={select} />
             </div>
 
-            <div style={{ ...groupTitle, marginTop: 14 }}>4 &middot; Win conditions</div>
+            <div style={{ ...groupTitle, marginTop: 14 }}>4 &middot; Communications</div>
+            <div style={row}>
+              <span style={{ ...subtle, width: 46 }}>comms</span>
+              <select value={commsMode} onChange={(e) => setCommsMode(e.target.value as "radio" | "perfect")} style={select}>
+                <option value="radio">radio net</option>
+                <option value="perfect">perfect (instant sharing)</option>
+              </select>
+            </div>
+            <div style={{ ...subtle, lineHeight: 1.5 }}>
+              {commsMode === "radio"
+                ? "Each unit knows what it has seen and what reaches it by radio: reports take time, go through an HQ if " +
+                  "there is one, queue when the net is busy, and do not carry beyond about 5 km. Units ask each other for cover and fire."
+                : "Every sighting reaches the whole side after 15 s, whatever the range. Units still ask each other for help."}
+            </div>
+
+            <div style={{ ...groupTitle, marginTop: 14 }}>5 &middot; Win conditions</div>
             <div style={row}>
               <span style={{ ...subtle, width: 96 }}>breakpoint %</span>
               <input
@@ -1499,7 +1605,9 @@ export default function RealtimePlay() {
                       ? SIDE_COLOUR[entry.side]
                       : entry.type === "flag"
                         ? "#e8c547"
-                        : "#8a91a8",
+                        : entry.type === "message"
+                          ? "#8fbfb0"
+                          : "#8a91a8",
               }}
             >
               {describeEntry(entry)}

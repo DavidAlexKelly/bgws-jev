@@ -22,6 +22,13 @@ export const EVENT_STREAM_RID = "ri.foundry.main.dataset.032c716d-b571-4ca4-a683
 export const EVENT_STREAM_BRANCH = "master";
 
 /**
+ * Stream radio messages too. Off until the stream's schema has the `message`
+ * column (docs/EVENT_STREAM.md): a row with a field the stream does not know
+ * would be refused, and with it the whole batch.
+ */
+export const STREAM_MESSAGES = false;
+
+/**
  * Publish to a Foundry stream with the app's own credentials.
  *
  * Foundry API v2, Streams: POST
