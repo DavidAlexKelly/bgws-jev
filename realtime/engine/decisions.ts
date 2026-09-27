@@ -209,7 +209,8 @@ export function resumeOrder(state: RtState, id: string): { order: RtOrder; summa
   if (!unit || !self) return null;
   if (unit.orders) {
     const phase = unit.orders.phases[unit.orders.phase];
-    if (!phase) return null;
+    // A phase it found it cannot carry out is not offered again.
+    if (!phase || unit.orders.blocked?.phase === unit.orders.phase) return null;
     return { order: { ...phase.order, phase: unit.orders.phase }, summary: `back to its orders: ${phase.label}` };
   }
   const { mission } = unit;
@@ -576,6 +577,17 @@ export function optionsAt(
     }
     case "D10": {
       if (resume && event.kind !== "outOfOrders") push({ id: "resume", summary: resume.summary, order: resume.order });
+      // Its current phase cannot be done: skip to the next one, if there is one.
+      const o = unit.orders;
+      if (o && o.blocked?.phase === o.phase && o.phase + 1 < o.phases.length) {
+        const next = o.phases[o.phase + 1];
+        push({
+          id: "nextPhase",
+          summary: `skip to the next step of its orders: ${next.label}`,
+          order: { ...next.order, phase: o.phase + 1 },
+          orders: { ...o, phase: o.phase + 1, blocked: undefined },
+        });
+      }
       if (unit.order.kind !== "hold") push({ id: "hold", summary: "hold here", order: { kind: "hold" } });
       push({ id: "overwatch", summary: "overwatch from here: fire at anything in reach", order: { kind: "overwatch" } });
       if (unit.order.kind === "hold") push(keep("hold here"));
@@ -720,7 +732,7 @@ export function ruleFallback(state: RtState, id: string, point: DecisionPoint, o
     case "D9":
       return onContact === "engage" ? pick("help", "support", "keep") : pick("keep");
     case "D10":
-      return pick("resume", "overwatch");
+      return pick("resume", "nextPhase", "overwatch");
     case "D11":
       return pick("resume", "hold");
   }

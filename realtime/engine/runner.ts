@@ -80,6 +80,8 @@ export interface RunnerOptions {
   deciders?: Partial<Record<Side, RtDecider>>;
   /** How many feed entries to keep. */
   logLimit?: number;
+  /** Called with every feed entry as it is made — to stream the log elsewhere. Must not throw. */
+  onEntry?: (entry: RtLogEntry, state: RtState) => void;
 }
 
 const DEFAULT_LOG_LIMIT = 500;
@@ -201,6 +203,13 @@ export class RealtimeRunner {
       for (const event of result.events) {
         const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
         this.push({ type: "event", time: event.time, side, event });
+        const stuck = this.state.units[event.unitId]?.orders?.blocked;
+        if (event.kind === "blocked" && stuck && stuck.time === event.time) {
+          this.flag(
+            { time: event.time, side, unitId: event.unitId, kind: "outOfOrders", text: `${event.unitId} cannot carry out its orders (${stuck.why}) and needs new ones` },
+            `stuck:${event.unitId}:${stuck.phase}:${this.state.units[event.unitId].orders?.issuedAt}`,
+          );
+        }
         if (event.kind === "outOfOrders") {
           this.flag({ time: event.time, side, unitId: event.unitId, kind: "outOfOrders", text: `${event.unitId} has carried out its orders and needs new ones` }, `out:${event.unitId}`);
         }
@@ -251,6 +260,11 @@ export class RealtimeRunner {
 
   private push(entry: RtLogEntry): void {
     this.log.push(entry);
+    try {
+      this.options.onEntry?.(entry, this.state);
+    } catch {
+      // A listener's failure is never the game's.
+    }
     const limit = this.options.logLimit ?? DEFAULT_LOG_LIMIT;
     if (this.log.length > limit) this.log.splice(0, this.log.length - limit);
   }

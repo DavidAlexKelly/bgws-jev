@@ -247,6 +247,14 @@ export interface UnitOrders {
   boundaries: Boundary[];
   by: "claude" | "heuristic" | "rules";
   issuedAt: number;
+  /**
+   * A phase it found it cannot carry out (the ground, or a line it may not
+   * cross). It is not sent back to it; the player is told and it waits for
+   * new orders.
+   */
+  blocked?: { phase: number; time: number; why: string };
+  /** Every phase carried out: it waits for new orders. */
+  done?: boolean;
 }
 
 /** One unit's fire on one target, since it started. */
@@ -381,6 +389,15 @@ export interface RtShot {
   targetId: string;
   result: string;
   narrative?: string;
+  rangeM?: number;
+  /** Rounds fired: one per fit vehicle. */
+  rounds?: number;
+  /** Rounds that struck. */
+  hits?: number;
+  /** Vehicles it knocked out. */
+  knockedOut?: number;
+  /** The chance each round had of hitting. */
+  pHit?: number;
 }
 
 /** How time maps onto the rules. See timing.ts. */
