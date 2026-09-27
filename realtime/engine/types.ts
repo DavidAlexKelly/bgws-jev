@@ -458,6 +458,8 @@ export interface RtEvent {
   info?: boolean;
   /** The request it is about (D12). */
   requestId?: number;
+  /** A sighting it was told of by radio, not one it made itself. */
+  reported?: boolean;
 }
 
 /** A shot, for the feed and the fire lines on the map. */
@@ -476,6 +478,11 @@ export interface RtShot {
   knockedOut?: number;
   /** The chance each round had of hitting. */
   pHit?: number;
+  /** What the volley did, at best: for the map. */
+  outcome?: "miss" | "intercepted" | "bounced" | "penetrated" | "knockedOut";
+  /** Where the firer and the target were when it was fired. */
+  firerAt?: LatLng;
+  targetAt?: LatLng;
 }
 
 /** How time maps onto the rules. See timing.ts. */
