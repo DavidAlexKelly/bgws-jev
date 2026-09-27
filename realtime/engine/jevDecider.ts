@@ -1,27 +1,29 @@
 // ── bgws/realtime/engine/jevDecider.ts ─────────────────────────────────────
-// Jev in command, in real time.
+// Jev as each unit's leader, at the decision points.
 //
-// When units on one side need a decision at the same moment, they are asked
-// together: ONE request, one `choice` question per unit, answered in parallel.
-// Jev chooses from the options the rules generated, so it cannot give an
-// order that is not possible.
+// docs/REALTIME_COMMAND_DESIGN.html. Jev makes one call at a well-defined
+// moment (decisions.ts), always inside the unit's orders; game logic does
+// everything else. When units on one side reach a decision point at the same
+// moment they are asked together: ONE request, one `choice` question each,
+// answered in parallel.
 //
-// "Carry on" is always an option. When Jev is unsure the RULES decide — not
-// "carry on", which is how a unit used to trade misses for ever.
+// WHAT JEV IS SHOWN, and only this:
+//   the order's task, intent, urgency and constraints;
+//   the unit's beliefs about each enemy and about itself — never the truth;
+//   the odds, in words ("likely to knock one out within a minute");
+//   its friends within reach;
+//   its last few decisions and what came of them.
+// Only the units being asked are described: irrelevant state makes a single
+// pass judge worse, not better. Exact figures go to the console, not to Jev.
 //
-// Jev is stateless: each question is a fresh request. So the state carries
-// the memory — each unit's fire record, the fire it is taking, its last
-// decisions and what came of them — and the side's picture of who is
-// fighting whom, and every option says what it would really achieve (the
-// chance per minute of doing damage, not of a round striking). That is what
-// lets Jev weigh a trade-off instead of repeating the last answer.
+// When Jev is unsure, or cannot be reached, the rules decide — following the
+// order's actions on contact, not "carry on".
 //
 // Every decision is printed to the browser console, like the turn game's.
 
-import { distanceM } from "../../lib/board";
-import { projectForSide } from "../../lib/fogOfWar";
+import { bearingDeg, distanceM } from "../../lib/board";
 import { inCover } from "../../lib/proceduralTerrain";
-import { forceElementsOf, opposing, sightingOf, type Side } from "../../lib/state";
+import type { Side } from "../../lib/state";
 import {
   JEV_MAX_CHOICES,
   JEV_MODEL,
@@ -34,12 +36,13 @@ import {
 } from "../../rules/jev";
 import { printDecision } from "../../rules/jevConsole";
 import type { TacticalTrace } from "../../rules/tactical";
-import { canHit, describeOrder, onMission } from "./engine";
-import { damageEffect, describeEffect, engagedBy, knownDamage } from "./options";
-import { compass } from "./geometry";
-import { ruleChoice, ruleTrace, type RtDecider, type RtDecision } from "./deciders";
-import { PINNED_AT, SUPPRESSED_AT, clock } from "./timing";
-import type { RtConfig, RtState } from "./types";
+import { BALANCE, DECISION_POINTS, effectWords } from "./decisions";
+import { ruleTrace, type RtDecider, type RtDecision, type RtDecisionRequest } from "./deciders";
+import { activityOf, canHit, describeTrigger } from "./engine";
+import { agoBand, beliefsOf, compassWord, rangeBand, selfBeliefOf } from "./knowledge";
+import { damageEffect } from "./options";
+import { PINNED_AT, SUPPRESSED_AT } from "./timing";
+import type { RtConfig, RtState, UnitOrders } from "./types";
 
 export interface JevRealtimeOptions {
   side: Side;
@@ -48,234 +51,160 @@ export interface JevRealtimeOptions {
   directive?: string;
   /** How long to wait before the rules decide. Sim time waits for this, not the other way round. */
   timeoutMs?: number;
-  /** Below this, Jev's answer is not taken on its own and the unit carries on. */
+  /** Below this, Jev's answer is not taken and the rules decide. */
   minConfidence?: number;
   /** Print decisions to the console. On unless turned off. */
   log?: boolean;
 }
 
-/**
- * What this side knows, right now, for Jev.
- *
- * Fog of war applied: enemies only as sighted, unidentified ones unnamed,
- * and their odds against us only when identified (their weapons are what
- * nobody knows yet).
- */
-export function realtimeSideState(
-  state: RtState,
-  side: Side,
-  config: RtConfig,
-  asked: readonly string[],
-  recent: readonly { time: number; text: string }[] = [],
-) {
-  const view = projectForSide(state.game, side);
-  const objective = state.game.objectives?.[side];
+/** Friends within this are "nearby". */
+const FRIENDS_M = 1500;
 
-  // Units being asked, and every unit in the same fights, get the full
-  // picture — memory, fire record, friends around them. The rest are
-  // summarised, so a big battle does not crowd out the part being decided.
-  const fightOf = (id: string) => {
-    const unit = state.units[id];
-    const out = new Set<string>();
-    if (unit?.engagement && state.time - unit.engagement.lastShotAt <= 60) out.add(unit.engagement.targetId);
-    for (const [enemyId, fire] of Object.entries(unit?.incoming ?? {})) if (state.time - fire.last <= 60) out.add(enemyId);
-    return out;
-  };
-  const askedFights = new Set(asked.flatMap((id) => [...fightOf(id)]));
-  const involved = new Set(view.own.map((fe) => fe.id).filter((id) => [...fightOf(id)].some((e) => askedFights.has(e))));
+const ROE_WORDS: Record<string, string> = {
+  never: "weapons hold: do not fire at all",
+  ifFiredUpon: "fire only once the enemy has fired on your side",
+  withinShortRange: "fire at anything that closes to short range",
+  always: "fire at anything in reach",
+};
+const ON_CONTACT_WORDS: Record<string, string> = {
+  engage: "engage",
+  observe: "observe and report",
+  avoid: "avoid a fight",
+  bypass: "carry on with the task",
+};
 
-  const units = view.own.map((self) => {
-    const unit = state.units[self.id];
-    const threats = forceElementsOf(state.game, opposing(side))
-      .filter((enemy) => enemy.combatStrength > 0 && sightingOf(state.game, side, enemy.id) === "full")
-      .filter((enemy) => canHit(enemy, self, self.position, config))
-      .map((enemy) => ({
-        from: enemy.id,
-        rangeM: Math.round(distanceM(enemy.position, self.position)),
-        itsFireOnYou: describeEffect(damageEffect(enemy, self, state, config), "you"),
-      }));
-    const detailed = unit != null && (asked.includes(self.id) || involved.has(self.id));
-    const memory = detailed ? unitMemory(state, self.id) : {};
-    const friends = view.own
-      .filter((other) => other.id !== self.id && distanceM(other.position, self.position) <= FRIENDS_M)
-      .map((other) => ({
-        id: other.id,
-        rangeM: Math.round(distanceM(other.position, self.position)),
-        doing: state.units[other.id] ? describeOrder(state.units[other.id].order) : "unknown",
-      }));
-    const seesNow = unit
-      ? Object.keys(unit.ownSeen).filter((enemyId) => state.game.forceElements[enemyId]?.combatStrength > 0)
-      : [];
-    return {
-      id: self.id,
-      unit: self.label,
-      strength: `${self.combatStrength}/${self.combatStrengthStart}`,
-      ...(unit ? { vehicles: `${unit.vehicles.fit} of ${unit.vehicles.total} fighting` } : {}),
-      ...(unit && unit.posture === "hullDown" ? { hullDown: true } : {}),
-      troopQuality: self.troopQuality,
-      ...(unit
-        ? {
-            cohesion: unit.cohesion,
-            suppression: `${Math.round(unit.suppression)}/100${
-              unit.suppression >= PINNED_AT ? " (pinned: cannot advance)" : unit.suppression >= SUPPRESSED_AT ? " (suppressed)" : ""
-            }`,
-            posture: unit.posture,
-            mission: `${unit.mission.task}: ${unit.mission.purpose}${
-              unit.mission.at
-                ? ` (${Math.round(distanceM(self.position, unit.mission.at))} m ${compass(self.position, unit.mission.at)})`
-                : ""
-            }`,
-            onMission: onMission(unit, self),
-          }
-        : { morale: self.morale }),
-      doing: unit ? describeOrder(unit.order) : "unknown",
-      rulesOfEngagement: unit?.roe,
-      terrain: config.terrain.classify(self.position),
-      inCover: inCover(config.terrain, self.position),
-      ...(seesNow.length ? { seesItself: seesNow } : {}),
-      ...(objective
-        ? {
-            objective: `${Math.round(distanceM(self.position, objective))} m ${compass(self.position, objective)}`,
-          }
-        : {}),
-      ...(threats.length ? { threatsToYou: threats } : {}),
-      ...memory,
-      ...(detailed && friends.length ? { friendsWithin1500m: friends } : {}),
-      beingAskedNow: asked.includes(self.id),
-    };
-  });
-
-  const contacts = view.contacts.map((contact) => ({
-    id: contact.id,
-    identified: contact.sighting === "full",
-    unit: contact.label ?? "unidentified",
-    seen: contact.observedMarkers,
-    // Who is fighting whom, so units can be coordinated: one covering while
-    // another moves, or fire spread over targets that are being ignored.
-    engagedBy: engagedBy(state, side, contact.id),
-    firingOn: view.own
-      .filter((fe) => {
-        const fire = state.units[fe.id]?.incoming[contact.id];
-        return fire != null && state.time - fire.last <= 60;
-      })
-      .map((fe) => fe.id),
-    damageYouHaveDoneToIt: knownDamage(state, side, contact.id),
-    // Knocked-out vehicles are seen to burn; only when it is identified.
-    ...(contact.sighting === "full" && state.units[contact.id]
-      ? { vehiclesStillFighting: `${state.units[contact.id].vehicles.fit} of ${state.units[contact.id].vehicles.total}` }
-      : {}),
-    ...(contact.sighting === "full" && state.units[contact.id]?.cohesion !== "steady"
-      ? { visiblyBreaking: state.units[contact.id]?.cohesion === "broken" ? "falling back" : "shaken" }
-      : {}),
-    nearestOfYoursM: view.own.length
-      ? Math.round(Math.min(...view.own.map((fe) => distanceM(fe.position, contact.position))))
-      : null,
-  }));
-  const inSight = new Set(view.contacts.map((contact) => contact.id));
-  const lastKnown = Object.entries(state.lastKnown?.[side] ?? {})
-    .filter(([id]) => !inSight.has(id))
-    .map(([id, seen]) => ({
-      id,
-      unit: seen.label ?? "unidentified",
-      lastSeen: `${clock(state.time - seen.time)} ago`,
-      nearestOfYoursM: view.own.length
-        ? Math.round(Math.min(...view.own.map((fe) => distanceM(fe.position, seen.at))))
-        : null,
-    }));
-
+/** A unit's standing orders, in words. */
+export function ordersWords(orders: UnitOrders) {
   return {
-    clock: clock(state.time),
-    you: side,
-    ...(state.plan[side] ? { commandersPlan: state.plan[side] } : {}),
-    yourUnits: units,
-    knownEnemies: contacts,
-    ...(lastKnown.length ? { lostContacts: lastKnown } : {}),
-    recent: recent.slice(-8),
-    note:
-      "Real time: every unit acts at once. Enemies you have not sighted are not " +
-      "listed; their absence is not evidence that they are not there. Lost " +
-      "contacts are where an enemy was last seen, not where it is. Shaken and " +
-      "broken units are not yours to order until they rally.",
+    task: orders.task,
+    nowOn: orders.phases[orders.phase]?.label ?? "done",
+    intent: orders.intent,
+    urgency: orders.urgency === "now" ? "now" : "when able",
+    rulesOfEngagement: ROE_WORDS[orders.roe] ?? orders.roe,
+    onContact: ON_CONTACT_WORDS[orders.onContact] ?? orders.onContact,
+    ...(orders.boundaries.length ? { constraints: orders.boundaries.map((b) => `stay ${b.keep} of ${b.label}`) } : {}),
   };
 }
 
-/** Units in this much range of each other are "nearby" for coordination. */
-const FRIENDS_M = 1500;
-
-/**
- * What a unit remembers: its fire on its target, the fire it is taking, and
- * its last few decisions with what came of each. Jev is stateless — every
- * question is a fresh request — so this is its only memory.
- */
-export function unitMemory(state: RtState, id: string) {
+/** What one unit knows and is, in words, for its question. */
+export function unitPicture(state: RtState, id: string, config: RtConfig) {
+  const self = state.game.forceElements[id];
   const unit = state.units[id];
-  const fe = state.game.forceElements[id];
-  if (!unit || !fe) return {};
-  const e = unit.engagement;
-  const firing = e && state.time - e.lastShotAt <= 60 ? e : null;
-  const incoming = Object.entries(unit.incoming)
-    .filter(([, fire]) => state.time - fire.last <= 120)
-    .map(([from, fire]) => ({
-      from,
-      for: clock(fire.last - fire.since),
-      shots: fire.shots,
-      damageToYou: fire.damage,
+  if (!self || !unit) return { id };
+  const self_ = selfBeliefOf(unit, state.time);
+  const enemies = beliefsOf(state, id).map((belief) => {
+    const enemy = state.game.forceElements[belief.id];
+    if (!enemy || belief.belief !== "identified") return belief;
+    const their = state.units[enemy.id];
+    return {
+      ...belief,
+      ...(their ? { vehicles: `${their.vehicles.fit} of ${their.vehicles.total} still fighting` } : {}),
+      ...(their && their.cohesion !== "steady" ? { visibly: their.cohesion === "broken" ? "breaking, falling back" : "shaken" } : {}),
+      itsFireOnYou: canHit(enemy, self, self.position, config) ? effectWords(damageEffect(enemy, self, state, config), "you") : "cannot reach you",
+      yourFireOnIt: canHit(self, enemy, enemy.position, config) ? effectWords(damageEffect(self, enemy, state, config)) : "out of your reach",
+    };
+  });
+  const friends = Object.values(state.game.forceElements)
+    .filter((other) => other.side === self.side && other.id !== id && other.combatStrength > 0)
+    .filter((other) => distanceM(other.position, self.position) <= FRIENDS_M)
+    .map((other) => ({
+      id: other.id,
+      doing: state.units[other.id] ? activityOf(state.units[other.id]) : "unknown",
+      where: `${rangeBand(distanceM(self.position, other.position))} to the ${compassWord(bearingDeg(self.position, other.position))}`,
     }));
-  const decisions = unit.history.map((memory) => ({
-    ago: `${clock(state.time - memory.time)} ago`,
-    chose: memory.chose,
-    by: memory.by,
-    because: memory.because,
-    since: `lost ${memory.strength - fe.combatStrength} strength, did ${unit.dealt - memory.dealt} damage`,
-  }));
+  const decisions = unit.history.map((memory) => {
+    const lost = memory.strength - self.combatStrength;
+    const did = unit.dealt - memory.dealt;
+    return {
+      when: agoBand(state.time - memory.time),
+      chose: memory.chose,
+      by: memory.by,
+      since: `${lost > 0 ? "took losses" : "no losses"}; ${did > 0 ? "did damage" : "did no damage"}`,
+    };
+  });
   return {
-    ...(firing
-      ? {
-          yourFire: {
-            target: firing.targetId,
-            for: clock(state.time - firing.since),
-            shots: firing.shots,
-            struck: firing.hits,
-            damageDone: firing.damage,
-          },
-        }
-      : {}),
-    ...(incoming.length ? { fireOnYou: incoming } : {}),
+    id,
+    unit: self.label,
+    doing: activityOf(unit),
+    ...(unit.orders ? { orders: ordersWords(unit.orders) } : { purpose: unit.mission.purpose }),
+    vehicles: `${unit.vehicles.fit} of ${unit.vehicles.total} fighting`,
+    nerve:
+      unit.suppression >= PINNED_AT
+        ? "pinned down: cannot advance"
+        : unit.suppression >= SUPPRESSED_AT
+          ? "suppressed: shooting worse"
+          : "steady",
+    ground: `${config.terrain.classify(self.position)}${inCover(config.terrain, self.position) ? ", in cover" : ""}${
+      unit.posture === "hullDown" ? ", hull-down" : unit.posture === "moving" ? ", on the move" : ""
+    }`,
+    doesTheEnemyKnowYouAreHere:
+      self_ === "knownSeen"
+        ? "yes: you have been fired on"
+        : self_ === "possiblySeen"
+          ? `perhaps: ${unit.lastCue?.enemyId} ${unit.lastCue?.cue}`
+          : "no sign of it",
+    enemies,
+    ...(friends.length ? { friendsNearby: friends } : {}),
     ...(decisions.length ? { lastDecisions: decisions } : {}),
   };
 }
 
-/** One line on a unit's fire and last decision, for its question. */
-function briefing(state: RtState, id: string): string {
-  const unit = state.units[id];
-  const e = unit?.engagement;
-  const parts: string[] = [];
-  if (e && state.time - e.lastShotAt <= 60) {
-    parts.push(
-      `It has been firing on ${e.targetId} for ${clock(state.time - e.since)}: ${e.shots} shots, ` +
-        `${e.hits} struck, ${e.damage} damage done.`,
-    );
+/** What happened, in words: the event that raised the decision point. */
+export function situationWords(state: RtState, request: RtDecisionRequest): string {
+  const { event, point } = request;
+  const unit = state.units[request.unitId];
+  const self = state.game.forceElements[request.unitId];
+  const enemy = event.about ? state.game.forceElements[event.about] : undefined;
+  const identified = enemy && unit?.ownSeen[enemy.id]?.level === "full";
+  const name = enemy ? (identified ? `${enemy.label} (${enemy.id})` : `the contact ${enemy.id}`) : "an enemy";
+  const where =
+    enemy && self
+      ? ` at ${rangeBand(distanceM(self.position, enemy.position))} to the ${compassWord(bearingDeg(self.position, enemy.position))}`
+      : "";
+  const hurt = request.events.some((e) => e.kind === "hit") ? ", and has knocked out one of its vehicles" : "";
+  switch (point) {
+    case "D0":
+      return `New orders have come down while it is fighting. ${event.detail}.`;
+    case "D1":
+      return `It has ${event.kind === "contact" ? "run into" : "found"} ${name}${where}.`;
+    case "D2":
+      return `${name}${where} is firing on it${hurt}.`;
+    case "D3":
+      return event.kind === "searchDone"
+        ? `Its search of the ${compassWord(event.bearingDeg ?? 0)} found nothing.`
+        : `It is under fire from a shooter it cannot see, somewhere to the ${compassWord(event.bearingDeg ?? 0)}${hurt}.`;
+    case "D4":
+      return unit?.order.kind === "wait"
+        ? `The moment it was waiting for has come: ${describeTrigger(unit.order.trigger)} (${name}${where}).`
+        : `Its trigger on ${name} is met.`;
+    case "D5":
+      return `${name}${where}, which it is watching from hiding, ${unit?.lastCue?.cue ?? "changed what it was doing"}. It cannot tell whether that is because it has been seen.`;
+    case "D6":
+      return event.severe ? `It has knocked out one of ${name}'s vehicles.` : `It has fired its first volley at ${name}${where}.`;
+    case "D7":
+      return event.kind === "enemyBroke" ? `${name} has broken and is falling back.` : `It has lost ${name}: out of sight or out of the fight.`;
+    case "D8":
+      return `It has been firing on ${unit?.engagement?.targetId ?? "its target"} for minutes and has knocked nothing out.`;
+    case "D9":
+      return `A friend close by needs help: ${event.detail}${where}.`;
+    case "D10":
+      return event.kind === "arrived"
+        ? "It has reached where it was going."
+        : event.kind === "outOfOrders"
+          ? "It has carried out all its orders."
+          : event.kind === "idle"
+            ? "It has been quiet for a while and is not doing its task."
+            : `It cannot go on: ${event.detail}.`;
+    case "D11":
+      return "It has rallied and takes orders again.";
   }
-  const last = unit?.history[unit.history.length - 1];
-  if (last) {
-    const fe = state.game.forceElements[id];
-    parts.push(
-      `Last decision (${clock(state.time - last.time)} ago, by ${last.by}): ${last.chose} — since then it has ` +
-        `lost ${last.strength - (fe?.combatStrength ?? last.strength)} strength and done ${(unit?.dealt ?? 0) - last.dealt} damage.`,
-    );
-  }
-  return parts.length ? `${parts.join(" ")} ` : "";
 }
 
 function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export function jevRealtimeDecider(
-  options: JevRealtimeOptions,
-  /** The last few things that happened, as this side saw them. Supplied by the runner. */
-  recent: () => { time: number; text: string }[] = () => [],
-): RtDecider {
+export function jevRealtimeDecider(options: JevRealtimeOptions): RtDecider {
   const minConfidence = options.minConfidence ?? 0.25;
   const timeoutMs = options.timeoutMs ?? 4000;
   const directive = options.directive?.trim() ? `${options.directive.trim()}\n\n` : "";
@@ -288,67 +217,60 @@ export function jevRealtimeDecider(
 
     async decide(state, side, requests, config): Promise<RtDecision[]> {
       const asked = keyed(requests, "u");
-      const stateSent = realtimeSideState(state, side, config, requests.map((r) => r.unitId), recent());
-      const keysFor = new Map<string, { key: string; id: string; summary: string }[]>();
+      const stateSent = {
+        you: side,
+        ...(state.plan[side] ? { commandersPlan: state.plan[side] } : {}),
+        units: requests.map((request) => unitPicture(state, request.unitId, config)),
+        note:
+          "Only what each unit believes. Enemies it has not found are not listed, and their absence is not " +
+          "evidence that they are not there. A lost contact is where an enemy was last seen, not where it is.",
+      };
+      const keysFor = new Map<string, { key: string; id: string; summary: string; exact?: string }[]>();
       const questions: Record<string, JevQuestion> = {};
 
-      const team = requests.map((request) => ({
-        id: request.unitId,
-        doing: describeOrder(state.units[request.unitId].order),
-      }));
       for (const { key, item } of asked) {
         const choices = item.options.slice(0, JEV_MAX_CHOICES).map((option, index) => ({
           key: option.id === "keep" ? "keep" : `o${index}`,
           id: option.id,
           summary: option.summary,
+          exact: option.exact,
         }));
         keysFor.set(key, choices);
+        const dp = DECISION_POINTS[item.point];
+        const unit = state.units[item.unitId];
         const label = state.game.forceElements[item.unitId]?.label ?? item.unitId;
+        const others = requests.filter((r) => r.unitId !== item.unitId).map((r) => r.unitId);
         questions[key] = {
           type: "choice",
           instructions:
-            `${directive}Your unit ${item.unitId} (${label}) is ${describeOrder(state.units[item.unitId].order)}. ` +
-            `What just happened: ${item.events.map((event) => event.detail).join("; ")}. ` +
-            briefing(state, item.unitId) +
-            (team.length > 1
-              ? `Also being decided now, so choose them to work together: ${team
-                  .filter((one) => one.id !== item.unitId)
-                  .map((one) => `${one.id} (${one.doing})`)
-                  .join(", ")}. `
-              : "") +
-            "The crew has already run its drill (returned fire, taken the nearest cover). " +
-            "Choose its order from now on. Weigh its mission and your commander's plan " +
-            "against the threats to it, its odds, the cover around it, its strength " +
-            "and its suppression. How it moves matters: a road march does not fire; " +
-            "tactical movement fires within its ROE; an assault fires at anything and " +
-            "closes to point-blank, which is how ground is taken; bounding is slow and " +
-            "covered. Once in contact, halting to engage, taking cover or flanking is " +
-            "usually better than driving on into the enemy; a quiet unit off its " +
-            "mission should resume it; an enemy that breaks can be pursued. " +
-            "Judge fire by what it has actually done (yourFire, lastDecisions) and the " +
-            "damage odds per minute in each option, not by how often rounds strike: " +
-            "if a long exchange is doing nothing, change something — close to effective " +
-            "range, flank, shift to a target you can hurt, or break contact. When a friend " +
-            "is already firing on a target, it can cover you while you move. " +
-            "Carry on only when what it is doing is working or nothing better is on offer.",
+            `${directive}You lead ${item.unitId} (${label}). ${BALANCE}\n\n` +
+            `Decision point ${item.point}, ${dp.title.toLowerCase()}. ${situationWords(state, item)} ${dp.question} ` +
+            (unit?.orders
+              ? `Its orders: ${unit.orders.task}. Intent: ${unit.orders.intent}. Urgency: ${unit.orders.urgency === "now" ? "now" : "when able"}. `
+              : `Its purpose: ${unit?.mission.purpose ?? "hold its ground"}. `) +
+            (others.length ? `Also deciding now, so choose to work together: ${others.join(", ")}. ` : "") +
+            "The crew has already done its drill (cover, and return fire if it can see the shooter).",
           criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary])),
         };
       }
+
+      const rulesTrace = (request: RtDecisionRequest, why: string, fallback: TacticalTrace["fallback"]) => {
+        const trace = ruleTrace(request, request.fallback, why, fallback);
+        return { ...trace, rationale: `${why}. ${exactOf(request)}` };
+      };
 
       let response: JevResponse;
       try {
         response = await withDeadline(options.call({ state: stateSent, questions }), timeoutMs);
       } catch (err) {
         return requests.map((request) => {
-          const optionId = ruleChoice(state, request);
-          const trace = ruleTrace(
+          const trace = rulesTrace(
             request,
-            optionId,
             `Jev unavailable (${describe(err)}) — the rules decided`,
             err instanceof Error && err.name === "JevTimeoutError" ? "timeout" : "error",
           );
           print(trace, stateSent);
-          return { unitId: request.unitId, optionId, trace };
+          return { unitId: request.unitId, optionId: request.fallback, trace };
         });
       }
 
@@ -357,19 +279,18 @@ export function jevRealtimeDecider(
         const answer = choiceOf(response.answers, key);
         const picked = choices.find((choice) => choice.key === answer?.choice);
         const confident = answer != null && picked != null && answer.confidence >= minConfidence;
-        // Unsure is not "carry on": with twenty options on the table even a
-        // clear preference can have low confidence, and defaulting to "carry
-        // on" is how a unit kept trading misses for ever. The rules decide.
-        const optionId = confident ? picked.id : ruleChoice(state, item);
+        const optionId = confident ? picked.id : item.fallback;
         const trace: TacticalTrace = {
           actorId: item.unitId,
-          question: item.events.map((event) => event.kind).join(" + "),
+          question: `${item.point} ${DECISION_POINTS[item.point].title}: ${item.events.map((event) => event.kind).join(" + ")}`,
           options: choices.map((choice) => ({ id: choice.id, summary: choice.summary })),
           chosenId: optionId,
           chosenBy: confident ? "jev" : "heuristic",
-          rationale: confident
-            ? item.events.map((event) => event.detail).join("; ")
-            : `Jev ${answer ? `was unsure (${picked?.id ?? answer.choice} at ${Math.round((answer.confidence ?? 0) * 100)}% confidence)` : "gave no answer"} — the rules chose`,
+          rationale:
+            (confident
+              ? item.events.map((event) => event.detail).join("; ")
+              : `Jev ${answer ? `was unsure (${picked?.id ?? answer.choice} at ${Math.round((answer.confidence ?? 0) * 100)}% confidence)` : "gave no answer"} — the rules chose`) +
+            `. ${exactOf(item)}`,
           probabilities: answer
             ? Object.fromEntries(choices.map((choice) => [choice.id, answer.probabilities[choice.key] ?? 0]))
             : undefined,
@@ -384,4 +305,10 @@ export function jevRealtimeDecider(
       });
     },
   };
+}
+
+/** The exact figures behind the words, for the console. */
+function exactOf(request: RtDecisionRequest): string {
+  const figures = request.options.filter((option) => option.exact).map((option) => `${option.id}: ${option.exact}`);
+  return figures.length ? `Exact: ${figures.join(" | ")}` : "";
 }

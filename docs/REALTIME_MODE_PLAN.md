@@ -152,7 +152,7 @@ the turn engine's event logs are still identical.
 | `engine/runner.ts` | the clock: coalesces events, cooldowns, severity, one batch per side, answers applied at event time + reaction time, and the clock **waits** for a late answer (so games replay exactly) |
 | `engine/deciders.ts` | the rule decider (default and fallback) |
 | `engine/jevDecider.ts` | Jev in command: one request per side per moment, "carry on" when unsure, rules when unreachable, console output |
-| `engine/initialOrders.ts` | opening orders: heuristic, or Jev (order + rules of engagement per unit, one request) |
+| `engine/orders.ts` | mission orders from the commander (Claude) or the heuristic, written only while the clock is stopped — see [REALTIME_COMMAND.md](REALTIME_COMMAND.md). (Replaced `initialOrders.ts`.) |
 | `RealtimePlay.tsx` | setup (placement, force lists, Jev in command, directives, ground and seed), generate initial orders, play/pause, ×1–×60, umpire/blue/red views, moving counters, order and fire lines, decision tags, live feed |
 
 **Findings from the first headless runs:**

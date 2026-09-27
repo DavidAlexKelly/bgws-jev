@@ -1,0 +1,736 @@
+<title>Real-Time Command Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f4f5f2;
+    --panel: #ffffff;
+    --ink: #1b2320;
+    --muted: #5a6560;
+    --rule: #d5dad6;
+    --cmd: #6547b3;
+    --cmd-bg: #efebfa;
+    --jev: #a85a07;
+    --jev-bg: #fbf0e2;
+    --game: #267461;
+    --game-bg: #e6f2ee;
+    --sans: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121614; --panel: #1a1f1d; --ink: #e2e8e4; --muted: #9ba7a1; --rule: #333c38;
+      --cmd: #b39df2; --cmd-bg: #231d38; --jev: #f0a54a; --jev-bg: #2e2213; --game: #62c3a8; --game-bg: #15291f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121614; --panel: #1a1f1d; --ink: #e2e8e4; --muted: #9ba7a1; --rule: #333c38;
+    --cmd: #b39df2; --cmd-bg: #231d38; --jev: #f0a54a; --jev-bg: #2e2213; --game: #62c3a8; --game-bg: #15291f;
+  }
+
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 1120px; margin: 0 auto; display: grid; gap: 48px; }
+  header { display: grid; gap: 10px; max-width: 70ch; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0; text-wrap: balance; }
+  h2 { font-size: 23px; line-height: 1.25; margin: 0; text-wrap: balance; }
+  h3 { font-size: 16px; margin: 0; }
+  p { margin: 0; max-width: 70ch; }
+  section { display: grid; gap: 16px; }
+  .lede { font-size: 18px; }
+  nav ol { margin: 0; padding-left: 20px; columns: 2 260px; column-gap: 32px; font-size: 15px; }
+  nav a { color: inherit; }
+
+  .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .role { background: var(--panel); border: 1px solid var(--rule); border-top: 4px solid var(--c); border-radius: 8px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+  .role .tag { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c); }
+  .role dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 14.5px; }
+  .role dt { color: var(--muted); }
+  .role dd { margin: 0; }
+  .c-cmd { --c: var(--cmd); } .c-jev { --c: var(--jev); } .c-game { --c: var(--game); }
+
+  .ladders { display: grid; gap: 20px; }
+  .ladder { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; display: grid; gap: 12px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+  .step { flex: 1 1 150px; border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--bg); display: grid; gap: 4px; align-content: start; }
+  .step b { font-size: 14.5px; }
+  .step span { font-size: 13.5px; color: var(--muted); }
+  .arrow-sep { align-self: center; color: var(--muted); font-family: var(--mono); }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  .scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px; }
+  .scroll svg { display: block; width: 100%; min-width: 900px; height: auto; color: var(--ink); }
+  figcaption { font-size: 14px; color: var(--muted); max-width: 82ch; }
+
+  svg text { font-family: var(--sans); fill: currentColor; }
+  svg .small { font-size: 12px; fill: var(--muted); }
+  svg .title { font-size: 14px; font-weight: 700; }
+  svg .lane-title { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.06em; }
+  svg .lane-cmd { fill: var(--cmd-bg); } svg .lane-jev { fill: var(--jev-bg); } svg .lane-game { fill: var(--game-bg); }
+  svg .box-cmd { fill: var(--panel); stroke: var(--cmd); stroke-width: 2; }
+  svg .box-jev { fill: var(--panel); stroke: var(--jev); stroke-width: 2; }
+  svg .box-game { fill: var(--panel); stroke: var(--game); stroke-width: 2; }
+  svg .t-cmd { fill: var(--cmd); } svg .t-jev { fill: var(--jev); } svg .t-game { fill: var(--game); }
+  svg .wire { fill: none; stroke: currentColor; stroke-width: 1.4; }
+  svg .wire-cmd { fill: none; stroke: var(--cmd); stroke-width: 1.8; }
+  svg .wire-jev { fill: none; stroke: var(--jev); stroke-width: 1.8; }
+  svg .wire-game { fill: none; stroke: var(--game); stroke-width: 1.8; }
+  svg .dash { stroke-dasharray: 5 4; }
+  svg .head { fill: currentColor; } svg .head-cmd { fill: var(--cmd); } svg .head-jev { fill: var(--jev); } svg .head-game { fill: var(--game); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 14.5px; background: var(--panel); }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: 0; }
+  th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  td.id { font-family: var(--mono); font-size: 13px; color: var(--jev); white-space: nowrap; }
+  td ul { margin: 0; padding-left: 18px; }
+  td li + li { margin-top: 2px; }
+
+  ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 76ch; }
+  ol.phases { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 76ch; }
+  .note { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 18px; font-size: 15px; max-width: 76ch; }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">BGWS real-time · design outline</p>
+    <h1>Real-time command design</h1>
+    <p class="lede">You can pause the simulation at any point and have Claude write new orders; Claude runs at no other time. Jev is each unit's leader, making the call at a handful of well-defined moments within those orders. The game resolves everything else, including what each side can and cannot know.</p>
+  </header>
+
+  <nav aria-label="Contents">
+    <ol>
+      <li><a href="#who">Who decides what</a></li>
+      <li><a href="#know">What each unit knows</a></li>
+      <li><a href="#machine">The unit state machine</a></li>
+      <li><a href="#points">The decision points</a></li>
+      <li><a href="#fire">Example: a shot, and the enemy's view</a></li>
+      <li><a href="#hold">Example: holding for a better shot</a></li>
+      <li><a href="#commander">Pausing and new orders</a></li>
+      <li><a href="#rules">Rules that keep it sane</a></li>
+      <li><a href="#build">Build order</a></li>
+    </ol>
+  </nav>
+
+  <section id="who" aria-labelledby="who-h">
+    <h2 id="who-h">1. Who decides what</h2>
+    <p>Your instinct is right: Jev should not run the battlefield. It is a fast, single-pass judge of one well-posed question. It is good at "given what this troop can see, what now?" and poor at "how should the battlegroup win?", which needs reasoning across the whole map. So the unit-goal layer I proposed goes. The plan and each unit's intent come from Claude's orders, and Claude runs only when you ask for it.</p>
+    <div class="who">
+      <div class="role c-cmd">
+        <span class="tag">Commander · Claude</span>
+        <h3>The plan and the orders</h3>
+        <dl>
+          <dt>Decides</dt><dd>Each unit's task, route, intent, engagement criteria, rules of engagement and default actions on contact</dd>
+          <dt>When</dt><dd>Only when you press "Generate orders": before the start, or while paused. Never on events, never on a timer.</dd>
+          <dt>Speed</dt><dd>Seconds, while the clock is stopped. Nothing moves until you resume.</dd>
+        </dl>
+      </div>
+      <div class="role c-jev">
+        <span class="tag">Unit leader · Jev</span>
+        <h3>The call at a decision point</h3>
+        <dl>
+          <dt>Decides</dt><dd>One choice from the options code generates for that moment, always inside the order</dd>
+          <dt>When</dt><dd>Only at the decision points in §4, never every second</dd>
+          <dt>Speed</dt><dd>~0.3 s, then the crew's reaction time</dd>
+        </dl>
+      </div>
+      <div class="role c-game">
+        <span class="tag">Crew and world · game logic</span>
+        <h3>Everything that is not a choice</h3>
+        <dl>
+          <dt>Decides</dt><dd>Movement, spotting, locating a shooter, firing cycles, hits, penetration, morale, drills, watching triggers</dd>
+          <dt>When</dt><dd>Every second</dd>
+          <dt>Speed</dt><dd>Instant and replayable: seeded, no network</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section id="know" aria-labelledby="know-h">
+    <h2 id="know-h">2. What each unit knows</h2>
+    <p>Most of your questions ("did it see where the shot came from?", "has it spotted us?") are about knowledge, so knowledge is modelled first. Each unit holds two beliefs, both kept by game logic. Jev is only ever shown the unit's beliefs, never the truth.</p>
+    <div class="ladders">
+      <div class="ladder">
+        <h3>About each enemy: how much this unit knows</h3>
+        <div class="steps">
+          <div class="step"><b>Unaware</b><span>Nothing. Its absence is not evidence it is not there.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Suspected</b><span>A bearing only: fired on from the north-west, heard firing, or a friend's vague report.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Located</b><span>A position, type unknown. Can be fired on at a penalty.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Identified</b><span>Position and type: a tank troop, 4 vehicles. Full odds can be worked out.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Lost</b><span>Out of sight for 2 min: a last known position with its age.</span></div>
+        </div>
+        <p style="font-size:14.5px;color:var(--muted)">Moves up by a spotting roll each second, a <b>locate roll</b> when fired on, or a friend's report after 15 s. Moves down when out of sight.</p>
+      </div>
+      <div class="ladder">
+        <h3>About itself: does it think the enemy knows it is there?</h3>
+        <div class="steps">
+          <div class="step"><b>Unobserved</b><span>No sign it has been seen.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Possibly seen</b><span>A cue from an enemy it can see: halted, turned towards it, went to ground, started moving its way.</span></div>
+          <div class="arrow-sep" aria-hidden="true">→</div>
+          <div class="step"><b>Known seen</b><span>Fired on, or rounds landing close.</span></div>
+        </div>
+        <p style="font-size:14.5px;color:var(--muted)">Cues come only from what the unit can observe, never from whether the enemy really spotted it. So an enemy that stops at a waypoint by coincidence produces the same cue as one that has spotted it. That ambiguity is the real one, and Jev has to weigh it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="machine" aria-labelledby="machine-h">
+    <h2 id="machine-h">3. The unit state machine</h2>
+    <p>A unit is always in one activity, which game logic carries out every second. It leaves an activity only through an event, and an event that matters becomes a decision point for Jev. Each activity lists what ends it. New orders from Claude arrive only after a pause, through decision point D0.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 660" role="img" aria-label="State machine. Claude's orders, written while paused, put a unit into Executing order through decision point D0. Six activities surround a central decision point: executing order, engaging, waiting for a trigger, manoeuvring, observing or searching, and withdrawing. Game logic runs each activity every second. Events end an activity and bring the unit back to the decision point, where Jev picks the next activity. The crew drill runs instantly on contact, and shaken or broken units are run by the autopilot outside the loop.">
+          <defs>
+            <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="mj" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-jev" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="mc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-cmd" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-game" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+
+          <!-- Commander -->
+          <rect class="box-cmd" x="30" y="30" width="220" height="64" rx="6"/>
+          <text class="title t-cmd" x="140" y="57" text-anchor="middle">Commander · Claude</text>
+          <text class="small" x="140" y="77" text-anchor="middle">only when you pause</text>
+
+          <!-- Hub: decision point -->
+          <path class="box-jev" d="M550,262 L680,330 L550,398 L420,330 z"/>
+          <text class="title t-jev" x="550" y="325" text-anchor="middle">Decision point</text>
+          <text class="small" x="550" y="343" text-anchor="middle">Jev picks 1 of 3–7</text>
+
+          <!-- Activities -->
+          <rect class="box-game" x="30" y="298" width="220" height="64" rx="6"/>
+          <text class="title" x="140" y="324" text-anchor="middle">Executing order</text>
+          <text class="small" x="140" y="344" text-anchor="middle">move, hold or watch as ordered</text>
+
+          <rect class="box-game" x="250" y="130" width="220" height="64" rx="6"/>
+          <text class="title" x="360" y="156" text-anchor="middle">Engaging</text>
+          <text class="small" x="360" y="176" text-anchor="middle">acquire, fire every cycle</text>
+
+          <rect class="box-game" x="630" y="130" width="220" height="64" rx="6"/>
+          <text class="title" x="740" y="156" text-anchor="middle">Waiting for a trigger</text>
+          <text class="small" x="740" y="176" text-anchor="middle">hidden, watching its trigger</text>
+
+          <rect class="box-game" x="850" y="298" width="220" height="64" rx="6"/>
+          <text class="title" x="960" y="324" text-anchor="middle">Manoeuvring</text>
+          <text class="small" x="960" y="344" text-anchor="middle">to a spot code picked</text>
+
+          <rect class="box-game" x="630" y="466" width="220" height="64" rx="6"/>
+          <text class="title" x="740" y="492" text-anchor="middle">Observing or searching</text>
+          <text class="small" x="740" y="512" text-anchor="middle">stay hidden, scan a bearing</text>
+
+          <rect class="box-game" x="250" y="466" width="220" height="64" rx="6"/>
+          <text class="title" x="360" y="492" text-anchor="middle">Withdrawing</text>
+          <text class="small" x="360" y="512" text-anchor="middle">to friends, out of sight</text>
+
+          <!-- Commander to executing order -->
+          <path class="wire-cmd" d="M140,94 L140,296" marker-end="url(#mc)"/>
+          <text class="small" x="148" y="194">new orders,</text>
+          <text class="small" x="148" y="209">through D0</text>
+          <!-- Escalation hub to commander -->
+
+          <!-- Spokes: out (chosen, amber) and back (events, neutral) -->
+          <!-- Executing order -->
+          <path class="wire-jev" d="M418,322 L252,322" marker-end="url(#mj)"/>
+          <path class="wire" d="M252,340 L418,340" marker-end="url(#m)"/>
+          <text class="small" x="335" y="360" text-anchor="middle">contact · fired on · done</text>
+          <!-- Engaging -->
+          <path class="wire-jev" d="M470,292 L380,196" marker-end="url(#mj)"/>
+          <path class="wire" d="M402,196 L488,286" marker-end="url(#m)"/>
+          <text class="small" x="452" y="226">result · target lost</text>
+          <text class="small" x="452" y="241">fire not working</text>
+          <!-- Waiting -->
+          <path class="wire-jev" d="M612,286 L700,196" marker-end="url(#mj)"/>
+          <path class="wire" d="M720,196 L630,292" marker-end="url(#m)"/>
+          <text class="small" x="750" y="226">trigger met · cue</text>
+          <text class="small" x="750" y="241">fired on</text>
+          <!-- Manoeuvring -->
+          <path class="wire-jev" d="M682,322 L848,322" marker-end="url(#mj)"/>
+          <path class="wire" d="M848,340 L682,340" marker-end="url(#m)"/>
+          <text class="small" x="765" y="360" text-anchor="middle">arrived · contact · fired on</text>
+          <!-- Observing -->
+          <path class="wire-jev" d="M612,374 L700,464" marker-end="url(#mj)"/>
+          <path class="wire" d="M720,464 L630,368" marker-end="url(#m)"/>
+          <text class="small" x="750" y="420">found it · timed out</text>
+          <text class="small" x="750" y="435">fired on</text>
+          <!-- Withdrawing -->
+          <path class="wire-jev" d="M488,374 L400,464" marker-end="url(#mj)"/>
+          <path class="wire" d="M380,464 L470,368" marker-end="url(#m)"/>
+          <text class="small" x="300" y="420" text-anchor="end">safe · pursued</text>
+          <text class="small" x="300" y="435" text-anchor="end">fired on</text>
+
+          <!-- Drill and autopilot -->
+          <rect class="box-game" x="850" y="560" width="220" height="64" rx="6"/>
+          <text class="title" x="960" y="586" text-anchor="middle">Drill, 0 s</text>
+          <text class="small" x="960" y="606" text-anchor="middle">on "fired on": cover, return fire</text>
+          <rect class="box-game" x="30" y="560" width="220" height="64" rx="6"/>
+          <text class="title" x="140" y="586" text-anchor="middle">Shaken or broken</text>
+          <text class="small" x="140" y="606" text-anchor="middle">autopilot only, until it rallies</text>
+
+          <!-- Legend -->
+          <path class="wire-jev" d="M420,610 L460,610" marker-end="url(#mj)"/>
+          <text class="small" x="468" y="614">Jev's choice</text>
+          <path class="wire" d="M570,610 L610,610" marker-end="url(#m)"/>
+          <text class="small" x="618" y="614">event, from game logic</text>
+        </svg>
+      </div>
+      <figcaption>Green boxes are activities game logic runs every second. The amber diamond is the only place Jev decides: an event ends the current activity, and Jev picks the next one from options code generates for that event. The drill and the shaken or broken state sit outside the loop because they need no decision. Nothing goes up to Claude automatically: it runs only when you pause and ask for orders.</figcaption>
+    </figure>
+  </section>
+
+  <section id="points" aria-labelledby="points-h">
+    <h2 id="points-h">4. The decision points</h2>
+    <p>This is the complete list. Each has a fixed trigger, a fixed set of options (generated by code, so Jev can only pick something legal), and a defined follow-up by game logic. If an event matches none of them, Jev is not asked.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Decision point</th><th>Triggered when (game logic)</th><th>Options Jev picks from</th><th>What the game does next</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">D0</td>
+            <td><b>New orders arrive</b></td>
+            <td>You resume after "Generate orders" changed this unit's order, and the unit is in contact. Out of contact, it switches at once with no call.</td>
+            <td><ul>
+              <li><i>Order marked "now":</i> break off at once · under covering fire · fire and move back</li>
+              <li><i>Order marked "when able":</i> comply now · finish this fight first · break contact, then comply</li>
+            </ul></td>
+            <td>"Finish first" is time-boxed: until the target is destroyed or lost, or 2 min, whichever comes first. Then the order runs with no further call, so it can't drift.</td>
+          </tr>
+          <tr>
+            <td class="id">D1</td>
+            <td><b>New contact</b></td>
+            <td>The unit locates an enemy it did not know about, by its own spotting or a friend's report</td>
+            <td><ul>
+              <li>Carry on with the order</li>
+              <li>Engage now</li>
+              <li>Hold and wait for a trigger (D4 lists the triggers)</li>
+              <li>Get a better shot: hull-down, closer or flank; code picks the spot</li>
+              <li>Observe and report, without firing</li>
+              <li>Pull back to friends</li>
+            </ul></td>
+            <td>Engage: acquire, fire, then the enemy's <b>locate roll</b> (§5). Hold: the trigger is watched each second. Move: route and go. Observe: its reports reach the side.</td>
+          </tr>
+          <tr>
+            <td class="id">D2</td>
+            <td><b>Fired on, shooter located</b></td>
+            <td>Incoming fire and this unit's locate roll succeeded</td>
+            <td><ul>
+              <li>Return fire from here (the drill has already taken cover if any was close)</li>
+              <li>Back into hull-down, then return fire</li>
+              <li>Pull back out of its sight</li>
+              <li>Assault it</li>
+              <li>Hold, stay in cover, don't fire</li>
+            </ul></td>
+            <td>As for engage or move. Returning fire gives the shooter a locate roll on this unit.</td>
+          </tr>
+          <tr>
+            <td class="id">D3</td>
+            <td><b>Fired on, shooter not located</b></td>
+            <td>Incoming fire and the locate roll failed: it knows only a bearing</td>
+            <td><ul>
+              <li>Search that bearing (hold still; spotting rate doubled for 30 s)</li>
+              <li>Move into cover away from the bearing</li>
+              <li>Pull back</li>
+              <li>Carry on with the order</li>
+            </ul></td>
+            <td>Search: another locate roll each second; if found, D2; after 30 s, asked again. Each later volley gives a fresh locate roll with better odds.</td>
+          </tr>
+          <tr>
+            <td class="id">D4</td>
+            <td><b>Trigger met</b></td>
+            <td>The trigger chosen at D1 is met. Triggers are offered as concrete choices:
+              <ul>
+                <li>"hit chance reaches 80% (about 1,500 m)"</li>
+                <li>"it shows its side"</li>
+                <li>"inside 800 m"</li>
+                <li>"it reaches the treeline"</li>
+              </ul></td>
+            <td><ul>
+              <li>Fire now</li>
+              <li>Wait for a closer trigger</li>
+              <li>Let it pass and stay hidden</li>
+            </ul>
+            A trigger can instead be chosen as "fire automatically when met". Then no call is needed, which is quicker and is how a pre-briefed ambush works.</td>
+            <td>As for engage. Waiting sets the new trigger.</td>
+          </tr>
+          <tr>
+            <td class="id">D5</td>
+            <td><b>Enemy behaviour changed</b></td>
+            <td>While hidden (waiting, observing or holding), an enemy it can see halts, turns towards it, goes to ground or starts towards it. At most once per enemy every 30 s.</td>
+            <td><ul>
+              <li>Fire first, while you still can</li>
+              <li>Keep holding (it may be a coincidence)</li>
+              <li>Relocate quietly</li>
+              <li>Pull back</li>
+            </ul></td>
+            <td>The unit's self-belief becomes "possibly seen", which Jev sees as a band. It is not told whether the enemy really saw it.</td>
+          </tr>
+          <tr>
+            <td class="id">D6</td>
+            <td><b>After a volley</b></td>
+            <td>After the first volley at a target, and after any volley that knocks a vehicle out</td>
+            <td><ul>
+              <li>Keep firing: it hasn't located you yet</li>
+              <li>Fire and move: shoot, then change position before it finds you</li>
+              <li>Shift to another target</li>
+              <li>Stop firing and go quiet</li>
+              <li>Pull back</li>
+            </ul></td>
+            <td>Jev sees whether the enemy has reacted (returned fire, moved, gone to ground) and an estimate of how likely it is to have located you, as a band.</td>
+          </tr>
+          <tr>
+            <td class="id">D7</td>
+            <td><b>Target lost</b></td>
+            <td>The target goes out of sight or is destroyed</td>
+            <td><ul>
+              <li>Watch its last known position</li>
+              <li>Move to regain sight</li>
+              <li>Next target</li>
+              <li>Back to the order</li>
+            </ul></td>
+            <td>As chosen.</td>
+          </tr>
+          <tr>
+            <td class="id">D8</td>
+            <td><b>Fire not working</b></td>
+            <td>Engaging for 3 min with nothing knocked out</td>
+            <td><ul>
+              <li>Get a better shot</li>
+              <li>Shift target</li>
+              <li>Stop firing and go quiet</li>
+              <li>Pull back</li>
+              <li>Keep at it</li>
+            </ul></td>
+            <td>As chosen.</td>
+          </tr>
+          <tr>
+            <td class="id">D9</td>
+            <td><b>Friend needs help</b></td>
+            <td>A friendly unit within 1.5 km is fired on or loses a vehicle, and this unit can see or reach its attacker</td>
+            <td><ul>
+              <li>Fire on its attacker</li>
+              <li>Move to support it</li>
+              <li>Carry on</li>
+            </ul></td>
+            <td>As chosen. This is how units cover each other without a commander.</td>
+          </tr>
+          <tr>
+            <td class="id">D10</td>
+            <td><b>Order step done or blocked</b></td>
+            <td>Arrived, route blocked, or the order's current phase is complete</td>
+            <td><ul>
+              <li>Next phase of the order</li>
+              <li>Hold here</li>
+              <li>Overwatch</li>
+            </ul></td>
+            <td>If Claude's order already names the next phase, it simply continues and Jev isn't asked. When a unit runs out of orders, it is flagged for you on screen.</td>
+          </tr>
+          <tr>
+            <td class="id">D11</td>
+            <td><b>Rallied</b></td>
+            <td>A shaken or broken unit recovers</td>
+            <td><ul>
+              <li>Rejoin the order</li>
+              <li>Hold and recover</li>
+              <li>Join the nearest friends</li>
+            </ul></td>
+            <td>Back into the loop.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>What Jev is shown at every decision point:</p>
+    <ul class="plain">
+      <li>the order's intent, urgency and engagement criteria;</li>
+      <li>the unit's beliefs about each enemy and about itself;</li>
+      <li>the odds, in words ("likely to knock one out within a minute", "its rounds can't get through your front");</li>
+      <li>its friends within reach;</li>
+      <li>the last few decisions and what came of them.</li>
+    </ul>
+  </section>
+
+  <section id="fire" aria-labelledby="fire-h">
+    <h2 id="fire-h">5. Example: a shot, and the enemy's view</h2>
+    <p>Your first example. Troop A spots troop B at 1,900 m and decides to engage. The key step is that B does not automatically know where the fire came from. Game logic rolls for it.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 700" role="img" aria-label="Sequence across three lanes: unit A, game logic, unit B. A spots B and Jev chooses engage. Game logic acquires and fires, then rolls whether B locates A. If located, B gets decision D2 with return fire as an option. If not, B gets decision D3 with search and cover options. A gets decision D6 after its volley, seeing whether B reacted. Each later volley gives B another locate roll with better odds.">
+          <defs>
+            <marker id="n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="lane-jev" x="10" y="10" width="340" height="680" rx="8"/>
+          <rect class="lane-game" x="380" y="10" width="340" height="680" rx="8"/>
+          <rect class="lane-jev" x="750" y="10" width="340" height="680" rx="8"/>
+          <text class="lane-title t-jev" x="180" y="38" text-anchor="middle">TROOP A · FIRER</text>
+          <text class="lane-title t-game" x="550" y="38" text-anchor="middle">GAME LOGIC</text>
+          <text class="lane-title t-jev" x="920" y="38" text-anchor="middle">TROOP B · TARGET</text>
+
+          <rect class="box-game" x="30" y="60" width="300" height="56" rx="6"/>
+          <text class="title" x="180" y="84" text-anchor="middle">Spotting roll: locates B at 1,900 m</text>
+          <text class="small" x="180" y="103" text-anchor="middle">B is moving, so easier to see</text>
+
+          <rect class="box-jev" x="30" y="140" width="300" height="64" rx="6"/>
+          <text class="title t-jev" x="180" y="165" text-anchor="middle">D1 new contact → engage now</text>
+          <text class="small" x="180" y="185" text-anchor="middle">B is unaware; our hit chance 80%</text>
+
+          <rect class="box-game" x="400" y="230" width="300" height="64" rx="6"/>
+          <text class="title" x="550" y="255" text-anchor="middle">Acquire 8 s, then 4 rounds</text>
+          <text class="small" x="550" y="275" text-anchor="middle">1 hit (front, no penetration), 3 land close</text>
+
+          <rect class="box-game" x="400" y="320" width="300" height="84" rx="6"/>
+          <text class="title" x="550" y="345" text-anchor="middle">Locate roll for B</text>
+          <text class="small" x="550" y="365" text-anchor="middle">range 1,900 m · A hull-down · first volley</text>
+          <text class="small" x="550" y="383" text-anchor="middle">B always gets the bearing; P(locates A)</text>
+          <text class="small" x="550" y="397" text-anchor="middle">here ≈ 35%</text>
+
+          <rect class="box-jev" x="770" y="310" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="920" y="335" text-anchor="middle">Located A → D2</text>
+          <text class="small" x="920" y="355" text-anchor="middle">return fire · hull-down and return fire</text>
+          <text class="small" x="920" y="373" text-anchor="middle">pull back · assault · hold, stay quiet</text>
+
+          <rect class="box-jev" x="770" y="430" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="920" y="455" text-anchor="middle">Bearing only → D3</text>
+          <text class="small" x="920" y="475" text-anchor="middle">search that bearing · cover away from it</text>
+          <text class="small" x="920" y="493" text-anchor="middle">pull back · carry on</text>
+
+          <rect class="box-jev" x="30" y="430" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="180" y="455" text-anchor="middle">D6 after the volley</text>
+          <text class="small" x="180" y="475" text-anchor="middle">sees: B went to ground, not firing back</text>
+          <text class="small" x="180" y="493" text-anchor="middle">keep firing · fire and move · go quiet</text>
+
+          <rect class="box-game" x="400" y="560" width="300" height="84" rx="6"/>
+          <text class="title" x="550" y="585" text-anchor="middle">Each further volley</text>
+          <text class="small" x="550" y="605" text-anchor="middle">B gets a new locate roll, more likely</text>
+          <text class="small" x="550" y="623" text-anchor="middle">each time. Moving after firing resets it.</text>
+
+          <path class="wire" d="M180,116 L180,138" marker-end="url(#n)"/>
+          <path class="wire" d="M330,172 L550,172 L550,228" marker-end="url(#n)"/>
+          <text class="small" x="440" y="164" text-anchor="middle">engage</text>
+          <path class="wire" d="M550,294 L550,318" marker-end="url(#n)"/>
+          <path class="wire" d="M700,352 L768,352" marker-end="url(#n)"/>
+          <text class="small" x="734" y="344" text-anchor="middle">35%</text>
+          <path class="wire" d="M680,404 L680,472 L768,472" marker-end="url(#n)"/>
+          <text class="small" x="690" y="440">65%</text>
+          <path class="wire" d="M420,404 L420,472 L332,472" marker-end="url(#n)"/>
+          <text class="small" x="376" y="464" text-anchor="middle">what A sees</text>
+          <path class="wire dash" d="M180,514 L180,602 L398,602" marker-end="url(#n)"/>
+          <text class="small" x="190" y="560">keep firing</text>
+          <path class="wire dash" d="M700,600 L730,600 L730,380 L702,380" marker-end="url(#n)"/>
+          <text class="small" x="738" y="560">roll again</text>
+        </svg>
+      </div>
+      <figcaption>A shot does not reveal the shooter automatically, as it does in today's code. The target always learns a bearing. Whether it locates the shooter is a roll: easier at short range, against a shooter in the open, and after several volleys; harder against one that is hull-down or in cover. That is what gives "keep firing while you have surprise" and "fire and move" real meaning.</figcaption>
+    </figure>
+  </section>
+
+  <section id="hold" aria-labelledby="hold-h">
+    <h2 id="hold-h">6. Example: holding for a better shot</h2>
+    <p>Your second example. Troop A, hull-down and unseen, spots troop B approaching at 2,600 m and decides to wait for a better shot. "Close enough" is not a later Jev question. It is part of the hold decision: Jev picks a concrete trigger and game logic watches for it.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 610" role="img" aria-label="Sequence across three lanes. A chooses to hold and fire automatically when its hit chance reaches 80 percent. Game logic checks the trigger every second and runs B's spotting rolls against hidden A. Three outcomes: the trigger is met and A fires without another call; B halts, which A sees as a cue and gets decision D5 without knowing why B halted; or B fires first, giving A decision D2 or D3.">
+          <defs>
+            <marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="lane-jev" x="10" y="10" width="340" height="590" rx="8"/>
+          <rect class="lane-game" x="380" y="10" width="340" height="590" rx="8"/>
+          <rect class="lane-jev" x="750" y="10" width="340" height="590" rx="8"/>
+          <text class="lane-title t-jev" x="180" y="38" text-anchor="middle">TROOP A · WAITING</text>
+          <text class="lane-title t-game" x="550" y="38" text-anchor="middle">GAME LOGIC · EVERY SECOND</text>
+          <text class="lane-title t-jev" x="920" y="38" text-anchor="middle">TROOP B · APPROACHING</text>
+
+          <rect class="box-jev" x="30" y="60" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="180" y="85" text-anchor="middle">D1 → hold, fire automatically</text>
+          <text class="title t-jev" x="180" y="103" text-anchor="middle">when hit chance ≥ 80%</text>
+          <text class="small" x="180" y="123" text-anchor="middle">code works it out: about 1,500 m</text>
+
+          <rect class="box-game" x="400" y="160" width="300" height="84" rx="6"/>
+          <text class="title" x="550" y="185" text-anchor="middle">Check the trigger</text>
+          <text class="small" x="550" y="205" text-anchor="middle">and roll B's spotting against A:</text>
+          <text class="small" x="550" y="223" text-anchor="middle">hull-down and still, so a low rate</text>
+
+          <rect class="box-game" x="770" y="160" width="300" height="84" rx="6"/>
+          <text class="title" x="920" y="185" text-anchor="middle">Keeps moving on its route</text>
+          <text class="small" x="920" y="205" text-anchor="middle">if B spots A, B's own D1 runs:</text>
+          <text class="small" x="920" y="223" text-anchor="middle">B might halt, turn or fire</text>
+
+          <!-- Three outcomes -->
+          <rect class="box-game" x="400" y="290" width="300" height="72" rx="6"/>
+          <text class="title" x="550" y="315" text-anchor="middle">① Trigger met at 1,500 m</text>
+          <text class="small" x="550" y="335" text-anchor="middle">A fires at once, no Jev call;</text>
+          <text class="small" x="550" y="351" text-anchor="middle">then as in §5 (locate roll, D6)</text>
+
+          <rect class="box-jev" x="30" y="390" width="300" height="100" rx="6"/>
+          <text class="title t-jev" x="180" y="415" text-anchor="middle">② B halts at 2,100 m → D5</text>
+          <text class="small" x="180" y="435" text-anchor="middle">"B has stopped: it may have seen you"</text>
+          <text class="small" x="180" y="453" text-anchor="middle">fire first (hit chance 65%) · keep holding</text>
+          <text class="small" x="180" y="471" text-anchor="middle">relocate quietly · pull back</text>
+
+          <rect class="box-jev" x="30" y="510" width="300" height="72" rx="6"/>
+          <text class="title t-jev" x="180" y="535" text-anchor="middle">③ B fires first → D2 or D3</text>
+          <text class="small" x="180" y="555" text-anchor="middle">A's locate roll decides which</text>
+
+          <rect class="box-game" x="770" y="390" width="300" height="100" rx="6"/>
+          <text class="title" x="920" y="415" text-anchor="middle">Why did B halt?</text>
+          <text class="small" x="920" y="435" text-anchor="middle">it spotted A (B's D1: hold or overwatch),</text>
+          <text class="small" x="920" y="453" text-anchor="middle">or it just reached a waypoint.</text>
+          <text class="small" x="920" y="471" text-anchor="middle">A can't tell which. Only the cue exists.</text>
+
+          <path class="wire" d="M330,102 L550,102 L550,158" marker-end="url(#k)"/>
+          <text class="small" x="440" y="94" text-anchor="middle">trigger set</text>
+          <path class="wire" d="M550,244 L550,288" marker-end="url(#k)"/>
+          <text class="small" x="558" y="270">closes to 1,500 m</text>
+          <path class="wire" d="M920,244 L920,388" marker-end="url(#k)"/>
+          <text class="small" x="928" y="320">halts</text>
+          <path class="wire" d="M768,440 L332,440" marker-end="url(#k)"/>
+          <text class="small" x="550" y="432" text-anchor="middle">A sees it stop: the cue</text>
+          <path class="wire" d="M1000,490 L1000,546 L332,546" marker-end="url(#k)"/>
+          <text class="small" x="660" y="538" text-anchor="middle">B fires first</text>
+        </svg>
+      </div>
+      <figcaption>The trigger is picked from concrete options code works out ("hit chance 80%, about 1,500 m", "inside 800 m", "when it shows its side"). Game logic checks it every second. The same second, B is rolling to spot hidden A, which is hard against a still, hull-down target. If B spots A, B's own decision may make it halt, and A sees only that it halted. That uncertain cue is decision D5.</figcaption>
+    </figure>
+  </section>
+
+  <section id="commander" aria-labelledby="cmd-h">
+    <h2 id="cmd-h">7. Pausing and new orders</h2>
+    <p>You can pause at any moment. While paused the clock is stopped, and "Generate orders" asks Claude for a new plan: for one side or both, optionally with your own guidance ("hold the bridge; the northern troop is too exposed"). Claude sees what that side knows: its units' strength, cohesion and position, the enemy as that side has sighted it, the last few minutes of events, and each unit's current order and how far it has got. You review the orders, then resume. Claude does nothing while the clock runs.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 330" role="img" aria-label="Play and pause loop. Setup, then Generate orders by Claude, then Running, where game logic and Jev act. You press pause at any point: the clock stops. From paused you can resume unchanged, or press Generate orders: Claude writes a new plan from that side's picture and your guidance, you review it, and on resume each unit receives its new order through decision point D0. While running, the game only flags things for you; it never calls Claude.">
+          <defs>
+            <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="pc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-cmd" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="box-game" x="30" y="60" width="170" height="64" rx="6"/>
+          <text class="title" x="115" y="87" text-anchor="middle">Setup</text>
+          <text class="small" x="115" y="107" text-anchor="middle">place units</text>
+
+          <rect class="box-cmd" x="250" y="60" width="200" height="64" rx="6"/>
+          <text class="title t-cmd" x="350" y="87" text-anchor="middle">Generate orders</text>
+          <text class="small" x="350" y="107" text-anchor="middle">Claude writes the plan</text>
+
+          <rect class="box-jev" x="500" y="60" width="250" height="64" rx="6"/>
+          <text class="title" x="625" y="87" text-anchor="middle">Running</text>
+          <text class="small" x="625" y="107" text-anchor="middle">game logic · Jev at D0–D11</text>
+
+          <rect class="box-game" x="500" y="220" width="250" height="64" rx="6"/>
+          <text class="title" x="625" y="247" text-anchor="middle">Paused</text>
+          <text class="small" x="625" y="267" text-anchor="middle">clock stopped · nothing changes</text>
+
+          <rect class="box-cmd" x="830" y="220" width="240" height="64" rx="6"/>
+          <text class="title t-cmd" x="950" y="247" text-anchor="middle">Generate orders</text>
+          <text class="small" x="950" y="267" text-anchor="middle">that side's picture + your guidance</text>
+
+          <rect class="box-game" x="830" y="60" width="240" height="64" rx="6"/>
+          <text class="title" x="950" y="87" text-anchor="middle">Review, then resume</text>
+          <text class="small" x="950" y="107" text-anchor="middle">each changed unit goes through D0</text>
+
+          <path class="wire" d="M200,92 L248,92" marker-end="url(#p)"/>
+          <path class="wire" d="M450,92 L498,92" marker-end="url(#p)"/>
+          <text class="small" x="474" y="84" text-anchor="middle">play</text>
+          <path class="wire" d="M600,124 L600,218" marker-end="url(#p)"/>
+          <text class="small" x="592" y="176" text-anchor="end">you press pause</text>
+          <path class="wire" d="M650,218 L650,126" marker-end="url(#p)"/>
+          <text class="small" x="658" y="176">resume unchanged</text>
+          <path class="wire-cmd" d="M750,252 L828,252" marker-end="url(#pc)"/>
+          <path class="wire" d="M950,220 L950,126" marker-end="url(#p)"/>
+          <text class="small" x="958" y="176">orders ready</text>
+          <path class="wire" d="M830,92 L752,92" marker-end="url(#p)"/>
+          <text class="small" x="791" y="84" text-anchor="middle">resume</text>
+
+          <path class="wire dash" d="M625,60 L625,30 L650,30"/>
+          <text class="small" x="658" y="34">flags for you only: a unit out of orders, 25% losses, an objective taken</text>
+        </svg>
+      </div>
+      <figcaption>Claude appears only on the pause path. While the game runs it raises flags for you (a unit out of orders, heavy losses, an objective taken), but whether to pause and re-plan is your call.</figcaption>
+    </figure>
+
+    <h3>Hard orders or loose goals? Mission orders, with an urgency</h3>
+    <p>Neither extreme works. "Stop and obey at once" makes units turn their backs in the middle of a fight, which gets them killed; real armies don't order that way. A loose goal risks units never getting round to it, because Jev will always find a good local reason to keep fighting. So each order Claude writes has four parts:</p>
+    <ul class="plain">
+      <li><b>Task and phases:</b> "advance to the ridge, then overwatch the bridge". What game logic carries out.</li>
+      <li><b>Intent,</b> in one line: "keep the bridge under fire so the infantry can cross". Jev reads it at every decision, so a unit that is fighting weighs its fight against what the plan needs.</li>
+      <li><b>Urgency:</b> <i>now</i> or <i>when able</i>, per unit. The default is <i>when able</i>; <i>now</i> is for orders where the timing is the point, like "withdraw before the flank collapses".</li>
+      <li><b>Constraints,</b> which game logic enforces and Jev never overrides: "don't cross the river", "fire only in self-defence", "stay south of the road". Plus the default actions on contact, which are what the rules fall back to when Jev is unsure.</li>
+    </ul>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 330" role="img" aria-label="What happens when a new order reaches a unit. If the unit is not in contact, it switches at once with no call. If it is and the order is marked now, Jev picks only how to break off: at once, under covering fire, or fire and move back. If marked when able, Jev picks when to switch: comply now, finish this fight first, or break contact first. Finishing first is time-boxed to the target being destroyed or lost, or two minutes, after which the order runs automatically.">
+          <defs>
+            <marker id="q" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="box-cmd" x="30" y="130" width="190" height="70" rx="6"/>
+          <text class="title t-cmd" x="125" y="160" text-anchor="middle">New order reaches</text>
+          <text class="title t-cmd" x="125" y="178" text-anchor="middle">the unit on resume</text>
+
+          <path class="box-game" d="M360,120 L460,165 L360,210 L260,165 z"/>
+          <text class="title" x="360" y="161" text-anchor="middle">In contact?</text>
+          <text class="small" x="360" y="178" text-anchor="middle">urgency?</text>
+
+          <rect class="box-jev" x="520" y="30" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="670" y="56" text-anchor="middle">D0 · "now": how to break off</text>
+          <text class="small" x="670" y="76" text-anchor="middle">at once · under covering fire</text>
+          <text class="small" x="670" y="94" text-anchor="middle">fire and move back</text>
+
+          <rect class="box-jev" x="520" y="216" width="300" height="84" rx="6"/>
+          <text class="title t-jev" x="670" y="242" text-anchor="middle">D0 · "when able": when to switch</text>
+          <text class="small" x="670" y="262" text-anchor="middle">comply now · finish this fight first</text>
+          <text class="small" x="670" y="280" text-anchor="middle">break contact, then comply</text>
+
+          <rect class="box-game" x="880" y="130" width="190" height="70" rx="6"/>
+          <text class="title" x="975" y="160" text-anchor="middle">Carry out</text>
+          <text class="title" x="975" y="178" text-anchor="middle">the new order</text>
+
+          <path class="wire" d="M220,165 L258,165" marker-end="url(#q)"/>
+          <path class="wire" d="M360,120 L360,72 L518,72" marker-end="url(#q)"/>
+          <text class="small" x="370" y="64">in contact, "now"</text>
+          <path class="wire" d="M360,210 L360,258 L518,258" marker-end="url(#q)"/>
+          <text class="small" x="370" y="276">in contact, "when able"</text>
+          <path class="wire" d="M462,165 L878,165" marker-end="url(#q)"/>
+          <text class="small" x="670" y="157" text-anchor="middle">not in contact: switch at once, no call</text>
+          <path class="wire" d="M820,72 L975,72 L975,128" marker-end="url(#q)"/>
+          <path class="wire" d="M820,258 L975,258 L975,202" marker-end="url(#q)"/>
+          <text class="small" x="840" y="296">"finish first" ends when the target</text>
+          <text class="small" x="840" y="312">is gone, or after 2 min at most</text>
+        </svg>
+      </div>
+      <figcaption>A new order never makes a unit turn its back mid-fight, and a "finish first" can't last for ever. Out of contact, the switch is immediate and needs no call.</figcaption>
+    </figure>
+    <p>Jev is told the balance in plain words at every decision: <i>the intent comes first; keep the unit alive and able to carry it out; take a local opportunity only when it doesn't cost the intent</i>. The time-box and the constraints make sure that balance can't be argued away.</p>
+  </section>
+
+  <section id="rules" aria-labelledby="rules-h">
+    <h2 id="rules-h">8. Rules that keep it sane</h2>
+    <ul class="plain">
+      <li><b>Claude runs only when you pause and ask.</b> The game flags things for you; it never calls Claude on its own.</li>
+      <li><b>Only the decision points in §4 ask Jev.</b> Everything else is game logic. That keeps calls to a few per unit per engagement.</li>
+      <li><b>One decision in flight per unit.</b> Events that arrive while it's pending are folded into the next question, not queued as separate ones.</li>
+      <li><b>Timing:</b> events are held 3 s to fold a burst into one question, answers take effect after the crew's reaction time (5–15 s by quality), and serious events skip the 20 s cooldown.</li>
+      <li><b>Cues are rationed:</b> at most one D5 per enemy every 30 s, and only while the unit is trying to stay hidden.</li>
+      <li><b>Words, not numbers:</b> odds and distances shown to Jev as bands, with the exact figures kept in the console log.</li>
+      <li><b>Short, fixed option lists per decision point,</b> always in the same order, always including a safe default, and each with a rules fallback that follows the order's actions on contact.</li>
+      <li><b>The clock still waits for a late answer,</b> so every game can be replayed exactly from its seed and its answers.</li>
+    </ul>
+  </section>
+
+  <section id="build" aria-labelledby="build-h">
+    <h2 id="build-h">9. Build order</h2>
+    <ol class="phases">
+      <li><b>Knowledge.</b> Suspected, located, identified and lost, for each unit against each enemy. A locate roll when fired on, replacing today's automatic muzzle-flash reveal. The self-belief with its cues. Everything after this depends on it.</li>
+      <li><b>Activities and decision points.</b> The six activities, D1–D11 with their option generators and rules fallbacks, the trigger watcher, and "fire automatically when". This replaces today's catch-all options list.</li>
+      <li><b>Pause and orders.</b> Pause and resume with the clock stopped. "Generate orders" while paused, for one side or both, with your guidance. Orders with phases, intent, urgency, constraints and actions on contact. D0 on resume, and flags for you while running.</li>
+      <li><b>Tuning.</b> The locate-roll and cue figures (declared, like the rest), balance runs, and a small set of hand-checked situations for each decision point, to set Jev's confidence threshold properly.</li>
+    </ol>
+    <p class="note">What stays as it is: the combat model (hits, penetration, vehicles, hull-down), the movement modes, morale and rally, the drill, the replayable clock, and the turn game.</p>
+  </section>
+</main>

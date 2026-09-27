@@ -1,23 +1,32 @@
 // ── bgws/realtime/engine/deciders.ts ───────────────────────────────────────
-// Who chooses a unit's next order when something happens to it.
+// Who makes the call at a decision point.
 //
 // The runner collects events, decides WHEN a unit is asked (coalescing,
-// cooldown, severity) and applies the answer after the unit's reaction time.
-// A decider only answers: for each unit asked, which of its options.
+// cooldown, severity, one decision in flight per unit), works out WHICH
+// decision point it is and its options (decisions.ts), and applies the
+// answer after the unit's reaction time. A decider only answers: for each
+// unit asked, which of its options.
 //
-// `ruleDecider` is the default and the fallback: simple, legible, instant,
-// and deterministic. Jev (jevDecider.ts) is the one that matters.
+// `ruleDecider` is the default and the fallback: it takes the rules' choice,
+// which follows the unit's actions on contact. Jev (jevDecider.ts) is the one
+// that matters.
 
-import { distanceM } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import type { TacticalTrace } from "../../rules/tactical";
+import type { DecisionPoint } from "./decisions";
 import type { RtConfig, RtEvent, RtOption, RtState } from "./types";
 
 /** One unit's question. */
 export interface RtDecisionRequest {
   unitId: string;
+  /** Which decision point, and the event that raised it. */
+  point: DecisionPoint;
+  event: RtEvent;
+  /** Everything that happened to it since it was last asked. */
   events: RtEvent[];
   options: RtOption[];
+  /** The rules' choice here, following its actions on contact. */
+  fallback: string;
 }
 
 /** One unit's answer: an option id, and how it was reached. */
@@ -38,98 +47,6 @@ export interface RtDecider {
   ): Promise<RtDecision[]>;
 }
 
-/** How much better an option's damage odds must be to be worth changing for. */
-const BETTER = 1.5;
-
-/** The option the rule would take. */
-export function ruleChoice(state: RtState, request: RtDecisionRequest): string {
-  const kinds = new Set(request.events.map((event) => event.kind));
-  const has = (id: string) => request.options.some((option) => option.id === id);
-  const self = state.game.forceElements[request.unitId];
-
-  // The best shot on offer, by its real chance of doing damage; otherwise the nearest.
-  const engage = request.options
-    .filter((option) => option.id.startsWith("engage:"))
-    .map((option) => ({
-      option,
-      p: option.effect ?? 0,
-      range:
-        option.order.kind === "engage" && self
-          ? distanceM(self.position, state.game.forceElements[option.order.targetId]?.position ?? self.position)
-          : Infinity,
-    }))
-    .sort((a, b) => b.p - a.p || a.range - b.range)[0]?.option.id;
-
-  const unit = state.units[request.unitId];
-  const attackers = new Set(
-    Object.entries(unit?.attackers ?? {})
-      .filter(([, at]) => state.time - at <= 60)
-      .map(([id]) => id),
-  );
-  // Shooting back at whoever is shooting at it comes first.
-  const answer =
-    request.options.find(
-      (option) => option.order.kind === "engage" && attackers.has(option.order.targetId),
-    )?.id ?? engage;
-
-  // Its fire is not working: change something. Close to effective range on
-  // what it is shooting at if that is clearly better; else a target it can
-  // actually hurt; else the flank; else pull out of a losing trade.
-  if (kinds.has("ineffective")) {
-    const now = request.options.find((option) => option.id === "keep")?.effect ?? 0;
-    const target = unit?.engagement?.targetId;
-    const close = request.options.find((option) => option.id === `close:${target}`);
-    if (close && (close.effect ?? 0) > Math.max(0.02, now * BETTER)) return close.id;
-    const better = request.options
-      .filter((option) => option.id.startsWith("engage:") && (option.effect ?? 0) > Math.max(0.02, now * BETTER))
-      .sort((a, b) => (b.effect ?? 0) - (a.effect ?? 0))[0];
-    if (better) return better.id;
-    const anyClose = request.options
-      .filter((option) => option.id.startsWith("close:") && (option.effect ?? 0) > Math.max(0.02, now * BETTER))
-      .sort((a, b) => (b.effect ?? 0) - (a.effect ?? 0))[0];
-    if (anyClose) return anyClose.id;
-    if (has("pos:flank")) return "pos:flank";
-    return "keep";
-  }
-  if (kinds.has("review")) return "keep";
-  // Back from being shaken or broken, or quiet and off its mission: get on
-  // with what it is for. This is what stops a unit holding for ever.
-  if (kinds.has("rallied") || kinds.has("idle")) {
-    if (has("resume")) return "resume";
-    return engage ?? "keep";
-  }
-  // The enemy has broken: an attacker follows up, anyone else stays put.
-  if (kinds.has("enemyBroke")) {
-    const pursue = request.options.find((option) => option.id.startsWith("pursue:"))?.id;
-    if (unit?.mission.task === "take" && pursue) return pursue;
-    if (has("consolidate")) return "consolidate";
-    return "keep";
-  }
-  // Under fire in the open: get into cover if there is any, else shoot back.
-  if (kinds.has("hit") || kinds.has("underFire") || kinds.has("moraleDrop")) {
-    if (has("pos:cover")) return "pos:cover";
-    if (has("pos:hulldown")) return "pos:hulldown";
-    if (answer) return answer;
-    return "keep";
-  }
-  // Run into the enemy, sighted one, or walked into its reach: stop and
-  // fight if there is a shot, unless this unit was told to stay silent.
-  // "Carry on" here is how two columns used to drive straight past each
-  // other.
-  if (kinds.has("contact") || kinds.has("sighted") || kinds.has("exposed")) {
-    const silent = unit?.roe === "never";
-    if (answer && !silent) return answer;
-    return "keep";
-  }
-  // Nothing left to do where it is: fight if it can, else get on with the mission.
-  if (kinds.has("arrived") || kinds.has("targetGone") || kinds.has("blocked") || kinds.has("friendLost")) {
-    if (answer) return answer;
-    if (has("resume") && !kinds.has("blocked")) return "resume";
-    return has("overwatch") ? "overwatch" : "keep";
-  }
-  return "keep";
-}
-
 export function ruleTrace(
   request: RtDecisionRequest,
   optionId: string,
@@ -138,7 +55,7 @@ export function ruleTrace(
 ): TacticalTrace {
   return {
     actorId: request.unitId,
-    question: request.events.map((event) => event.kind).join(" + "),
+    question: `${request.point}: ${request.events.map((event) => event.kind).join(" + ")}`,
     options: request.options.map((option) => ({ id: option.id, summary: option.summary })),
     chosenId: optionId,
     chosenBy: "heuristic",
@@ -148,13 +65,14 @@ export function ruleTrace(
   };
 }
 
-/** The default: simple rules, answered at once. */
+/** The default: the rules' choice, answered at once. */
 export const ruleDecider: RtDecider = {
   name: "rules",
-  async decide(state, _side, requests) {
-    return requests.map((request) => {
-      const optionId = ruleChoice(state, request);
-      return { unitId: request.unitId, optionId, trace: ruleTrace(request, optionId, "rules") };
-    });
+  async decide(_state, _side, requests) {
+    return requests.map((request) => ({
+      unitId: request.unitId,
+      optionId: request.fallback,
+      trace: ruleTrace(request, request.fallback, "rules"),
+    }));
   },
 };

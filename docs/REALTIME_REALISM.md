@@ -93,7 +93,7 @@ All of it is in `realtime/engine/`. The turn game is unchanged: its event logs a
 | **Shaken** | Holds where it is and fires only in self-defence. | |
 | **Broken → fall back once → rally** | A broken unit withdraws **once**, to a rally point: an HQ, then the nearest friend further from the enemy (preferring one out of the enemy's sight), otherwise 800 m away. It is never sent back again. Every 60 s, once it is out of fire (suppression under 25 and no incoming fire for 30 s), it rolls d6 + ⌊TQ/2⌋, +1 with an HQ nearby, +1 with no enemy in sight. 7+ moves it up a step: broken → shaken → steady. | `engine.ts` §8–9 |
 | **Autopilot while shaken or broken** | The runner doesn't ask shaken or broken units. On rallying, a unit raises a severe `rallied` event and is asked again. | `runner.ts` |
-| **Missions** | Every unit has a `mission` (take, hold or support; a place; a purpose), set from its opening order and kept when the order changes. | `types.ts`, `initialOrders.ts` |
+| **Missions** | Every unit has a `mission` (take, hold or support; a place; a purpose), set from its opening order and kept when the order changes. | `types.ts`, `orders.ts` |
 | **Idle re-ask** | A steady unit that is off its mission and has been quiet for 75 s (no events, no incoming fire, no shots) raises `idle`. The rules answer **resume**. This is what fixes the winner holding for ever. | `engine.ts` §10, `deciders.ts` |
 | **Pursue / consolidate** | When an enemy a unit can see breaks, that unit gets `enemyBroke`. The options include `pursue:X` (assault after it) and `consolidate` (overwatch). The rules pursue when the mission is to take ground, and consolidate otherwise. | `options.ts`, `deciders.ts` |
 | **Side breakpoint** | A side is beaten when 50% of its starting strength is destroyed or broken. The time limit remains as a backstop. | `engine.ts` §11 |
@@ -304,3 +304,7 @@ With real accuracy (§10) at real rates of fire, troops meeting in the open sett
 | Procedural relief + woods | combined arms | 0.6 min | 2.8 min | 45% | 8 | 34 |
 
 **Balance:** over 600 symmetric games, 279 blue / 317 red / 4 draws. With processing order reversed (red processed first), 304 / 292 / 4. Pooled by colour that is 583 / 609, and pooled by order 571 / 621 — neither significant, so no side or processing-order bias shows.
+
+## 12. Command: who decides what, and what each unit knows
+
+The catch-all options list, the automatic muzzle-flash reveal and Jev's opening orders have been replaced by the command design: Claude writes mission orders only while the clock is stopped, Jev decides at decision points D0–D11, and each unit acts on its own beliefs (a locate roll when fired on, cues when hiding). Design: [REALTIME_COMMAND_DESIGN.html](REALTIME_COMMAND_DESIGN.html); how it is built: [REALTIME_COMMAND.md](REALTIME_COMMAND.md).

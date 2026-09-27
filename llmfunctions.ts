@@ -106,6 +106,16 @@ const MAX_TOKENS_JEV: Record<CommanderModel, number> = {
     "gpt-5-2": 8000,
 };
 
+/**
+ * A side's real-time mission orders: a task in phases, an intent and
+ * constraints for each unit. Longer than a turn's orders, and a reply cut
+ * short is unreadable JSON, so the ceiling is generous.
+ */
+const MAX_TOKENS_REALTIME: Record<CommanderModel, number> = {
+    "claude-sonnet-4-6": 4000,
+    "gpt-5-2": 10000,
+};
+
 /** A single escalated decision: a key and one sentence. */
 const MAX_TOKENS_DECIDE: Record<CommanderModel, number> = {
     "claude-sonnet-4-6": 300,
@@ -221,6 +231,33 @@ const DECIDE_BRIEF = [
     'Reply with JSON only, on one line: {"choice":"<key>","why":"<one sentence>"}',
 ].join("\n");
 
+/**
+ * The brief for real-time orders.
+ *
+ * The clock is stopped while this runs: the player paused the battle and
+ * asked for new orders. The app's prompt carries what the side knows, the
+ * player's guidance, the reference points and the reply format; this says
+ * who is asking and what good orders look like. Each unit's leader (Jev)
+ * makes the local calls inside them, so the orders are mission orders, not a
+ * script: a task, the intent behind it, how urgent it is, and the limits.
+ */
+const REALTIME_ORDERS_BRIEF = [
+    "You are a battlegroup commander in a real-time wargame at troop and platoon level. The",
+    "player has paused the battle and asked you for orders. The clock does not run again until",
+    "the player has reviewed them.",
+    "",
+    "Write mission orders. For each unit: a task in phases, one line of intent (the purpose,",
+    "so its leader can weigh a local fight against it), an urgency, rules of engagement, what",
+    "to do on contact, and any line it must not cross. Each unit's leader makes the moment-to-",
+    "moment calls — when to fire, take cover, wait for a better shot — inside your orders.",
+    "",
+    "Good orders keep units able to support each other, use the ground (cover, hull-down",
+    "crests, the flank), and do not send a unit into an enemy it cannot hurt. Only what your",
+    "side has sighted is shown; the rest may still be there.",
+    "",
+    "Reply with the JSON object the prompt describes, and nothing else.",
+].join("\n");
+
 export class BgwsCommanderFunctions {
     /**
      * One side's orders for one turn.
@@ -305,6 +342,31 @@ export class BgwsCommanderFunctions {
             chosen,
             this.compose(DECIDE_BRIEF, directive, prompt),
             MAX_TOKENS_DECIDE[chosen],
+        );
+    }
+
+    /**
+     * One side's orders in the real-time mode, written while the clock is
+     * stopped. Called only when the player pauses and asks for orders —
+     * never on events or a timer.
+     *
+     * Reply: {"plan": "...", "orders": [...]} as the prompt describes; the
+     * app checks every field and drops what it cannot use.
+     */
+    @Query({ apiName: "bgwsCommanderRealtimeOrders" })
+    public async commanderRealtimeOrders(
+        prompt: string,
+        model: string,
+        directive: string,
+    ): Promise<string> {
+        if (!prompt || prompt.trim().length === 0) {
+            throw new UserFacingError("No situation was supplied, so there is nothing to order.");
+        }
+        const chosen = this.modelFor(model);
+        return this.run(
+            chosen,
+            this.compose(REALTIME_ORDERS_BRIEF, directive, prompt),
+            MAX_TOKENS_REALTIME[chosen],
         );
     }
 
