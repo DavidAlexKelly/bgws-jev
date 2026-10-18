@@ -9,16 +9,20 @@
 | §1 | The end goal |
 | §2 | The design rules that hold everything together |
 | §3 | How modern war actually works, in the terms this simulation needs |
-| §4 | The target architecture |
-| §5 | Thirteen workstreams, one per capability, each with how it works, its decision points, its numbers, its build steps and its "done when" |
-| §6 | The order to build them in, as milestones with a playable scenario at each |
-| §7 | Running Jev and Claude at scale |
-| §8 | Risks and open questions |
+| §4 | The target architecture, including the hierarchy of Claude planners and commander seats (the hook for human command) |
+| §5 | Scenario scope and the preset scenario types |
+| §6 | Fifteen workstreams, one per capability, each with how it works, its decision points, its numbers, its build steps and its "done when" |
+| §7 | The order to build them in, as milestones with a playable scenario at each |
+| §8 | Running Jev and Claude at scale |
+| §9 | Decisions taken, risks and open questions |
+| §10 | Packages to install |
 
 Companion documents:
 
 - [DECISION_FLOW_GRAPHS.md](DECISION_FLOW_GRAPHS.md): the full specification of editable behaviour templates (workstream W1).
-- [MODERN_WARFARE_REFERENCE.md](../research/MODERN_WARFARE_REFERENCE.md): the research this plan is built on, with sources. Numbers below marked **[ref]** come from it. Numbers marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W12) until a source replaces them.
+- [MODERN_WARFARE_REFERENCE.md](../research/MODERN_WARFARE_REFERENCE.md): the research this plan is built on, with sources. Numbers below marked **[ref]** come from it. Numbers marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W0, W12) until a source replaces them.
+
+**About data.** For now, the simulation runs on a **synthetic catalogue of best guesses** (W14). Every platform, sensor, weapon, bearer and store has every property the simulation needs, filled with plausible values, and is labelled as synthetic. The **[ref]** figures are used as sanity checks and to seed those guesses where they exist. Realistic data replaces the guesses later, record by record, with no code changes.
 
 ---
 
@@ -28,7 +32,14 @@ Companion documents:
 
 What that looks like in play, at the end state. This is a single vignette, with every element built by a workstream below:
 
-1. **Planning.** A brigade attack is planned at 0300 by the Blue brigade HQ (Claude). It writes the plan:
+0. **Scope and aims.** The player chose the *Joint operation* scenario type (§5): a 10-day operation over a 400 × 300 km area, every domain on. Blue's **overall Claude**, the joint commander, has set the operation's aims and priorities:
+   - main effort on land in the north
+   - air to win local superiority there by day 3
+   - the navy to hold the coastal flank
+   - space and cyber to blind Red's long-range strike
+
+   The land, air, maritime and space/cyber planners each work inside that guidance (§4.4).
+1. **Planning.** A brigade attack is planned at 0300 by the Blue brigade HQ, with the land component's Claude planner writing the plan:
    - phases, with phase lines and boundaries
    - a fire support plan
    - a request for two air sorties and a reconnaissance drone tasking
@@ -49,6 +60,7 @@ What that looks like in play, at the end state. This is a single vignette, with 
 7. **The sea flank.** A Blue frigate on the coastal flank detects a raid of four anti-ship missiles. Its layered defence fires from a magazine that will not be reloaded until it reaches port (**W8**). The salvo arithmetic **emerges from the entities**; it is not rolled from a table.
 8. **Space and cyber.** A Red satellite pass at 1112 images the Blue assembly area. The image reaches Red's corps HQ 45 minutes later **[declared]**, so its picture is that old (**W9**). A Red cyber operation, prepared before the game started, takes down Blue's cellular-based logistics app for 3 hours (**W9**).
 9. **After-action review.** Every decision, with the graph path walked and Jev's probabilities, is in the event stream for the AAR (**W13**).
+10. **Later: a person in the chair.** The player sits in Blue's brigade HQ instead of the land planner (**W15**). They see only the reports that reach that HQ, and only when they arrive. Their orders go out over the same jammed nets. A FRAGO sent at 0710 reaches one company at 0712 and another at 0731, because its relay was jammed.
 
 ---
 
@@ -58,12 +70,14 @@ These are carried forward from the existing real-time documents and extended. Th
 
 1. **Claude plans, Jev decides, the rules execute.** Claude, or a human, issues mission orders from an HQ's picture. Jev picks one option at a decision point, only from options the rules and the unit's graph generate, so it can never invent one. The engine moves, senses, shoots, communicates and consumes, every tick, deterministically. Escalation bias in LLMs is well documented: all five models in Rivera et al. 2024 escalated **[ref]**. That is one more reason Claude never chooses individual engagements and ROE is a hard gate.
 2. **Truth is not knowledge.** Every unit acts on its own beliefs. These come from its own sensors and from what it has been told over a network, with ages and errors. HQs act on a fused picture that is older and coarser than the truth. The existing `knowledge.ts` belief model generalises to every domain.
-3. **Every number has a source or is declared.** A registry lists every parameter: value, unit, source, confidence and how sensitive outcomes are to it (W12). This is how the simulation stays honest as it grows.
+3. **Every number lives in data, with its provenance.** Platform properties live in the catalogue (W14). Engine constants live in the figures registry (W0). Every value is labelled *synthetic* (a best guess), *reference* (from the research) or *sourced* (from real data). For now most are synthetic, by design. The point is that every property exists and has a value; realism comes later by replacing values, not by changing code.
 4. **Emergent, not scripted.** A salvo exchange, a kill zone, a broken supply line or an air-defence collapse must come from entities acting under rules, not from a table that names the outcome. Tables are allowed only *inside* a mechanism, e.g. a Pk curve for one missile against one target type.
 5. **Deterministic and replayable.** All randomness comes from the seeded `config.rng`. Every Jev and Claude answer is recorded, so a replay reproduces a game exactly, as `runner.ts` already guarantees.
 6. **Resolution where it matters.** Entity-level for anything that manoeuvres, senses or fires independently: platoon-sized ground elements (as today), each aircraft, ship, drone and missile in flight. Aggregate or abstract for what does not need it: depots, rear-area traffic, distant formations, cyber.
 7. **A unit's behaviour is data, not code.** The decision flow graph (W1) is the only place that says what a unit may consider. Code supplies the verbs and the physics.
 8. **One clock, many tempos.** A submarine transit, an FPV dive and a satellite pass all live on the same 1-second clock. Fast things are resolved analytically within a tick; slow things are evaluated sparsely (§4.2).
+9. **Scope is a setting, not a different game.** A skirmish and a ten-day joint operation run on the same engine. The scenario's scope (§5) decides which domains are simulated, which are abstracted, which planners exist, and how much is aggregated.
+10. **Every commander is a seat.** Claude, a heuristic and (later) a person all sit in the same kind of seat at an HQ. They read only what reaches that HQ and send orders over its networks (§4.4.3). Nothing gives a commander the truth or a free channel. This is what lets human command drop in later without redesign.
 
 ---
 
@@ -234,7 +248,13 @@ W2 does this mapping first, behind an adapter, and keeps the golden tests green.
      - Consumption accrues every tick, but resupply nodes run every 60 s.
      - Satellites are propagated analytically and only evaluated when a pass or an access check is due.
      - Cyber effects are scheduled windows.
-  3. **Speed multiplier up to ×60** for quiet periods. Long games of 24–72 h, needed for logistics, are run partly headless at ×600.
+  3. **Time compression** from ×1 to ×60 interactively. **Quiet-period skipping**: when no unit is in contact and no decision is pending, the scheduler jumps to the next scheduled event (an arrival, a satellite pass, a resupply, a planner's battle rhythm), as discrete-event simulations do.
+  4. **Level of detail by scope.** A ten-day operation cannot simulate every platoon every second across 400 km. Formations far from contact, and the rear area, run **aggregated**:
+     - a formation-level mover
+     - attrition and consumption by rate, which JTLS does for ground combat **[ref]**
+     - the rule decider, not Jev
+
+     They **disaggregate** into platoon entities when they come within a set distance of enemy contact, or when the player or a planner focuses on them. The scope (§5) sets the thresholds. The tactical scenario types never aggregate.
 - **Weather and light.** A time of day, sun angle and weather state (visibility, cloud base, precipitation, wind, sea state) affect sensors, movement, flying and drones. Thermal crossover and bad weather are when assaults happen **[ref]**.
 
 ### 4.3 Knowledge: truth, unit beliefs and the HQ picture
@@ -246,16 +266,63 @@ Today's `beliefOf` states (*unaware → suspected → located → identified →
 - **HQ pictures (a COP per HQ)** are fused from reports. Fusion can merge two tracks into one or split one into two, and holds false and decoy tracks. Deception (decoys, Shahed-style mixed raids **[ref]**) works because pictures can be wrong.
 - **Each side's picture is visible to the player separately from the truth** (W13). This is the most important teaching tool.
 
-### 4.4 Command tree
+### 4.4 Command: the tree, the planners and the seats
 
-- `Side → Component (Land / Maritime / Air / Space / Cyber / Logistics) → Formation HQ → … → Unit`.
-- **Every HQ is an entity.** A command post can be found, jammed and destroyed. It has a staff with **cells**: manoeuvre, fires, ISR, EW, sustainment and air. Each cell is driven by its own decision graph (W1) and its own commander type:
+#### 4.4.1 The command tree
 
-| Commander type | Decides | When |
+- `Side → Joint HQ → Component (Land / Air / Maritime / Space & Cyber / Sustainment) → Formation HQ → … → Unit`.
+- **Every HQ is an entity.** A command post can be found, jammed and destroyed. It has a staff with **cells**: manoeuvre, fires, ISR, EW, sustainment and air. Each cell is driven by its own decision graph (W1).
+- **Which levels exist depends on the scope** (§5). A skirmish has only a company HQ. A joint operation has the whole tree.
+
+| Who | Decides | When |
 |---|---|---|
-| **Claude** (or human) | Plans and orders: tasks, phases, control measures, task organisation, priorities | On the battle rhythm, on CCIR triggers, or when the player asks (W4) |
-| **Jev** | A cell's choices: which shooter answers a fire request, whether to commit the reserve, which convoy goes first | At the cell's decision points |
+| **Claude planners** (later, or a person) | Aims, plans and orders: tasks, phases, control measures, task organisation, apportionment, priorities | On the battle rhythm, on CCIR triggers, or when the player asks (W4) |
+| **Jev** | A unit's or a cell's choices: which shooter answers a fire request, whether to commit the reserve, which convoy goes first | At decision points |
 | **Rules** | Routing reports, fusing tracks, scheduling | Always |
+
+#### 4.4.2 The Claude planner hierarchy
+
+Each scenario has **several Claude planners, one per scope and domain, under one overall Claude** that keeps their aims together. Joint doctrine works the same way: a joint force commander and component commanders.
+
+| Planner | Sits at | Plans | Output schema |
+|---|---|---|---|
+| **Overall (joint commander)** | Joint HQ | The operation's aims, phases and end state. It names the main effort and gives priorities of support. It **apportions** shared means: air sorties by mission type, ISR and drone time, long-range fires, satellite tasking, logistics priority. It sets coordination measures between components (boundaries, FSCL, airspace) and limits (ROE, escalation). | `JointGuidance` |
+| **Land** | Land component, and per formation (corps, division, brigade) as the scope requires | Manoeuvre, fires plan, task organisation, control measures; requests for air, ISR and drones | `LandPlan` → `UnitOrders` for subordinates |
+| **Air** | Air component | Air tasking (W7): packages, CAP, SEAD, CAS on call, ISR, tankers, airspace control | `AirTasking` |
+| **Maritime** | Maritime component | Task groups, sea control areas, escort, strike, mine warfare | `MaritimePlan` |
+| **Space and cyber** | Space & cyber cell | Satellite tasking, counterspace, cyber accesses to use | `SpaceCyberPlan` |
+| **Sustainment** | Sustainment component | Supply priorities, routes, nodes, medical | `SustainmentPlan` |
+| **Tactical** | A battalion or company HQ, in small scopes only | What today's `bgwsCommanderRealtimeOrders` does | `UnitOrders` |
+
+How they work together:
+
+1. **Top-down guidance.** The overall Claude writes `JointGuidance` first. Each component planner receives it as part of its prompt and must plan inside it. Its plan is validated against the guidance by rule: a component that asks for more air sorties than it was apportioned gets the overage turned into a **request** to the joint HQ.
+2. **Bottom-up reports and requests.** Components send SITREPs, requests and conflicts up the command net. "Land needs two more CAS sorties in phase 2." "Air cannot support the northern axis until the SAM site is gone." They go as messages, so they are subject to delay and EW like any other.
+3. **Reconciliation.** The overall Claude re-plans on its battle rhythm (e.g. every 6 sim-hours in a joint operation **[declared]**) and on joint CCIR triggers: a component's main objective lost, apportionment exhausted, a major unexpected enemy force. It answers requests by reapportioning and resolves conflicts (two components want the same drone orbit). Its answer goes down as an amended `JointGuidance`.
+4. **Each planner sees only its HQ's picture.** The joint HQ's picture is the fusion of what the components report, so it is the oldest and coarsest.
+5. **One planner can cover several roles in small scopes.** In a single battle, the overall Claude and the land planner can be one call. The scope decides which planners exist (§5).
+6. **Each planner is a Foundry function with its own prompt and output schema**, in the functions repository, validated as strictly as `parseOrders` is today. Each has the heuristic fallback that `heuristicOrders` provides now.
+
+#### 4.4.3 Commander seats: the hook for human command
+
+Every HQ that plans has a **seat**. The seat interface is the only way any commander, AI or human, touches the simulation:
+
+```ts
+interface CommanderSeat {
+  hq: PlatformId;                          // the HQ entity it sits in
+  kind: "claude" | "heuristic" | "human";  // human comes in W15
+  inbox(): Message[];                      // only what has ARRIVED at this HQ over its networks
+  picture(): HqPicture;                    // this HQ's fused COP, never the truth
+  send(order: Order | Message): void;      // goes out on this HQ's nets: delay, loss, jamming apply
+}
+```
+
+Consequences we build in now, even though human play comes later:
+
+- **Reports reach a commander only if they arrive.** The Claude planners already work this way (from W4). A person will too.
+- **Orders leave as messages.** They are composed, transmitted, relayed and possibly jammed or lost. A unit acts on an order only when it has received it.
+- **The HQ can be hit.** If the command post is destroyed, the seat moves to the alternate HQ named in the orders, after a delay, or its subordinates act on intent.
+- **Time is shared.** A human commander cannot pause a running simulation in multiplayer. In single-player, pausing stays available as a setting.
 
 ### 4.5 Networks
 
@@ -314,7 +381,7 @@ Today's per-second hazard with multipliers (`detection.ts`) is the visual case, 
 | Choices at decision points | Jev | Every unit and every HQ cell, through its **decision flow graph** (W1) |
 | Drills, ROE, weapon release, EMCON | Rules (hard gates) | Autopilot |
 
-The runner's batching, cooldowns, reaction time and deterministic wait are kept. They scale with batching per side and per tick (§7).
+The runner's batching, cooldowns, reaction time and deterministic wait are kept. They scale with batching per side and per tick (§8).
 
 ### 4.10 Performance budget
 
@@ -344,15 +411,93 @@ apps/bgws/realtime/
   fires/             indirect fire, kill web, airspace deconfliction  (W3, W11)
   domains/
     drones/ air/ sea/ space/ ew/ cyber/ logistics/                    (W5–W10)
-  scenario/          C2SIM-shaped scenario format, loaders            (W0)
+  scenario/          C2SIM-shaped scenario format, scope, presets     (W0, §5)
+  command/           planner hierarchy, commander seats, guidance     (W4, §4.4)
+  catalogue/         the synthetic data catalogue and its schema      (W14)
+  lod/               aggregate formations, disaggregation             (§4.2, W4)
   worker/            engine host for Web Worker and Node              (W0)
   ui/                setup, map layers, inspectors, editors           (W13)
 apps/bgws/behaviour/ the template editor screen at /bgws/behaviour   (W1)
+apps/bgws/hq/        the HQ console for human command, later          (W15)
 ```
 
 ---
 
-## 5. Workstreams
+## 5. Scenario scope and scenario types
+
+### 5.1 Scope is chosen at the start
+
+The first step of setup is choosing a **scenario type**: a preset scope. The user can then adjust any part of it. A scope has seven dimensions:
+
+| Dimension | What it sets | Range |
+|---|---|---|
+| **Duration** | How long the scenario may run, in sim-time | 15 min → 6 weeks |
+| **Area** | The operating area, drawn on the map or typed as width × depth | 5 × 5 km → 1,500 × 1,500 km |
+| **Echelon** | The highest and lowest command level that exists | Platoon/company → joint HQ |
+| **Domains** | Each domain is **simulated**, **abstracted** or **off** (§5.2) | Land, drones, EW, air, air defence, naval, space, cyber, logistics, medical |
+| **Planners** | Which Claude planners exist per side (§4.4.2) | One tactical planner → overall plus five components |
+| **Detail** | Where aggregation applies (§4.2), and whether far units use Jev or the rule decider | Full entity → aggregated rear |
+| **Time** | Start time, weather, time compression allowed, quiet-period skipping | — |
+
+The scope is saved in the scenario file (W0). The engine reads it at load and wires only the systems it needs, so a skirmish does not pay for a satellite propagator.
+
+### 5.2 Simulated, abstracted, off
+
+Every domain has three modes:
+
+| Mode | Meaning | Example: air | Example: logistics |
+|---|---|---|---|
+| **Simulated** | Full entities, sensors, weapons, decisions | Flights fly from airbases; air defence engages them | Nodes, convoys, LOGPACs, consumption |
+| **Abstracted** | No entities; the domain's effect arrives as a support service with a response time, availability and effect, using the existing `CuratedSupport` fields (`responseTurns`, `loiterTurns`, `sortiesPerDay`) | "CAS on call: 2 sorties per hour, 20 min response, cancelled if an air-defence threat is known within 10 km" | Units start with full loads and get a resupply drop every *n* hours at a rally point |
+| **Off** | The domain does not exist | No aircraft at all | Unlimited fuel and ammunition (today's behaviour) |
+
+Abstracted modes let a small battle feel the presence of the wider war without simulating it.
+
+### 5.3 The scenario types
+
+Eight presets. Each lists its default scope. The milestone column (§7) shows when each becomes playable.
+
+| # | Type | Duration | Area | Echelon | Domains: **S**imulated / **A**bstracted / off | Planners per side | Milestone |
+|---|---|---|---|---|---|---|---|
+| 1 | **Skirmish** | 15 min – 2 h | 5–15 km | Platoon → company | Land **S**; drones **A**; fires **A**; the rest off | One tactical planner (it is also the overall planner) | M1 |
+| 2 | **Combined-arms battle** | 2–12 h | 20–50 km | Company → brigade | Land, drones, EW, fires, unit sustainment **S**; air (CAS, helicopters) **A**; space (imagery) **A**; logistics network **A** | Overall + land (brigade) | M3 |
+| 3 | **Drone line (positional front)** | 1–3 days | 30 × 15 km strip | Platoon → brigade | Drones, EW, artillery, infantry, last-mile logistics, medical **S**; air **A** (glide bombs); space **A** | Overall + land | M4 |
+| 4 | **Air campaign** | 1–5 days | 300–1,000 km | Flight → air component | Air, air defence, EW, space ISR, missiles **S**; land **A** (static targets and air-defence sites); logistics **A** (sortie generation, munitions stock) | Overall + air (+ land as target owner) | M5 |
+| 5 | **Sustained offensive** | 3–10 days | 100–300 km | Battalion → division | Land, drones, EW, air defence, logistics network, medical **S**; air **S** or **A**; space **A**; cyber **A** | Overall + land (division and brigades) + sustainment | M6 |
+| 6 | **Maritime / littoral** | 1–14 days | 500–1,500 km of sea and coast | Ship → maritime component | Naval, air, air defence, drones (USVs, one-way attack), EW, space, port logistics **S**; land **A** (coastal batteries **S**); neutral shipping as a third side | Overall + maritime + air | M7 |
+| 7 | **Strike and missile defence** | 1–12 days | Theatre, 1,000–1,500 km | Battery/flight → joint | Missiles, air, air defence, space (missile warning, ISR), EW, cyber **S**; staged drone teams **S**; land **A**; logistics **A** (interceptor and munition stocks) | Overall + air + space & cyber | M8 |
+| 8 | **Joint operation (campaign)** | 1–6 weeks | User-set, up to 1,500 × 1,500 km | Platoon → joint, with aggregation | Everything **S**, with aggregated formations away from contact | Overall + land + air + maritime + space & cyber + sustainment | M8 |
+
+Plus **Custom**: start from any preset, or from blank, and set each dimension.
+
+Each preset ships with:
+- **one or more example scenarios**, including the milestone scenarios in §7
+- **default victory conditions** suited to its scope:
+
+  | Type | Default victory condition |
+  |---|---|
+  | Skirmish | Breakpoint or objective |
+  | Combined-arms battle, sustained offensive | Objectives by time |
+  | Air campaign | Air superiority over an area, or target-set destruction |
+  | Maritime | Sea control, or ships and cargo through |
+  | Joint operation | The overall aims in `JointGuidance` |
+
+- **default template assignments**: a drone-line preset defaults infantry to small-team infiltration templates.
+
+### 5.4 What scope changes in the engine
+
+| Concern | Small scopes (1–3) | Large scopes (4–8) |
+|---|---|---|
+| Map | One terrain raster | Tiled terrain pyramid plus bathymetry, lazily loaded |
+| Entities | All full entities | Aggregated away from contact (§4.2) |
+| Time | ×1 – ×10, with pause | ×1 – ×60 plus quiet-period skipping; headless ×600 for testing |
+| Decisions | Jev for every unit | Jev near contact and in HQ cells; rules for aggregated formations |
+| Claude | One or two planners | Up to six per side, on battle rhythms of minutes (tactical) to hours (joint) |
+| Victory | Tactical | Operational aims |
+
+---
+
+## 6. Workstreams
 
 Each workstream has the same parts:
 
@@ -365,11 +510,13 @@ Each workstream has the same parts:
 
 ### W0 — Foundations
 
-**Goal.** Make the repository buildable and testable here and in CI, and remove the blockers every other workstream hits.
+**Goal.** Remove the blockers every other workstream hits.
+
+**The project shell stays on Foundry.** `package.json`, the Vite config and `index.html` live in the Foundry repository and are not recreated here. Any package a workstream needs is listed in §10 for you to install there. Tests are run on Foundry; this repository holds the source.
 
 **Build steps.**
 
-1. **Restore the project shell.** The last two commits (`7f7f4d9`, `76685db`) moved the source into `apps/bgws/` and `shared/` but committed no `package.json`, `tsconfig.json`, `vite.config.ts` or `index.html`. Restore these, with the private `@acc/*` and `@dk-real-time-ai-wargaming/sdk` packages resolved from the Foundry npm registry. Add CI that runs `vitest` and `tsc --noEmit`. Remove the committed `.DS_Store` files and ignore them.
+1. **Tidy.** Remove the committed `.DS_Store` files and add a `.gitignore` for them.
 2. **Run the engine in a host.** `realtime/worker/`: one engine host API usable from a Web Worker (browser) and from Node (headless batch runs).
 3. **N sides.** Replace the hard-coded `"blue" | "red"` loops (`engine.ts:1074,1922`, `comms.ts:172`) with a `SideId` and a relationship table: hostile / neutral / friendly. Neutrals (civil shipping, civilians) matter for the Red Sea and for ROE.
 4. **Scenario file.** A versioned JSON scenario, shaped after C2SIM/MSDL **[ref]**, holding:
@@ -377,15 +524,20 @@ Each workstream has the same parts:
    - sides and relationships
    - forces as a command tree
    - initial orders
+   - **scope**: duration, area, echelons, domain modes, planners, detail (§5)
    - template assignments (W1)
    - victory conditions
-   - declared-figure overrides
+   - declared-figure and catalogue overrides
 
-   Saved to Foundry and to local file.
+   Saved to Foundry and to local file. The **scenario type presets** (§5.3) are scenario files with blanks for forces.
+7. **Scope wiring.** The engine loads only the systems the scope's domain modes need. Abstracted domains run as support services (§5.2).
 5. **Declared-figures registry.** `realtime/figures.ts`: every tunable number, with value, unit, source, confidence and sensitivity, exported as a table in the UI. Move today's constants into it (`timing.ts`, `detection.ts`, `comms.ts:31-50`, `fire.ts`, `lethality.ts`).
 6. **Event scheduler** next to the tick (§4.2), with tests that replay is unchanged.
 
-**Done when:** the repo builds and the test suite runs in CI; the same seeded scenario gives byte-identical event streams in browser and Node; existing tests pass.
+**Done when:**
+- the same seeded scenario gives byte-identical event streams in browser and Node
+- existing tests pass on Foundry
+- a Skirmish preset loads with every other domain off
 
 ### W1 — Decision flow graphs and the template editor
 
@@ -397,7 +549,7 @@ Each workstream has the same parts:
 - **The editor** has a simple table view for most needs, a node-graph view for full control, validation, a test bench on the calibration scenes, and batch comparison of two templates.
 - The first build reproduces today's `decisionPointOf` / `optionsAt` / `ruleFallback` behaviour exactly (golden tests) before anything changes.
 
-W1 comes early (§6) because every later domain adds its decisions as templates rather than as new `switch` cases.
+W1 comes early (§7) because every later domain adds its decisions as templates rather than as new `switch` cases.
 
 ### W2 — Platform model, sensors and weapons
 
@@ -412,7 +564,7 @@ W1 comes early (§6) because every later domain adds its decisions as templates 
   - `opticsClass` and `signatureClass`
   - `CuratedSupport` (350 support missions over 311 platforms: response, loiter, sorties per day, range, sensor class)
 
-  W2 plays them for the first time. Each archetype's missing fields come from the declared-figures registry until data replaces them.
+  W2 plays them for the first time. The new component fields come from the **synthetic catalogue** (W14). Curated data overrides a synthetic value wherever it has one.
 - **Sensors.** `sensing/models/*.ts`, one file per sensor type, each returning a hazard per second for an observer–target pair, plus a classification level reached. The visual model is today's `detectChance` with its multipliers. Optics and thermal use ACQUIRE with `opticsClass`. Radar, ESM, sonar and space come with their workstreams.
 - **Line of sight between heights**, with the 3,000 m cap (`LOS_CAP_M`) replaced by a per-sensor maximum and the radar horizon.
 - **Weapons.** `WeaponMount` with magazines, minimum ranges, salvo, guidance and an `inFlight` flag. Munitions in flight become entities with a simple kinematic model (ballistic, cruise, pursuit, proportional navigation), resolved by closest point of approach.
@@ -484,7 +636,7 @@ W1 comes early (§6) because every later domain adds its decisions as templates 
   | Sustainment notes | Resupply points and priorities |
 
   Today's axis-aligned `Boundary` becomes a polygon.
-- **Claude's role** stays planning, but it can now happen during play:
+- **Claude's role** stays planning, but it can now happen during play. It is split into the **planner hierarchy** of §4.4.2. W4 builds the overall planner and the land planners (formation and tactical). The air, maritime, space & cyber and sustainment planners arrive with W7, W8, W9 and W10. Every planner sits in a **commander seat** (§4.4.3).
   1. **Battle rhythm.** Each Claude-commanded HQ re-plans every *T* sim-minutes (default 30) **[declared]**, or when a CCIR trigger fires: objective taken or lost, a subordinate combat-ineffective, a major enemy force found. The player can still press *Generate orders*.
   2. **Planning takes sim-time.** The new order applies at `t + planningTime`. Planning time scales with echelon and with the time available (the one-third/two-thirds rule) **[ref]**, **[declared]** values. The game does not pause for it. Claude's real latency is hidden inside that sim-time; if Claude is slower than the sim-time allows, the runner waits deterministically, as it does for Jev today.
   3. **Orders travel.** A new order is a message on the command net. A unit out of comms keeps its last order, and acts on intent through its graph's `outOfComms` trigger.
@@ -834,11 +986,13 @@ W1 comes early (§6) because every later domain adds its decisions as templates 
 
 **Goal.** Know how far to trust the simulation, and make it better with evidence.
 
+**For now: plausibility, not accuracy.** While the catalogue is synthetic (W14), the vignette tests below check that outcomes are in a **plausible order of magnitude**: a breach takes hours, not seconds; most FPV strikes do not destroy. They do not demand a match to the reference band. Tightening each test to the band is part of replacing synthetic data with real data later.
+
 **How it works.**
 
 - **Declared-figures registry** (W0) with a source, confidence and sensitivity per figure. The UI lists the least-sourced, most-sensitive figures: the research backlog.
 - **Headless batch runner** (Node, W0): N seeded runs of a scenario at maximum speed. Jev can be replaced by the recorded-answer decider (replay) or by the rule decider when a run must be free and fast. A sample of runs uses live Jev to check that conclusions hold.
-- **Vignette tests:** historical or reference outcomes as **distributions**, checked in CI on the rule decider and nightly on Jev.
+- **Vignette tests:** historical or reference outcomes as **distributions**, checked on every test run with the rule decider, and periodically with live Jev.
 
   | Vignette | Target **[ref]** |
   |---|---|
@@ -874,12 +1028,79 @@ W1 comes early (§6) because every later domain adds its decisions as templates 
    - logistics: stocks, convoys, requests
 5. **Kill-chain timeline**: each strike as a bar from find to assess.
 6. **AAR and replay** from the event stream (`EVENT_STREAM.md` already streams to Foundry). Scrub, filter by unit, domain or decision point. Export to Foundry dashboards.
-7. **Setup.** A scenario editor for command tree, orders, templates, figures overrides and weather, saved per W0.
+7. **Setup.** It starts with the **scenario type picker** (§5.3): eight cards plus Custom. Each card shows its default scope, which the user then adjusts:
+   - draw the area on the map
+   - set the duration
+   - set each domain to simulated, abstracted or off
+   - choose the planners and the detail level
+
+   Then comes the scenario editor for command tree, orders, templates, catalogue and figure overrides and weather, saved per W0.
 8. **The behaviour editor** at `/bgws/behaviour` (W1).
+
+### W14 — The synthetic data catalogue
+
+**Goal.** Every property every system needs, for every kind of platform, filled with **best-guess values** that make the simulation work and behave plausibly. Realistic data comes later, record by record.
+
+**How it works.**
+
+- **Schema first.** `realtime/catalogue/schema.ts` defines the full record for each component in §4.1:
+
+  | Component | Fields include |
+  |---|---|
+  | Mover | Speeds by terrain or medium, endurance, ceiling or depth, turn rate |
+  | Body | Count, vulnerability class, damage-state thresholds, armour by aspect, staying power |
+  | Signatures | Visual, IR, RCS by aspect, acoustic, RF |
+  | Sensors | Type, range, arc, scan period, classification levels |
+  | Weapons | Range band, rate, magazine, reload, guidance, Pk curve, cost |
+  | Emitters and bearers | Band, power, range model, capacity, latency, hop resistance |
+  | Stores | Fuel capacity and burn by activity, basic loads by ammunition family, batteries |
+  | Crew | Default quality |
+  | Carried | What it can carry: dismounts, drones, cargo |
+
+  Every field is required, has a unit, and has a `provenance: "synthetic" | "reference" | "sourced"`.
+- **Generic archetypes, not real systems, first.** Each archetype gets a "generic" platform: generic MBT, IFV, infantry section, ATGM team, 120 mm mortar section, 155 mm SP battery, MLRS, SHORAD, medium SAM, long-range SAM, EW team, ISR quadcopter team, FPV team (RF and fibre), loitering-munition team, one-way attack drone, MALE drone, interceptor-drone team, UGV, 4th-gen fighter, 5th-gen fighter, attack helicopter, transport helicopter, tanker, AEW, MPA, destroyer, frigate, corvette, SSK, SSN, USV, coastal anti-ship battery, LEO EO satellite, LEO SAR satellite, GEO SATCOM, GNSS constellation, depot, convoy truck, railhead, port, airbase, command post per echelon. Real systems from L6/L7 (the 819 armour rows today) inherit from their generic archetype and override what the curated data holds.
+- **How the guesses are made.** Each value is set by:
+  - the **[ref]** figures, where the research has them
+  - otherwise physics and proportion (a heavier vehicle burns more fuel)
+  - otherwise a round-number default that gives sensible gameplay
+
+  Each record carries a one-line rationale.
+- **Consistency checks** as tests: every archetype can be placed, move, sense, fire and be killed in a smoke-test scenario. No field is missing. Values sit inside sane ranges per unit type.
+- **Stored in code** (`realtime/catalogue/generic/*.ts`) to start, so it is versioned and testable. It moves to a Foundry dataset when real data starts arriving, with the same schema.
+- **A catalogue browser** in the Asset Explorer shows each record with its provenance, so it is obvious what is guessed.
+
+**Built in slices:** each milestone adds the archetypes its domains need. M2 is land, M4 drones and EW, M5 air and air defence, M7 naval, M8 space and cyber.
+
+**Done when:** every archetype used by a milestone's scenario has a complete record and passes the smoke test.
+
+### W15 — Human command from an HQ (later; designed for now)
+
+**Goal.** The end state: a person commands from an HQ while the simulation runs. They receive updates as and if they are sent, and send orders back, with all of it subject to the networks, delay and EW.
+
+**Not built until after M8.** These rules hold from W4 on, so nothing has to be redesigned:
+
+- Every planner works through a **commander seat** (§4.4.3).
+- Every report and order is a **message on a net**.
+- HQ pictures are fused, not true.
+
+**How it will work.**
+
+- **The player takes a seat** at any HQ in the scope: joint HQ, a component, or a brigade. Every other seat stays Claude or heuristic, and any of them can be taken over or handed back during play.
+- **The HQ console** (`apps/bgws/hq/`):
+  - **Inbox**: SITREPs, contact reports, requests, CCIR alerts, each stamped with when it was sent and when it arrived.
+  - **COP map**: only this HQ's fused picture, with track ages and uncertainty. No truth view during play.
+  - **Comms status**: which subordinates are reachable on which bearer, and what is jammed or degraded, as far as the HQ can tell.
+  - **Orders composer**: FRAGOs, tasks, control measures drawn on the map, priorities, apportionment. They are sent as messages, with a delivery receipt when acknowledged.
+  - **Staff assistants**: the Claude planners can draft a plan or a FRAGO for the player to approve, edit or reject. The Jev-driven staff cells (fires, sustainment) keep making their routine choices unless the player intervenes.
+- **Time.** In single-player the clock can be paused or slowed. With more than one human player, the clock runs at a fixed speed and cannot be paused by a player.
+- **EW and destruction affect the player** exactly as they affect Claude. A jammed net delays their reports and orders. A destroyed command post moves their seat to the alternate HQ after a delay, during which they see nothing new.
+- **Later still: multiplayer** across Foundry, one player per seat, on both sides.
+
+**Done when (eventually):** a person can play the brigade HQ in a Combined-arms battle scenario and win or lose through orders alone, with an AAR comparing their decisions to the Claude planner's on the same seed.
 
 ---
 
-## 6. Roadmap: milestones
+## 7. Roadmap: milestones
 
 Each milestone ends with a **playable scenario** that exercises everything built so far, plus its vignette tests (W12). W12 (calibration) and W13 (UI) run alongside every milestone.
 
@@ -893,19 +1114,25 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
           ┌─────────────────────────────────────────────────────────────────┘
           ▼
    M7 Littoral (naval) ──► M8 Joint all-domain (space, cyber, kill web, theatre scale)
+                                                                            │
+                                                                            ▼
+                                                        M9 Human command (HQ console)
 ```
 
-| Milestone | Workstreams | Playable scenario | Key acceptance |
-|---|---|---|---|
-| **M0 Foundations** | W0 | Today's real-time game, built in CI, running in a worker | Byte-identical replays in browser and Node; all tests green |
-| **M1 Editable behaviour** | W1 (steps 1–8), W13.8 | Today's tank battle, with "Tank: stand fast" built in the editor and assigned to Red | Golden test identical to old behaviour; a template made and assigned in under 2 min; test bench works |
-| **M2 Combined-arms company** | W2, W3, W1 (archetype templates) | Mech company hasty attack: dismounts, mortars on call, a minefield breach, ammunition and fuel | Breach time and attacker halt in reference bands |
-| **M3 Battalion C2** | W4, W13.1–4 | Battalion attack: 3 company HQs, a battalion HQ, nets with terrain-limited VHF, Claude re-planning on CCIR | Out-of-comms units act on intent; HQ loss measurably slows reporting |
-| **M4 Transparent battlefield** | W5, W6 | "Drone line": drone teams on both sides, jammers, fibre FPVs, a counter-drone screen | Kill-zone depth and FPV effectiveness in reference bands; GNSS jamming degrades precision rounds |
-| **M5 Air over the battle** | W7 | SEAD package and CAS on a contested front; a Shahed-style raid on a layered defence | Interception and cost exchange as outputs in reference order; fires/air deconfliction |
-| **M6 Sustained fight** | W10, W13.5–6 | 24-hour brigade fight with a supply network, convoys and medical evacuation | Culmination when supply is cut; casualty evacuation in reference band |
-| **M7 Littoral** | W8 | Red Sea task group defence; Black Sea port strike | Magazine-limited defence; ships leave to reload; salvo outcomes emergent |
-| **M8 Joint all-domain** | W9, W11, theatre scale | Rising Lion-style opening plus a land campaign: satellites, cyber accesses, joint kill web | Full kill-chain AAR; network swap changes kill-chain times by reference factor |
+"In band" below means in a plausible order of magnitude while the catalogue is synthetic (W12).
+
+| Milestone | Workstreams | Scenario types unlocked (§5.3) | Playable scenario | Key acceptance |
+|---|---|---|---|---|
+| **M0 Foundations** | W0 | (scope and presets in the file format) | Today's real-time game, running in a worker, loaded from a scenario file | Byte-identical replays in browser and Node; all tests green |
+| **M1 Editable behaviour** | W1 (steps 1–8), W13.7–8, W14 (land slice started) | **1 Skirmish** | Today's tank battle as a Skirmish, with "Tank: stand fast" built in the editor and assigned to Red | Golden test identical to old behaviour; a template made and assigned in under 2 min; test bench works |
+| **M2 Combined-arms company** | W2, W3, W1 (archetype templates), W14 (land) | Skirmish, extended | Mech company hasty attack: dismounts, mortars on call, a minefield breach, ammunition and fuel | Breach time and attacker halt in band |
+| **M3 Battalion C2** | W4 (overall + land planners, seats), W13.1–4 | **2 Combined-arms battle** | Battalion attack: 3 company HQs, a battalion HQ, nets with terrain-limited VHF, Claude re-planning on CCIR; air and space abstracted | Out-of-comms units act on intent; HQ loss measurably slows reporting |
+| **M4 Transparent battlefield** | W5, W6, W14 (drones, EW) | **3 Drone line** | "Drone line": drone teams on both sides, jammers, fibre FPVs, a counter-drone screen | Kill-zone depth and FPV effectiveness in band; GNSS jamming degrades precision rounds |
+| **M5 Air over the battle** | W7 (+ air planner), W14 (air) | **4 Air campaign** | SEAD package and CAS on a contested front; a Shahed-style raid on a layered defence | Interception and cost exchange in band; fires/air deconfliction |
+| **M6 Sustained fight** | W10 (+ sustainment planner), aggregation (§4.2), W13.5–6 | **5 Sustained offensive** | 3-day division offensive with a supply network, convoys and medical evacuation | Culmination when supply is cut; casualty evacuation in band; aggregation and disaggregation work |
+| **M7 Littoral** | W8 (+ maritime planner), W14 (naval) | **6 Maritime / littoral** | Red Sea task group defence; Black Sea port strike | Magazine-limited defence; ships leave to reload; salvo outcomes emergent |
+| **M8 Joint all-domain** | W9 (+ space & cyber planner), W11, theatre scale, W14 (space) | **7 Strike and missile defence**, **8 Joint operation** | Rising Lion-style opening plus a land campaign: satellites, cyber accesses, joint kill web, all six planners | Full kill-chain AAR; network swap changes kill-chain times by reference factor |
+| **M9 Human command** | W15 | All, with a human seat | A person commands the brigade HQ in a Combined-arms battle | Orders and reports flow only over the simulated networks; EW delays both ways |
 
 **Why this order:**
 
@@ -917,7 +1144,7 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 
 ---
 
-## 7. Jev and Claude at scale
+## 8. Jev and Claude at scale
 
 **Jev call volume.**
 
@@ -939,29 +1166,79 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 4. **The rule decider** for units far from the player's focus, as a per-scenario level-of-detail setting.
 5. **The recorded-answer decider** for replays and batches.
 
-**Claude** is called per HQ on the battle rhythm or on CCIR, which is rare by design (a few calls per sim-hour per HQ). Its prompt is the HQ picture plus the order schema. Its output is validated as strictly as `parseOrders` does today, with the same heuristic fallback. The Foundry functions (`bgwsCommanderRealtimeOrders` and new ones per component) live in the separate functions repository that `REALTIME_COMMAND.md` refers to as `llmfunctions.ts`.
+**Claude.**
+
+- **Planners.** Each planner (§4.4.2) is called on its battle rhythm or on a CCIR trigger, which is rare by design:
+
+  | Planner | Typical cadence **[declared]** |
+  |---|---|
+  | Tactical | Every 15–30 sim-minutes |
+  | Formation | Every 30–60 sim-minutes |
+  | Component | Every 2–6 sim-hours |
+  | Overall (joint) | Every 6–12 sim-hours |
+
+- **Volume.** A joint operation with six planners per side is a few dozen calls per sim-day per side.
+- **Prompt and output.** Each prompt is the planner's HQ picture, its inbox of reports and requests, and the guidance from the planner above. Each output is validated against its schema as strictly as `parseOrders` is today, with a heuristic fallback.
+- **Ordering.** Calls within one side are made top-down when they coincide: the overall planner first, then the components with its fresh guidance.
+- **Where the functions live.** The Foundry functions are `bgwsCommanderRealtimeOrders` plus one new function per planner type. They live in the functions repository that `REALTIME_COMMAND.md` refers to as `llmfunctions.ts`.
 
 ---
 
-## 8. Risks and open questions
+## 9. Decisions taken, risks and open questions
+
+### Decisions taken (October 2026)
+
+| Question | Decision | Where in the plan |
+|---|---|---|
+| Scale and scope | The user sets the scope at the start: from a single battle to a weeks-long operation across every domain over an area they choose. Preset scenario types contain all domains or a chosen selection. | §5 |
+| Human command | Yes, eventually: a person in an HQ who gets updates as and if they are sent and sends commands back, all subject to EW. Not built yet, but designed for from W4 on. | §4.4.3, W15, M9 |
+| Claude's place | Several Claude planners, one per scope and domain, with one overall Claude managing their aims together | §4.4.2 |
+| Data | Best-guess synthetic data with every property the simulation needs; realistic data later | W14, §2 rule 3 |
+| Build shell | Stays on Foundry; not recreated here. Packages needed are listed for installation. | W0, §10 |
 
 ### Risks
 
 | Risk | Mitigation |
 |---|---|
-| **Scope.** Thirteen workstreams is years of work for one person. | Milestones are each playable. Domains can be cut (e.g. naval after M6) without breaking the core. W0–W1 are valuable on their own. |
-| **False precision.** A detailed simulation looks authoritative even where numbers are guesses. | Registry, confidence labels in the UI, results as ranges, vignette tests, and the research backlog (W12) |
-| **Open-source data limits.** Many figures, such as Pk values, sonar performance and EW parameters, are classified or contested. | Declared figures with honest labels; sensitivity analysis to show which matter; curated data in Foundry can be replaced by better data without code changes |
-| **Performance at theatre scale** | Worker, spatial hash, staggering and level of detail (§4.10); profile from M2 on |
-| **LLM escalation and unrealistic choices** | Claude plans only; ROE and weapon release are hard gates; Jev chooses only from rule-generated options; escalation suite (W12) |
+| **Scope.** Fifteen workstreams is years of work for one person. | Milestones are each playable. Domains can be cut (e.g. naval after M6) without breaking the core. W0–W1 are valuable on their own. |
+| **False precision.** A detailed simulation looks authoritative even where numbers are guesses, and for now most are guesses by design. | Provenance on every value (synthetic / reference / sourced), shown in the UI; results as ranges; vignette tests; the research backlog (W12) |
+| **Synthetic data that plays badly** | The W14 smoke tests and the W12 plausibility vignettes; tune guesses until behaviour is plausible, then replace them with real data |
+| **Planners that disagree or contradict each other** | Top-down guidance, rule validation of each plan against it, overages become requests, reconciliation by the overall planner (§4.4.2) |
+| **Performance at theatre scale and over weeks** | Worker, spatial hash, staggering, aggregation and quiet-period skipping (§4.2, §4.10); profile from M2 on |
+| **LLM escalation and unrealistic choices** | Claude plans only; ROE and weapon release are hard gates; Jev chooses only from rule-generated options; escalation suite (W12); the overall planner owns escalation limits |
 | **Determinism under async AI** | Kept by the runner's deterministic wait and recorded answers; tested in M0 |
-| **Sensitive content** | The simulation uses open-source information only. Scenarios use real systems' public figures. Nothing here targets real people or places beyond public historical events. |
+| **Sensitive content** | Open-source information and synthetic data only. Nothing here targets real people or places beyond public historical events. |
 
-### Open questions for you
+### Still open
 
-1. **Target scale for the first version of each domain.** Is theatre scale (1,000 km+) needed before M7, or can air stay operational-scale (≤300 km) until then?
-2. **Human players.** Should a person be able to command a side or an HQ live? That needs a different orders UI and possibly multiplayer over Foundry.
-3. **Where Claude sits.** Brigade and above only, or also battalion and company HQs?
-4. **Template sharing.** Team-wide in Foundry from the start, or local first?
-5. **Data.** Is there a better source than the L6/L7 curated tables for air, naval and drone figures, and can the curated pipeline be extended to fill the new component fields?
-6. **Build shell.** Is the missing `package.json`/Vite setup kept in another repo (the original Mapplications), or should W0 recreate it here?
+1. **Template sharing:** team-wide in Foundry from the start, or local first? The plan assumes local first, then Foundry at W1 step 9.
+2. **The overall Claude: can a person take it over?** It is a seat like any other, so W15 allows it. Confirm that it is wanted.
+3. **Human-play pacing:** real time (×1) only, or accelerated with automatic pause on important messages?
+
+---
+
+## 10. Packages to install
+
+The project shell is on Foundry, so these are listed for you to install there. Each is pinned to an exact version when added.
+
+| Package | Needed for | When | Required? |
+|---|---|---|---|
+| `@xyflow/react` (React Flow 12) | The node-graph view of the behaviour editor | W1 step 10 (M1) | Yes |
+| `zod` | Validating templates, scenario files, catalogue records and every planner's output against one schema each | W0 (M0) | Recommended. The alternative is hand-written validators like today's `parseOrders`. |
+| `tsx` (dev) | Running the headless Node engine host and batch calibration runs as TypeScript scripts | W0 (M0) | Recommended, if Vitest is not used as the runner |
+| `deck.gl` + `@deck.gl/mapbox` | Altitude-aware rendering of air tracks, missile arcs and coverage volumes over MapLibre | W13 step 3 (M5) | Optional; the side-profile panel works without it |
+
+Already present and reused: `react`, `react-router-dom`, `maplibre-gl`, `milsymbol`, `geodesy`, `vitest`, `@osdk/*`, `@acc/decho-basemap`, `@acc/decho-elevation`. Web Workers need nothing extra with Vite.
+
+No package is needed for satellites (two-body orbits are a few lines), spatial indexing (a grid hash) or the sensor models.
+
+**Foundry-side items** (not npm packages, listed so they can be set up when their milestone comes):
+
+| Item | For | When |
+|---|---|---|
+| A `BgwsBehaviourTemplate` object type with create/edit actions | Shared templates | M1 |
+| A scenario object type or dataset | Saved scenarios and presets | M0–M1 |
+| New AIP functions: overall planner, land formation, air, maritime, space & cyber, sustainment | The planner hierarchy | M3–M8 |
+| An event stream schema update, adding domain, graph path and planner fields | `EVENT_STREAM.md` | M1 onward |
+| Terrain rasters for new areas, and a bathymetry dataset (e.g. GEBCO) | Larger and maritime scopes | M6–M7 |
+| A dataset for the catalogue, once real data starts replacing synthetic values | W14 | Later |
