@@ -10,3 +10,6 @@
 | [REALTIME_COMMAND.md](REALTIME_COMMAND.md) | How that design is built: modules, declared figures, calibration, what is not done yet. |
 | [REALTIME_COMMS.md](REALTIME_COMMS.md) | What each unit knows, and how units talk: per-unit pictures, the radio net, asking friends for help (D9, D12). |
 | [EVENT_STREAM.md](EVENT_STREAM.md) | The real-time feed streamed to Foundry: the schema, and how it is sent. |
+| [plan/MULTI_DOMAIN_PLAN.md](plan/MULTI_DOMAIN_PLAN.md) | The plan from proof of concept to a multi-domain simulation: the end goal, target architecture, the Claude planner hierarchy and commander seats, scenario scopes and eight preset scenario types, fifteen workstreams (land, C2 and comms, drones, EW, air, naval, space and cyber, logistics, the joint kill web, synthetic data, human command) and the milestones to build them in. |
+| [plan/DECISION_FLOW_GRAPHS.md](plan/DECISION_FLOW_GRAPHS.md) | Editable decision flow graphs: every unit's default behaviour template from what it can do, templates derived by patches, swapping them, and the editor. |
+| [research/MODERN_WARFARE_REFERENCE.md](research/MODERN_WARFARE_REFERENCE.md) | The research the plan is built on: how modern war is planned, commanded, communicated and fought in every domain, with sourced figures separated from unverified defaults. |
