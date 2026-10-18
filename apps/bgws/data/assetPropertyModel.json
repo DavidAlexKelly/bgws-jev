@@ -1,0 +1,219 @@
+{
+  "id": "bgws-asset-acquisition-spec",
+  "version": "2",
+  "purpose": "What data we need to GO AND GET, per asset type, for the wargame to work. A shopping list, not an audit: every field below is something a person can look up in a manual, a datasheet or an ORBAT, with the unit it must be in and the rule that consumes it. Fields we do not need are listed too, so nobody spends a week sourcing gear ratios.",
+  "howToRead": {
+    "blocking": "Without this the asset cannot be fielded at all. Collect these first.",
+    "fidelity": "Improves resolution once the asset is playable. Collect these second.",
+    "derived": "We compute it — do NOT go looking for it. Combat Strength, Troop Quality and the counter symbol are ours by design, because they are game abstractions rather than facts about equipment.",
+    "scenario": "Belongs to a scenario (SSI), not to an asset. Ammunition allocations, fire-mission budgets and objectives change per game."
+  },
+  "conventions": {
+    "length": "metres, integer",
+    "range": "MAX EFFECTIVE range against the stated target type, not maximum ballistic range. If a source gives both, record effective and note the other.",
+    "penetration": "mm RHAe at 0 m, 1000 m and 2000 m. Flat figures are expected and correct for shaped charges — do not smooth them.",
+    "armour": "mm RHAe frontal, turret and hull separately if available; otherwise a band and a note saying why.",
+    "ammunition": "rounds or missiles carried, per weapon, first-line scale only",
+    "perFieldMetadata": "Every field needs: value, unit, source (publication or URL), as_of date, confidence (high/medium/low/estimated). A figure with no source is treated as declared, which is a different thing from sourced and is reported differently.",
+    "nulls": "An explicit null with a reason beats a plausible guess. 'unavailable' is data; a made-up number is not."
+  },
+  "universal": {
+    "description": "Needed for every asset type.",
+    "blocking": [
+      { "field": "asset_id", "unit": "string", "why": "Our key. Stable across refreshes." },
+      { "field": "display_name", "unit": "string", "why": "The counter label and the FMC entry." },
+      { "field": "asset_type", "allowed": ["armoured", "wheeled", "human", "human_carried_weapon", "air", "naval"], "why": "Selects which of the lists below applies." },
+      { "field": "nation_of_service", "unit": "string, repeatable", "why": "Force list construction, and flagging when one nation's kit is standing in for another's." },
+      { "field": "role", "allowed": ["manoeuvre", "recce", "hq", "mortar", "atgm", "air_defence", "engineer", "logistics", "fire_support_team"], "why": "Recce and Fire Support Teams are the precondition for indirect fire; HQs command-activate; logistics enables resupply and rally." },
+      { "field": "echelon", "allowed": ["section", "platoon_troop", "company_squadron", "battlegroup"], "why": "Sets what one counter represents, and drives stacking and mounting." }
+    ],
+    "fidelity": [
+      { "field": "in_service_from", "unit": "year", "why": "Scenario plausibility." },
+      { "field": "in_service_to", "unit": "year|null" },
+      { "field": "signature_size", "allowed": ["small", "medium", "large"], "why": "A sighting modifier: a tank is easier to see than a dismounted section." }
+    ],
+    "derived": [
+      { "field": "sidc", "why": "Built from asset_type, role and echelon." },
+      { "field": "bgws_move_type", "why": "F / W / T follows from asset_type." },
+      { "field": "target_class", "why": "foot / soft_skin / armoured_vehicle follows from armour presence." },
+      { "field": "combat_strength_index", "why": "A game abstraction calibrated by sweep against the rest of the scale. Sourcing it is a category error." },
+      { "field": "troop_quality", "why": "A property of the unit in a scenario, not of the equipment." }
+    ]
+  },
+  "byType": {
+    "armoured": {
+      "description": "Tracked armoured fighting vehicles: MBTs, IFVs, tracked APCs, SPGs, tracked recce.",
+      "blocking": [
+        { "field": "armour_frontal_mm_rhae", "unit": "mm RHAe", "typicalSource": "manufacturer datasheet, Jane's, national army pages; STANAG level where thickness is classified", "why": "Protection band, and the comparison side of every penetration check." },
+        { "field": "armour_side_mm_rhae", "unit": "mm RHAe", "why": "Flank shots are a real column shift; without this a flank attack is worth nothing." },
+        { "field": "primary_weapon", "unit": "{ name, calibre_mm, type: gun|autocannon|atgm_launcher }", "why": "The main armament decides the fire column." },
+        { "field": "primary_effective_range_m", "unit": "m", "why": "Range bands and the short-range modifier." },
+        { "field": "primary_penetration_mm", "unit": "{ m0, m1000, m2000 } mm RHAe", "why": "Whether a hit can hurt what it hit." },
+        { "field": "primary_ammunition_carried", "unit": "rounds, split by natures if known (APFSDS / HE / HEAT)", "why": "Ammunition is an economy: at zero an FE still fires but at Combat Strength 1." },
+        { "field": "transport_capacity_dismounts", "unit": "integer personnel, 0 for a tank", "why": "Mounting and dismounting. An IFV that cannot carry infantry cannot take ground." }
+      ],
+      "fidelity": [
+        { "field": "secondary_weapons", "unit": "array of { name, calibre_mm, effective_range_m, type: mg|agl|atgm }", "why": "Coaxial and pintle weapons are the only thing most AFVs can engage infantry with." },
+        { "field": "atgm", "unit": "{ name, effective_range_m, penetration_mm, missiles_carried }", "why": "Anti-tank missiles use their own fire column regardless of the firer's strength, so they must be recorded separately from the main gun." },
+        { "field": "has_smoke_dischargers", "unit": "boolean" },
+        { "field": "sight_type", "allowed": ["optical", "image_intensifier", "thermal"], "why": "Sighting modifier." },
+        { "field": "detection_range_m", "unit": "m", "why": "How far it can pick a target out. The basis of a recce role." },
+        { "field": "commanders_independent_sight", "unit": "boolean", "why": "Hunter-killer: a second sighting attempt." },
+        { "field": "mobility_note", "unit": "string", "why": "Only for the exceptionally slow or fast. A per-platform movement modifier against the terrain table." }
+      ],
+      "doNotCollect": [
+        "engine power, power-to-weight, gear ratios, top road speed, empty mass",
+        "hull points, crew size, fuel capacity, range on roads",
+        "rate of fire, muzzle velocity, explosive filler mass",
+        "why: movement is a table lookup by Move Type and Terrain, casualties are Combat Strength, and no resolver reads any of these"
+      ]
+    },
+    "wheeled": {
+      "description": "Wheeled vehicles: IFVs, APCs, protected patrol vehicles, trucks, wheeled recce, wheeled SPGs.",
+      "blocking": [
+        { "field": "is_soft_skin", "unit": "boolean", "why": "Two unrelated consequences: anti-personnel weapons may engage it, and marsh and water are impassable to it." },
+        { "field": "armour_frontal_mm_rhae", "unit": "mm RHAe|null", "why": "Null is a valid and useful answer for a truck." },
+        { "field": "primary_weapon", "unit": "as armoured, may be null", "why": "Many wheeled assets are unarmed; record that explicitly." },
+        { "field": "primary_effective_range_m", "unit": "m|null" },
+        { "field": "primary_ammunition_carried", "unit": "rounds|null" },
+        { "field": "transport_capacity_dismounts", "unit": "integer personnel", "why": "The main reason most of these exist." }
+      ],
+      "fidelity": [
+        { "field": "secondary_weapons", "unit": "as armoured" },
+        { "field": "atgm", "unit": "as armoured" },
+        { "field": "sight_type", "allowed": ["optical", "image_intensifier", "thermal"] },
+        { "field": "detection_range_m", "unit": "m" },
+        { "field": "cross_country_capable", "unit": "boolean", "why": "Distinguishes a protected patrol vehicle from a load-carrier off-road." }
+      ],
+      "doNotCollect": ["as armoured"]
+    },
+    "human": {
+      "description": "Dismounted elements — the only assets that can take ground. Sourced from ORBATs and organisation tables rather than equipment datasheets.",
+      "blocking": [
+        { "field": "personnel_strength", "unit": "integer", "why": "A section is about 8, a platoon about 30. The size of the element behind the counter." },
+        { "field": "organic_weapons", "unit": "array of { weapon_id, count }", "why": "What every member carries: rifles, LMG, UGL. Reference human_carried_weapon entries by id rather than restating their figures." },
+        { "field": "support_weapons", "unit": "array of { weapon_id, count }", "why": "GPMG, light mortar, MANPATS. These are what let infantry hurt vehicles." },
+        { "field": "first_line_ammunition", "unit": "{ weapon_id: rounds_or_missiles }", "why": "Assaults require and spend ammunition; running dry forces a withdrawal." },
+        { "field": "can_assault", "unit": "boolean", "why": "Dismounted strength is the ONLY strength that counts in an assault. An element that cannot assault cannot take an objective." },
+        { "field": "mount_eligible", "unit": "boolean", "why": "Whether it can ride, and therefore whether it can keep up with armour." }
+      ],
+      "fidelity": [
+        { "field": "command_rating", "unit": "integer 1-3, HQ elements only", "why": "Command activations, morale steadying, initiative and assault modifiers all read it." },
+        { "field": "is_observer", "unit": "boolean", "why": "HQ, recce and fire support teams can direct mortars and artillery onto targets they can see and the firer cannot." },
+        { "field": "night_vision", "unit": "boolean" },
+        { "field": "specialist_equipment", "unit": "array of string", "why": "Breaching, demolition, obstacle-crossing — for engineer tasks later." },
+        { "field": "typical_quality", "allowed": ["elite", "regular", "reserve", "conscript"], "why": "A HINT for setting Troop Quality in a scenario. Not the value itself." }
+      ],
+      "doNotCollect": [
+        "body armour rating, individual load weight, march rate in km/h",
+        "why: BGWS has one dismounted protection class, and foot movement is a table row"
+      ],
+      "sourcingNote": "The current catalogue cannot supply any of this: its 76 'foot' rows are character weapon presets from a simulator, one has a weapon and none has a range. Expect to build this list by hand from ORBATs — a dozen entries covers a battlegroup."
+    },
+    "human_carried_weapon": {
+      "description": "A weapon a dismounted element carries. Collected once, referenced by many human assets — this is why it is its own type rather than a column on infantry.",
+      "blocking": [
+        { "field": "weapon_id", "unit": "string" },
+        { "field": "name", "unit": "string" },
+        { "field": "weapon_type", "allowed": ["rifle", "lmg", "gpmg", "hmg", "ugl", "light_mortar", "manpats_missile", "manpats_rocket", "manpads", "smoke"], "why": "Selects the capability kind." },
+        { "field": "capability_kind", "allowed": ["apers", "atk", "atm", "aa", "idf", "smoke"], "why": "Anti-personnel weapons may only engage dismounts and soft-skinned vehicles; anti-tank weapons may not engage dismounts at all." },
+        { "field": "effective_range_m", "unit": "m", "why": "Range band and short-range modifier." },
+        { "field": "ammunition_carried", "unit": "rounds or missiles per element", "why": "Fire and assault both spend it." },
+        { "field": "single_use", "unit": "boolean", "why": "A disposable launcher is gone once fired; a reusable command launch unit is not. This is the difference between one shot and a sustained anti-armour position." }
+      ],
+      "fidelity": [
+        { "field": "penetration_mm", "unit": "{ m0, m1000, m2000 } mm RHAe, anti-armour weapons only", "why": "Flat is correct for shaped charges." },
+        { "field": "crew_required", "unit": "integer", "why": "A two- or three-man weapon takes people out of the rifle strength of the element carrying it." },
+        { "field": "uses_own_fire_column", "unit": "boolean", "why": "True for guided anti-tank missiles: their effect is the weapon's, not the firer's strength." },
+        { "field": "can_combine_fire", "unit": "boolean", "why": "False for guided anti-tank missiles." },
+        { "field": "minimum_range_m", "unit": "m|null", "why": "Missile arming distance." },
+        { "field": "top_attack", "unit": "boolean", "why": "Attacks the thinnest armour; a column shift rather than a penetration change." }
+      ],
+      "doNotCollect": [
+        "weight, length, muzzle velocity, rate of fire, guidance mode detail",
+        "why: none of it reaches a resolver. Crew size is the only weight proxy that matters"
+      ],
+      "minimumViableSet": [
+        "assault rifle (apers)",
+        "light machine gun (apers)",
+        "general purpose machine gun (apers, longer)",
+        "underslung grenade launcher (apers, short)",
+        "disposable anti-tank rocket (atk, single use)",
+        "guided anti-tank missile, reusable launcher (atm, own column)",
+        "60mm light mortar (idf, short range, smoke capable)",
+        "man-portable air defence (aa) — only if air assets are modelled"
+      ]
+    },
+    "air": {
+      "description": "Artillery-equivalent, air and attack-helicopter support, plus uncrewed air systems. These have NO counter on the map: they are fire missions and sensors, so what is needed is the effect and its availability rather than the airframe.",
+      "blocking": [
+        { "field": "provider_type", "allowed": ["tube_artillery", "mlrs", "mortar_battery", "fixed_wing_cas", "attack_helicopter", "uas"], "why": "Selects the effect profile." },
+        { "field": "munition_natures", "unit": "array of { nature: he|cluster|precision|smoke|illum, calibre_mm }", "why": "Calibre and nature set the fire column and whether armour is suppressed." },
+        { "field": "effect_radius_m", "unit": "m", "why": "Everything inside it takes a morale step, INCLUDING friendly elements. This is the field that makes danger-close a real decision." },
+        { "field": "requires_observer", "unit": "boolean", "why": "Someone must see the target: an HQ, recce element or fire support team." },
+        { "field": "minimum_safe_distance_m", "unit": "m", "why": "How close to your own troops it may be fired. Smoke is usually exempt." }
+      ],
+      "fidelity": [
+        { "field": "max_range_m", "unit": "m|null", "why": "Null for air, which has no meaningful range limit on a 10 km sheet; real for tube artillery and mortars." },
+        { "field": "accuracy_cep_m", "unit": "m", "why": "A modifier rather than a scatter model." },
+        { "field": "response_delay_turns", "unit": "integer", "why": "The difference between pre-planned and on-call fires, and a genuine planning lesson." },
+        { "field": "can_fire_smoke", "unit": "boolean" },
+        { "field": "detection_range_m", "unit": "m, uas only", "why": "A UAS is a sensor first." },
+        { "field": "sensor_type", "allowed": ["eo", "ir", "sar"], "unit": "uas only" },
+        { "field": "endurance_turns", "unit": "integer, uas only", "why": "How long it stays up before it must be relieved." },
+        { "field": "reveals_concealed", "unit": "boolean, uas only" },
+        { "field": "atgm_load", "unit": "{ name, count, effective_range_m, penetration_mm }, attack helicopter only" }
+      ],
+      "scenario": [
+        { "field": "missions_available_per_game", "why": "Rationing is set by the scenario, not by the airframe. This is the resource the plan spends." },
+        { "field": "missions_available_per_turn", "why": "Usually one per type." },
+        { "field": "on_call_window_turns", "why": "Which turns the support is actually available." }
+      ],
+      "doNotCollect": [
+        "airspeed, ceiling, payload mass, combat radius, airframe dimensions, sortie generation rate",
+        "why: there is no air movement and no air combat in this game. An aircraft is a budgeted effect"
+      ]
+    },
+    "naval": {
+      "description": "Recommended scope: naval gunfire support and lift only. There are no naval rules, no naval counters and no naval movement, so a hull is either a fires provider or it is scenery.",
+      "blocking": [
+        { "field": "provider_type", "allowed": ["naval_gunfire", "amphibious_lift"], "why": "The only two ways a ship touches this game." },
+        { "field": "gun_calibre_mm", "unit": "mm, naval_gunfire only" },
+        { "field": "max_range_m", "unit": "m", "why": "Only to confirm it can reach the sheet at all." },
+        { "field": "effect_radius_m", "unit": "m" },
+        { "field": "rounds_available", "unit": "integer", "why": "Naval gunfire is rationed like any other mission." },
+        { "field": "requires_observer", "unit": "boolean" }
+      ],
+      "fidelity": [
+        { "field": "response_delay_turns", "unit": "integer" },
+        { "field": "can_fire_smoke", "unit": "boolean" },
+        { "field": "lift_capacity", "unit": "{ dismounts, vehicles }, amphibious_lift only" },
+        { "field": "landing_sites", "unit": "array of grid references, amphibious_lift only", "why": "Scenario geography rather than a ship property." }
+      ],
+      "doNotCollect": [
+        "displacement, hull length, propulsion, torpedoes, anti-air fit, radar fit, crew",
+        "why: modelling any of it would be inventing a naval game the rulebook does not have"
+      ]
+    }
+  },
+  "scenarioLevel": {
+    "description": "Collect these per SCENARIO, not per asset. They are the levers that make two games with the same equipment different.",
+    "fields": [
+      "troop quality per unit",
+      "ammunition allocation, where it differs from first-line scale",
+      "fire missions available per support type, per game and per turn",
+      "objectives and victory conditions, in grades",
+      "starting locations, concealment and dummy counters",
+      "weather, visibility and time of day",
+      "order verbs and contingency plans per element"
+    ]
+  },
+  "acquisitionOrder": [
+    "1. human_carried_weapon minimum viable set — eight entries, and nothing infantry-related works without them",
+    "2. human elements for one battlegroup on each side — about a dozen entries each, from ORBATs",
+    "3. transport_capacity_dismounts for every vehicle already in the catalogue — one integer per row, unlocks mounting",
+    "4. armour_side_mm_rhae and atgm blocks for vehicles that have them — makes flanking and anti-tank fire distinct",
+    "5. air providers as fire missions, with scenario budgets",
+    "6. naval only if a scenario needs gunfire support"
+  ]
+}

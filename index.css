@@ -1,0 +1,61 @@
+/*
+ * Base styles for BGWS.
+ *
+ * The BGWS screens are full-viewport (map board, real-time play) and style
+ * themselves inline, so this only has to provide a dark, edge-to-edge page
+ * and the one design token they read: --font-mono.
+ *
+ * The template's Blueprint CSS and centred, max-width #root have been
+ * dropped: Blueprint's element resets restyle headings, links and buttons the
+ * BGWS screens were never designed against, and the padded #root clipped the
+ * map. (Mapplications got these from its shared global.css — that file also
+ * pulls in @acc/decho-styling and @fontsource, which BGWS does not need.)
+ */
+@import "normalize.css";
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root-container,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #0b0d12;
+  color: #e6e9f2;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
