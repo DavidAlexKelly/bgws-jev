@@ -15,6 +15,7 @@ import type { ForceElement } from "../../../lib/state";
 import { distanceM } from "../../../lib/board";
 import { hasRecord, recordFor } from "../../catalogue";
 import type { RtState, UnitOrders } from "../../engine/types";
+import { wfig } from "../figures";
 import { offsetBy, bearingDeg } from "../geo";
 import type { Guidance, Headquarters, PlanAnswer, WorldTrack } from "../types";
 
@@ -72,8 +73,17 @@ export function heuristicPlan(state: RtState, hq: Headquarters): PlanAnswer {
   const per = units.length ? own / units.length : 8;
   const enemy = enemyNear(hq.cop, objective, 2500, per);
   const ratio = own / Math.max(1, enemy);
-  const attack = enemy === 0 || ratio >= 1.2;
-  const intent = attack ? `take the objective and hold it (${hq.echelon} attack, ${Math.round(ratio * 10) / 10}:1)` : `hold where we stand until the odds improve (${Math.round(ratio * 10) / 10}:1)`;
+  // An attack culminates when its losses pass the point a commander halts at, whatever the odds [ref, doctrine].
+  const fleet = subs.filter((id) => state.units[id]);
+  const total = fleet.reduce((s, id) => s + state.units[id].vehicles.total, 0);
+  const lost = total ? 1 - fleet.reduce((s, id) => s + state.units[id].vehicles.fit, 0) / total : 0;
+  const culminated = lost >= wfig("world/command/heuristicPlanner.CULMINATION_LOSS") && distanceM(anchor, objective) > 300;
+  const attack = !culminated && (enemy === 0 || ratio >= 1.2);
+  const intent = culminated
+    ? `the attack has culminated at ${Math.round(lost * 100)}% losses: hold and consolidate`
+    : attack
+      ? `take the objective and hold it (${hq.echelon} attack, ${Math.round(ratio * 10) / 10}:1)`
+      : `hold where we stand until the odds improve (${Math.round(ratio * 10) / 10}:1)`;
 
   // HQs below get a task, not orders: they plan their own.
   const guidance: Guidance = {

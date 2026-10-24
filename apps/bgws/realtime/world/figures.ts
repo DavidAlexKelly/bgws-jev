@@ -123,6 +123,7 @@ export const WORLD_FIGURES = {
   "world/domains/c2.PLAN_BATTALION_S": { value: 900, unit: "s", module: "world/domains/c2", source: ref("R1, P1"), range: [600, 2400], note: "A hasty battalion plan." },
   "world/domains/c2.PLAN_BRIGADE_S": { value: 2400, unit: "s", module: "world/domains/c2", source: ref("R1, P1"), range: [1200, 7200], note: "A hasty brigade plan (the vignette's 40 sim-minutes)." },
   "world/domains/c2.PLAN_HIGH_S": { value: 5400, unit: "s", module: "world/domains/c2", source: ref("P25 (default)"), range: [3600, 21600], note: "A division, component or joint plan, hasty." },
+  "world/domains/c2.HASTY_PLAN_S": { value: 180, unit: "s", module: "world/domains/c2", source: declared, range: [60, 600], note: "A hasty plan on a crisis (heavy losses): a FRAGO in minutes." },
   "world/domains/c2.CCIR_MIN_GAP_S": { value: 600, unit: "s", module: "world/domains/c2", source: declared, range: [300, 1800], note: "An HQ does not re-plan on a CCIR trigger within this long of its last plan." },
   "world/domains/c2.CCIR_NEW_CONTACTS": { value: 3, module: "world/domains/c2", source: declared, range: [2, 6], note: "New enemy contacts in the COP since the last plan that count as a major enemy force found." },
   "world/domains/c2.HEARTBEAT_S": { value: 300, unit: "s", module: "world/domains/c2", source: declared, range: [120, 900], note: "An HQ restates its intent to its subordinates this often; each answers with a situation report." },
@@ -236,6 +237,8 @@ export const WORLD_FIGURES = {
   "world/domains/naval.PORT_UNTENABLE": { value: 0.5, unit: "×", module: "world/domains/naval", source: ref("R6.3"), range: [0.3, 0.8], note: "A port below this share of its staying power is no longer tenable: its fleet moves." },
   "world/domains/naval.IDENTIFY_M": { value: 20000, unit: "m", module: "world/domains/naval", source: declared, range: [10000, 40000], note: "Closing to identify, a ship goes to this range of the contact." },
   "world/domains/naval.SHADOW_M": { value: 40000, unit: "m", module: "world/domains/naval", source: declared, range: [20000, 80000], note: "Shadowing, a ship keeps this far from the contact." },
+  // ── The heuristic planner (world/command/heuristicPlanner) ──
+  "world/command/heuristicPlanner.CULMINATION_LOSS": { value: 0.2, unit: "×", module: "world/command/heuristicPlanner", source: ref("doctrine"), range: [0.1, 0.4], note: "An HQ halts its attack once its units have lost this share of their vehicles." },
   // ── Kill web (world/domains/killweb) ──
   "world/domains/killweb.DATALINK_STAFF_S": { value: 90, unit: "s", module: "world/domains/killweb", source: declared, range: [30, 300], note: "Over a data link, the targeting cell turns a track into a nomination in this long." },
   "world/domains/killweb.VOICE_STAFF_S": { value: 1200, unit: "s", module: "world/domains/killweb", source: ref("R3, P2"), range: [600, 2400], note: "On voice nets, each echelon's staff takes this long with a nomination on its way up." },

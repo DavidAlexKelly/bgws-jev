@@ -182,13 +182,14 @@ function paceFor(c: WorldCtx, id: string): { pace?: StructuredOrder["pace"] } {
 
 // ── Plans ────────────────────────────────────────────────────────────────
 
-function startPlan(c: WorldCtx, hq: Headquarters, why: string): void {
+function startPlan(c: WorldCtx, hq: Headquarters, why: string, hasty = false): void {
   if (hq.down || hq.planning) return;
-  const readyAt = c.time + planningS(hq.echelon);
+  // A hasty plan (a FRAGO on a crisis) takes minutes, not the full planning time.
+  const readyAt = c.time + (hasty ? wfig("world/domains/c2.HASTY_PLAN_S") : planningS(hq.echelon));
   setHq(c, hq.id, { planning: { startedAt: c.time, readyAt, why }, nextPlanAt: c.time + rhythmS(hq.echelon) });
   const request: PlanRequest = { id: c.newNumber(), hq: hq.id, side: hq.side, planner: hq.planner ?? "tactical", seat: hq.seat, raisedAt: c.time, readyAt, why };
   c.world.plans.push(request);
-  c.log({ side: hq.side, domain: "c2", kind: "planning", text: `${hq.id} starts planning (${why}); ready in ${Math.round(planningS(hq.echelon) / 60)} min`, ids: [hq.id] });
+  c.log({ side: hq.side, domain: "c2", kind: "planning", text: `${hq.id} starts planning (${why}); ready in ${Math.round((readyAt - c.time) / 60)} min`, ids: [hq.id] });
 }
 
 /** Send a plan out: FRAGOs to units, guidance to sub-HQs, over the nets. */
@@ -249,8 +250,24 @@ function plans(c: WorldCtx): void {
 
 function ccir(c: WorldCtx): void {
   for (const id of Object.keys(c.world.hqs).sort()) {
-    const hq = c.world.hqs[id];
-    if (hq.down || hq.planning || !hq.planner) continue;
+    let hq = c.world.hqs[id];
+    if (hq.down || !hq.planner) continue;
+    // Heavy losses: the commander decides at once whether the attack goes on — a hasty plan, whatever the gap,
+    // dropping a deliberate plan still being made.
+    const fleet = hq.subordinates.filter((s) => c.land.units[s]);
+    const total = fleet.reduce((s, u) => s + c.land.units[u].vehicles.total, 0);
+    const lost = total ? 1 - fleet.reduce((s, u) => s + c.land.units[u].vehicles.fit, 0) / total : 0;
+    if (lost >= wfig("world/command/heuristicPlanner.CULMINATION_LOSS") && c.world.memo[`heavyLosses:${hq.id}`] == null) {
+      c.mark(`heavyLosses:${hq.id}`);
+      if (hq.planning) {
+        c.world.plans = c.world.plans.filter((p) => p.hq !== hq.id);
+        setHq(c, hq.id, { planning: undefined });
+        hq = c.world.hqs[id];
+      }
+      startPlan(c, hq, `CCIR: ${Math.round(lost * 100)}% losses`, true);
+      continue;
+    }
+    if (hq.planning) continue;
     if (c.time - hq.lastPlannedAt < wfig("world/domains/c2.CCIR_MIN_GAP_S")) continue;
     // A major enemy force found: several new contacts in the COP since the last plan.
     const fresh = Object.values(hq.cop).filter((t) => t.domain === "land" && t.seenAt > hq.lastPlannedAt).length;

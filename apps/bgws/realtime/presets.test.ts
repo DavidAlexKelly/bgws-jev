@@ -55,8 +55,10 @@ describe("milestone scenarios", () => {
     const record = recordFromScenario(PRESET_SCENARIOS.M5());
     const result = await playRecord(record, { untilS: 2 * 3600 });
     const w = result.state.world!;
-    const raid = Object.values(w.entities).filter((e) => e.id.startsWith("r-owa-"));
-    expect(raid.filter((e) => e.status === "destroyed").length, "raid intercepted").toBeGreaterThan(raid.length / 2);
+    // Of the drones whose flight ended (shot down, or arrived), most were shot down; the game may end with some still in the air.
+    const ended = Object.values(w.entities).filter((e) => e.id.startsWith("r-owa-") && e.status !== "active");
+    expect(ended.length, "raid met").toBeGreaterThan(0);
+    expect(ended.filter((e) => e.status === "destroyed").length / ended.length, "raid intercepted").toBeGreaterThan(0.5);
     expect(w.stats.interceptsTried, "interceptors fired").toBeGreaterThan(0);
     expect(w.stats.spentUsd.blue, "the defence's bill").toBeGreaterThan(0);
     expect(Object.values(w.entities).some((e) => e.air?.sorties != null && e.air.sorties > 0), "a flight landed and turned round").toBe(true);
