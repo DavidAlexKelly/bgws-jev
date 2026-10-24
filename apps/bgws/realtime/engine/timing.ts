@@ -15,43 +15,44 @@
 //              misses included, adds suppression.
 
 import type { RtTiming } from "./types";
+import { figure } from "./figures";
 
 /** Closer than this, a moving unit halts: it has run into the enemy. */
-export const CLOSE_CONTACT_M = 300;
+export const CLOSE_CONTACT_M = figure("timing.CLOSE_CONTACT_M");
 /** An assault keeps closing until this close. */
-export const ASSAULT_CONTACT_M = 150;
+export const ASSAULT_CONTACT_M = figure("timing.ASSAULT_CONTACT_M");
 
 /** Suppression at or above this lowers accuracy. */
-export const SUPPRESSED_AT = 25;
+export const SUPPRESSED_AT = figure("timing.SUPPRESSED_AT");
 /** Suppression at or above this pins: no advancing. */
-export const PINNED_AT = 60;
+export const PINNED_AT = figure("timing.PINNED_AT");
 /** Suppression fades by this much per second once fire stops... */
-export const SUPPRESSION_DECAY_PER_S = 2;
+export const SUPPRESSION_DECAY_PER_S = figure("timing.SUPPRESSION_DECAY_PER_S");
 /** ...after this long without an incoming shot. */
-export const SUPPRESSION_GRACE_S = 10;
+export const SUPPRESSION_GRACE_S = figure("timing.SUPPRESSION_GRACE_S");
 /** Pinned this long, and a unit tests its nerve. */
-export const PINNED_TEST_S = 60;
+export const PINNED_TEST_S = figure("timing.PINNED_TEST_S");
 
 /** Break-test thresholds, as fractions of strength lost (Dupuy: attackers ~20%, defenders ~40%). */
-export const ATTACKER_BREAK_AT = 0.2;
-export const DEFENDER_BREAK_AT = 0.4;
-export const BREAK_STEP = 0.2;
+export const ATTACKER_BREAK_AT = figure("timing.ATTACKER_BREAK_AT");
+export const DEFENDER_BREAK_AT = figure("timing.DEFENDER_BREAK_AT");
+export const BREAK_STEP = figure("timing.BREAK_STEP");
 /** A side is beaten when this much of its strength is destroyed or broken. */
-export const SIDE_BREAKPOINT = 0.5;
+export const SIDE_BREAKPOINT = figure("timing.SIDE_BREAKPOINT");
 
 /** An HQ within this range steadies nerves and speeds rallying. */
-export const HQ_RADIUS_M = 1500;
+export const HQ_RADIUS_M = figure("timing.HQ_RADIUS_M");
 /** Cover this close is worth dashing for in the react-to-contact drill. */
-export const DRILL_COVER_M = 150;
+export const DRILL_COVER_M = figure("timing.DRILL_COVER_M");
 /** Bounding overwatch: how far a bound goes, and how long the cover halt lasts. */
-export const BOUND_M = 300;
-export const BOUND_COVER_S = 40;
+export const BOUND_M = figure("timing.BOUND_M");
+export const BOUND_COVER_S = figure("timing.BOUND_COVER_S");
 /** Still for this long, a unit has settled into its position. */
-export const SETTLE_S = 30;
+export const SETTLE_S = figure("timing.SETTLE_S");
 /** A unit engaging for this long is reviewed: "ineffective" if it has done nothing, "review" if it has. */
-export const REVIEW_S = 180;
+export const REVIEW_S = figure("timing.REVIEW_S");
 /** Decisions each unit remembers. */
-export const HISTORY_LENGTH = 4;
+export const HISTORY_LENGTH = figure("timing.HISTORY_LENGTH");
 
 export const DEFAULT_TIMING: RtTiming = {
   tickS: 1,

@@ -3,6 +3,7 @@
  * what each unit knows as a result. docs/REALTIME_COMMS.md.
  */
 
+import { trackFor, withReport } from "./picture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { metresPerDegreeLon, type LatLng } from "../../lib/board";
@@ -116,7 +117,7 @@ describe("reports on the radio net", () => {
     // Composed, sent, passed on and sent again.
     expect(contact[0].time - 1).toBeGreaterThanOrEqual(COMPOSE_S + TRANSMIT_S);
     expect(contact[1].time - contact[0].time).toBeGreaterThanOrEqual(RELAY_S + TRANSMIT_S);
-    expect(state.units.B2.picture.R1).toMatchObject({ from: "B1", via: "HQ1", level: "full" });
+    expect(trackFor(state, "B2", "R1")).toMatchObject({ from: "B1", via: "HQ1", level: "full" });
   });
 
   it("with no HQ, go straight to whoever is in range, a little slower to compose", () => {
@@ -131,7 +132,7 @@ describe("reports on the radio net", () => {
     const cfg = radio();
     const far = game([fe("B1", "blue", at(0, 0)), fe("B9", "blue", at(0, -9000)), fe("R1", "red", at(0, 140))]);
     const { state } = run(quiet(createRealtimeState(far), cfg), cfg, 120);
-    expect(state.units.B9.picture.R1).toBeUndefined();
+    expect(trackFor(state, "B9", "R1")).toBeUndefined();
   });
 
   it("with perfect comms, reach every friend after the report delay, as before", () => {
@@ -140,7 +141,7 @@ describe("reports on the radio net", () => {
     const contact = messages.find((m) => m.message.kind === "contact")!;
     expect(contact.time - 1).toBe(DEFAULT_TIMING.reportDelayS);
     expect(contact.to.sort()).toEqual(["B2", "HQ1"]);
-    expect(state.units.B2.picture.R1).toBeDefined();
+    expect(trackFor(state, "B2", "R1")).toBeDefined();
   });
 
   it("share one net: one talker at a time", () => {
@@ -176,10 +177,10 @@ describe("reports on the radio net", () => {
           ...state.units.B1,
           roe: "always",
           order: { kind: "overwatch" },
-          picture: { R1: { level: "full", at: at(0, 2500), seenAt: 0, receivedAt: 0, from: "B9", errorM: 50, moving: false } },
         },
       },
     };
+    state = withReport(state, "B1", "R1", { level: "full", at: at(0, 2500), seenAt: 0, receivedAt: 0, from: "B9", errorM: 50, moving: false });
     const first = tick(state, cfg);
     expect(first.shots.filter((s) => s.firerId === "B1")).toHaveLength(0);
     expect(first.state.units.B1.ownSeen.R1).toBeUndefined();

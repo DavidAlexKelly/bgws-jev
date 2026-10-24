@@ -1,0 +1,602 @@
+// ── realtime/engine/figures.ts ───────────────────────────────────────────
+// Every hand-set number the real-time engine runs on, in one place, each with
+// its unit, the module that uses it, what it means, and where it comes from
+// (docs/plan/MULTI_DOMAIN_PLAN.md W0 step 4).
+//
+// source.kind:
+//   "declared"  a design default with no source yet — the honest default.
+//   "ref"       traced to docs/research/MODERN_WARFARE_REFERENCE.md (R section / P row).
+//
+// The modules keep their constant names and read the value from here, so
+// changing a figure is a one-line edit with its provenance next to it. Values
+// were moved verbatim; the decision golden test pins that nothing changed.
+//
+// Generated once from the modules' constants; maintained by hand from now on.
+
+export type Provenance = { kind: "declared" } | { kind: "ref"; ref: string };
+
+export interface Figure {
+  value: number;
+  unit?: string;
+  module: string;
+  source: Provenance;
+  note: string;
+}
+
+export const FIGURES = {
+  "timing.CLOSE_CONTACT_M": {
+    value: 300,
+    unit: "m",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Closer than this, a moving unit halts: it has run into the enemy.",
+  },
+  "timing.ASSAULT_CONTACT_M": {
+    value: 150,
+    unit: "m",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "An assault keeps closing until this close.",
+  },
+  "timing.SUPPRESSED_AT": {
+    value: 25,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Suppression at or above this lowers accuracy.",
+  },
+  "timing.PINNED_AT": {
+    value: 60,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Suppression at or above this pins: no advancing.",
+  },
+  "timing.SUPPRESSION_DECAY_PER_S": {
+    value: 2,
+    unit: "/s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Suppression fades by this much per second once fire stops...",
+  },
+  "timing.SUPPRESSION_GRACE_S": {
+    value: 10,
+    unit: "s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "...after this long without an incoming shot.",
+  },
+  "timing.PINNED_TEST_S": {
+    value: 60,
+    unit: "s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Pinned this long, and a unit tests its nerve.",
+  },
+  "timing.ATTACKER_BREAK_AT": {
+    value: 0.2,
+    module: "timing",
+    source: { kind: "ref", ref: "R4.6, P14" },
+    note: "Break-test thresholds, as fractions of strength lost (Dupuy: attackers ~20%, defenders ~40%). Matches P14, attack halt threshold ~20% casualties (sourced, historical).",
+  },
+  "timing.DEFENDER_BREAK_AT": {
+    value: 0.4,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Break-test thresholds, as fractions of strength lost (Dupuy: attackers ~20%, defenders ~40%).",
+  },
+  "timing.BREAK_STEP": {
+    value: 0.2,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Break-test thresholds, as fractions of strength lost (Dupuy: attackers ~20%, defenders ~40%).",
+  },
+  "timing.SIDE_BREAKPOINT": {
+    value: 0.5,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "A side is beaten when this much of its strength is destroyed or broken.",
+  },
+  "timing.HQ_RADIUS_M": {
+    value: 1500,
+    unit: "m",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "An HQ within this range steadies nerves and speeds rallying.",
+  },
+  "timing.DRILL_COVER_M": {
+    value: 150,
+    unit: "m",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Cover this close is worth dashing for in the react-to-contact drill.",
+  },
+  "timing.BOUND_M": {
+    value: 300,
+    unit: "m",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Bounding overwatch: how far a bound goes, and how long the cover halt lasts.",
+  },
+  "timing.BOUND_COVER_S": {
+    value: 40,
+    unit: "s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Bounding overwatch: how far a bound goes, and how long the cover halt lasts.",
+  },
+  "timing.SETTLE_S": {
+    value: 30,
+    unit: "s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Still for this long, a unit has settled into its position.",
+  },
+  "timing.REVIEW_S": {
+    value: 180,
+    unit: "s",
+    module: "timing",
+    source: { kind: "declared" },
+    note: "A unit engaging for this long is reviewed: \"ineffective\" if it has done nothing, \"review\" if it has.",
+  },
+  "timing.HISTORY_LENGTH": {
+    value: 4,
+    module: "timing",
+    source: { kind: "declared" },
+    note: "Decisions each unit remembers.",
+  },
+  "detection.BASE_RATE_PER_S": {
+    value: 0.1,
+    unit: "/s",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "A halted, exposed vehicle at 1 km is found in 10 s on average.",
+  },
+  "detection.REFERENCE_M": {
+    value: 1000,
+    unit: "m",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "A halted, exposed vehicle at 1 km is found in 10 s on average.",
+  },
+  "detection.CERTAIN_M": {
+    value: 150,
+    unit: "m",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "Inside this, nobody fails to see what is in plain view.",
+  },
+  "detection.IDENTIFY_M": {
+    value: 2000,
+    unit: "m",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "Inside this, a spotted target is identified (type known), not only \"a contact\".",
+  },
+  "comms.COMPOSE_S": {
+    value: 10,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Seconds to compose a report, and to pass one on at an HQ.",
+  },
+  "comms.RELAY_S": {
+    value: 5,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Seconds to compose a report, and to pass one on at an HQ.",
+  },
+  "comms.TRANSMIT_S": {
+    value: 4,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Seconds a transmission holds the net.",
+  },
+  "comms.RADIO_RANGE_M": {
+    value: 5000,
+    unit: "m",
+    module: "comms",
+    source: { kind: "ref", ref: "R2, P4" },
+    note: "Radio range, metres: a troop set in rolling country. P4 (SINCGARS range by power) gives 0.4–5 km at medium power and 5–10 km at high: 5 km is the top of the medium band.",
+  },
+  "comms.SIGHTED_ERROR_M": {
+    value: 50,
+    unit: "m",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "A report's position error when made (own sight), and what passing it on adds.",
+  },
+  "comms.REREPORT_S": {
+    value: 60,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Re-report a contact still in sight this often; not at all if a friend reported it this recently.",
+  },
+  "comms.ALREADY_REPORTED_S": {
+    value: 30,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Re-report a contact still in sight this often; not at all if a friend reported it this recently.",
+  },
+  "comms.UNDER_FIRE_REPORT_S": {
+    value: 20,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "At most one \"under fire\" report a unit this often; a situation report this often.",
+  },
+  "comms.SITREP_S": {
+    value: 120,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "At most one \"under fire\" report a unit this often; a situation report this often.",
+  },
+  "comms.HELP_RADIUS_M": {
+    value: 1500,
+    unit: "m",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Friends within this may be asked to help, and hear a friend's trouble as theirs to act on (D9).",
+  },
+  "comms.HELP_INTERVAL_S": {
+    value: 60,
+    unit: "s",
+    module: "comms",
+    source: { kind: "declared" },
+    note: "Friends within this may be asked to help, and hear a friend's trouble as theirs to act on (D9).",
+  },
+  "comms.HEARD_LENGTH": {
+    value: 6,
+    module: "comms",
+    source: { kind: "declared" },
+    note: "The last few messages a unit remembers hearing.",
+  },
+  "fire.BURST_CYCLE_S": {
+    value: 6,
+    unit: "s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "An automatic weapon fires bursts, not aimed rounds: one burst every this many seconds counts as one \"round\" against its dispersion. DECLARED.",
+  },
+  "fire.AUTOMATIC_ROF": {
+    value: 30,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Faster than this is automatic fire.",
+  },
+  "fire.ACQUIRE_BASE_S": {
+    value: 4,
+    unit: "s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Before the first round at a new target, the gunner has to find it in the sight, identify it, lase and lay. DECLARED: 4 s plus 2 s a kilometre; 4 s more if the crew has only been told where it is and has not seen it itself; slower under fire.",
+  },
+  "fire.ACQUIRE_PER_KM_S": {
+    value: 2,
+    unit: "s/km",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Before the first round at a new target, the gunner has to find it in the sight, identify it, lase and lay. DECLARED: 4 s plus 2 s a kilometre; 4 s more if the crew has only been told where it is and has not seen it itself; slower under fire.",
+  },
+  "fire.ACQUIRE_REPORTED_S": {
+    value: 4,
+    unit: "s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Before the first round at a new target, the gunner has to find it in the sight, identify it, lase and lay. DECLARED: 4 s plus 2 s a kilometre; 4 s more if the crew has only been told where it is and has not seen it itself; slower under fire.",
+  },
+  "lethality.KE_FALLOFF_PER_KM": {
+    value: 0.06,
+    unit: "/km",
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Kinetic penetration lost per km beyond the last known point — the L27A1 curve's own slope (~6%/km).",
+  },
+  "lethality.PEN_SPREAD": {
+    value: 0.12,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "How soft the penetration margin is: at ±12% of the armour the chance is ~27% / ~73%.",
+  },
+  "lethality.P_KILL_MARGINAL": {
+    value: 0.5,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Chance a penetration knocks an armoured vehicle out: a round that barely gets through often does not, one that overmatches the armour by a wide margin (a sabot into 40 mm of rear plate) nearly always does.",
+  },
+  "lethality.P_KILL_OVERMATCH": {
+    value: 0.95,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Chance a penetration knocks an armoured vehicle out: a round that barely gets through often does not, one that overmatches the armour by a wide margin (a sabot into 40 mm of rear plate) nearly always does.",
+  },
+  "lethality.OVERMATCH_RATIO": {
+    value: 2.5,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Penetration this many times the armour counts as full overmatch.",
+  },
+  "lethality.P_KILL_SOFT": {
+    value: 0.9,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Anything unarmoured that is struck.",
+  },
+  "lethality.P_APS_INTERCEPT": {
+    value: 0.5,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "Chance an active protection system defeats one missile or rocket.",
+  },
+  "lethality.TANDEM_ERA_STRIP": {
+    value: 0.4,
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "As the rules have it (tandemEraDefeatFraction): a tandem warhead strips this much of ERA-fitted armour.",
+  },
+  "lethality.REAR_ARC_DEG": {
+    value: 150,
+    unit: "°",
+    module: "lethality",
+    source: { kind: "declared" },
+    note: "A shot this far round from the target's facing arrives on the rear.",
+  },
+  // ── Table-shaped figures: one entry per field, "module.TABLE.field" ──
+  "detection.FACTORS.targetMoving": {
+    value: 3,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate.",
+  },
+  "detection.FACTORS.targetFired": {
+    value: 5,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Muzzle flash, dust and smoke: a vehicle that has just fired gives itself away.",
+  },
+  "detection.FACTORS.targetInCover": {
+    value: 0.3,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate.",
+  },
+  "detection.FACTORS.targetHullDown": {
+    value: 0.4,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate.",
+  },
+  "detection.FACTORS.targetSettled": {
+    value: 0.7,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Still for a while: camouflaged, engine off.",
+  },
+  "detection.FACTORS.targetOnFoot": {
+    value: 0.3,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Small and low: a section of infantry.",
+  },
+  "detection.FACTORS.observerMoving": {
+    value: 0.5,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Buttoned up and bouncing.",
+  },
+  "detection.FACTORS.observerSuppressed": {
+    value: 0.5,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate.",
+  },
+  "detection.FACTORS.observerPinned": {
+    value: 0.2,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate.",
+  },
+  "detection.FACTORS.observerSearching": {
+    value: 2,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Searching the bearing it was fired on from (D3): spotting doubled there.",
+  },
+  "detection.FACTORS.observerWatching": {
+    value: 1.5,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Still and watching, not firing: observing, or waiting for a trigger.",
+  },
+  "detection.FACTORS.observerCued": {
+    value: 3,
+    unit: "×",
+    module: "detection",
+    source: { kind: "declared" },
+    note: "What makes a target easier or harder to find: multipliers on the rate. — Told where to look: a friend's report puts it in that direction (comms.ts).",
+  },
+  "fire.FIRE_CONTROL.biasMil": {
+    value: 0.2,
+    unit: "mil",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "One \"modern fire control\" class: laser rangefinder, ballistic computer, stabiliser.",
+  },
+  "fire.FIRE_CONTROL.rangeErrorM": {
+    value: 10,
+    unit: "m",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "One \"modern fire control\" class: laser rangefinder, ballistic computer, stabiliser. — Laser rangefinder, 1σ.",
+  },
+  "fire.FIRE_CONTROL.speedErrorMs": {
+    value: 1,
+    unit: "m/s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "One \"modern fire control\" class: laser rangefinder, ballistic computer, stabiliser. — Error in the target's estimated speed, 1σ, with a lead-computing sight.",
+  },
+  "fire.FIRE_CONTROL.firerMovingMil": {
+    value: 0.5,
+    unit: "mil",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "One \"modern fire control\" class: laser rangefinder, ballistic computer, stabiliser. — Firing on the move, after stabilisation.",
+  },
+  "fire.DISPERSION_MIL.ke": {
+    value: 0.2,
+    unit: "mil",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Round-to-round dispersion, 1σ.",
+  },
+  "fire.DISPERSION_MIL.ce": {
+    value: 0.35,
+    unit: "mil",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Round-to-round dispersion, 1σ.",
+  },
+  "fire.DISPERSION_MIL.automatic": {
+    value: 1.5,
+    unit: "mil",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Round-to-round dispersion, 1σ.",
+  },
+  "fire.DEFAULT_MUZZLE_VELOCITY.ke": {
+    value: 1600,
+    unit: "m/s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Muzzle velocity when the weapon has none in the data.",
+  },
+  "fire.DEFAULT_MUZZLE_VELOCITY.ce": {
+    value: 900,
+    unit: "m/s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Muzzle velocity when the weapon has none in the data.",
+  },
+  "fire.DEFAULT_MUZZLE_VELOCITY.automatic": {
+    value: 850,
+    unit: "m/s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Muzzle velocity when the weapon has none in the data.",
+  },
+  "fire.DEFAULT_MUZZLE_VELOCITY.other": {
+    value: 800,
+    unit: "m/s",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Muzzle velocity when the weapon has none in the data.",
+  },
+  "fire.DEFAULT_ROF.gun": {
+    value: 6,
+    unit: "rounds/min",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Sustained aimed rounds a minute when the weapon has none.",
+  },
+  "fire.DEFAULT_ROF.missile": {
+    value: 2,
+    unit: "rounds/min",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Sustained aimed rounds a minute when the weapon has none.",
+  },
+  "fire.DEFAULT_ROF.automatic": {
+    value: 200,
+    unit: "rounds/min",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Sustained aimed rounds a minute when the weapon has none.",
+  },
+  "fire.GUIDED.hit": {
+    value: 0.9,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Guided missiles: hit chance from the guidance, not ballistics.",
+  },
+  "fire.GUIDED.vsMoving": {
+    value: 0.9,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Guided missiles: hit chance from the guidance, not ballistics.",
+  },
+  "fire.GUIDED.firerMoving": {
+    value: 0.3,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Guided missiles: hit chance from the guidance, not ballistics.",
+  },
+  "fire.NERVE.suppressed": {
+    value: 1.4,
+    unit: "×",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "What degrades aim: multipliers on the angular error.",
+  },
+  "fire.NERVE.pinned": {
+    value: 2.2,
+    unit: "×",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "What degrades aim: multipliers on the angular error.",
+  },
+  "fire.NERVE.shaken": {
+    value: 1.8,
+    unit: "×",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "What degrades aim: multipliers on the angular error.",
+  },
+  "fire.COVER_EXPOSED.width": {
+    value: 0.7,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Woods or buildings hide part of what is there.",
+  },
+  "fire.COVER_EXPOSED.height": {
+    value: 0.5,
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Woods or buildings hide part of what is there.",
+  },
+  "fire.ACQUIRE_NERVE.suppressed": {
+    value: 1.5,
+    unit: "×",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Target acquisition (see fire.ACQUIRE_BASE_S): multiplier on the time to find a new target when the gunner is suppressed.",
+  },
+  "fire.ACQUIRE_NERVE.pinned": {
+    value: 2.5,
+    unit: "×",
+    module: "fire",
+    source: { kind: "declared" },
+    note: "Target acquisition (see fire.ACQUIRE_BASE_S): multiplier on the time to find a new target when the gunner is pinned.",
+  },
+} as const satisfies Record<string, Figure>;
+
+export type FigureKey = keyof typeof FIGURES;
+
+/** A figure's value. */
+export function figure(key: FigureKey): number {
+  return FIGURES[key].value;
+}

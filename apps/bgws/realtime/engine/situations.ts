@@ -109,7 +109,8 @@ export interface Situation {
   story: string;
   /** Options a sensible leader might take, judged by hand. */
   sensible: string[];
-  build(): { state: RtState; config: RtConfig; request: RtDecisionRequest };
+  /** `context`: what the decision knew beyond the state (orders just given), as `optionsAt` was told. */
+  build(): { state: RtState; config: RtConfig; request: RtDecisionRequest; context?: DecisionContext };
 }
 
 interface Scene {
@@ -146,7 +147,7 @@ function scene(s: Scene) {
       options,
       fallback: ruleFallback(state, "B1", point, options),
     };
-    return { state, config, request };
+    return { state, config, request, context: s.context };
   };
 }
 

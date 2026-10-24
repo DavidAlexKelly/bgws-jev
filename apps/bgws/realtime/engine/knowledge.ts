@@ -37,6 +37,7 @@
 // Every figure here is DECLARED, like detection.ts's.
 
 import { bearingDeltaDeg, distanceM } from "../../lib/board";
+import { trackFor, trackedBy } from "./picture";
 import type { Belief, RtState, RtUnit, SelfBelief, Track } from "./types";
 
 /** DECLARED. How fast a reported enemy's position goes stale, metres a second: moving, or still. */
@@ -130,13 +131,13 @@ export function chanceLocatedAfter(rangeM: number, volleys: number, c: Omit<Loca
 }
 
 /** What this unit knows of this enemy, as a belief. */
-export function beliefOf(state: Pick<RtState, "game" | "units" | "lastKnown" | "time">, unitId: string, enemyId: string): Belief {
+export function beliefOf(state: Pick<RtState, "game" | "units" | "lastKnown" | "time" | "reports">, unitId: string, enemyId: string): Belief {
   const self = state.game.forceElements[unitId];
   const unit = state.units[unitId];
   if (!self || !unit) return "unaware";
   // Its own sight, or what it has been told — not what its side knows.
   const own: string = unit.ownSeen[enemyId]?.level ?? "none";
-  const told: string = unit.picture?.[enemyId]?.level ?? "none";
+  const told: string = trackFor(state, unitId, enemyId)?.level ?? "none";
   if (own === "full" || told === "full") return "identified";
   if (own !== "none" || told !== "none") return "located";
   const suspect = unit.suspects[enemyId];
@@ -246,7 +247,7 @@ export function beliefsOf(state: RtState, unitId: string) {
       }
       // Where it is as this unit believes: in sight, or where it was reported.
       const own = unit.ownSeen[enemy.id];
-      const told = unit.picture?.[enemy.id];
+      const told = trackFor(state, unitId, enemy.id);
       const inSight = own != null && state.time - own.time <= 5;
       const useReport = !own && told != null;
       const where = useReport ? told.at : own && !inSight && own.at ? own.at : enemy.position;
@@ -315,8 +316,8 @@ export function hqPicture(state: RtState, side: "blue" | "red"): HqContact[] {
         ...(seen.level === "full" ? { label: enemy.label } : {}),
       });
     }
-    for (const [enemyId, track] of Object.entries(unit.picture ?? {})) {
-      if ((state.game.forceElements[enemyId]?.combatStrength ?? 0) <= 0) continue;
+    trackedBy(state, holder.id, (enemyId, track) => {
+      if ((state.game.forceElements[enemyId]?.combatStrength ?? 0) <= 0) return;
       offer({
         enemyId,
         level: track.level,
@@ -326,7 +327,7 @@ export function hqPicture(state: RtState, side: "blue" | "red"): HqContact[] {
         from: track.from,
         ...(track.label ? { label: track.label } : {}),
       });
-    }
+    });
   }
   return [...best.values()].sort((a, b) => a.enemyId.localeCompare(b.enemyId));
 }

@@ -105,8 +105,8 @@ const MENU: MenuItem[] = [
   },
   {
     to: "/bgws/assets",
-    title: "Asset Explorer",
-    blurb: "Browse the equipment catalogue — stats, armament, photographs",
+    title: "Asset Manager",
+    blurb: "Equipment and units, and how they behave",
     glyph: "\u26ed",
   },
 ];

@@ -1,0 +1,1847 @@
+## seed golden0: 24 decisions, over at t=65 (red)
+t=2 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=3 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=4 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=4 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=10 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=10 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈92%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, a few hundred metres to the west)
+t=12 red red-1 D1 [exposed + sighted + exposed] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈95%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=14 blue blue-2 D6 [exposed + volley + friendLost] fallback=keep
+    keep → engage — keep firing on red-2: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=14 blue blue-3 D6 [exposed + volley + friendLost] fallback=keep
+    keep → engage — keep firing on red-3: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=20 red red-2 D3 [exposed + sighted + underFire + enemyBroke + sighted] fallback=search
+    search → search — search the south: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the south
+    keep → engage — carry on (engaging blue-3)
+t=22 red red-1 D2 [volley + underFire + hit + enemyBroke] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈100%/min to knock out one of its vehicles (rear, 635 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈100%/min to knock out one of its vehicles (rear, 635 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=24 blue blue-2 D1 [sighted + sighted] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=30 blue blue-3 D2 [sighted + sighted + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=30 red red-2 D2 [underFire + friendNeedsHelp] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=32 red red-1 D1 [sighted + volley] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=40 blue blue-3 D2 [volley + friendLost + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=42 red red-1 D6 [volley + targetGone] fallback=keep
+    keep → engage — carry on (engaging blue-2)
+t=46 red red-2 D2 [underFire + request] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=53 blue blue-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-3: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=54 red red-1 D12 [request] fallback=comply
+    comply → engage — comply: fire on blue-2 — engage Blue 2 Troop (blue-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"reply","to":"red-2","text":"red-1 to red-2: complying, engaging blue-2","reply":{"requestId":26,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-2","text":"red-1 to red-2: can't move, covering from where it is","reply":{"requestId":26,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-2)
+        message: {"kind":"reply","to":"red-2","text":"red-1 to red-2: can't","reply":{"requestId":26,"answer":"cannot"}}
+t=56 red red-2 D9 [friendNeedsHelp] fallback=help
+    help → engage — fire on its attacker, Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    support → move — move to support (closer, a few hundred metres to the south), then engage blue-3
+    keep → engage — carry on (engaging blue-2)
+t=60 blue blue-3 D2 [underFire + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=63 blue blue-2 D2 [request + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-3 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-3","text":"blue-2 asks blue-3 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=64 red red-1 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-2: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈95%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); red-3 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+
+## seed golden1: 26 decisions, over at t=65 (blue)
+t=1 blue blue-3 D1 [sighted + sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈85%/min to knock out one of its vehicles (front, 624 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=3 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=7 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, a few hundred metres to the west)
+t=8 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=9 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, about a kilometre to the west)
+t=13 blue blue-2 D1 [exposed + sighted + exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=17 red red-2 D2 [exposed + sighted + underFire + sighted] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=18 blue blue-3 D3 [exposed + exposed + volley + underFire + hit] fallback=search
+    search → search — search the north: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the north
+    keep → engage — carry on (engaging red-1)
+t=18 red red-1 D2 [exposed + sighted + exposed + underFire + volley] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=19 blue blue-1 D1 [sighted + sighted + exposed + exposed + sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈96%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1400 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1400 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=19 red red-3 D1 [exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=23 blue blue-2 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-1 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=27 red red-2 D2 [volley + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it, and ask red-3 to engage it too
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=34 blue blue-2 D2 [underFire + volley + enemyBroke] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-1 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=34 red red-3 D1 [sighted + friendLost] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=36 blue blue-1 D9 [friendNeedsHelp + enemyBroke + volley] fallback=help
+    help → engage — fire on its attacker, Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈100%/min to knock out one of its vehicles (rear, 637 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+    support → move — move to support (closer, a few hundred metres to the north), then engage red-1
+    keep → engage — carry on (engaging red-1)
+t=37 red red-2 D2 [friendLost + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it, and ask red-3 to engage it too
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=44 red red-3 D12 [request] fallback=comply
+    comply → engage — comply: fire on blue-3 — engage Blue 3 Troop (blue-3) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: complying, engaging blue-3","reply":{"requestId":19,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't move, covering from where it is","reply":{"requestId":19,"answer":"partly"}}
+    keep → wait — can't: carry on (waiting on blue-1), it is fighting blue-3
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't, engaged with blue-3","reply":{"requestId":19,"answer":"cannot"}}
+t=46 blue blue-1 D6 [volley] fallback=keep
+    keep → engage — carry on (engaging red-1)
+t=47 red red-2 D2 [request + friendLost + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute; red-3 already firing on it, and ask red-3 to engage it too
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=54 blue blue-2 D7 [targetGone] fallback=shift
+    resume → move — back to its orders: advance on the objective
+    watch → observe — watch where red-1 was last seen
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+t=54 red red-3 D12 [friendLost + request] fallback=comply
+    comply → engage — comply: fire on blue-3 — engage Blue 3 Troop (blue-3) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish the last one
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: complying, engaging blue-3","reply":{"requestId":25,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't move, covering from where it is","reply":{"requestId":25,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-3), it is fighting blue-3
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't, engaged with blue-3","reply":{"requestId":25,"answer":"cannot"}}
+t=56 blue blue-1 D12 [request + targetGone + friendLost] fallback=partly
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't move, covering from where it is","reply":{"requestId":21,"answer":"partly"}}
+    keep → hold — can't: carry on (hold)
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't","reply":{"requestId":21,"answer":"cannot"}}
+t=57 red red-2 D6 [volley + targetGone + targetGone] fallback=keep
+    keep → hold — carry on (hold)
+t=64 red red-3 D12 [volley + targetGone + request + targetGone] fallback=partly
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't move, covering from where it is","reply":{"requestId":30,"answer":"partly"}}
+    keep → hold — can't: carry on (hold)
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't","reply":{"requestId":30,"answer":"cannot"}}
+t=65 blue blue-2 D6 [volley + enemyBroke] fallback=keep
+    keep → engage — keep firing on red-2: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+
+## seed golden2: 20 decisions, over at t=52 (blue)
+t=2 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, a few hundred metres to the east)
+t=4 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=5 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=10 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, about a kilometre to the west)
+t=12 red red-2 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=13 red red-1 D3 [underFire] fallback=search
+    search → search — search the south: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the south
+    keep → hold — carry on (hold)
+t=14 blue blue-1 D1 [exposed + volley + sighted] fallback=wait1:fire
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈95%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=15 blue blue-2 D1 [exposed + sighted + exposed + volley + sighted] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=17 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=22 red red-2 D2 [underFire + hit + volley] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈85%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈85%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=23 red red-1 D2 [sighted + sighted + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=27 blue blue-3 D2 [exposed + sighted + underFire + sighted] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=30 red red-3 D1 [exposed + sighted + exposed + sighted + exposed + volley] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); red-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 3
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=33 red red-1 D9 [friendNeedsHelp] fallback=help
+    help → engage — fire on its attacker, Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-2 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    support → move — move to support (closer, a few hundred metres to the south), then engage blue-1
+    keep → engage — carry on (engaging blue-2)
+t=40 blue blue-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-3: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 2
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=42 red red-2 D2 [underFire + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈75%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈75%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=47 blue blue-3 D2 [underFire + volley + underFire + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=51 blue blue-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-3 — engage Red 3 Troop (red-3) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: complying, engaging red-3","reply":{"requestId":23,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't move, covering from where it is","reply":{"requestId":23,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-3
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't, engaged with red-3","reply":{"requestId":23,"answer":"cannot"}}
+t=52 red red-2 D2 [underFire + hit + request + friendLost] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: about even to knock out one of its vehicles within a minute
+        exact: ≈50%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~5 min to finish all 3
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: about even to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈50%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~5 min to finish all 3
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=52 red red-1 D9 [friendNeedsHelp + friendLost] fallback=help
+    help → engage — fire on its attacker, Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); red-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    support → move — move to support (closer, about a kilometre to the south-east), then engage blue-3
+    keep → engage — carry on (engaging blue-1)
+
+## seed golden3: 24 decisions, over at t=55 (red)
+t=1 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=2 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=4 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=6 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, a few hundred metres to the east)
+t=8 blue blue-1 D3 [underFire + hit] fallback=search
+    search → search — search the north: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the north
+    keep → hold — carry on (hold)
+t=11 red red-1 D1 [exposed + volley + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=12 blue blue-3 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging red-3)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=13 red red-3 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on the contact blue-3 at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on the contact blue-3 at long range: likely to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=14 blue blue-2 D1 [exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=16 red red-2 D2 [exposed + volley + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=18 blue blue-1 D2 [underFire + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on the contact red-2 at long range: likely to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on the contact red-2 at long range: likely to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈87%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=21 red red-1 D1 [sighted] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈97%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=26 red red-2 D2 [sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=27 blue blue-3 D2 [volley + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=30 red red-3 D1 [sighted + sighted + volley + friendLost] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); red-1, red-2 already firing on it
+        exact: ≈97%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 3
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=34 blue blue-2 D1 [sighted + enemyBroke] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=37 blue blue-1 D1 [sighted + enemyBroke + friendLost] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1300 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1300 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=38 red red-1 D6 [enemyBroke + volley] fallback=keep
+    keep → engage — keep firing on blue-3: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 18%; ≈100%/min to knock out one of its vehicles (side, 625 vs 140 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=40 red red-3 D6 [volley + enemyBroke] fallback=keep
+    keep → engage — keep firing on blue-3: almost certain to knock out one of its vehicles within a minute; it has moved; about even that it has located you
+        exact: P(located) ≈ 51%; ≈100%/min to knock out one of its vehicles (rear, 636 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=44 blue blue-2 D12 [friendLost + volley + request] fallback=comply
+    comply → engage — comply: fire on red-2 — engage Red 2 Troop (red-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈100%/min to knock out one of its vehicles (rear, 635 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: complying, engaging red-2","reply":{"requestId":22,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't move, covering from where it is","reply":{"requestId":22,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-1
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't, engaged with red-1","reply":{"requestId":22,"answer":"cannot"}}
+t=47 blue blue-1 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-2: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 22%; ≈100%/min to knock out one of its vehicles (rear, 632 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=48 red red-1 D2 [request + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-1 asks red-3 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=54 blue blue-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-3 — engage Red 3 Troop (red-3) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: complying, engaging red-3","reply":{"requestId":26,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't move, covering from where it is","reply":{"requestId":26,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-2), it is fighting red-1
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't, engaged with red-1","reply":{"requestId":26,"answer":"cannot"}}
+t=55 red red-3 D6 [volley + enemyBroke] fallback=keep
+    keep → engage — keep firing on blue-1: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 18%; ≈97%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+
+## seed golden4: 38 decisions, over at t=132 (blue)
+t=2 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈85%/min to knock out one of its vehicles (front, 624 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=4 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=4 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=4 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=9 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=12 blue blue-1 D1 [exposed + sighted + sighted + exposed + exposed] fallback=engage
+    keep → engage — carry on (engaging red-3)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, about a kilometre to the east)
+t=14 blue blue-2 D2 [exposed + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-1 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=14 red red-2 D1 [exposed + volley + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, a few hundred metres to the west)
+t=14 red red-3 D1 [exposed + sighted + volley] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=16 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈96%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1400 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1400 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=19 red red-1 D1 [exposed + volley + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=22 blue blue-1 D2 [underFire + volley] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through), and ask blue-2 to engage it too
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=24 blue blue-2 D2 [underFire + hit + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: likely to knock out one of its vehicles within a minute, and ask blue-3 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-3","text":"blue-2 asks blue-3 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=24 red red-3 D2 [sighted + underFire + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈90%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through), and ask red-2 to engage it too
+        exact: ≈90%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=33 blue blue-3 D1 [exposed + sighted + sighted + exposed + exposed + volley + volley] fallback=wait1:fire
+    keep → engage — carry on (engaging red-3)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=34 red red-2 D1 [sighted] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=38 blue blue-1 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-2 — engage Red 2 Troop (red-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: complying, engaging red-2","reply":{"requestId":17,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't move, covering from where it is","reply":{"requestId":17,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-3
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't, engaged with red-3","reply":{"requestId":17,"answer":"cannot"}}
+t=39 red red-1 D1 [sighted] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=43 blue blue-3 D2 [underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=44 blue blue-2 D2 [underFire + friendNeedsHelp] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈88%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute, and ask blue-3 to engage it too
+        exact: ≈88%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-3","text":"blue-2 asks blue-3 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=44 red red-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-3: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=49 red red-1 D6 [volley + enemyBroke] fallback=keep
+    keep → wait — keep firing on blue-1: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈100%/min to knock out one of its vehicles (rear, 636 vs 40 mm: 100% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=53 blue blue-3 D12 [friendLost + request] fallback=comply
+    comply → engage — comply: fire on red-2 — engage Red 2 Troop (red-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: complying, engaging red-2","reply":{"requestId":20,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: can't move, covering from where it is","reply":{"requestId":20,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-2), it is fighting red-3
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: can't, engaged with red-3","reply":{"requestId":20,"answer":"cannot"}}
+t=54 blue blue-2 D12 [friendLost + request + volley] fallback=comply
+    comply → engage — comply: fire on red-3 — engage Red 3 Troop (red-3) from here: likely to knock out one of its vehicles within a minute
+        exact: ≈88%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: complying, engaging red-3","reply":{"requestId":18,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't move, covering from where it is","reply":{"requestId":18,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-1), it is fighting red-2
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't, engaged with red-2","reply":{"requestId":18,"answer":"cannot"}}
+t=54 red red-2 D2 [enemyBroke + underFire + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈77%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈77%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=63 blue blue-3 D6 [volley + enemyBroke] fallback=keep
+    keep → engage — keep firing on red-2: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈100%/min to knock out one of its vehicles (rear, 633 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈96%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=67 blue blue-2 D12 [enemyBroke + request] fallback=comply
+    comply → engage — comply: fire on red-2 — engage Red 2 Troop (red-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈100%/min to knock out one of its vehicles (rear, 635 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: complying, engaging red-2","reply":{"requestId":30,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't move, covering from where it is","reply":{"requestId":30,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-2
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't, engaged with red-2","reply":{"requestId":30,"answer":"cannot"}}
+t=73 blue blue-3 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-1 — engage Red 1 Troop (red-1) from here: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈94%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: complying, engaging red-1","reply":{"requestId":31,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: can't move, covering from where it is","reply":{"requestId":31,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-2), it is fighting red-2
+        message: {"kind":"reply","to":"blue-2","text":"blue-3 to blue-2: can't, engaged with red-2","reply":{"requestId":31,"answer":"cannot"}}
+t=80 blue blue-2 D7 [targetGone + friendLost] fallback=shift
+    resume → move — back to its orders: advance on the objective
+    watch → observe — watch where red-2 was last seen
+    shift → engage — shift fire to Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+t=83 blue blue-3 D6 [volley + targetGone + friendLost] fallback=keep
+    keep → engage — carry on (engaging red-1)
+t=92 red red-1 D2 [underFire] fallback=returnFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈97%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 3
+    quiet → observe — hold still in cover and do not fire
+t=100 blue blue-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈95%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=102 red red-1 D2 [underFire + underFire] fallback=returnFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    quiet → observe — hold still in cover and do not fire
+t=103 blue blue-3 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); no visible reaction yet; possible that it has located you
+        exact: P(located) ≈ 41%; ≈94%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈96%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=110 blue blue-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; about even that it has located you
+        exact: P(located) ≈ 48%; ≈95%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=112 red red-1 D2 [underFire + hit + underFire] fallback=returnFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈88%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+    quiet → observe — hold still in cover and do not fire
+t=132 blue blue-3 D6 [volley + enemyBroke] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); no visible reaction yet; likely that it has located you
+        exact: P(located) ≈ 88%; ≈94%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈96%/min to knock out one of its vehicles (front, 637 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=132 blue blue-2 D2 [underFire + enemyBroke] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it, and ask blue-3 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+        message: {"kind":"request","to":"blue-3","text":"blue-2 asks blue-3 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+
+## seed golden5: 28 decisions, over at t=96 (blue)
+t=4 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=5 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=5 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, a few hundred metres to the east)
+t=7 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=8 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, about a kilometre to the west)
+t=9 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=15 blue blue-2 D1 [exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=15 red red-2 D2 [exposed + sighted + exposed + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=17 blue blue-3 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=18 blue blue-1 D1 [exposed + volley + sighted] fallback=engage
+    keep → engage — carry on (engaging red-3)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, about a kilometre to the east)
+t=18 red red-3 D2 [exposed + underFire + sighted + volley] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through), and ask red-2 to engage it too
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=19 red red-1 D1 [exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=25 blue blue-2 D1 [sighted + volley] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=25 red red-2 D2 [sighted + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~3 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-1 to engage it too
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~3 min to finish all 4
+        message: {"kind":"request","to":"red-1","text":"red-2 asks red-1 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=27 blue blue-3 D2 [underFire + underFire + sighted + volley] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it, and ask blue-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=38 blue blue-1 D1 [sighted] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 2
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=38 red red-3 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through), and ask red-2 to engage it too
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=41 red red-2 D9 [friendNeedsHelp + friendNeedsHelp] fallback=help
+    help → engage — fire on its attacker, Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈75%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~3 min to finish all 4
+    support → move — move to support (closer, a few hundred metres to the south), then engage blue-1
+    keep → engage — carry on (engaging blue-2)
+t=48 blue blue-1 D2 [volley + underFire] fallback=returnFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); blue-2 already firing on it
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    quiet → observe — hold still in cover and do not fire
+t=48 red red-3 D2 [volley + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-2 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-2 already firing on it, and ask red-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=51 red red-2 D12 [request + volley] fallback=comply
+    comply → engage — comply: fire on blue-1 — engage Blue 1 Troop (blue-1) from here: likely to knock out one of its vehicles within a minute
+        exact: ≈85%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: complying, engaging blue-1","reply":{"requestId":21,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: can't move, covering from where it is","reply":{"requestId":21,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-1), it is fighting blue-2
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: can't, engaged with blue-2","reply":{"requestId":21,"answer":"cannot"}}
+t=58 red red-3 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it, and ask red-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=62 red red-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on blue-1 — engage Blue 1 Troop (blue-1) from here: likely to knock out one of its vehicles within a minute
+        exact: ≈85%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: complying, engaging blue-1","reply":{"requestId":32,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: can't move, covering from where it is","reply":{"requestId":32,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-1), it is fighting blue-2
+        message: {"kind":"reply","to":"red-3","text":"red-2 to red-3: can't, engaged with blue-2","reply":{"requestId":32,"answer":"cannot"}}
+t=67 blue blue-1 D2 [underFire + underFire] fallback=returnFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through); blue-3 already firing on it
+        exact: ≈90%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    quiet → observe — hold still in cover and do not fire
+t=72 red red-2 D2 [underFire + volley + enemyBroke + request] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=78 red red-3 D2 [underFire + enemyBroke + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=82 red red-2 D2 [underFire + request] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈78%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=92 red red-2 D2 [underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: about even to knock out one of its vehicles within a minute
+        exact: ≈53%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~4 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: about even to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈53%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~4 min to finish all 3
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+
+## seed golden6: 7 decisions, over at t=13 (blue)
+t=2 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=3 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, a few hundred metres to the east)
+t=3 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=5 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=6 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, about a kilometre to the east)
+t=9 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=12 blue blue-2 D1 [exposed + sighted + exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+
+## seed golden7: 30 decisions, over at t=72 (blue)
+t=1 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 632 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=4 red red-1 D1 [sighted + sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=5 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=6 red red-3 D1 [sighted + sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=8 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=8 red red-2 D3 [underFire] fallback=search
+    search → search — search the south: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the south
+    keep → hold — carry on (hold)
+t=11 blue blue-3 D1 [exposed + sighted + exposed + volley] fallback=wait1:fire
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈95%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=14 red red-1 D3 [exposed + exposed + volley + underFire] fallback=search
+    search → search — search the south: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the south
+    keep → engage — carry on (engaging blue-1)
+t=15 blue blue-2 D1 [exposed + sighted + exposed + volley] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=18 blue blue-1 D2 [exposed + sighted + exposed + underFire + sighted] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=18 red red-2 D2 [sighted + sighted + sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it, and ask red-3 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=21 blue blue-3 D2 [sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=24 red red-1 D2 [sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=26 red red-3 D1 [exposed + exposed + volley + sighted] fallback=wait1:fire
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=30 blue blue-2 D2 [sighted + underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-1 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=35 blue blue-3 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-3: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=36 red red-3 D2 [volley + underFire + hit + targetGone] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=38 blue blue-1 D2 [underFire + friendNeedsHelp] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=40 red red-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-3: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=42 blue blue-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-1 — engage Red 1 Troop (red-1) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: complying, engaging red-1","reply":{"requestId":20,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't move, covering from where it is","reply":{"requestId":20,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-1
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't, engaged with red-1","reply":{"requestId":20,"answer":"cannot"}}
+t=48 blue blue-1 D9 [friendNeedsHelp + volley] fallback=help
+    help → engage — fire on its attacker, Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); blue-2, blue-3 already firing on it
+        exact: ≈96%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 2
+    support → move — move to support (closer, about a kilometre to the north-east), then engage red-3
+    keep → engage — carry on (engaging red-1)
+t=48 red red-1 D2 [underFire + hit] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=50 red red-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on blue-2 — engage Blue 2 Troop (blue-2) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"reply","to":"red-1","text":"red-2 to red-1: complying, engaging blue-2","reply":{"requestId":25,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-1","text":"red-2 to red-1: can't move, covering from where it is","reply":{"requestId":25,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-3), it is fighting blue-3
+        message: {"kind":"reply","to":"red-1","text":"red-2 to red-1: can't, engaged with blue-3","reply":{"requestId":25,"answer":"cannot"}}
+t=52 blue blue-2 D2 [volley + request + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it, and ask blue-1 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=58 blue blue-1 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-3 — engage Red 3 Troop (red-3) from here: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 2
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: complying, engaging red-3","reply":{"requestId":27,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't move, covering from where it is","reply":{"requestId":27,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-3), it is fighting red-1
+        message: {"kind":"reply","to":"blue-2","text":"blue-1 to blue-2: can't, engaged with red-1","reply":{"requestId":27,"answer":"cannot"}}
+t=62 blue blue-2 D12 [request] fallback=comply
+    comply → engage — comply: fire on red-1 — engage Red 1 Troop (red-1) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: complying, engaging red-1","reply":{"requestId":32,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't move, covering from where it is","reply":{"requestId":32,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-1), it is fighting red-3
+        message: {"kind":"reply","to":"blue-1","text":"blue-2 to blue-1: can't, engaged with red-3","reply":{"requestId":32,"answer":"cannot"}}
+t=65 red red-1 D2 [volley + underFire + friendLost] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈88%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: likely to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈88%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 3
+        message: {"kind":"request","to":"red-2","text":"red-1 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=68 blue blue-1 D6 [enemyBroke + volley + targetGone + targetGone] fallback=keep
+    keep → hold — carry on (hold)
+t=70 red red-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-2: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 25%; ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=72 blue blue-2 D2 [volley + enemyBroke + underFire + volley] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: likely to knock out one of its vehicles within a minute
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: likely to knock out one of its vehicles within a minute, and ask blue-1 to engage it too
+        exact: ≈89%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-1","text":"blue-2 asks blue-1 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+
+## seed golden8: 28 decisions, over at t=69 (red)
+t=1 red red-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈85%/min to knock out one of its vehicles (front, 624 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=2 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=5 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=7 blue blue-1 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=12 blue blue-2 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=13 red red-1 D1 [exposed + volley + sighted + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, about a kilometre to the east)
+t=13 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈86%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=13 red red-2 D3 [underFire] fallback=search
+    search → search — search the south: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the south
+    keep → hold — carry on (hold)
+t=15 blue blue-3 D3 [exposed + underFire + sighted] fallback=search
+    search → search — search the north-west: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the north-west
+    keep → engage — carry on (engaging red-2)
+t=17 blue blue-1 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging red-2)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, about a kilometre to the east)
+t=22 blue blue-2 D1 [volley + sighted] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈97%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, a few hundred metres to the west)
+t=23 red red-2 D1 [sighted + sighted + sighted] fallback=engage
+    keep → search — carry on (searching)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, a few hundred metres to the west)
+t=25 blue blue-3 D2 [sighted + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈90%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: likely to knock out one of its vehicles within a minute (most rounds will not get through), and ask blue-2 to engage it too
+        exact: ≈90%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=27 blue blue-1 D2 [sighted + volley + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=31 red red-3 D1 [exposed + sighted + exposed + sighted + volley + enemyBroke] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=32 blue blue-2 D6 [volley + friendLost] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=33 red red-2 D2 [underFire + hit + volley + enemyBroke + targetGone] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈100%/min to knock out one of its vehicles (rear, 633 vs 40 mm: 100% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it, and ask red-3 to engage it too
+        exact: ≈100%/min to knock out one of its vehicles (rear, 633 vs 40 mm: 100% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=43 red red-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-1: almost certain to knock out one of its vehicles within a minute; it has moved; about even that it has located you
+        exact: P(located) ≈ 47%; ≈100%/min to knock out one of its vehicles (rear, 633 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=45 blue blue-3 D9 [friendNeedsHelp] fallback=help
+    help → engage — fire on its attacker, Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    support → move — move to support (closer, a few hundred metres to the north), then engage red-2
+    keep → engage — carry on (engaging red-1)
+t=46 blue blue-2 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-3 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-3","text":"blue-2 asks blue-3 to engage red-1","request":{"kind":"fire","enemyId":"red-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=47 red red-3 D2 [underFire] fallback=callFire
+    returnFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it, and ask red-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-2","request":{"kind":"fire","enemyId":"blue-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=53 red red-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on blue-1: almost certain to knock out one of its vehicles within a minute; it has moved; likely that it has located you
+        exact: P(located) ≈ 67%; ≈100%/min to knock out one of its vehicles (rear, 632 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute; red-1 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=55 blue blue-3 D2 [underFire + volley + enemyBroke] fallback=callFire
+    returnFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-3 asks blue-2 to engage red-3","request":{"kind":"fire","enemyId":"red-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=56 blue blue-2 D12 [volley + request + enemyBroke] fallback=comply
+    comply → engage — comply: fire on red-1 — engage Red 1 Troop (red-1) from here: almost certain to knock out one of its vehicles within a minute
+        exact: ≈100%/min to knock out one of its vehicles (rear, 633 vs 40 mm: 100% penetrate), ~1 min to finish all 2
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: complying, engaging red-1","reply":{"requestId":23,"answer":"comply"}}
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't move, covering from where it is","reply":{"requestId":23,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging red-1), it is fighting red-3
+        message: {"kind":"reply","to":"blue-3","text":"blue-2 to blue-3: can't, engaged with red-3","reply":{"requestId":23,"answer":"cannot"}}
+t=57 red red-3 D12 [volley + friendLost + request] fallback=partly
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't move, covering from where it is","reply":{"requestId":25,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging blue-2), it is fighting blue-3
+        message: {"kind":"reply","to":"red-2","text":"red-3 to red-2: can't, engaged with blue-3","reply":{"requestId":25,"answer":"cannot"}}
+t=63 red red-2 D6 [friendLost + volley + targetGone] fallback=keep
+    keep → hold — carry on (hold)
+t=68 blue blue-2 D6 [volley] fallback=keep
+    keep → engage — keep firing on red-1: almost certain to knock out one of its vehicles within a minute; it has moved; unlikely that it has located you
+        exact: P(located) ≈ 22%; ≈100%/min to knock out one of its vehicles (rear, 632 vs 40 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=69 red red-3 D6 [volley + enemyBroke] fallback=keep
+    keep → overwatch — keep firing on blue-2: almost certain to knock out one of its vehicles within a minute; no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 23%; ≈98%/min to knock out one of its vehicles (front, 634 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    shift → engage — shift fire to Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+
+## seed golden9: 18 decisions, over at t=45 (blue)
+t=2 blue blue-1 D1 [sighted + sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, about a kilometre to the east)
+t=2 red red-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 2 Troop (blue-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=3 red red-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go S)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-1, about a kilometre to the west)
+t=4 blue blue-3 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈93%/min to knock out one of its vehicles (front, 635 vs 700 mm: 32% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-1, about a kilometre to the west)
+t=5 blue blue-2 D1 [sighted] fallback=engage
+    keep → move — carry on (moving tactical, long range to go N)
+    engage → engage — engage now: Red 1 Troop (red-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈91%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then decide
+    wait0:fire → wait — hold still and wait until its hit chance reaches 80% (about 1200 m), then fire at once
+    wait1 → wait — hold still and wait until it is inside 800 m, then decide
+    wait1:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to blue-3, a few hundred metres to the east)
+t=12 red red-2 D1 [exposed + sighted + exposed] fallback=engage
+    keep → engage — carry on (engaging blue-2)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to red-3, a few hundred metres to the east)
+t=13 blue blue-1 D1 [sighted + volley + friendLost + enemyBroke] fallback=engage
+    keep → engage — carry on (engaging red-1)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=13 red red-3 D2 [exposed + sighted + exposed + volley + underFire + enemyBroke + friendLost] fallback=callFire
+    returnFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"red-2","text":"red-3 asks red-2 to engage blue-3","request":{"kind":"fire","enemyId":"blue-3"}}
+    quiet → observe — hold still in cover and do not fire
+t=15 blue blue-2 D3 [exposed + sighted + exposed + volley + underFire + hit + friendLost + enemyBroke] fallback=search
+    search → search — search the north: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the north
+    keep → engage — carry on (engaging red-1)
+t=22 red red-2 D1 [volley + friendLost + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-1)
+    engage → engage — engage now: Blue 3 Troop (blue-3) at long range: almost certain to knock out one of its vehicles within a minute; red-3 already firing on it
+        exact: ≈100%/min to knock out one of its vehicles (side, 634 vs 140 mm: 100% penetrate), ~1 min to finish the last one
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    observe → observe — observe and report, without firing
+t=23 red red-3 D1 [volley + sighted] fallback=engage
+    keep → engage — carry on (engaging blue-3)
+    engage → engage — engage now: Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈96%/min to knock out one of its vehicles (front, 625 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=25 blue blue-2 D6 [volley] fallback=keep
+    keep → search — keep firing on red-1: almost certain to knock out one of its vehicles within a minute; it has moved; about even that it has located you
+        exact: P(located) ≈ 48%; ≈100%/min to knock out one of its vehicles (side, 634 vs 140 mm: 100% penetrate), ~1 min to finish the last one
+    shift → engage — shift fire to Red 3 Troop (red-3) at long range: almost certain to knock out one of its vehicles within a minute; blue-3 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+t=30 blue blue-1 D2 [volley + underFire] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute, and ask blue-2 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire
+t=32 red red-2 D2 [volley + underFire + targetGone] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈98%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=33 red red-3 D6 [volley + targetGone] fallback=keep
+    keep → engage — carry on (engaging blue-1)
+t=35 blue blue-2 D1 [sighted + friendLost] fallback=engage
+    keep → search — carry on (searching)
+    engage → engage — engage now: Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-1 already firing on it
+        exact: ≈95%/min to knock out one of its vehicles (front, 636 vs 700 mm: 32% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+t=42 red red-2 D2 [underFire + request] fallback=callFire
+    returnFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+    callFire → engage — return fire from here on Blue 1 Troop (blue-1) at long range: almost certain to knock out one of its vehicles within a minute, and ask red-3 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~2 min to finish all 4
+        message: {"kind":"request","to":"red-3","text":"red-2 asks red-3 to engage blue-1","request":{"kind":"fire","enemyId":"blue-1"}}
+    quiet → observe — hold still in cover and do not fire
+t=45 blue blue-1 D2 [underFire + volley + underFire + enemyBroke] fallback=callFire
+    returnFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+    callFire → engage — return fire from here on Red 2 Troop (red-2) at long range: almost certain to knock out one of its vehicles within a minute; blue-2 already firing on it, and ask blue-2 to engage it too
+        exact: ≈94%/min to knock out one of its vehicles (front, 633 vs 700 mm: 31% penetrate), ~1 min to finish all 3
+        message: {"kind":"request","to":"blue-2","text":"blue-1 asks blue-2 to engage red-2","request":{"kind":"fire","enemyId":"red-2"}}
+    quiet → observe — hold still in cover and do not fire

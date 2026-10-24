@@ -11,6 +11,8 @@ import AuthCallback from "@/AuthCallback";
 const BgwsHome = lazy(() => import("@/apps/bgws/Home"));
 const BgwsPlay = lazy(() => import("@/apps/bgws/Play"));
 const BgwsAssetExplorer = lazy(() => import("@/apps/bgws/AssetExplorer"));
+const BgwsAssetHub = lazy(() => import("@/apps/bgws/AssetHub"));
+const BgwsBehaviourManager = lazy(() => import("@/apps/bgws/BehaviourManager"));
 
 export const router = createBrowserRouter(
   [
@@ -21,7 +23,9 @@ export const router = createBrowserRouter(
     },
     { path: "/bgws", element: <BgwsHome /> },
     { path: "/bgws/play", element: <BgwsPlay /> },
-    { path: "/bgws/assets", element: <BgwsAssetExplorer /> },
+    { path: "/bgws/assets", element: <BgwsAssetHub /> },
+    { path: "/bgws/assets/units", element: <BgwsAssetExplorer /> },
+    { path: "/bgws/assets/behaviours", element: <BgwsBehaviourManager /> },
     {
       // This is the route defined in your application's redirect URL
       path: "/auth/callback",

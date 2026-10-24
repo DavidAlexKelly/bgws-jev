@@ -19,6 +19,18 @@ import type { PlannedRoute } from "./routePlan";
 
 export type Side = "blue" | "red";
 
+/**
+ * Every side, in the order sides are processed (blue first).
+ *
+ * The game is two-sided by decision (docs/plan/MULTI_DOMAIN_PLAN.md §9,
+ * W0 step 2). Code that visits each side iterates THIS rather than writing
+ * its own `["blue", "red"]`, and code that needs "the enemy" calls
+ * opposing() rather than naming the other colour, so that adding a side
+ * later is a change here plus a relationship table, not a hunt through
+ * the engine for literals.
+ */
+export const SIDES: readonly Side[] = ["blue", "red"];
+
 export function opposing(side: Side): Side {
   return side === "blue" ? "red" : "blue";
 }

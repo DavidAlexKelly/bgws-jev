@@ -1,0 +1,137 @@
+# D1-close-good-shot B1 D1 [sighted] fallback=engage
+    keep → overwatch — carry on (overwatch)
+    engage → engage — engage now: T-90 troop R1 (R1) at medium range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈100%/min to knock out one of its vehicles (side, 654 vs 140 mm: 100% penetrate), ~1 min to finish all 4
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (out of its sight, a few hundred metres to the south)
+
+# D1-far-unseen B1 D1 [sighted] fallback=wait1:fire
+    keep → overwatch — carry on (overwatch)
+    engage → engage — engage now: T-90 troop R1 (R1) at very long range: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈87%/min to knock out one of its vehicles (front, 580 vs 700 mm: 19% penetrate), ~2 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (out of its sight, a few hundred metres to the south)
+
+# D1-observe-orders B1 D1 [sighted] fallback=observe
+    keep → overwatch — carry on (overwatch)
+    engage → engage — engage now: T-90 troop R1 (R1) at medium range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 631 vs 700 mm: 30% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (out of its sight, a few hundred metres to the south)
+
+# D1-avoid-orders B1 D1 [sighted] fallback=pullBack
+    keep → overwatch — carry on (overwatch)
+    engage → engage — engage now: T-90 troop R1 (R1) at medium range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈99%/min to knock out one of its vehicles (front, 642 vs 700 mm: 33% penetrate), ~1 min to finish all 4
+    wait0 → wait — hold still and wait until it is inside 800 m, then decide
+    wait0:fire → wait — hold still and wait until it is inside 800 m, then fire at once
+    wait1 → wait — hold still and wait until it shows its side, then decide
+    wait1:fire → wait — hold still and wait until it shows its side, then fire at once
+    observe → observe — observe and report, without firing
+    pullBack → withdraw — pull back to friends (back to B2, about a kilometre to the south)
+
+# D2-open-located B1 D2 [underFire] fallback=returnFire
+    returnFire → engage — return fire from here on T-90 troop R1 (R1) at medium range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈99%/min to knock out one of its vehicles (front, 642 vs 700 mm: 33% penetrate), ~1 min to finish all 4
+    pullBack → withdraw — pull back out of R1's sight (a few hundred metres to the south)
+    assault → move — assault T-90 troop R1 (R1): close in firing, to point-blank
+    quiet → observe — hold still in cover and do not fire
+
+# D2-avoid B1 D2 [underFire] fallback=pullBack
+    returnFire → engage — return fire from here on T-90 troop R1 (R1) at medium range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 631 vs 700 mm: 30% penetrate), ~1 min to finish all 4
+    pullBack → withdraw — pull back out of R1's sight (a few hundred metres to the south)
+    assault → move — assault T-90 troop R1 (R1): close in firing, to point-blank
+    quiet → observe — hold still in cover and do not fire
+
+# D3-open-unseen-shooter B1 D3 [underFire] fallback=cover
+    search → search — search the north: hold still and look for the shooter (spotting doubled that way for half a minute)
+    cover → move — move into cover away from the north (a short way to the south)
+    pullBack → withdraw — pull back, away from the north
+    keep → overwatch — carry on (overwatch)
+
+# D3-in-cover B1 D3 [underFire] fallback=search
+    search → search — search the north: hold still and look for the shooter (spotting doubled that way for half a minute)
+    pullBack → withdraw — pull back, away from the north
+    keep → overwatch — carry on (overwatch)
+
+# D4-trigger-met B1 D4 [triggerMet] fallback=fire
+    fire → engage — fire now on T-90 troop R1 (R1) at close: almost certain to knock out one of its vehicles within a minute
+        exact: ≈99%/min to knock out one of its vehicles (front, 659 vs 700 mm: 38% penetrate), ~1 min to finish all 4
+    closer → wait — wait for a closer shot: until it is inside 500 m
+    letPass → observe — let it pass and stay hidden
+
+# D5-halted B1 D5 [cue] fallback=fireFirst
+    fireFirst → engage — fire first, while it still can, on T-90 troop R1 (R1) at long range: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 627 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+    keep → wait — keep holding: it may be a coincidence
+    relocate → move — relocate quietly (a few hundred metres to the south) and keep watching
+    pullBack → withdraw — pull back out of R1's sight (a few hundred metres to the south)
+
+# D6-first-volley B1 D6 [volley] fallback=keep
+    keep → engage — keep firing on R1: almost certain to knock out one of its vehicles within a minute (most rounds will not get through); no visible reaction yet; unlikely that it has located you
+        exact: P(located) ≈ 19%; ≈97%/min to knock out one of its vehicles (front, 619 vs 700 mm: 28% penetrate), ~1 min to finish all 4
+    fireAndMove → engage — fire and move: one more volley, then shift position (a few hundred metres to the south) before it finds you, then engage again
+    quiet → observe — stop firing and go quiet: stay still and watch
+    pullBack → withdraw — pull back out of R1's sight (a few hundred metres to the south)
+
+# D7-target-lost B1 D7 [targetGone] fallback=resume
+    resume → overwatch — back to its orders: hold the crossing
+    watch → observe — watch where R1 was last seen
+    regain → move — move to regain sight of R1 (about a kilometre to the north)
+
+# D8-long-range-misses B1 D8 [ineffective] fallback=better
+    better → move — get a better shot (closer, a long way to the north), then engage: from there almost certain to knock out one of its vehicles within a minute
+        exact: ≈99%/min to knock out one of its vehicles (front, 654 vs 700 mm: 37% penetrate), ~1 min to finish all 4
+    quiet → observe — stop firing and go quiet: stay still and watch
+    pullBack → withdraw — pull back out of R1's sight (a few hundred metres to the south)
+    keep → engage — keep at it: likely to knock out one of its vehicles within a minute (most rounds will not get through)
+
+# D9-friend-hit B1 D9 [friendNeedsHelp] fallback=help
+    help → engage — fire on its attacker, T-90 troop R1 (R1) at long range: almost certain to knock out one of its vehicles within a minute
+        exact: ≈98%/min to knock out one of its vehicles (front, 630 vs 700 mm: 30% penetrate), ~1 min to finish all 4
+    support → move — move to support (closer, a few hundred metres to the north-east), then engage R1
+    keep → overwatch — carry on (overwatch)
+
+# D10-arrived-off-task B1 D10 [arrived] fallback=resume
+    resume → move — back to its orders: hold the crossing
+    overwatch → overwatch — overwatch from here: fire at anything in reach
+    keep → hold — hold here
+
+# D10-out-of-orders B1 D10 [outOfOrders] fallback=overwatch
+    overwatch → overwatch — overwatch from here: fire at anything in reach
+    keep → hold — hold here
+
+# D11-rallied B1 D11 [rallied] fallback=resume
+    resume → move — rejoin: back to its orders: hold the crossing
+    hold → hold — hold and recover
+
+# D12-fire-request B1 D12 [request] fallback=comply
+    comply → engage — comply: fire on R1 — engage T-90 troop R1 (R1) from here: almost certain to knock out one of its vehicles within a minute (most rounds will not get through)
+        exact: ≈98%/min to knock out one of its vehicles (front, 626 vs 700 mm: 29% penetrate), ~1 min to finish all 4
+        message: {"kind":"reply","to":"B2","text":"B1 to B2: complying, engaging R1","reply":{"requestId":1,"answer":"comply"}}
+    keep → overwatch — can't: carry on (overwatch)
+        message: {"kind":"reply","to":"B2","text":"B1 to B2: can't","reply":{"requestId":1,"answer":"cannot"}}
+
+# D12-busy B1 D12 [request] fallback=partly
+    partly → overwatch — partly: stay here on overwatch and fire at anything in reach, without moving
+        message: {"kind":"reply","to":"B2","text":"B1 to B2: can't move, covering from where it is","reply":{"requestId":2,"answer":"partly"}}
+    keep → engage — can't: carry on (engaging R1), it is fighting R1
+        message: {"kind":"reply","to":"B2","text":"B1 to B2: can't, engaged with R1","reply":{"requestId":2,"answer":"cannot"}}
+
+# D0-when-able B1 D0 [newOrders] fallback=finish
+    comply → move — comply now: start "fall back behind the woods"
+    finish → engage — finish this fight with R1 first (until it is out of the fight or lost, at most two minutes), then start "fall back behind the woods"
+    breakContact → withdraw — break contact (back out of sight, a few hundred metres to the south), then start "fall back behind the woods"
+
+# D0-now B1 D0 [newOrders] fallback=comply
+    comply → move — break off at once and start "fall back behind the woods"
+    fireAndBack → engage — fire one more volley at R1, move back out of its sight, then start "fall back behind the woods"

@@ -20,7 +20,17 @@
 Companion documents:
 
 - [DECISION_FLOW_GRAPHS.md](DECISION_FLOW_GRAPHS.md): the full specification of editable behaviour templates (workstream W1).
-- [MODERN_WARFARE_REFERENCE.md](../research/MODERN_WARFARE_REFERENCE.md): the research this plan is built on, with sources. Numbers below marked **[ref]** come from it. Numbers marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W0, W12) until a source replaces them.
+- [MODERN_WARFARE_REFERENCE.md](../research/MODERN_WARFARE_REFERENCE.md): the research this plan is built on, with sources. Numbers below marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W0, W12) until a source replaces them.
+
+**Citations.** A claim taken from the research is tagged with where to find it:
+
+| Tag | Means |
+|---|---|
+| **[ref R4.3]** | Section R4.3 of the reference (its headings are numbered R1–R8) |
+| **[ref R4.3, P12]** | That section, and row P12 of its parameter sheet, the table at the end that says whether a figure is sourced or a default |
+| **[ref: not in reference]** | The plan states this as researched, but the reference does not contain it. Find a source and add it to the reference, or re-mark the claim **[declared]**. |
+
+Plain **[ref]** is used only where the plan talks about the reference in general.
 
 **About data.** For now, the simulation runs on a **synthetic catalogue of best guesses** (W14). Every platform, sensor, weapon, bearer and store has every property the simulation needs, filled with plausible values, and is labelled as synthetic. The **[ref]** figures are used as sanity checks and to seed those guesses where they exist. Realistic data replaces the guesses later, record by record, with no code changes.
 
@@ -54,7 +64,7 @@ What that looks like in play, at the end state. This is a single vignette, with 
 
    The rocket fires.
 3. **Strike under jamming.** Red's GNSS jammer degrades the guided rocket (**W6**). The battle damage assessment drone sees the radar still standing. The fires cell re-strikes with a fibre-optic FPV, which cannot be jammed but must be within 20 km (**W5**).
-4. **The approach.** At 0545 the Blue companies cross the line of departure. Red's FPV operators get a link-quality hit from Blue's forward jammers, which moved up behind the lead companies as Ukraine did at Kursk **[ref]**. Two Red operator teams decide, each at its own decision point, to switch to fibre drones, and one decides to relocate because it has been transmitting for 6 minutes (**W5/W6**).
+4. **The approach.** At 0545 the Blue companies cross the line of departure. Red's FPV operators get a link-quality hit from Blue's forward jammers, which moved up behind the lead companies as Ukraine did at Kursk **[ref R5.3]**. Two Red operator teams decide, each at its own decision point, to switch to fibre drones, and one decides to relocate because it has been transmitting for 6 minutes (**W5/W6**).
 5. **Contact.** A Blue tank troop running the *stand fast* template (**W1**) comes under ATGM fire. Jev may choose among *return fire*, *hull-down* and *call fire*, but not *pull back*, because the template removed it.
 6. **Sustainment.** By 1000 the lead battalion is at 30% of its basic load of 120 mm and 40% fuel. The logistics cell sends a LOGPAC. A Red loitering munition hunts the convoy 12 km behind the line; the driver's template allows *push on*, *scatter* and *take cover*. Ground robots finish the last 3 km (**W10**).
 7. **The sea flank.** A Blue frigate on the coastal flank detects a raid of four anti-ship missiles. Its layered defence fires from a magazine that will not be reloaded until it reaches port (**W8**). The salvo arithmetic **emerges from the entities**; it is not rolled from a table.
@@ -68,7 +78,7 @@ What that looks like in play, at the end state. This is a single vignette, with 
 
 These are carried forward from the existing real-time documents and extended. They decide every trade-off below.
 
-1. **Claude plans, Jev decides, the rules execute.** Claude, or a human, issues mission orders from an HQ's picture. Jev picks one option at a decision point, only from options the rules and the unit's graph generate, so it can never invent one. The engine moves, senses, shoots, communicates and consumes, every tick, deterministically. Escalation bias in LLMs is well documented: all five models in Rivera et al. 2024 escalated **[ref]**. That is one more reason Claude never chooses individual engagements and ROE is a hard gate.
+1. **Claude plans, Jev decides, the rules execute.** Claude, or a human, issues mission orders from an HQ's picture. Jev picks one option at a decision point, only from options the rules and the unit's graph generate, so it can never invent one. The engine moves, senses, shoots, communicates and consumes, every tick, deterministically. Escalation bias in LLMs is well documented: all five models in Rivera et al. 2024 escalated **[ref R8]**. That is one more reason Claude never chooses individual engagements and ROE is a hard gate.
 2. **Truth is not knowledge.** Every unit acts on its own beliefs. These come from its own sensors and from what it has been told over a network, with ages and errors. HQs act on a fused picture that is older and coarser than the truth. The existing `knowledge.ts` belief model generalises to every domain.
 3. **Every number lives in data, with its provenance.** Platform properties live in the catalogue (W14). Engine constants live in the figures registry (W0). Every value is labelled *synthetic* (a best guess), *reference* (from the research) or *sourced* (from real data). For now most are synthetic, by design. The point is that every property exists and has a value; realism comes later by replacing values, not by changing code.
 4. **Emergent, not scripted.** A salvo exchange, a kill zone, a broken supply line or an air-defence collapse must come from entities acting under rules, not from a table that names the outcome. Tables are allowed only *inside* a mechanism, e.g. a Pk curve for one missile against one target type.
@@ -87,13 +97,13 @@ The [research reference](../research/MODERN_WARFARE_REFERENCE.md) has the detail
 
 ### 3.1 Planning and command
 
-- **Planning is a process with a clock.** The US Army MDMP has seven steps. The one-third/two-thirds rule says a commander uses at most a third of the available time and leaves two-thirds to subordinates; units routinely break it **[ref]**. *Simulation:* planning takes sim-time, and orders arrive late if planning runs long.
+- **Planning is a process with a clock.** The US Army MDMP has seven steps. The one-third/two-thirds rule says a commander uses at most a third of the available time and leaves two-thirds to subordinates; units routinely break it **[ref R1, P1]**. *Simulation:* planning takes sim-time, and orders arrive late if planning runs long.
 - **Mission command.** Orders give a task, a purpose and the commander's intent, and subordinates act on intent when the plan breaks or comms fail. *Simulation:* each unit's graph has an "out of comms" trigger and an initiative parameter, and Jev is told the intent, as today.
 - **Orders have structure.** An order has five paragraphs: Situation, Mission, Execution, Sustainment, Command and signal. It carries control measures: phase lines, boundaries, objectives, fire support coordination measures, airspace control measures. It has decision points, with branches and sequels. *Simulation:* `UnitOrders` grows into an order with geometry and triggers (W4).
 - **Echelons.** Section → platoon → company → battalion → brigade → division → corps, with joint component commands for land, maritime, air, space and cyber above. Each HQ has a staff and runs a battle rhythm.
 - **Russian and Chinese contrasts** are useful for asymmetric sides:
-  - Russian battalion tactical groups were short of infantry and gave commanders little authority, and were largely dropped by late 2022 **[ref]**. *Simulation:* a side-level "initiative" setting.
-  - The PLA's "systems destruction warfare" aims to paralyse an enemy's networks rather than destroy its forces **[ref]**. *Simulation:* a side doctrine that prioritises C2 and network nodes.
+  - Russian battalion tactical groups were short of infantry and gave commanders little authority, and were largely dropped by late 2022 **[ref R1]**. *Simulation:* a side-level "initiative" setting.
+  - The PLA's "systems destruction warfare" aims to paralyse an enemy's networks rather than destroy its forces **[ref R1]**. *Simulation:* a side doctrine that prioritises C2 and network nodes.
 
 ### 3.2 Communications
 
@@ -107,10 +117,10 @@ The [research reference](../research/MODERN_WARFARE_REFERENCE.md) has the detail
   | Starlink | 25–220 Mbps nominal, about 10 Mbps per terminal on a crowded front | 25–100 ms |
 
 - **Networks decide the speed of the kill chain:**
-  - Ukraine's Delta: detect-to-strike went from about 20 minutes to 3–5 minutes, and is claimed at about 2 minutes against up to 72 hours early in the war **[ref]**.
-  - Kropyva: about 1 minute for an unplanned target **[ref]**.
-  - Project Convergence 2020: about 20 minutes cut to under 20 seconds in a demonstration, with officials warning that contested networks would not achieve this **[ref]**.
-- **Comms are contested.** Russian jamming disrupted Russia's own communications in 2022 **[ref]**. Starlink was jammed, and in February 2026 it was restricted to registered terminals, which cut Russian links for about two weeks **[ref]**. *Simulation:* jamming is spatial and indiscriminate, and an outside party's decision can switch a bearer off.
+  - Ukraine's Delta: detect-to-strike went from about 20 minutes to 3–5 minutes, and is claimed at about 2 minutes against up to 72 hours early in the war **[ref R3, P2]**.
+  - Kropyva: about 1 minute for an unplanned target **[ref R3]**.
+  - Project Convergence 2020: about 20 minutes cut to under 20 seconds in a demonstration, with officials warning that contested networks would not achieve this **[ref R3, P3]**.
+- **Comms are contested.** Russian jamming disrupted Russia's own communications in 2022 **[ref R2]**. Starlink was jammed, and in February 2026 it was restricted to registered terminals, which cut Russian links for about two weeks **[ref R2]**. *Simulation:* jamming is spatial and indiscriminate, and an outside party's decision can switch a bearer off.
 
 ### 3.3 The kill chain
 
@@ -118,54 +128,54 @@ The [research reference](../research/MODERN_WARFARE_REFERENCE.md) has the detail
 
 ### 3.4 Land
 
-- **The transparent battlefield.** The drone kill zone is about 5–15 km deep, with claims of 20 km and more **[ref]**. About 60–70% of Russian equipment losses are attributed to drones (RUSI) **[ref]**.
-- **Infantry.** Small groups of five or fewer now infiltrate, timed for thermal crossover and bad weather, because mass assaults die to drones **[ref]**.
-- **Breaching.** Russian minefields deepened from about 120 m to about 500 m. Line charges cleared lanes only about 6 m wide. A breach took about 1.5 h, and deliberate attacks advanced about 700–1,200 m every five days in 2023 **[ref]**.
-- **Fires.** Russia fired about 27,000 rounds a day in 2025 by Ukrainian figures, at a fire ratio of about 1.8:1 in July 2025 **[ref]**. Counter-battery radars detect to about 40 km (Zoopark-1M claim) **[ref]**. Lancets kept guns from moving forward **[ref]**.
-- **Armour.** Most Abrams losses in Ukraine were to drones. Trophy has gaps against dives steeper than about 55°. Tanks are used as indirect-fire guns at 5–8 km **[ref]**.
-- **Attrition.** Attacking battalions almost always halted near 20% casualties, and about 40% of those broke (Dupuy). Fixed-percentage breakpoints are a gross oversimplification **[ref]**. The engine's break tests already sit close to this (20% for attackers, 40% for defenders).
+- **The transparent battlefield.** The drone kill zone is about 5–15 km deep, with claims of 20 km and more **[ref R4, P8]**. About 60–70% of Russian equipment losses are attributed to drones (RUSI) **[ref: not in reference]**.
+- **Infantry.** Small groups of five or fewer now infiltrate, timed for thermal crossover and bad weather, because mass assaults die to drones **[ref R4.1]**.
+- **Breaching.** Russian minefields deepened from about 120 m to about 500 m. Line charges cleared lanes only about 6 m wide. A breach took about 1.5 h, and deliberate attacks advanced about 700–1,200 m every five days in 2023 **[ref R4.5, P13]**.
+- **Fires.** Russia fired about 27,000 rounds a day in 2025 by Ukrainian figures, at a fire ratio of about 1.8:1 in July 2025 **[ref R4.3, P12]**. Counter-battery radars detect to about 40 km (Zoopark-1M claim) **[ref R4.3]**. Lancets kept guns from moving forward **[ref R4.3]**.
+- **Armour.** Most Abrams losses in Ukraine were to drones. Trophy has gaps against dives steeper than about 55°. Tanks are used as indirect-fire guns at 5–8 km **[ref R4.2]**.
+- **Attrition.** Attacking battalions almost always halted near 20% casualties, and about 40% of those broke (Dupuy). Fixed-percentage breakpoints are a gross oversimplification **[ref R4.6, P14]**. The engine's break tests already sit close to this (20% for attackers, 40% for defenders).
 
 ### 3.5 Drones and counter-drone
 
 - **Volume and cost:**
-  - FPV production was about 200,000 a month at the end of 2024, and about 3 million for 2025 **[ref]**.
-  - Shahed/Geran: about 5,300–5,600 a month by late 2025, about 60% real strike drones and the rest decoys, about 85% intercepted in February 2026, at roughly $30–50k each **[ref]**.
-  - Interceptor drones, at $1.5–16k, made about 70% of Shahed kills by January 2026 **[ref]**.
+  - FPV production was about 200,000 a month at the end of 2024, and about 3 million for 2025 **[ref R5.1]**.
+  - Shahed/Geran: about 5,300–5,600 a month by late 2025, about 60% real strike drones and the rest decoys, about 85% intercepted in February 2026, at roughly $30–50k each **[ref R4.4, P10]**.
+  - Interceptor drones, at $1.5–16k, made about 70% of Shahed kills by January 2026 **[ref R4.4, P11]**.
 - **Effectiveness:**
   - 60–80% of FPV strikes fail to destroy the target (OSW, Oct 2025).
-  - Hit rates are 30–50% for skilled pilots and about 10% for novices **[ref]**.
-- **Jamming and links.** Fibre-optic FPVs cannot be jammed. Most fly 20 km or less, the longest NATO knew of was 41 km, and they are used against logistics routes **[ref]**.
-- **Ground robots.** Ukraine's ground robots ran 25,143 logistics and evacuation missions in August 2026 alone **[ref]**.
+  - Hit rates are 30–50% for skilled pilots and about 10% for novices **[ref R5.1, P9]**.
+- **Jamming and links.** Fibre-optic FPVs cannot be jammed. Most fly 20 km or less, the longest NATO knew of was 41 km, and they are used against logistics routes **[ref R4, P8]**.
+- **Ground robots.** Ukraine's ground robots ran 25,143 logistics and evacuation missions in August 2026 alone **[ref R5.2]**.
 
 ### 3.6 Air
 
-- **Contested airspace is the norm.** In Ukraine, neither side has air superiority; SAM coverage keeps aircraft at stand-off range. Russia's answer is glide bombs: about 3,500 a month in early 2025, rising to more than 5,000 by October 2025 **[ref]**.
-- **Missile range decides beyond-visual-range fights.** India's Rafale loss in May 2025 is attributed to underestimating the PL-15's range: the shot came from about 200 km while pilots assumed about 150 km **[ref]**. *Simulation:* a pilot's belief about enemy weapon range is part of its picture and can be wrong.
-- **Attack helicopters.** They suffered heavy early losses: 23 or more of 90 Ka-52s by October 2022. Survivors were effective with stand-off ATGMs **[ref]**.
-- **Deep strike and missile defence.** Israel–Iran, June 2025: about 85% of missiles were intercepted. Interceptor stocks were the binding constraint: Israel came close to running out of Arrow-3, and the US used roughly 92–150+ THAAD rounds **[ref]**.
+- **Contested airspace is the norm.** In Ukraine, neither side has air superiority; SAM coverage keeps aircraft at stand-off range. Russia's answer is glide bombs: about 3,500 a month in early 2025, rising to more than 5,000 by October 2025 **[ref R6.4]**.
+- **Missile range decides beyond-visual-range fights.** India's Rafale loss in May 2025 is attributed to underestimating the PL-15's range: the shot came from about 200 km while pilots assumed about 150 km **[ref R6.4]**. *Simulation:* a pilot's belief about enemy weapon range is part of its picture and can be wrong.
+- **Attack helicopters.** They suffered heavy early losses: 23 or more of 90 Ka-52s by October 2022. Survivors were effective with stand-off ATGMs **[ref R6.4]**.
+- **Deep strike and missile defence.** Israel–Iran, June 2025: about 85% of missiles were intercepted. Interceptor stocks were the binding constraint: Israel came close to running out of Arrow-3, and the US used roughly 92–150+ THAAD rounds **[ref R6.6]**.
 
 ### 3.7 Naval
 
 - **The Red Sea showed magazine depth and cost exchange.**
   - About 220 missiles (SM-2 at about $2–2.4M, SM-6 at about $4M) and 160 5-inch rounds over about 380 engagements by January 2025.
   - Ships must leave station to reload.
-  - The Navy calls reliance on SM-3/SM-6 "unsustainable" **[ref]**.
-- **The Black Sea showed a navy defeated from the shore and by drones.** Moskva was sunk. About 25% of the Black Sea Fleet was sunk or damaged by February 2024, and the fleet withdrew from Sevastopol. Sea drones armed with air-to-air missiles have shot down helicopters **[ref]**.
-- **Salvo combat (Hughes).** Outcomes depend on offensive firepower, defensive firepower, staying power and, above all, scouting and firing effectively first **[ref]**. *Simulation:* these quantities are not parameters; they emerge from sensors, missiles, interceptors and damage.
+  - The Navy calls reliance on SM-3/SM-6 "unsustainable" **[ref R6.2]**.
+- **The Black Sea showed a navy defeated from the shore and by drones.** Moskva was sunk. About 25% of the Black Sea Fleet was sunk or damaged by February 2024, and the fleet withdrew from Sevastopol. Sea drones armed with air-to-air missiles have shot down helicopters **[ref R6.4]**.
+- **Salvo combat (Hughes).** Outcomes depend on offensive firepower, defensive firepower, staying power and, above all, scouting and firing effectively first **[ref R6.1]**. *Simulation:* these quantities are not parameters; they emerge from sensors, missiles, interceptors and damage.
 
 ### 3.8 Electronic warfare, space and cyber
 
-- **GNSS jamming breaks precision.** Excalibur effectiveness reportedly fell from more than 50% to under 10% within months, on thin data. JDAM-ER bombs lost effectiveness within weeks until fixed **[ref]**. Each Pole-21 jamming module covers at least 25 km **[ref]**.
-- **Emitting is dangerous.** Russia uses its EW systems to cue artillery **[ref]**. The time from detecting an emitter to a strike landing is not sourced, so it is **[declared]**, and it is an emergent kill-chain time in the simulation.
-- **Space.** In 2025 the main counterspace activity was GNSS jamming and spoofing and satellites manoeuvring, not kinetic ASAT **[ref]**. Imagery access is a policy lever: Ukraine lost free Maxar access for about a week in March 2025, and ICEYE's radar satellites filled part of the gap **[ref]**.
-- **Cyber is months of access followed by a short effect.** Sandworm was inside Kyivstar from May 2023. In December it cut service for about 24 million people for 2–3 days **[ref]**. Viasat KA-SAT: tens of thousands of modems wiped on 24 February 2022, with limited military effect **[ref]**.
+- **GNSS jamming breaks precision.** Excalibur effectiveness reportedly fell from more than 50% to under 10% within months, on thin data. JDAM-ER bombs lost effectiveness within weeks until fixed **[ref R3, P15]**. Each Pole-21 jamming module covers at least 25 km **[ref R5.3, P16]**.
+- **Emitting is dangerous.** Russia uses its EW systems to cue artillery **[ref: not in reference]**. The time from detecting an emitter to a strike landing is not sourced, so it is **[declared]**, and it is an emergent kill-chain time in the simulation.
+- **Space.** In 2025 the main counterspace activity was GNSS jamming and spoofing and satellites manoeuvring, not kinetic ASAT **[ref R5.3]**. Imagery access is a policy lever: Ukraine lost free Maxar access for about a week in March 2025, and ICEYE's radar satellites filled part of the gap **[ref R5.4]**.
+- **Cyber is months of access followed by a short effect.** Sandworm was inside Kyivstar from May 2023. In December it cut service for about 24 million people for 2–3 days **[ref R5.5, P21]**. Viasat KA-SAT: tens of thousands of modems wiped on 24 February 2022, with limited military effect **[ref R5.5]**.
 
 ### 3.9 Logistics
 
-- **Fuel.** An M1 Abrams burns about 60 gal/h cross-country and about 10 gal/h idling, about 300 gal per 8 hours **[ref]**. A brigade's fuel need rose from about 40,000 L/day to over 300,000 L/day when it re-equipped with heavy armour **[ref]**.
-- **Reach.** Supply hubs were pulled back to about 120 km, beyond GMLRS range. The 40-mile convoy north of Kyiv stalled for lack of fuel and food **[ref]**.
-- **The last mile is robotic.** Drones and ground robots make 50–80% of front-line deliveries in some Ukrainian brigades **[ref]**.
-- **Casualty evacuation.** Delays of 60–120 minutes are now common under drones, against the "golden hour", and are sometimes far longer **[ref]**.
+- **Fuel.** An M1 Abrams burns about 60 gal/h cross-country and about 10 gal/h idling, about 300 gal per 8 hours **[ref R7, P17]**. A brigade's fuel need rose from about 40,000 L/day to over 300,000 L/day when it re-equipped with heavy armour **[ref R7]**.
+- **Reach.** Supply hubs were pulled back to about 120 km, beyond GMLRS range. The 40-mile convoy north of Kyiv stalled for lack of fuel and food **[ref R7]**.
+- **The last mile is robotic.** Drones and ground robots make 50–80% of front-line deliveries in some Ukrainian brigades **[ref R7, P19]**.
+- **Casualty evacuation.** Delays of 60–120 minutes are now common under drones, against the "golden hour", and are sometimes far longer **[ref R7]**.
 
 ### 3.10 What the professional simulations teach
 
@@ -178,7 +188,7 @@ The [research reference](../research/MODERN_WARFARE_REFERENCE.md) has the detail
 | **Command: Modern Operations** | Exposes weapon release authority, EMCON and doctrine as player settings |
 | **SWORD/TARAN** | Doctrine-driven AI from brigade to corps |
 
-Orders and scenarios have standards: C-BML for orders, requests and reports; MSDL for scenarios; C2SIM, which is replacing both **[ref]**. Detection models for EO sensors descend from ACQUIRE, P = (N/N50)^E / (1 + (N/N50)^E) with E = 2.7 + 0.7·(N/N50) **[ref]**.
+Orders and scenarios have standards: C-BML for orders, requests and reports; MSDL for scenarios; C2SIM, which is replacing both **[ref R8]**. Detection models for EO sensors descend from ACQUIRE, P = (N/N50)^E / (1 + (N/N50)^E) with E = 2.7 + 0.7·(N/N50) **[ref R8, P22]**.
 
 **The lesson this plan takes:**
 
@@ -199,7 +209,7 @@ Today a unit is a `ForceElement` plus an `RtUnit`. It is shaped for ground vehic
 ```ts
 // realtime/model/platform.ts (W2)
 interface Platform {
-  id; side: SideId; label; sidc; archetype: ArchetypeId;   // archetype → default decision graph
+  id; side: Side; label; sidc; archetype: ArchetypeId;     // Side = "blue" | "red" (W0 step 2); archetype → default decision graph
   domain: "land" | "surface" | "subsurface" | "air" | "space" | "cyber" | "node";
   echelon?: Echelon; parent?: PlatformId;                  // command tree (W4)
   kin: Kinematics;          // position {lat, lng, altM | depthM}, velocity, heading
@@ -251,11 +261,11 @@ W2 does this mapping first, behind an adapter, and keeps the golden tests green.
   3. **Time compression** from ×1 to ×60 interactively. **Quiet-period skipping**: when no unit is in contact and no decision is pending, the scheduler jumps to the next scheduled event (an arrival, a satellite pass, a resupply, a planner's battle rhythm), as discrete-event simulations do.
   4. **Level of detail by scope.** A ten-day operation cannot simulate every platoon every second across 400 km. Formations far from contact, and the rear area, run **aggregated**:
      - a formation-level mover
-     - attrition and consumption by rate, which JTLS does for ground combat **[ref]**
+     - attrition and consumption by rate, which JTLS does for ground combat **[ref R8]**
      - the rule decider, not Jev
 
      They **disaggregate** into platoon entities when they come within a set distance of enemy contact, or when the player or a planner focuses on them. The scope (§5) sets the thresholds. The tactical scenario types never aggregate.
-- **Weather and light.** A time of day, sun angle and weather state (visibility, cloud base, precipitation, wind, sea state) affect sensors, movement, flying and drones. Thermal crossover and bad weather are when assaults happen **[ref]**.
+- **Weather and light.** A time of day, sun angle and weather state (visibility, cloud base, precipitation, wind, sea state) affect sensors, movement, flying and drones. Thermal crossover and bad weather are when assaults happen **[ref R4.1]**.
 
 ### 4.3 Knowledge: truth, unit beliefs and the HQ picture
 
@@ -263,7 +273,7 @@ Today's `beliefOf` states (*unaware → suspected → located → identified →
 
 - **Every belief carries a source, an age, a position error and a classification.** Classification has levels: *track → class (vehicle/aircraft/ship) → type (MBT) → identity (T-90M, hostile)*. Sensors differ in how far up that ladder they get.
 - **Track quality**, as on Link 16 (0–15), is the common currency between sensors, data links and the COP.
-- **HQ pictures (a COP per HQ)** are fused from reports. Fusion can merge two tracks into one or split one into two, and holds false and decoy tracks. Deception (decoys, Shahed-style mixed raids **[ref]**) works because pictures can be wrong.
+- **HQ pictures (a COP per HQ)** are fused from reports. Fusion can merge two tracks into one or split one into two, and holds false and decoy tracks. Deception (decoys, Shahed-style mixed raids **[ref R5.2]**) works because pictures can be wrong.
 - **Each side's picture is visible to the player separately from the truth** (W13). This is the most important teaching tool.
 
 ### 4.4 Command: the tree, the planners and the seats
@@ -464,7 +474,7 @@ Eight presets. Each lists its default scope. The milestone column (§7) shows wh
 | 3 | **Drone line (positional front)** | 1–3 days | 30 × 15 km strip | Platoon → brigade | Drones, EW, artillery, infantry, last-mile logistics, medical **S**; air **A** (glide bombs); space **A** | Overall + land | M4 |
 | 4 | **Air campaign** | 1–5 days | 300–1,000 km | Flight → air component | Air, air defence, EW, space ISR, missiles **S**; land **A** (static targets and air-defence sites); logistics **A** (sortie generation, munitions stock) | Overall + air (+ land as target owner) | M5 |
 | 5 | **Sustained offensive** | 3–10 days | 100–300 km | Battalion → division | Land, drones, EW, air defence, logistics network, medical **S**; air **S** or **A**; space **A**; cyber **A** | Overall + land (division and brigades) + sustainment | M6 |
-| 6 | **Maritime / littoral** | 1–14 days | 500–1,500 km of sea and coast | Ship → maritime component | Naval, air, air defence, drones (USVs, one-way attack), EW, space, port logistics **S**; land **A** (coastal batteries **S**); neutral shipping as a third side | Overall + maritime + air | M7 |
+| 6 | **Maritime / littoral** | 1–14 days | 500–1,500 km of sea and coast | Ship → maritime component | Naval, air, air defence, drones (USVs, one-way attack), EW, space, port logistics **S**; land **A** (coastal batteries **S**); neutral shipping as non-combatant traffic, owned by neither side | Overall + maritime + air | M7 |
 | 7 | **Strike and missile defence** | 1–12 days | Theatre, 1,000–1,500 km | Battery/flight → joint | Missiles, air, air defence, space (missile warning, ISR), EW, cyber **S**; staged drone teams **S**; land **A**; logistics **A** (interceptor and munition stocks) | Overall + air + space & cyber | M8 |
 | 8 | **Joint operation (campaign)** | 1–6 weeks | User-set, up to 1,500 × 1,500 km | Platoon → joint, with aggregation | Everything **S**, with aggregated formations away from contact | Overall + land + air + maritime + space & cyber + sustainment | M8 |
 
@@ -512,16 +522,20 @@ Each workstream has the same parts:
 
 **Goal.** Remove the blockers every other workstream hits.
 
-**The project shell stays on Foundry.** `package.json`, the Vite config and `index.html` live in the Foundry repository and are not recreated here. Any package a workstream needs is listed in §10 for you to install there. Tests are run on Foundry; this repository holds the source.
+**The project shell is this repository.** `package.json`, the Vite config, `index.html` and CI (`ci.yml`: lint, test, build on every push) all live here, in the Foundry code repository. Packages a workstream needs are listed in §10 and installed here when that workstream starts.
 
 **Build steps.**
 
-1. **Tidy.** Remove the committed `.DS_Store` files and add a `.gitignore` for them.
-2. **Run the engine in a host.** `realtime/worker/`: one engine host API usable from a Web Worker (browser) and from Node (headless batch runs).
-3. **N sides.** Replace the hard-coded `"blue" | "red"` loops (`engine.ts:1074,1922`, `comms.ts:172`) with a `SideId` and a relationship table: hostile / neutral / friendly. Neutrals (civil shipping, civilians) matter for the Red Sea and for ROE.
-4. **Scenario file.** A versioned JSON scenario, shaped after C2SIM/MSDL **[ref]**, holding:
+1. **Run the engine in a host.** `realtime/worker/`: one engine host API usable from a Web Worker (browser) and from Node (headless batch runs).
+2. **Two sides: blue and red, for now.** The game stays two-sided (§9). The `Side` type stays `"blue" | "red"` in `lib/state.ts`, which turn mode shares and which must not change. Neutral traffic (civil shipping, civilians) is modelled as non-combatant entities owned by neither side, not as a third side; see W8. There is no relationship table. One cheap guard keeps a later change open:
+   - add `SIDES = ["blue", "red"] as const` next to `opposing()` in `lib/state.ts`;
+   - new real-time code iterates `SIDES` and calls `opposing()` instead of writing new `"blue"`/`"red"` literals;
+   - the existing literals (about 300 in 8 real-time files, including the side loops at `engine.ts:413,1074,1922` and `comms.ts:172`) are left alone.
+
+   If more sides are ever needed, that is its own workstream: it starts by giving the real-time engine its own side type, so turn mode is untouched.
+3. **Scenario file.** A versioned JSON scenario, shaped after C2SIM/MSDL **[ref R8]**, holding:
    - area, time and weather
-   - sides and relationships
+   - the two sides
    - forces as a command tree
    - initial orders
    - **scope**: duration, area, echelons, domain modes, planners, detail (§5)
@@ -530,13 +544,47 @@ Each workstream has the same parts:
    - declared-figure and catalogue overrides
 
    Saved to Foundry and to local file. The **scenario type presets** (§5.3) are scenario files with blanks for forces.
-7. **Scope wiring.** The engine loads only the systems the scope's domain modes need. Abstracted domains run as support services (§5.2).
-5. **Declared-figures registry.** `realtime/figures.ts`: every tunable number, with value, unit, source, confidence and sensitivity, exported as a table in the UI. Move today's constants into it (`timing.ts`, `detection.ts`, `comms.ts:31-50`, `fire.ts`, `lethality.ts`).
-6. **Event scheduler** next to the tick (§4.2), with tests that replay is unchanged.
+4. **Declared-figures registry.** `realtime/figures.ts`: every tunable number, with value, unit, source, confidence and sensitivity, exported as a table in the UI. Move today's constants into it (`timing.ts`, `detection.ts`, `comms.ts:31-50`, `fire.ts`, `lethality.ts`).
+5. **Event scheduler** next to the tick (§4.2), with tests that replay is unchanged.
+6. **Scope wiring.** The engine loads only the systems the scope's domain modes need. Abstracted domains run as support services (§5.2). Needs the scenario file (step 3).
+
+   **Status: first part done** (`realtime/scope.ts`).
+   - **The scope as data.** The seven dimensions of §5.1 are typed: duration, area, echelons, domain modes, planners and detail, plus the type. Time (weather and the like) is not yet included. All eight presets of §5.3 and Custom carry their default scopes, victory conditions and milestones.
+   - **Scenario file version 2** carries the scope; its duration is the time limit. Version 1 files are read as Skirmishes.
+   - **The config spec and the engine's config carry the scope.** `domainMode(config, domain)` is the switch each domain's systems will ask.
+   - **`ENGINE_CAN` says exactly what is built: land, simulated.**
+     - `effectiveScope` makes a scope runnable by switching unbuilt *abstracted* domains off, with a note saying so.
+     - It refuses a scope that needs an unbuilt domain *simulated*, or levels and aggregation that do not exist yet.
+     - So today only Skirmish and Custom are playable. A Skirmish loads with every domain but land off, which meets this step's "done when".
+   - **Setup starts with a "Scenario type" step.** Presets that cannot be played yet show their milestone and cannot be chosen.
+   - **Still to do:**
+     - abstracted domains as support services (§5.2), each arriving with its workstream;
+     - the time dimension;
+     - an editable Custom scope;
+     - the headless Node runner and the browser-versus-Node event-stream check.
+
+**Headless play, and the browser-versus-Node check** (`realtime/headless.ts`, `engine/fingerprint.ts`, `scripts/bgws-run.ts`):
+
+- **A game record** is the config as data, the state at the first tick, and the orders issued while paused, each with its time.
+  - The end-of-game screen shows the event stream's **fingerprint**: a hash over every feed entry in order, computed the same way in the browser and in Node.
+  - The screen also offers **Download game record**.
+- **`npm run bgws:run -- <file>`** plays a game in Node and prints the fingerprint:
+  - a game record is replayed exactly (to the same moment, if it was saved mid-game), with "sameAsBrowser" reported;
+  - a scenario file is played with simple opening orders and the rules deciding;
+  - `--events out.jsonl` writes the stream itself.
+- **Tests show the fingerprint is the same:**
+  - whatever the step size (1, 7 or 300 s);
+  - after the record goes through JSON (with -Infinity and byte arrays kept);
+  - with orders issued mid-game;
+  - through the worker host.
+- **Limits:**
+  - Jev and the commander depend on language-model answers that are not recorded, so only rules-decided games replay exactly (the record says which kind it is). Orders the commander gave are recorded, so they replay.
+  - Raster ground needs the raster, which the Node runner does not load yet.
+  - The browser side of the check is done by hand: play a rules-only game on generated ground, download the record, run it, and compare.
 
 **Done when:**
 - the same seeded scenario gives byte-identical event streams in browser and Node
-- existing tests pass on Foundry
+- existing tests pass in CI
 - a Skirmish preset loads with every other domain off
 
 ### W1 — Decision flow graphs and the template editor
@@ -585,19 +633,19 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 - **Infantry.**
   - Dismounts carried by IFVs (`dismountsCarried` is in L7 data) become their own platforms when they dismount.
   - Small-team infiltration, buildings and trenches as cover and posture.
-  - Movement and detection timed by light and weather; thermal crossover matters **[ref]**.
+  - Movement and detection timed by light and weather; thermal crossover matters **[ref R4.1]**.
 - **Indirect fire.**
   - Guns, mortars and rockets fire missions on a target location. The location comes from the shooter's own picture or from a call for fire received over the fires net.
   - The fire-mission chain is: request → fires cell (W4) → battery assignment → lay → fire → time of flight → impact → adjust or fire for effect → battle damage assessment.
   - Dispersion depends on round type and whether PNT is good; with GNSS jammed, precision rounds degrade (W6).
-  - Shoot-and-scoot, and counter-battery radar tracking incoming rounds back to the gun position. Detection is about 40 km for the Zoopark-1M claim **[ref]**; 10–15 km for AN/TPQ-50 **[ref]**.
-- **Engineers.** Minefields as areas with density and depth: about 120 m to 500 m **[ref]**. Breach operations: lanes about 6 m wide, about 1.5 h per breach **[ref]**. Obstacles (ditches, dragon's teeth) slow or block routing. Digging in improves cover over time.
+  - Shoot-and-scoot, and counter-battery radar tracking incoming rounds back to the gun position. Detection is about 40 km for the Zoopark-1M claim **[ref R4.3]**; 10–15 km for AN/TPQ-50 **[ref: not in reference]**.
+- **Engineers.** Minefields as areas with density and depth: about 120 m to 500 m **[ref R4.5, P13]**. Breach operations: lanes about 6 m wide, about 1.5 h per breach **[ref R4.5, P13]**. Obstacles (ditches, dragon's teeth) slow or block routing. Digging in improves cover over time.
 - **Unit sustainment.**
   - Ammunition by type per mount (basic load).
-  - Fuel by burn rate per hour by activity: about 60 gal/h cross-country, about 10 gal/h idle for an Abrams **[ref]**; others **[declared]** by mass and engine.
+  - Fuel by burn rate per hour by activity: about 60 gal/h cross-country, about 10 gal/h idle for an Abrams **[ref R7, P17]**; others **[declared]** by mass and engine.
   - Batteries for drones and radios.
   - Units at threshold raise a `stocksLow` trigger. Units at zero lose the capability, so the option disappears by masking.
-- **Morale.** Keep the break tests; they match Dupuy's 20% attacker halt closely **[ref]**. Add fatigue for games over 6 h **[declared]**.
+- **Morale.** Keep the break tests; they match Dupuy's 20% attacker halt closely **[ref R4.6, P14]**. Add fatigue for games over 6 h **[declared]**.
 
 **Decision points added** (default templates `core.land.*`):
 
@@ -638,7 +686,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   Today's axis-aligned `Boundary` becomes a polygon.
 - **Claude's role** stays planning, but it can now happen during play. It is split into the **planner hierarchy** of §4.4.2. W4 builds the overall planner and the land planners (formation and tactical). The air, maritime, space & cyber and sustainment planners arrive with W7, W8, W9 and W10. Every planner sits in a **commander seat** (§4.4.3).
   1. **Battle rhythm.** Each Claude-commanded HQ re-plans every *T* sim-minutes (default 30) **[declared]**, or when a CCIR trigger fires: objective taken or lost, a subordinate combat-ineffective, a major enemy force found. The player can still press *Generate orders*.
-  2. **Planning takes sim-time.** The new order applies at `t + planningTime`. Planning time scales with echelon and with the time available (the one-third/two-thirds rule) **[ref]**, **[declared]** values. The game does not pause for it. Claude's real latency is hidden inside that sim-time; if Claude is slower than the sim-time allows, the runner waits deterministically, as it does for Jev today.
+  2. **Planning takes sim-time.** The new order applies at `t + planningTime`. Planning time scales with echelon and with the time available (the one-third/two-thirds rule) **[ref R1, P1]**, **[declared]** values. The game does not pause for it. Claude's real latency is hidden inside that sim-time; if Claude is slower than the sim-time allows, the runner waits deterministically, as it does for Jev today.
   3. **Orders travel.** A new order is a message on the command net. A unit out of comms keeps its last order, and acts on intent through its graph's `outOfComms` trigger.
   4. **Claude plans from the HQ's COP**, as today's `hqPicture` does, never the truth.
 - **Networks** (`comms/`):
@@ -646,12 +694,12 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 
     | Bearer | Range model | Capacity and latency |
     |---|---|---|
-    | VHF combat net radio | Line of sight with terrain and antenna height; 5–10 km high power, 10–40 km with amplifier **[ref]** | — |
-    | HF | NVIS 35–450 km **[ref]** | Low data rate |
+    | VHF combat net radio | Line of sight with terrain and antenna height; 5–10 km high power, 10–40 km with amplifier **[ref R2, P4]** | — |
+    | HF | NVIS 35–450 km **[ref R2, P5]** | Low data rate |
     | UHF air–ground | Line of sight | — |
-    | Tactical data link (Link-16-like) | TDMA slots, line of sight, relay via air | 31.6–115.2 kbps **[ref]** |
+    | Tactical data link (Link-16-like) | TDMA slots, line of sight, relay via air | 31.6–115.2 kbps **[ref R2, P6]** |
     | Military SATCOM | GEO footprint | — |
-    | LEO commercial SATCOM | Per-terminal capacity under congestion | 25–100 ms; ~10 Mbps congested **[ref]** |
+    | LEO commercial SATCOM | Per-terminal capacity under congestion | 25–100 ms; ~10 Mbps congested **[ref R2, P7]** |
     | Mesh MANET | Hop count | — |
     | Fibre / landline | Fixed routes, cut by damage | — |
     | Courier | Physical movement | — |
@@ -696,7 +744,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   | Link | Properties |
   |---|---|
   | **RF** | Line of sight to the operator or a relay; can be jammed (W6); its emissions reveal the operator |
-  | **Fibre** | Cannot be jammed; spool length caps the range (commonly ≤20 km, record ~41 km **[ref]**); a cut fibre ends the flight |
+  | **Fibre** | Cannot be jammed; spool length caps the range (commonly ≤20 km, record ~41 km **[ref R4, P8]**); a cut fibre ends the flight |
   | **Autonomous** | Terminal guidance after link loss, if the drone has it |
 
 - **Drone classes.** Each is an archetype with a core template:
@@ -712,14 +760,14 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   | Ground robot (UGV) | Logistics, evacuation, strike |
   | Uncrewed surface vessel | With W8 |
 
-- **Strike resolution** is a chain of probabilities: reach the target (link, jamming, battery, interceptors), acquire it (sensor and pilot skill), hit (pilot skill: about 30–50% skilled, about 10% novice **[ref]**), then damage, using the existing penetration and lethality model with top attack. The aggregate "60–80% of strikes fail to destroy" **[ref]** is a calibration target, not an input (W12).
+- **Strike resolution** is a chain of probabilities: reach the target (link, jamming, battery, interceptors), acquire it (sensor and pilot skill), hit (pilot skill: about 30–50% skilled, about 10% novice **[ref R5.1, P9]**), then damage, using the existing penetration and lethality model with top attack. The aggregate "60–80% of strikes fail to destroy" **[ref R5.1, P9]** is a calibration target, not an input (W12).
 - **Drone-to-fires loop.** An ISR drone's detections go into the team's picture and onto the fires net. The time from sighting to rounds landing emerges from W4 and W11.
 - **Counter-drone.** Each is a platform component:
   - EW (W6)
   - guns and shotguns, at short range
   - interceptor drones
   - air-defence missiles (W7), at high cost
-  - passive measures: cages and netted roads that reduce the chance of a hit; the Trophy dive gap above 55° **[ref]**
+  - passive measures: cages and netted roads that reduce the chance of a hit; the Trophy dive gap above 55° **[ref R4.2]**
   - posture: hiding and dispersal, and movement timed for bad weather
 
 **Decision points added:**
@@ -756,9 +804,9 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   | Data links | Track quality decays |
   | Drone RF links | Loss of control |
   | Radar | Range cut, false tracks |
-  | **GNSS** | PNT quality falls in an area (Pole-21-like module ≥25 km **[ref]**); GNSS-only guided munitions lose accuracy (Excalibur >50% → <10% **[ref]**, a calibration target); units' own position error grows (affects call-for-fire accuracy) |
+  | **GNSS** | PNT quality falls in an area (Pole-21-like module ≥25 km **[ref R5.3, P16]**); GNSS-only guided munitions lose accuracy (Excalibur >50% → <10% **[ref R3, P15]**, a calibration target); units' own position error grows (affects call-for-fire accuracy) |
 
-  Jamming is indiscriminate: it hits **own** links in the area too. Russia's 2022 jamming disrupted its own comms **[ref]**.
+  Jamming is indiscriminate: it hits **own** links in the area too. Russia's 2022 jamming disrupted its own comms **[ref R2]**.
 - **Electronic protection.** Frequency hopping and spread spectrum as bearer properties (resistance to J/S), directional antennas, fibre, and changing frequencies as a decision that costs time.
 - **Spoofing** (later): false PNT that pulls munitions and drones off course; false tracks on radar.
 
@@ -768,7 +816,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 |---|---|---|
 | `emitterDetected` | EW team | locate (needs time), jam, report for strike, ignore |
 | `ownEmissionsExposed` (estimated exposure from time on air and known enemy ESM) | any emitter | go silent, relocate after this transmission, carry on, switch bearer |
-| `jammingOrder` | jammer | jam sector A/B, protect the advance (move up behind it, as at Kursk **[ref]**), go silent to survive |
+| `jammingOrder` | jammer | jam sector A/B, protect the advance (move up behind it, as at Kursk **[ref R5.3]**), go silent to survive |
 | `pntDegraded` | artillery, strike | fire anyway, switch to non-GNSS munitions, wait, request drone guidance |
 
 **Done when:**
@@ -784,7 +832,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 **How it works.**
 
 - **Aircraft** are air platforms with altitude, speed, fuel (**bingo**), weapons (**Winchester**), an RWR, radar and IFF. Each **flight** of 2–4 aircraft is one entity, like a ground platoon.
-- **Airbases** are node platforms. Sorties are generated by turnaround time, with damage to runways and dispersal. Airbase attack cut sortie output by 35–40% in an illustrative study **[ref, illustrative]**. Dispersal reduces sorties, because there are fewer spares and repairs are slower **[ref]**. The CuratedSupport data (sorties per day, response, loiter) seeds this.
+- **Airbases** are node platforms. Sorties are generated by turnaround time, with damage to runways and dispersal. Airbase attack cut sortie output by 35–40% in an illustrative study **[ref, illustrative]**. Dispersal reduces sorties, because there are fewer spares and repairs are slower **[ref R6.5]**. The CuratedSupport data (sorties per day, response, loiter) seeds this.
 - **Air tasking**, a light version of the 72-hour ATO cycle **[ref, doctrine]**. The Air component HQ (Claude) writes a tasking:
   - mission packages: CAP stations, strike, SEAD, CAS on call, ISR orbits, tanker tracks
   - times and routes
@@ -792,15 +840,15 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 
   Dynamic retasking happens through the Air Ops cell's Jev template when a time-sensitive target appears (W11).
 - **Engagements.**
-  - Air-to-air missiles are entities with range and kill probability by aspect and range; a pilot's belief about the threat's missile range comes from its picture (the PL-15 lesson **[ref]**).
+  - Air-to-air missiles are entities with range and kill probability by aspect and range; a pilot's belief about the threat's missile range comes from its picture (the PL-15 lesson **[ref R6.4]**).
   - Defensive manoeuvres (crank, notch, beam), chaff and flares, and missile energy modelled as Pk falling off toward maximum range **[declared]**.
 - **Ground-based air defence (GBAD).** SHORAD, medium-range and long-range air defence as platforms with:
   - search and fire-control radars (emitters for W6)
   - launchers with magazines
   - a weapon control status (free/tight/hold)
   - an engagement doctrine (shoot-look-shoot, salvo size)
-  - **cost-aware weapon-to-target assignment**: interceptor drone $1.5–16k, PAC-3 $4M+, Shahed $30–50k **[ref]**
-- **SEAD/DEAD.** Anti-radiation missiles home on emitters, decoys load the defence, and jammers support. Radars that go silent survive but stop defending (W6 decision). Opening-strike vignette from Rising Lion: drones staged in advance hit air-defence radars at H-hour **[ref]**.
+  - **cost-aware weapon-to-target assignment**: interceptor drone $1.5–16k, PAC-3 $4M+, Shahed $30–50k **[ref R4.4, P11]**
+- **SEAD/DEAD.** Anti-radiation missiles home on emitters, decoys load the defence, and jammers support. Radars that go silent survive but stop defending (W6 decision). Opening-strike vignette from Rising Lion: drones staged in advance hit air-defence radars at H-hour **[ref R6.5]**.
 - **CAS.** A JTAC on the ground passes a 9-line over the air–ground net. Glide bombs are released from stand-off range outside SAM coverage. Helicopters fire stand-off ATGMs and are vulnerable to MANPADS.
 - **Airspace control.** Restricted operating zones, corridors, coordinating altitudes, kill boxes and the FSCL. Artillery trajectories, drones and aircraft are deconflicted by rule (a hold-fire gate) or flagged when they are not. Fratricide is possible when deconfliction fails.
 
@@ -831,7 +879,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 - **Ships** are surface platforms with:
   - radar on a mast height (the horizon matters)
   - ESM
-  - vertical launch cells as a finite magazine that is **only reloaded in port**: Red Sea **[ref]**
+  - vertical launch cells as a finite magazine that is **only reloaded in port**: Red Sea **[ref R6.2]**
   - point defence (CIWS, short-range missiles), decoys and EW
   - a sonar and a helicopter on some
   - staying power in hits **[declared per class]**
@@ -839,11 +887,11 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 - **Anti-surface warfare.** Anti-ship missiles are entities with sea-skimming profiles and seekers. Targeting beyond the horizon needs a cue from another sensor (aircraft, drone, satellite or shore radar): the kill chain (W11). **Salvo outcomes emerge** from scouting, firing effectively first, layered defence and staying power **[ref, Hughes]**.
 - **Littoral and asymmetric.**
   - Coastal anti-ship batteries (Moskva).
-  - Uncrewed surface vessels with explosives or air-to-air missiles (the Black Sea **[ref]**).
+  - Uncrewed surface vessels with explosives or air-to-air missiles (the Black Sea **[ref R6.3]**).
   - Mines.
-  - Ports as nodes that can be struck, forcing a fleet to relocate (Sevastopol → Novorossiysk **[ref]**).
+  - Ports as nodes that can be struck, forcing a fleet to relocate (Sevastopol → Novorossiysk **[ref R6.3]**).
 - **Naval C2.** The composite warfare commander concept as staff cells: air defence, surface and ASW commanders. Cooperative engagement (sharing fire-control tracks across ships) as a data-link property. EMCON as a hard gate.
-- **Water terrain.** Bathymetry, coastline, shipping lanes, sea state (affects small craft and USVs). Neutral shipping as a third side, for ROE and for the economic effect (Suez transits fell from more than 26,000 in 2023 to 13,213 in 2024 **[ref]**).
+- **Water terrain.** Bathymetry, coastline, shipping lanes, sea state (affects small craft and USVs). Neutral shipping as non-combatant traffic owned by neither side (the game stays two-sided, W0 step 2): it moves on the lanes, can be mistaken for a target, and is what ROE protects. It also carries the economic effect (Suez transits fell from more than 26,000 in 2023 to 13,213 in 2024 **[ref R6.3]**).
 - **Naval gunfire and Tomahawk-like strike** link to land via W11.
 
 **Decision points added** (`core.sea.*`):
@@ -874,15 +922,15 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   - Access windows over named areas.
   - Weather (cloud) blocks EO but not SAR.
   - The image is a batch of detections delivered to an HQ's picture after a **processing latency** (**[declared]**, e.g. 30–90 min).
-  - Commercial imagery is a **provider** that can be cut off by a scenario event, as Maxar was in March 2025 **[ref]**.
+  - Commercial imagery is a **provider** that can be cut off by a scenario event, as Maxar was in March 2025 **[ref R5.4]**.
 - **PNT.** A side-wide GNSS service whose quality is reduced by W6 jamming per area, and by counterspace events.
-- **SATCOM.** GEO military and LEO commercial bearers (W4), with terminals that can be jammed, and a scenario lever for the provider cutting off terminals (February 2026 **[ref]**).
+- **SATCOM.** GEO military and LEO commercial bearers (W4), with terminals that can be jammed, and a scenario lever for the provider cutting off terminals (February 2026 **[ref R2]**).
 - **Missile warning.** Detects ballistic launches and cues GBAD and naval defence with a warning time.
-- **Counterspace** as scenario-level actions: jamming uplinks/downlinks, dazzling, cyber against ground stations, and kinetic anti-satellite weapons as a rare escalation, gated by ROE. The 2025 trend was jamming and spoofing, not kinetic **[ref]**.
+- **Counterspace** as scenario-level actions: jamming uplinks/downlinks, dazzling, cyber against ground stations, and kinetic anti-satellite weapons as a rare escalation, gated by ROE. The 2025 trend was jamming and spoofing, not kinetic **[ref R5.3]**.
 
 **How it works (cyber).**
 
-- A **cyber cell** per side holds **accesses** prepared before the game: target network, readiness, probability of effect, effect duration, detection risk. Sandworm's Kyivstar access took months; the effect lasted 2–3 days **[ref]**.
+- A **cyber cell** per side holds **accesses** prepared before the game: target network, readiness, probability of effect, effect duration, detection risk. Sandworm's Kyivstar access took months; the effect lasted 2–3 days **[ref R5.5, P21]**.
 - **Effects** act on modelled systems:
 
   | Target | Effect |
@@ -923,14 +971,14 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 - **Consumption** per platform from W3 (fuel by activity, ammunition by firing).
 - **Nodes** (node platforms):
   - railheads, ports, airfields
-  - depots and supply hubs, about 120 km back where the threat dictates **[ref]**
+  - depots and supply hubs, about 120 km back where the threat dictates **[ref R7, P18]**
   - brigade support areas
   - forward logistic points
   - company trains
-- **Movement** by convoy (entities on roads, visible and targetable), rail (fixed lines, can be cut), air and the last mile (drones and ground robots, as Ukraine does **[ref]**). Throughput per route per hour, with a rule-of-thumb reach from the railhead **[ref, unsourced rule of thumb]**.
+- **Movement** by convoy (entities on roads, visible and targetable), rail (fixed lines, can be cut), air and the last mile (drones and ground robots, as Ukraine does **[ref R7, P19]**). Throughput per route per hour, with a rule-of-thumb reach from the railhead **[ref, unsourced rule of thumb]**.
 - **The LOGPAC cycle.** Requests from units (`LOGSTAT`) go to the logistics cell. Jev chooses priorities and routes inside the plan's sustainment priorities. Convoys move to logistic release points, units come back to draw, or deliveries go forward.
 - **Maintenance and recovery.** Mobility-killed vehicles can be recovered and repaired (time **[declared]**) or cannibalised.
-- **Medical.** Wounded from W2 effects need evacuation: point of injury → casualty collection point → treatment. Evacuation time affects survival **[declared curve]**. Typical evacuation is now 60–120 min **[ref]**. Drones deliver blood **[ref]**. Losses affect morale.
+- **Medical.** Wounded from W2 effects need evacuation: point of injury → casualty collection point → treatment. Evacuation time affects survival **[declared curve]**. Typical evacuation is now 60–120 min **[ref R7]**. Drones deliver blood **[ref: not in reference]**. Losses affect morale.
 
 **Decision points added** (`core.log.*`):
 
@@ -967,7 +1015,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
   The shooters range across domains: artillery, rockets, drones, aircraft, ships and EW. The cell's **template** chooses through Jev, with doctrine biases ("prefer cheapest effective").
 - **Tracking.** The track must be maintained, by keeping a sensor on it, or the strike flies to a stale position. Moving targets punish slow chains.
 - **Battle damage assessment.** After impact, a sensor must look. Until then the HQ does not know the result; re-striking a dead target or leaving a live one are both possible errors.
-- **Measurement.** Each chain's step times (find → fix → track → target → engage → assess) are recorded per strike in the AAR. Comparing Delta-like settings (data link, flat kill web) with hierarchical voice nets should reproduce the reference contrast: minutes against hours **[ref]**. This is a key validation target.
+- **Measurement.** Each chain's step times (find → fix → track → target → engage → assess) are recorded per strike in the AAR. Comparing Delta-like settings (data link, flat kill web) with hierarchical voice nets should reproduce the reference contrast: minutes against hours **[ref R3, P2]**. This is a key validation target.
 - **Cascades.** These come free from the model, because everything is coupled through components:
   - GNSS jamming → precision fails → shift to laser, drone or unguided fire.
   - An HQ destroyed → slower nominations.
@@ -978,7 +1026,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 
 **Done when:**
 
-- a "joint strike" scenario runs the opening of a Rising Lion-like operation **[ref]**: staged drones hit radars, SEAD opens a corridor, then strikes follow
+- a "joint strike" scenario runs the opening of a Rising Lion-like operation **[ref R6.5]**: staged drones hit radars, SEAD opens a corridor, then strikes follow
 - the AAR shows every kill chain step by step
 - swapping the network model from voice to data link changes kill-chain times by the reference factor
 
@@ -1007,7 +1055,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 - **Sensitivity analysis:** vary each high-sensitivity figure across its plausible range and report which conclusions change. Results are reported as ranges, never as point predictions. This is analytic wargaming practice.
 - **Template A/B testing** (W1 batch compare) is the same machinery.
 - **LLM behaviour checks:**
-  - Claude's plans are tested for escalation and ROE breaches by a fixed suite of scenarios (the escalation literature **[ref]**).
+  - Claude's plans are tested for escalation and ROE breaches by a fixed suite of scenarios (the escalation literature **[ref R8]**).
   - Jev's choices are checked for degenerate patterns, such as always choosing one option, against the calibration scenes.
 
 **Done when:** every figure is in the registry; each vignette has a passing distribution test; a sensitivity report can be generated from the UI.
@@ -1138,7 +1186,7 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 
 - **W1 first after foundations**, because every later domain is expressed as templates. Building domains first would mean writing more `switch` cases and migrating them later.
 - **Land depth before C2.** Indirect fire and logistics at unit level give C2 something to coordinate.
-- **Drones and EW before air.** They dominate the modern land fight **[ref]**, they reuse the land map at tactical scale, and they force the 3D, sensor and emitter work that air and naval then build on.
+- **Drones and EW before air.** They dominate the modern land fight **[ref: not in reference]**, they reuse the land map at tactical scale, and they force the 3D, sensor and emitter work that air and naval then build on.
 - **Logistics network after air.** Sortie generation, interceptor stocks and convoys all need it, but it needs long games to matter, which in turn need the headless runner and the speed work.
 - **Naval and space/cyber last.** They need theatre scale, and they matter mostly through the kill web, which ties everything together.
 
@@ -1194,7 +1242,8 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 | Human command | Yes, eventually: a person in an HQ who gets updates as and if they are sent and sends commands back, all subject to EW. Not built yet, but designed for from W4 on. | §4.4.3, W15, M9 |
 | Claude's place | Several Claude planners, one per scope and domain, with one overall Claude managing their aims together | §4.4.2 |
 | Data | Best-guess synthetic data with every property the simulation needs; realistic data later | W14, §2 rule 3 |
-| Build shell | Stays on Foundry; not recreated here. Packages needed are listed for installation. | W0, §10 |
+| Sides | Blue and red only, for now. The `Side` type stays shared with turn mode. Neutral traffic is non-combatant scenery owned by neither side, not a third side. New code uses `SIDES` and `opposing()` rather than new literals, so more sides stay possible later without being built now. | W0 step 2, W8 |
+| Build shell | This Foundry code repository: `package.json`, Vite, `index.html`, CI. Packages are installed here when their workstream starts. | W0, §10 |
 
 ### Risks
 
@@ -1219,7 +1268,7 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 
 ## 10. Packages to install
 
-The project shell is on Foundry, so these are listed for you to install there. Each is pinned to an exact version when added.
+Install these in this repository when their workstream starts, through the Foundry npm registry the repository already uses. Pin each to an exact version when added.
 
 | Package | Needed for | When | Required? |
 |---|---|---|---|

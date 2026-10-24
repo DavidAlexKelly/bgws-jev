@@ -21,26 +21,23 @@
 
 import { bearingDeg, distanceM, type LatLng } from "../../lib/board";
 import { lineOfSight } from "../../lib/lineOfSight";
-import { inCover } from "../../lib/proceduralTerrain";
 import type { ForceElement } from "../../lib/state";
 import { weaponFor } from "../../rules/turnLoop";
-import {
-  canHit,
-  crosses,
-  describeTrigger,
-  hitConditions,
-  hullDownFrom,
-  isAlive,
-  knownEnemies,
-  knownTo,
-  nearestCover,
-} from "./engine";
+import { hitConditions, isAlive, knownEnemies, knownTo } from "./engine";
 import { hitChance } from "./fire";
-import { allowanceAt, compass, hullDownAgainst, hullDownSpot, offsetBy, positionsFor } from "./geometry";
+import {
+  allowanceAt,
+  compass,
+  hullDownAgainst,
+  hullDownSpot,
+  offsetBy,
+  positionsFor,
+} from "./geometry";
 import { aspectOf } from "./lethality";
-import { chanceBand, chanceLocatedAfter, compassWord, rangeBand, selfBeliefOf } from "./knowledge";
-import { closePosition, damageEffect, describeEffect, engagedBy, type Effect } from "./options";
+import { chanceBand, compassWord, rangeBand, selfBeliefOf } from "./knowledge";
+import { closePosition, type Effect } from "./options";
 import type { RtConfig, RtEvent, RtOption, RtOrder, RtState, Trigger, UnitOrders } from "./types";
+import { landOptions } from "../behaviour/actions/land";
 
 export type DecisionPoint = "D0" | "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7" | "D8" | "D9" | "D10" | "D11" | "D12";
 
@@ -110,9 +107,9 @@ export function effectWords(effect: Effect | null, it = "it"): string {
   return `${chanceBand(effect.perMinute)} to knock out ${whose} within a minute${bounce}`;
 }
 
-function nameOf(state: RtState, unitId: string, enemyId: string): string {
+export function nameOf(state: RtState, unitId: string, enemyId: string): string {
   const enemy = state.game.forceElements[enemyId];
-  return knownTo(state.game, state.units, unitId, enemyId) === "full" && enemy
+  return knownTo(state.game, state, unitId, enemyId) === "full" && enemy
     ? `${enemy.label} (${enemyId})`
     : `the contact ${enemyId}`;
 }
@@ -126,7 +123,7 @@ export function distanceWords(m: number): string {
 }
 
 /** Where a move goes, in words: "a short way to the south". */
-function whereWords(from: LatLng, to: LatLng): string {
+export function whereWords(from: LatLng, to: LatLng): string {
   return `${distanceWords(distanceM(from, to))} to the ${compassWord(bearingDeg(from, to))}`;
 }
 
@@ -165,7 +162,7 @@ export function betterShot(
 }
 
 /** Back towards friends: the nearest steady friend further from the threat, else a withdrawal out of its sight. */
-function pullBackSpot(state: RtState, self: ForceElement, threat: LatLng | null, config: RtConfig): { at: LatLng; why: string } | null {
+export function pullBackSpot(state: RtState, self: ForceElement, threat: LatLng | null, config: RtConfig): { at: LatLng; why: string } | null {
   const here = threat ? distanceM(self.position, threat) : 0;
   const friend = Object.values(state.game.forceElements)
     .filter((other) => other.side === self.side && other.id !== self.id && other.combatStrength > 0)
@@ -230,7 +227,7 @@ export function currentEnemy(state: RtState, id: string): string | null {
   if (!unit) return null;
   const e = unit.engagement;
   const known = (enemyId: string) =>
-    isAlive(state.game, enemyId) && knownTo(state.game, state.units, id, enemyId) !== "none";
+    isAlive(state.game, enemyId) && knownTo(state.game, state, id, enemyId) !== "none";
   if (e && state.time - e.lastShotAt <= 60 && known(e.targetId)) return e.targetId;
   const attacker = Object.entries(unit.attackers)
     .filter(([enemyId, at]) => state.time - at <= 60 && known(enemyId))
@@ -265,14 +262,14 @@ export function helperFor(state: RtState, id: string, enemyId?: string): string 
     .filter((f) => distanceM(f.position, self.position) <= ASK_RADIUS_M)
     .sort(
       (a, b) =>
-        Number(enemyId != null && knownTo(state.game, state.units, b.id, enemyId) !== "none") -
-          Number(enemyId != null && knownTo(state.game, state.units, a.id, enemyId) !== "none") ||
+        Number(enemyId != null && knownTo(state.game, state, b.id, enemyId) !== "none") -
+          Number(enemyId != null && knownTo(state.game, state, a.id, enemyId) !== "none") ||
         distanceM(a.position, self.position) - distanceM(b.position, self.position),
     )[0]?.id;
 }
 
 /** A request, carried by an option: sent when the option is taken. */
-function askFor(to: string, kind: "cover" | "fire", enemyId: string | undefined, text: string): NonNullable<RtOption["message"]> {
+export function askFor(to: string, kind: "cover" | "fire", enemyId: string | undefined, text: string): NonNullable<RtOption["message"]> {
   return { kind: "request", to, text, request: { kind, ...(enemyId ? { enemyId } : {}) } };
 }
 
@@ -292,456 +289,7 @@ export function optionsAt(
   config: RtConfig,
   context: DecisionContext = {},
 ): RtOption[] {
-  const self = state.game.forceElements[id];
-  const unit = state.units[id];
-  if (!self || !unit || self.combatStrength <= 0) return [];
-  const about = event.about ? state.game.forceElements[event.about] : undefined;
-  const aboutAlive = about && about.combatStrength > 0 && about.side !== self.side ? about : undefined;
-  const aboutKnown = aboutAlive && knownTo(state.game, state.units, id, aboutAlive.id) !== "none" ? aboutAlive : undefined;
-  const move = (to: LatLng, then?: RtOrder, mode: "tactical" | "march" = "tactical"): RtOrder => ({
-    kind: "move",
-    to,
-    mode,
-    ...(then ? { then } : {}),
-  });
-  const keep = (summary: string): RtOption => ({ id: "keep", summary, order: unit.order });
-  const resume = resumeOrder(state, id);
-  const out: RtOption[] = [];
-
-  /** Fire on an enemy now, worded with its odds. */
-  const engage = (enemy: ForceElement, id_: string, verb: string): RtOption | null => {
-    if (!canHit(self, enemy, enemy.position, config) || !allowedTarget(state, id, enemy.id)) return null;
-    const effect = damageEffect(self, enemy, state, config);
-    const others = engagedBy(state, self.side, enemy.id, id);
-    return {
-      id: id_,
-      summary:
-        `${verb} ${nameOf(state, id, enemy.id)} at ${rangeBand(distanceM(self.position, enemy.position))}: ` +
-        `${effectWords(effect)}${others.length ? `; ${others.join(", ")} already firing on it` : ""}`,
-      order: { kind: "engage", targetId: enemy.id },
-      ...(effect ? { effect: effect.perMinute, penetrate: effect.strike?.pPenetrate, exact: describeEffect(effect) } : {}),
-    };
-  };
-  /** A better place to shoot from. `always`: offered even if the odds say it is no better (D8: they have been wrong). */
-  const better = (enemy: ForceElement, id_ = "better", always = false): RtOption | null => {
-    if (!allowedTarget(state, id, enemy.id)) return null;
-    const spot = betterShot(state, self, enemy, config);
-    if (!spot) return null;
-    const there = damageEffect(self, enemy, state, config, spot.at);
-    // Only a better shot if it is better: safer (hull-down), clearly more
-    // likely to tell, or with rounds that get through where they now bounce.
-    const here = canHit(self, enemy, enemy.position, config) ? damageEffect(self, enemy, state, config) : null;
-    const gain =
-      (there?.perMinute ?? 0) > Math.max(0.05, (here?.perMinute ?? 0) * 1.2) ||
-      (there?.strike?.pPenetrate ?? 0) > (here?.strike?.pPenetrate ?? 0) + 0.2;
-    if (!always && spot.why !== "hull-down" && !gain) return null;
-    return {
-      id: id_,
-      summary: `get a better shot (${spot.why}, ${whereWords(self.position, spot.at)}), then engage: from there ${effectWords(there)}`,
-      order: move(spot.at, { kind: "engage", targetId: enemy.id }),
-      ...(there ? { effect: there.perMinute, exact: describeEffect(there) } : {}),
-    };
-  };
-  const pullBack = (threat: LatLng | null, id_ = "pullBack", summary = "pull back"): RtOption | null => {
-    const spot = pullBackSpot(state, self, threat, config);
-    if (!spot) return null;
-    return { id: id_, summary: `${summary} (${spot.why}, ${whereWords(self.position, spot.at)})`, order: { kind: "withdraw", to: spot.at } };
-  };
-  const outOfSight = (enemy: ForceElement, id_ = "pullBack"): RtOption | null => {
-    const spot = hiddenSpot(self, enemy.position, config);
-    if (!spot) return null;
-    return {
-      id: id_,
-      summary: `pull back out of ${enemy.id}'s sight (${whereWords(self.position, spot)})`,
-      order: { kind: "withdraw", to: spot },
-    };
-  };
-  const quiet = (summary = "stop firing and go quiet: stay still and watch"): RtOption => ({
-    id: "quiet",
-    summary,
-    order: { kind: "observe" },
-  });
-  const shift = (except: string): RtOption | null => {
-    const next = knownEnemies(state, id)
-      .filter((enemy) => enemy.id !== except && canHit(self, enemy, enemy.position, config))
-      .map((enemy) => ({ enemy, effect: damageEffect(self, enemy, state, config) }))
-      .sort((a, b) => (b.effect?.perMinute ?? 0) - (a.effect?.perMinute ?? 0))[0];
-    return next ? engage(next.enemy, "shift", "shift fire to") : null;
-  };
-  const push = (...options: (RtOption | null | undefined)[]) => {
-    for (const option of options) if (option && !out.some((one) => one.id === option.id)) out.push(option);
-  };
-
-  switch (point) {
-    case "D0": {
-      const orders = context.orders;
-      if (!orders || !orders.phases.length) break;
-      const first: RtOrder = { ...orders.phases[0].order, phase: 0 };
-      const enemyId = currentEnemy(state, id);
-      const enemy = enemyId ? state.game.forceElements[enemyId] : undefined;
-      const hide = enemy ? hiddenSpot(self, enemy.position, config) : null;
-      const task = `"${orders.task}"`;
-      if (orders.urgency === "now") {
-        push({ id: "comply", summary: `break off at once and start ${task}`, order: first, orders });
-        const cover = enemy
-          ? Object.values(state.game.forceElements)
-              .filter((f) => f.side === self.side && f.id !== id && f.combatStrength > 0 && state.units[f.id]?.cohesion === "steady")
-              .filter((f) => distanceM(f.position, self.position) <= 1500 && canHit(f, enemy, enemy.position, config))
-              .filter((f) => knownTo(state.game, state.units, f.id, enemy.id) !== "none")
-              .sort((a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position))[0]
-          : undefined;
-        if (cover && enemy) {
-          // Asked over the radio: whether and how it covers is its own call (D12).
-          push({
-            id: "covered",
-            summary: `break off under covering fire: ask ${cover.id} to cover it while it pulls out to start ${task}`,
-            order: first,
-            orders,
-            message: askFor(cover.id, "cover", enemy.id, `${id} asks ${cover.id} to cover it off against ${enemy.id}`),
-          });
-        }
-        if (enemy && hide && canHit(self, enemy, enemy.position, config)) {
-          push({
-            id: "fireAndBack",
-            summary: `fire one more volley at ${enemy.id}, move back out of its sight, then start ${task}`,
-            order: { kind: "engage", targetId: enemy.id, volleys: 1, then: { kind: "withdraw", to: hide, then: first } },
-            orders,
-          });
-        }
-      } else {
-        push({ id: "comply", summary: `comply now: start ${task}`, order: first, orders });
-        if (enemy && canHit(self, enemy, enemy.position, config)) {
-          push({
-            id: "finish",
-            summary: `finish this fight with ${enemy.id} first (until it is out of the fight or lost, at most two minutes), then start ${task}`,
-            order: { kind: "engage", targetId: enemy.id, until: state.time + 120, then: first },
-            orders,
-          });
-        }
-        if (hide) {
-          push({
-            id: "breakContact",
-            summary: `break contact (back out of sight, ${whereWords(self.position, hide)}), then start ${task}`,
-            order: { kind: "withdraw", to: hide, then: first },
-            orders,
-          });
-        }
-      }
-      break;
-    }
-    case "D1": {
-      push(keep(`carry on (${describeActivity(state, id)})`));
-      if (aboutKnown) {
-        push(engage(aboutKnown, "engage", "engage now:"));
-        if (allowedTarget(state, id, aboutKnown.id)) {
-          for (const [index, trigger] of triggersFor(state, self, aboutKnown, config).entries()) {
-            push(
-              { id: `wait${index}`, summary: `hold still and wait until ${describeTrigger(trigger)}, then decide`, order: { kind: "wait", targetId: aboutKnown.id, trigger, autoFire: false } },
-              { id: `wait${index}:fire`, summary: `hold still and wait until ${describeTrigger(trigger)}, then fire at once`, order: { kind: "wait", targetId: aboutKnown.id, trigger, autoFire: true } },
-            );
-          }
-        }
-        push(better(aboutKnown));
-      }
-      push({ id: "observe", summary: "observe and report, without firing", order: { kind: "observe" } });
-      push(pullBack(aboutKnown?.position ?? null, "pullBack", "pull back to friends"));
-      break;
-    }
-    case "D2": {
-      if (!aboutKnown) break;
-      push(engage(aboutKnown, "returnFire", "return fire from here on"));
-      if (self.targetClass === "armoured_vehicle" && !hullDownFrom(state, self, aboutKnown.position, config)) {
-        const spot = hullDownSpot(self, aboutKnown.position, config, 300);
-        if (spot && distanceM(spot, self.position) > 5 && allowedTarget(state, id, aboutKnown.id)) {
-          push({
-            id: "hullDown",
-            summary: `back into hull-down (${whereWords(self.position, spot)}), then return fire on ${aboutKnown.id}`,
-            order: move(spot, { kind: "engage", targetId: aboutKnown.id }),
-          });
-        }
-      }
-      push(outOfSight(aboutKnown));
-      // With a friend to ask: fire on it together, or pull back under its cover.
-      const friend = helperFor(state, id, aboutKnown.id);
-      if (friend) {
-        const back = out.find((o) => o.id === "pullBack");
-        if (back) {
-          push({
-            ...back,
-            id: "pullBackCovered",
-            summary: `${back.summary}, asking ${friend} to cover the move`,
-            message: askFor(friend, "cover", aboutKnown.id, `${id} pulling back under fire from ${aboutKnown.id}: asks ${friend} to cover`),
-          });
-        }
-        const answer = out.find((o) => o.id === "returnFire");
-        if (answer) {
-          push({
-            ...answer,
-            id: "callFire",
-            summary: `${answer.summary}, and ask ${friend} to engage it too`,
-            message: askFor(friend, "fire", aboutKnown.id, `${id} asks ${friend} to engage ${aboutKnown.id}`),
-          });
-        }
-      }
-      if (distanceM(self.position, aboutKnown.position) <= 1500 && allowedTarget(state, id, aboutKnown.id)) {
-        push({
-          id: "assault",
-          summary: `assault ${nameOf(state, id, aboutKnown.id)}: close in firing, to point-blank`,
-          order: { kind: "move", to: aboutKnown.position, mode: "assault" },
-        });
-      }
-      push(quiet("hold still in cover and do not fire"));
-      break;
-    }
-    case "D3": {
-      const bearing = event.bearingDeg ?? unit.suspects[event.about ?? ""]?.bearingDeg;
-      if (bearing == null) {
-        push(keep(`carry on (${describeActivity(state, id)})`));
-        break;
-      }
-      const words = compassWord(bearing);
-      push({
-        id: "search",
-        summary: `search the ${words}: hold still and look for the shooter (spotting doubled that way for half a minute)`,
-        order: { kind: "search", bearingDeg: bearing, until: state.time + 30 },
-      });
-      if (!inCover(config.terrain, self.position)) {
-        const threat = offsetBy(self.position, bearing, 1500);
-        const cover = nearestCover(self, config, 300, threat);
-        if (cover) {
-          push({
-            id: "cover",
-            summary: `move into cover away from the ${words} (${whereWords(self.position, cover)})`,
-            order: move(cover, undefined, "march"),
-          });
-        }
-      }
-      const back = offsetBy(self.position, (bearing + 180) % 360, 500);
-      if (allowanceAt(self, back, config) > 0) {
-        push({ id: "pullBack", summary: `pull back, away from the ${words}`, order: { kind: "withdraw", to: back } });
-      }
-      push(keep(`carry on (${describeActivity(state, id)})`));
-      break;
-    }
-    case "D4": {
-      if (!aboutKnown || unit.order.kind !== "wait") break;
-      push(engage(aboutKnown, "fire", "fire now on"));
-      const range = distanceM(self.position, aboutKnown.position);
-      if (range > 500) {
-        const trigger: Trigger = { kind: "range", withinM: Math.max(300, Math.round((range * 0.6) / 100) * 100) };
-        push({
-          id: "closer",
-          summary: `wait for a closer shot: until ${describeTrigger(trigger)}`,
-          order: { kind: "wait", targetId: aboutKnown.id, trigger, autoFire: false },
-        });
-      }
-      push({ id: "letPass", summary: "let it pass and stay hidden", order: { kind: "observe" } });
-      break;
-    }
-    case "D5": {
-      if (!aboutAlive) break;
-      push(aboutKnown ? engage(aboutKnown, "fireFirst", "fire first, while it still can, on") : null);
-      push(keep("keep holding: it may be a coincidence"));
-      const spot = hiddenSpot(self, aboutAlive.position, config, 400) ?? nearestCover(self, config, 300, aboutAlive.position);
-      if (spot) {
-        push({
-          id: "relocate",
-          summary: `relocate quietly (${whereWords(self.position, spot)}) and keep watching`,
-          order: move(spot, { kind: "observe" }),
-        });
-      }
-      push(outOfSight(aboutAlive));
-      break;
-    }
-    case "D6": {
-      if (!aboutKnown) break;
-      const e = unit.engagement;
-      const firedBack = e != null && (unit.incoming[aboutKnown.id]?.last ?? -Infinity) >= e.since;
-      const their = state.units[aboutKnown.id];
-      const dived = their?.history.some((m) => m.by === "crew" && e != null && m.time >= e.since && /dashing|backing/.test(m.chose));
-      const moved = their != null && e != null && their.lastMovedAt >= e.since;
-      const reaction = firedBack ? "it is firing back: it has found you" : dived ? "it went to ground" : moved ? "it has moved" : "no visible reaction yet";
-      const located = firedBack
-        ? 1
-        : chanceLocatedAfter(distanceM(self.position, aboutKnown.position), e?.shots ?? 1, {
-            shooterInCover: inCover(config.terrain, self.position),
-            shooterHullDown: hullDownFrom(state, self, aboutKnown.position, config),
-          });
-      const odds = damageEffect(self, aboutKnown, state, config);
-      push(
-        keep(
-          `keep firing on ${aboutKnown.id}: ${effectWords(odds)}; ${reaction}` +
-            (firedBack ? "" : `; ${chanceBand(located)} that it has located you`),
-        ),
-      );
-      const spot = hiddenSpot(self, aboutKnown.position, config, 400) ?? hullDownSpot(self, aboutKnown.position, config, 300);
-      if (spot) {
-        const friend = helperFor(state, id, aboutKnown.id);
-        push({
-          ...(friend
-            ? { message: askFor(friend, "cover", aboutKnown.id, `${id} shifting position under ${aboutKnown.id}'s eye: asks ${friend} to cover`) }
-            : {}),
-          id: "fireAndMove",
-          summary: `fire and move: one more volley, then shift position (${whereWords(self.position, spot)}) before it finds you, then engage again${
-            friend ? `, asking ${friend} to cover the move` : ""
-          }`,
-          order: {
-            kind: "engage",
-            targetId: aboutKnown.id,
-            volleys: 1,
-            then: move(spot, { kind: "engage", targetId: aboutKnown.id }),
-          },
-        });
-      }
-      push(shift(aboutKnown.id));
-      push(quiet());
-      push(outOfSight(aboutKnown));
-      out[0] = { ...out[0], exact: `P(located) ≈ ${Math.round(located * 100)}%; ${describeEffect(odds)}` };
-      break;
-    }
-    case "D7": {
-      const enemyId = event.about;
-      const lkp = enemyId ? state.lastKnown[self.side]?.[enemyId] : undefined;
-      const broken = enemyId ? state.units[enemyId]?.cohesion === "broken" : false;
-      push(resume ? { id: "resume", summary: resume.summary, order: resume.order } : keep(`carry on (${describeActivity(state, id)})`));
-      if (lkp || broken) push({ id: "watch", summary: `watch where ${enemyId} was last seen`, order: { kind: "observe" } });
-      const target = enemyId ? state.game.forceElements[enemyId] : undefined;
-      if (broken && target && target.combatStrength > 0 && allowedTarget(state, id, target.id)) {
-        push({ id: "regain", summary: `follow ${enemyId} up: it has broken (assault after it)`, order: { kind: "move", to: target.position, mode: "assault" } });
-      } else if (lkp && distanceM(self.position, lkp.at) > 300) {
-        const to = offsetBy(self.position, bearingDeg(self.position, lkp.at), distanceM(self.position, lkp.at) * 0.5);
-        push({ id: "regain", summary: `move to regain sight of ${enemyId} (${whereWords(self.position, to)})`, order: move(to, { kind: "observe" }) });
-      }
-      push(shift(enemyId ?? ""));
-      break;
-    }
-    case "D8": {
-      const targetId = unit.engagement?.targetId;
-      const target = targetId ? state.game.forceElements[targetId] : undefined;
-      if (target && target.combatStrength > 0) push(better(target, "better", true));
-      push(shift(targetId ?? ""));
-      push(quiet());
-      if (target) push(outOfSight(target));
-      const odds = target ? damageEffect(self, target, state, config) : null;
-      push(keep(`keep at it: ${effectWords(odds)}`));
-      break;
-    }
-    case "D9": {
-      if (!aboutKnown) break;
-      push(engage(aboutKnown, "help", "fire on its attacker,"));
-      const spot = betterShot(state, self, aboutKnown, config);
-      if (spot && allowedTarget(state, id, aboutKnown.id)) {
-        push({
-          id: "support",
-          summary: `move to support (${spot.why}, ${whereWords(self.position, spot.at)}), then engage ${aboutKnown.id}`,
-          order: move(spot.at, { kind: "engage", targetId: aboutKnown.id }),
-        });
-      }
-      push(keep(`carry on (${describeActivity(state, id)})`));
-      break;
-    }
-    case "D12": {
-      const request = unit.requests.find((r) => r.id === event.requestId);
-      if (!request) break;
-      const enemy = request.enemyId ? state.game.forceElements[request.enemyId] : undefined;
-      const known = enemy && enemy.combatStrength > 0 && knownTo(state.game, state.units, id, enemy.id) !== "none" ? enemy : undefined;
-      const reply = (answer: "comply" | "cannot" | "partly", text: string) => ({
-        kind: "reply" as const,
-        to: request.from,
-        text,
-        reply: { requestId: request.id, answer },
-      });
-      const what = request.kind === "cover" ? `cover ${request.from}` : `fire on ${request.enemyId ?? "its attacker"}`;
-      if (known && canHit(self, known, known.position, config) && allowedTarget(state, id, known.id)) {
-        const effect = damageEffect(self, known, state, config);
-        push({
-          id: "comply",
-          summary: `comply: ${what} — engage ${nameOf(state, id, known.id)} from here: ${effectWords(effect)}`,
-          order: { kind: "engage", targetId: known.id },
-          answers: request.id,
-          message: reply("comply", `${id} to ${request.from}: complying, engaging ${known.id}`),
-          ...(effect ? { effect: effect.perMinute, exact: describeEffect(effect) } : {}),
-        });
-      } else if (known && allowedTarget(state, id, known.id)) {
-        const spot = betterShot(state, self, known, config);
-        if (spot) {
-          push({
-            id: "comply",
-            summary: `comply: ${what} — move to get a shot (${spot.why}, ${whereWords(self.position, spot.at)}), then engage ${known.id}`,
-            order: move(spot.at, { kind: "engage", targetId: known.id }),
-            answers: request.id,
-            message: reply("comply", `${id} to ${request.from}: complying, moving to engage ${known.id}`),
-          });
-        }
-      }
-      if (unit.order.kind !== "overwatch") {
-        push({
-          id: "partly",
-          summary: `partly: stay here on overwatch and fire at anything in reach, without moving`,
-          order: { kind: "overwatch" },
-          answers: request.id,
-          message: reply("partly", `${id} to ${request.from}: can't move, covering from where it is`),
-        });
-      }
-      const busy = currentEnemy(state, id);
-      push({
-        ...keep(`can't: carry on (${describeActivity(state, id)})${busy ? `, it is fighting ${busy}` : ""}`),
-        answers: request.id,
-        message: reply("cannot", `${id} to ${request.from}: can't${busy ? `, engaged with ${busy}` : ""}`),
-      });
-      break;
-    }
-    case "D10": {
-      if (resume && event.kind !== "outOfOrders") push({ id: "resume", summary: resume.summary, order: resume.order });
-      // Its current phase cannot be done: skip to the next one, if there is one.
-      const o = unit.orders;
-      if (o && o.blocked?.phase === o.phase && o.phase + 1 < o.phases.length) {
-        const next = o.phases[o.phase + 1];
-        push({
-          id: "nextPhase",
-          summary: `skip to the next step of its orders: ${next.label}`,
-          order: { ...next.order, phase: o.phase + 1 },
-          orders: { ...o, phase: o.phase + 1, blocked: undefined },
-        });
-      }
-      if (unit.order.kind !== "hold") push({ id: "hold", summary: "hold here", order: { kind: "hold" } });
-      push({ id: "overwatch", summary: "overwatch from here: fire at anything in reach", order: { kind: "overwatch" } });
-      if (unit.order.kind === "hold") push(keep("hold here"));
-      break;
-    }
-    case "D11": {
-      if (resume) push({ id: "resume", summary: `rejoin: ${resume.summary}`, order: resume.order });
-      push({ id: "hold", summary: "hold and recover", order: { kind: "hold" } });
-      const friend = Object.values(state.game.forceElements)
-        .filter((f) => f.side === self.side && f.id !== id && f.combatStrength > 0 && state.units[f.id]?.cohesion === "steady")
-        .sort((a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position))[0];
-      if (friend && distanceM(friend.position, self.position) > 200) {
-        push({
-          id: "join",
-          summary: `join the nearest friends, ${friend.id} (${whereWords(self.position, friend.position)})`,
-          order: move(offsetBy(friend.position, bearingDeg(friend.position, self.position), 100)),
-        });
-      }
-      break;
-    }
-  }
-  if (out.length === 0) push(keep(`carry on (${describeActivity(state, id)})`));
-  return withinConstraints(out, unit.orders ?? context.orders);
-}
-
-/** Drop options that would cross one of the orders' lines. "keep" always stays. */
-function withinConstraints(options: RtOption[], orders: UnitOrders | null | undefined): RtOption[] {
-  const lines = orders?.boundaries ?? [];
-  if (!lines.length) return options;
-  const destinations = (order: RtOrder | undefined): LatLng[] =>
-    !order
-      ? []
-      : order.kind === "move" || order.kind === "withdraw"
-        ? [order.to, ...destinations(order.then)]
-        : order.kind === "engage"
-          ? destinations(order.then)
-          : [];
-  return options.filter((option) => option.id === "keep" || destinations(option.order).every((at) => !crosses(lines, at)));
+  return landOptions(state, id, point, event, config, context);
 }
 
 /**
@@ -759,7 +307,7 @@ export function allowedTarget(state: RtState, id: string, enemyId: string): bool
   return true;
 }
 
-function describeActivity(state: RtState, id: string): string {
+export function describeActivity(state: RtState, id: string): string {
   const unit = state.units[id];
   const order = unit.order;
   const self = state.game.forceElements[id];

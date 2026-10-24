@@ -24,30 +24,33 @@
 
 import { bearingDeg, distanceM } from "../../lib/board";
 import type { ForceElement, GameState, Side, SightingLevel } from "../../lib/state";
+import { SIDES } from "../../lib/state";
 import { compassWord } from "./knowledge";
 import { PINNED_AT, SUPPRESSED_AT } from "./timing";
 import type { CommsState, MessageKind, ReportLevel, RtConfig, RtEvent, RtMessage, RtUnit, Track } from "./types";
+import { figure } from "./figures";
+import { trackFor, type PictureSource, type ReportWriter } from "./picture";
 
 /** DECLARED. Seconds to compose a report, and to pass one on at an HQ. */
-export const COMPOSE_S = 10;
-export const RELAY_S = 5;
+export const COMPOSE_S = figure("comms.COMPOSE_S");
+export const RELAY_S = figure("comms.RELAY_S");
 /** DECLARED. Seconds a transmission holds the net. */
-export const TRANSMIT_S = 4;
+export const TRANSMIT_S = figure("comms.TRANSMIT_S");
 /** DECLARED. Radio range, metres: a troop set in rolling country. */
-export const RADIO_RANGE_M = 5000;
+export const RADIO_RANGE_M = figure("comms.RADIO_RANGE_M");
 /** DECLARED. A report's position error when made (own sight), and what passing it on adds. */
-export const SIGHTED_ERROR_M = 50;
+export const SIGHTED_ERROR_M = figure("comms.SIGHTED_ERROR_M");
 /** Re-report a contact still in sight this often; not at all if a friend reported it this recently. */
-export const REREPORT_S = 60;
-export const ALREADY_REPORTED_S = 30;
+export const REREPORT_S = figure("comms.REREPORT_S");
+export const ALREADY_REPORTED_S = figure("comms.ALREADY_REPORTED_S");
 /** At most one "under fire" report a unit this often; a situation report this often. */
-export const UNDER_FIRE_REPORT_S = 20;
-export const SITREP_S = 120;
+export const UNDER_FIRE_REPORT_S = figure("comms.UNDER_FIRE_REPORT_S");
+export const SITREP_S = figure("comms.SITREP_S");
 /** Friends within this may be asked to help, and hear a friend's trouble as theirs to act on (D9). */
-export const HELP_RADIUS_M = 1500;
-const HELP_INTERVAL_S = 60;
+export const HELP_RADIUS_M = figure("comms.HELP_RADIUS_M");
+const HELP_INTERVAL_S = figure("comms.HELP_INTERVAL_S");
 /** The last few messages a unit remembers hearing. */
-const HEARD_LENGTH = 6;
+const HEARD_LENGTH = figure("comms.HEARD_LENGTH");
 
 /** Most urgent first. */
 const PRIORITY: Record<MessageKind, number> = { underFire: 0, request: 1, reply: 1, contact: 2, sitrep: 3 };
@@ -74,6 +77,9 @@ export interface CommsContext {
     extra?: Partial<Pick<RtEvent, "about" | "located" | "bearingDeg" | "info" | "requestId" | "reported">>,
   ) => void;
   known: (id: string, enemyId: string) => SightingLevel;
+  /** What units have been told, to read and to change. Only `tick` delivers reports, and gives both. */
+  pictures?: PictureSource;
+  reports?: ReportWriter;
 }
 
 /** One message delivered: for the feed and the stream. */
@@ -169,7 +175,7 @@ export function stepComms(comms: CommsState, ctx: CommsContext): Delivery[] {
     }
   }
   if (!perfect) {
-    for (const side of ["blue", "red"] as const) {
+    for (const side of SIDES) {
       if (comms.busyUntil[side] > ctx.time) continue;
       const next = comms.pending
         .filter((m) => m.side === side && m.dueAt == null && m.readyAt <= ctx.time)
@@ -200,7 +206,7 @@ function receive(ctx: CommsContext, id: string, message: RtMessage): void {
       if (!alive(ctx, c.enemyId)) return;
       const own = unit.ownSeen[c.enemyId];
       if (own && own.time >= c.seenAt) return;
-      const had = unit.picture[c.enemyId];
+      const had = ctx.pictures ? trackFor(ctx.pictures, id, c.enemyId) : undefined;
       const knewBefore = ctx.known(id, c.enemyId);
       if (had && had.seenAt >= c.seenAt && RANK[had.level] >= RANK[c.level]) return;
       const level: ReportLevel = had && RANK[had.level] > RANK[c.level] ? had.level : c.level;
@@ -215,7 +221,9 @@ function receive(ctx: CommsContext, id: string, message: RtMessage): void {
         moving: c.moving,
         ...(c.label ?? had?.label ? { label: c.label ?? had?.label } : {}),
       };
-      ctx.setUnit(id, { picture: { ...ctx.units[id].picture, [c.enemyId]: track } });
+      // It now holds this track: a bit in the side's record, not a copy of
+      // its picture (picture.ts; docs/plan/SIDE_PICTURE.md).
+      ctx.reports?.hear(self.side, id, c.enemyId, track);
       // News of an enemy it knew nothing of: a new contact (D1).
       if (knewBefore === "none") {
         ctx.emit(

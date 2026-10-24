@@ -127,6 +127,9 @@ interface RasterGrid {
   data: Uint8Array;
 }
 
+/** A loaded raster's grid as plain, transferable data (see `TerrainRaster.exportGrid`). */
+export type RasterGridData = Readonly<RasterGrid>;
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export class TerrainRaster {
@@ -150,6 +153,32 @@ export class TerrainRaster {
 
   get isLoaded(): boolean {
     return this.grid !== null;
+  }
+
+  /**
+   * The loaded grid, after its water clean-up, as plain data: five numbers
+   * and one byte array. Everything this raster answers comes from it, so a
+   * Web Worker can rebuild the same raster with `fromGrid` — transfer
+   * `data.buffer` — instead of fetching and cleaning the file again.
+   * Null before it loads.
+   */
+  exportGrid(): RasterGridData | null {
+    if (!this.grid) return null;
+    const { minLat, minLon, cellSize, numRows, numCols, data } = this.grid;
+    return { minLat, minLon, cellSize, numRows, numCols, data: new Uint8Array(data) };
+  }
+
+  /** A loaded raster from `exportGrid`'s data. It cannot fetch: it already has its grid. */
+  static fromGrid(grid: RasterGridData, datasetRid?: string): TerrainRaster {
+    if (grid.data.length !== grid.numRows * grid.numCols) {
+      throw new Error(`[TerrainRaster] grid size mismatch: expected ${grid.numRows * grid.numCols}, got ${grid.data.length}`);
+    }
+    const noFetch: FoundryFileClient = {
+      getFileContent: () => Promise.reject(new Error("[TerrainRaster] built from a grid; nothing to fetch")),
+    };
+    const raster = new TerrainRaster(noFetch, datasetRid);
+    raster.grid = { ...grid };
+    return raster;
   }
 
   /** Exposes calibration offsets so external debug overlays can stay in sync. */

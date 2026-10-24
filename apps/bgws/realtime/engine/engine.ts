@@ -48,12 +48,27 @@ import {
   type Side,
   type SightingLevel,
 } from "../../lib/state";
+import { SIDES } from "../../lib/state";
 import { applyEffects } from "../../rules/apply";
 import { canAdvance } from "../../rules/resolvers";
 import { isFlankShot, weaponFor } from "../../rules/turnLoop";
 import { judgeVictory } from "../../rules/victory";
 import { bearingRoutePlanner } from "../../lib/routePlan";
 import { IDENTIFY_M, detectChance } from "./detection";
+import { PositionGrid } from "./grid";
+import { heldTrack, holderOf, ReportWriter, trackFor, trackedBy, type Holder, type PictureSource } from "./picture";
+import { elementRank, type ElementRank } from "./rank";
+export { elementRank, type ElementRank } from "./rank";
+
+/**
+ * How this game treats a domain (scope.ts): simulated, abstracted or off.
+ * A config with no scope is a skirmish: land simulated, the rest off. Every
+ * system for a domain other than land asks this before it runs — today none
+ * exists, so this is the switch the next workstreams plug into.
+ */
+export function domainMode(config: Pick<RtConfig, "scope">, domain: import("../scope").Domain): import("../scope").DomainMode {
+  return config.scope?.domains[domain] ?? (domain === "land" ? "simulated" : "off");
+}
 import { acquisitionS, aimedIntervalS, hitChance, type HitConditions } from "./fire";
 import {
   allowanceAt,
@@ -225,15 +240,15 @@ export function canHit(enemy: ForceElement, target: ForceElement, at: LatLng, co
  */
 export function knownTo(
   game: GameState,
-  units: Record<string, RtUnit>,
+  pictures: PictureSource,
   id: string,
   enemyId: string,
 ): SightingLevel {
   const fe = game.forceElements[id];
-  const unit = units[id];
+  const unit = pictures.units[id];
   if (!fe || !unit) return "none";
   const own: SightingLevel = unit.ownSeen[enemyId]?.level ?? "none";
-  const told: SightingLevel = unit.picture?.[enemyId]?.level ?? "none";
+  const told: SightingLevel = trackFor(pictures, id, enemyId)?.level ?? "none";
   return higher(own, told);
 }
 
@@ -242,27 +257,161 @@ export function seesItself(units: Record<string, RtUnit>, id: string, enemyId: s
   return units[id]?.ownSeen[enemyId] != null;
 }
 
-/** What each side knows, as a whole: the best any of its units knows. For the map and for fog of war. */
-export function sidePictureLevels(game: GameState, units: Record<string, RtUnit>, side: Side): Record<string, SightingLevel> {
+
+/**
+ * `record` without the entries `keep` rejects, in the same order — or
+ * `record` itself, the same object, when it keeps them all. Reads without
+ * allocating and copies only when something goes.
+ */
+export function pruned<T>(record: Record<string, T>, keep: (key: string, value: T) => boolean): Record<string, T> {
+  let out: Record<string, T> | null = null;
+  for (const key in record) {
+    const value = record[key];
+    if (keep(key, value)) {
+      if (out) out[key] = value;
+    } else if (!out) {
+      // The first to go: everything before it stays.
+      out = {};
+      for (const before in record) {
+        if (before === key) break;
+        out[before] = record[before];
+      }
+    }
+  }
+  return out ?? record;
+}
+
+/** `knownTo` without the checks on the unit itself: its own sighting or its picture, whichever is better. */
+function levelIn(holder: Holder | undefined, unit: RtUnit, enemyId: string): SightingLevel {
+  return higher<SightingLevel>(unit.ownSeen[enemyId]?.level ?? "none", heldTrack(holder, enemyId)?.level ?? "none");
+}
+
+/** A living element not on `side`. */
+function isLiveEnemy(game: GameState, enemyId: string, side: Side): boolean {
+  const enemy = game.forceElements[enemyId];
+  return enemy != null && enemy.side !== side && enemy.combatStrength > 0;
+}
+
+/**
+ * What each side knows, as a whole: the best any of its units knows. For the map and for fog of war.
+ *
+ * The same as asking `knownTo` for every friend × enemy pair, but each friend
+ * only looks at what is in its own sightings and its picture. Keys go in in
+ * the order that full walk would first meet them — friend by friend, each
+ * friend's new enemies in element order — so the result is identical.
+ */
+export function sidePictureLevels(
+  game: GameState,
+  pictures: PictureSource,
+  side: Side,
+  rank: ElementRank = elementRank(game),
+): Record<string, SightingLevel> {
   const out: Record<string, SightingLevel> = {};
   for (const fe of Object.values(game.forceElements)) {
     if (fe.side !== side || fe.combatStrength <= 0) continue;
-    for (const enemy of Object.values(game.forceElements)) {
-      if (enemy.side === side || enemy.combatStrength <= 0) continue;
-      const level = knownTo(game, units, fe.id, enemy.id);
-      if (level !== "none" && (!out[enemy.id] || SIGHT_RANK[level] > SIGHT_RANK[out[enemy.id]])) out[enemy.id] = level;
+    const unit = pictures.units[fe.id];
+    if (!unit) continue;
+    const own = unit.ownSeen;
+    const holder = holderOf(pictures, fe.id);
+    let fresh: string[] | undefined;
+    const visit = (enemyId: string) => {
+      const have = out[enemyId];
+      if (have === "full") return;
+      const level = levelIn(holder, unit, enemyId);
+      if (level === "none") return;
+      // Already in: a living enemy (life does not change during this call); maybe now known better.
+      if (have !== undefined) {
+        if (SIGHT_RANK[level] > SIGHT_RANK[have]) out[enemyId] = level;
+      } else if (isLiveEnemy(game, enemyId, side)) {
+        (fresh ??= []).push(enemyId);
+      }
+    };
+    for (const enemyId in own) visit(enemyId);
+    trackedBy(pictures, fe.id, (enemyId) => {
+      if (!(enemyId in own)) visit(enemyId);
+    });
+    if (fresh) {
+      if (fresh.length > 1) fresh.sort((a, b) => (rank.index.get(a) ?? 0) - (rank.index.get(b) ?? 0));
+      for (const enemyId of fresh) out[enemyId] = levelIn(holder, unit, enemyId);
     }
   }
   return out;
 }
 
-/** Living enemies this unit knows about. */
-export function knownEnemies(state: Pick<RtState, "game" | "units">, id: string): ForceElement[] {
-  const fe = state.game.forceElements[id];
-  if (!fe) return [];
-  return forceElementsOf(state.game, opposing(fe.side)).filter(
-    (enemy) => enemy.combatStrength > 0 && knownTo(state.game, state.units, id, enemy.id) !== "none",
-  );
+/**
+ * Living enemies this unit knows about, in element order (as `forceElementsOf`
+ * gives them). A unit that knows of few looks only at those and sorts them;
+ * one that knows of many walks the elements once, which is cheaper than sorting.
+ */
+export function knownEnemies(
+  state: PictureSource,
+  id: string,
+  rank: ElementRank = elementRank(state.game),
+): ForceElement[] {
+  const { game, units } = state;
+  const fe = game.forceElements[id];
+  const unit = units[id];
+  if (!fe || !unit) return [];
+  const opponent = opposing(fe.side);
+  const own = unit.ownSeen;
+  const holder = holderOf(state, id);
+  const isKnownEnemy = (enemyId: string) => {
+    const enemy = game.forceElements[enemyId];
+    return enemy != null && enemy.side === opponent && enemy.combatStrength > 0 && levelIn(holder, unit, enemyId) !== "none";
+  };
+
+  const candidates: string[] = [];
+  for (const enemyId in own) candidates.push(enemyId);
+  trackedBy(state, id, (enemyId) => {
+    if (!(enemyId in own)) candidates.push(enemyId);
+  });
+  if (candidates.length * 8 < rank.ids.length) {
+    return candidates
+      .filter(isKnownEnemy)
+      .sort((a, b) => (rank.index.get(a) ?? 0) - (rank.index.get(b) ?? 0))
+      .map((enemyId) => game.forceElements[enemyId]);
+  }
+  const out: ForceElement[] = [];
+  for (const enemyId of rank.ids) if (isKnownEnemy(enemyId)) out.push(game.forceElements[enemyId]);
+  return out;
+}
+
+/**
+ * The known enemy nearest to `at`: the first of `knownEnemies` at the least
+ * range (element order breaks a tie), found without building that list.
+ */
+export function nearestKnownEnemy(
+  state: PictureSource,
+  id: string,
+  at: LatLng,
+  rank: ElementRank = elementRank(state.game),
+): ForceElement | undefined {
+  const { game, units } = state;
+  const fe = game.forceElements[id];
+  const unit = units[id];
+  if (!fe || !unit) return undefined;
+  const opponent = opposing(fe.side);
+  const holder = holderOf(state, id);
+  let nearest: ForceElement | undefined;
+  let nearestM = Infinity;
+  let nearestRank = Infinity;
+  const visit = (enemyId: string) => {
+    const enemy = game.forceElements[enemyId];
+    if (enemy == null || enemy.side !== opponent || enemy.combatStrength <= 0) return;
+    if (levelIn(holder, unit, enemyId) === "none") return;
+    const range = distanceM(enemy.position, at);
+    const order = rank.index.get(enemyId) ?? 0;
+    if (range < nearestM || (range === nearestM && order < nearestRank)) {
+      nearest = enemy;
+      nearestM = range;
+      nearestRank = order;
+    }
+  };
+  for (const enemyId in unit.ownSeen) visit(enemyId);
+  trackedBy(state, id, (enemyId) => {
+    if (!(enemyId in unit.ownSeen)) visit(enemyId);
+  });
+  return nearest;
 }
 
 /** Cover, or hull-down, at a unit's position: what the fire table calls "target in cover". */
@@ -316,9 +465,8 @@ export function hullDownFrom(state: Pick<RtState, "units">, fe: ForceElement, fr
 export function exposureOf(state: RtState, id: string, config: RtConfig): string[] {
   const fe = state.game.forceElements[id];
   if (!fe) return [];
-  return forceElementsOf(state.game, opposing(fe.side))
-    .filter((enemy) => enemy.combatStrength > 0)
-    .filter((enemy) => knownTo(state.game, state.units, id, enemy.id) === "full")
+  return knownEnemies(state, id)
+    .filter((enemy) => knownTo(state.game, state, id, enemy.id) === "full")
     .filter((enemy) => canHit(enemy, fe, fe.position, config))
     .map((enemy) => enemy.id);
 }
@@ -370,7 +518,6 @@ function freshUnit(fe: ForceElement): RtUnit {
     cueAt: {},
     helpAt: {},
     orders: null,
-    picture: {},
     lastReported: {},
     lastUnderFireReportAt: -Infinity,
     lastSitrepAt: 0,
@@ -410,7 +557,7 @@ export function createRealtimeState(game: GameState): RtState {
   // Contacts already on the board count as seen at the start. Without this
   // they are "not seen for ever" and fade on the very first tick.
   const lastSeen: RtState["lastSeen"] = { blue: {}, red: {} };
-  for (const side of ["blue", "red"] as const) {
+  for (const side of SIDES) {
     for (const [id, level] of Object.entries(game.sighting[side] ?? {})) {
       if (level !== "none") lastSeen[side][id] = 0;
     }
@@ -436,6 +583,7 @@ export function createRealtimeState(game: GameState): RtState {
     lastFiredOn: { blue: {}, red: {} },
     comms: emptyComms(),
     lastKnown: { blue: {}, red: {} },
+    reports: { blue: {}, red: {} },
     startStrength,
     plan: {},
   };
@@ -508,7 +656,7 @@ export function sendMessage(state: RtState, draft: MessageDraft, config: RtConfi
       config,
       setUnit: () => {},
       emit: () => {},
-      known: (id, enemyId) => knownTo(state.game, state.units, id, enemyId),
+      known: (id, enemyId) => knownTo(state.game, state, id, enemyId),
     },
     withId,
   );
@@ -678,6 +826,23 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   const shots: RtShot[] = [];
 
   const ids = Object.keys(game.forceElements).sort();
+  // setFe replaces game.forceElements but never adds or removes an element.
+  const rank = elementRank(game);
+  // What units have been told: one record per side, read through picture.ts
+  // and changed only through this writer (comms delivering, the scan
+  // forgetting). `units` is this tick's own object, updated in place; the
+  // getters keep the view current as `game` and the record are replaced.
+  const reports = new ReportWriter(prev.reports, rank);
+  const pictures: PictureSource = {
+    units,
+    get game() {
+      return game;
+    },
+    get reports() {
+      return reports.reports;
+    },
+    rank,
+  };
   const fe = (id: string) => game.forceElements[id];
   const alive = (id: string) => isAlive(game, id) && units[id] != null;
   const setFe = (id: string, patch: Partial<ForceElement>) => {
@@ -722,7 +887,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         alive(id) &&
         distanceM(fe(id).position, of.position) <= FRIEND_RADIUS_M,
     );
-  const known = (id: string, enemyId: string) => knownTo(game, units, id, enemyId);
+  const known = (id: string, enemyId: string) => knownTo(game, pictures, id, enemyId);
   const sees = (from: LatLng, to: LatLng) => lineOfSight(config.terrain, { from, to }).visible;
   const hqNear = (self: ForceElement) =>
     ids.some(
@@ -763,7 +928,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const unit = units[observerId];
     const isNews = SIGHT_RANK[seenLevel] > SIGHT_RANK[before];
     const due = time - (unit.lastReported[enemyId] ?? -Infinity) >= REREPORT_S;
-    const told = unit.picture[enemyId];
+    const told = trackFor(pictures, observerId, enemyId);
     const alreadyHeard =
       told != null && told.from !== observerId && time - told.seenAt <= ALREADY_REPORTED_S && SIGHT_RANK[told.level] >= SIGHT_RANK[seenLevel];
     if (!isNews && (!due || alreadyHeard)) return;
@@ -788,7 +953,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     });
   };
   /** The net's view of this tick. */
-  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known });
+  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known, pictures, reports });
 
   /**
    * React to contact (Battle Drill 1): return fire at once, get into the
@@ -1015,6 +1180,16 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   // Now that everyone has moved: who has run into whom, and who has walked
   // into an identified enemy's reach.
   const contacts: { id: string; enemyId: string; range: number }[] = [];
+  // Each side's living elements, gridded for the halt check (grid.ts): only
+  // those within reach are measured. Nobody moves again before section 5.
+  const haltReach = Math.max(CLOSE_CONTACT_M, ASSAULT_CONTACT_M);
+  const standing = Object.fromEntries(
+    SIDES.map((side) => {
+      const list = forceElementsOf(game, side).filter((enemy) => enemy.combatStrength > 0);
+      const positions = list.map((one) => one.position);
+      return [side, { list, grid: new PositionGrid(positions, haltReach), reach: new PositionGrid(positions, LOS_CAP_M) }];
+    }),
+  ) as Record<Side, { list: ForceElement[]; grid: PositionGrid; reach: PositionGrid }>;
   for (const id of moving) {
     const self = fe(id);
     const order = units[id].order;
@@ -1024,8 +1199,10 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     // for cover keep going — that is what they are for.
     if (order.kind === "move" && !order.dash) {
       const halt = order.mode === "assault" ? ASSAULT_CONTACT_M : CLOSE_CONTACT_M;
-      const close = forceElementsOf(game, opposing(self.side))
-        .filter((enemy) => enemy.combatStrength > 0)
+      const them = standing[opposing(self.side)];
+      const close = them.grid
+        .near(self.position)
+        .map((index) => them.list[index])
         .map((enemy) => ({ enemy, range: distanceM(enemy.position, self.position) }))
         .filter(({ range }) => range <= halt)
         .filter(({ enemy }) => sees(self.position, enemy.position))
@@ -1037,8 +1214,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
 
     // Walking into an identified enemy's reach, once per enemy per order.
-    for (const enemy of forceElementsOf(game, opposing(self.side))) {
-      if (enemy.combatStrength <= 0) continue;
+    // Only enemies within the sight cap can reach it (`canHit`), so only
+    // those are asked about, in element order as `knownEnemies` gives them;
+    // "identified" already means known.
+    const them = standing[opposing(self.side)];
+    for (const index of them.reach.near(self.position)) {
+      const enemy = them.list[index];
       if (units[id].exposedTo.includes(enemy.id)) continue;
       if (known(id, enemy.id) !== "full") continue;
       if (!canHit(enemy, self, self.position, config)) continue;
@@ -1071,15 +1252,19 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   }
 
   // ── 4. Sighting ───────────────────────────────────────────────────────────
-  for (const side of ["blue", "red"] as const) {
+  for (const side of SIDES) {
     const observers = ids.filter((id) => fe(id).side === side && alive(id));
     const enemies = ids.filter((id) => fe(id).side !== side && alive(id));
+    // Only observers within the sight cap of an enemy are asked about it
+    // (grid.ts), still in `observers` order, so the dice fall as before.
+    const lookouts = new PositionGrid(observers.map((id) => fe(id).position), LOS_CAP_M);
 
     for (const enemyId of enemies) {
       const enemy = fe(enemyId);
       const their = units[enemyId];
       const enemyInCover = inCover(config.terrain, enemy.position);
-      for (const observerId of observers) {
+      for (const index of lookouts.near(enemy.position)) {
+        const observerId = observers[index];
         const observer = fe(observerId);
         const range = distanceM(observer.position, enemy.position);
         if (range > LOS_CAP_M) continue;
@@ -1090,11 +1275,11 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         // enough: it still has to be found, though knowing where to look helps.
         const ownSighting = units[observerId].ownSeen[enemyId];
         if (ownSighting) {
-          const was = higher(ownSighting.level, (units[observerId].picture[enemyId]?.level ?? "veryPartial") as ReportLevel);
+          const was = higher(ownSighting.level, (trackFor(pictures, observerId, enemyId)?.level ?? "veryPartial") as ReportLevel);
           observe(observerId, enemyId, was === "full" || range <= IDENTIFY_M ? "full" : was);
           continue;
         }
-        const told = units[observerId].picture[enemyId];
+        const told = trackFor(pictures, observerId, enemyId);
         const cued = told != null && distanceM(told.at, enemy.position) <= trackErrorM(told, time) + 300;
 
         // Not yet found: a chance per second (detection.ts).
@@ -1137,28 +1322,21 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
 
     // A unit forgets what it saw itself on the same clock as its side.
+    // (Every unit, every step, over everything it knows: `pruned` reads without
+    // allocating and copies only when something actually goes.)
     for (const id of observers) {
       const own = units[id].ownSeen;
-      const kept = Object.fromEntries(
-        Object.entries(own).filter(
-          ([enemyId, seen]) => isAlive(game, enemyId) && time - seen.time <= timing.contactMemoryS,
-        ),
-      );
-      if (Object.keys(kept).length !== Object.keys(own).length) setUnit(id, { ownSeen: kept });
+      const kept = pruned(own, (enemyId, seen) => isAlive(game, enemyId) && time - seen.time <= timing.contactMemoryS);
+      if (kept !== own) setUnit(id, { ownSeen: kept });
     }
     // Reports go stale: an enemy nobody has seen for a while drops out of
-    // each unit's picture.
-    for (const id of observers) {
-      const picture = units[id].picture;
-      const kept = Object.entries(picture).filter(
-        ([enemyId, track]) => isAlive(game, enemyId) && time - track.seenAt <= timing.contactMemoryS,
-      );
-      if (kept.length !== Object.keys(picture).length) setUnit(id, { picture: Object.fromEntries(kept) });
-    }
+    // the side's record, and so out of every unit's picture — once per side,
+    // not once per unit (picture.ts).
+    reports.forget(side, (enemyId, track) => isAlive(game, enemyId) && time - track.seenAt <= timing.contactMemoryS);
     // What the side knows as a whole — the best any of its units knows — for
     // the map and fog of war; and where each contact was last seen, left on
     // the map once nobody knows of it any more.
-    game = { ...game, sighting: { ...game.sighting, [side]: sidePictureLevels(game, units, side) } };
+    game = { ...game, sighting: { ...game.sighting, [side]: sidePictureLevels(game, pictures, side, rank) } };
     for (const enemyId of enemies) {
       const level = sightingOf(game, side, enemyId);
       if (level === "none") continue;
@@ -1721,11 +1899,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     let posture: Posture =
       unit.lastMovedAt === time ? "moving" : time - unit.lastMovedAt < SETTLE_S ? "halted" : "settled";
     if (posture === "settled") {
-      const nearest = knownEnemies({ game, units }, id).sort(
-        (a, b) => distanceM(a.position, self.position) - distanceM(b.position, self.position),
-      )[0];
-      const defilade = nearest != null && hullDownAgainst(self.position, nearest.position, config);
-      if (inCover(config.terrain, self.position) || defilade) posture = "hullDown";
+      if (inCover(config.terrain, self.position)) {
+        posture = "hullDown";
+      } else {
+        // Hull-down against the nearest enemy it knows of.
+        const nearest = nearestKnownEnemy(pictures, id, self.position, rank);
+        if (nearest != null && hullDownAgainst(self.position, nearest.position, config)) posture = "hullDown";
+      }
     }
     if (suppression !== unit.suppression || pinnedSince !== unit.pinnedSince || posture !== unit.posture) {
       setUnit(id, { suppression, pinnedSince, posture });
@@ -1786,7 +1966,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   // they stop and try to rally — they are not sent back again on arrival.
   for (const id of brokeNow) {
     const self = fe(id);
-    const threats = knownEnemies({ game, units }, id);
+    const threats = knownEnemies(pictures, id, rank);
     const danger = (at: LatLng) =>
       threats.length ? Math.min(...threats.map((enemy) => distanceM(enemy.position, at))) : Infinity;
     const hidden = (at: LatLng) => threats.every((enemy) => !sees(enemy.position, at));
@@ -1919,13 +2099,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     const morale = derivedMorale(unit);
     if (fe(id).morale !== morale) setFe(id, { morale });
   }
-  for (const side of ["blue", "red"] as const) {
+  for (const side of SIDES) {
     for (const enemyId of Object.keys(lastKnown[side])) {
       if (!isAlive(game, enemyId)) delete lastKnown[side][enemyId];
     }
   }
 
-  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms };
+  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms, reports: reports.reports };
 
   // ── 11. Is it over? ───────────────────────────────────────────────────────
   //

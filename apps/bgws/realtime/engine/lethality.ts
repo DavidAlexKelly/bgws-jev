@@ -21,32 +21,33 @@ import { bearingDeg, bearingDeltaDeg, type LatLng } from "../../lib/board";
 import type { Capability, ForceElement } from "../../lib/state";
 import type { Rng } from "../../rules/dice";
 import type { RuleSet } from "../../rules/ruleset";
+import { figure } from "./figures";
 
 export type Aspect = "front" | "turret" | "side" | "rear" | "roof";
 
 /** DECLARED. Kinetic penetration lost per km beyond the last known point — the L27A1 curve's own slope (~6%/km). */
-const KE_FALLOFF_PER_KM = 0.06;
+const KE_FALLOFF_PER_KM = figure("lethality.KE_FALLOFF_PER_KM");
 /** DECLARED. Where the source gives only frontal armour: side, rear and roof as fractions of it (Challenger 2's ratios). */
 const ASPECT_FRACTION: Record<Exclude<Aspect, "front" | "turret">, number> = { side: 0.2, rear: 0.06, roof: 0.045 };
 /** DECLARED. How soft the penetration margin is: at ±12% of the armour the chance is ~27% / ~73%. */
-const PEN_SPREAD = 0.12;
+const PEN_SPREAD = figure("lethality.PEN_SPREAD");
 /**
  * DECLARED. Chance a penetration knocks an armoured vehicle out: a round that
  * barely gets through often does not, one that overmatches the armour by a
  * wide margin (a sabot into 40 mm of rear plate) nearly always does.
  */
-const P_KILL_MARGINAL = 0.5;
-const P_KILL_OVERMATCH = 0.95;
+const P_KILL_MARGINAL = figure("lethality.P_KILL_MARGINAL");
+const P_KILL_OVERMATCH = figure("lethality.P_KILL_OVERMATCH");
 /** Penetration this many times the armour counts as full overmatch. */
-const OVERMATCH_RATIO = 2.5;
+const OVERMATCH_RATIO = figure("lethality.OVERMATCH_RATIO");
 /** DECLARED. Anything unarmoured that is struck. */
-const P_KILL_SOFT = 0.9;
+const P_KILL_SOFT = figure("lethality.P_KILL_SOFT");
 /** DECLARED. Chance an active protection system defeats one missile or rocket. */
-const P_APS_INTERCEPT = 0.5;
+const P_APS_INTERCEPT = figure("lethality.P_APS_INTERCEPT");
 /** As the rules have it (tandemEraDefeatFraction): a tandem warhead strips this much of ERA-fitted armour. */
-const TANDEM_ERA_STRIP = 0.4;
+const TANDEM_ERA_STRIP = figure("lethality.TANDEM_ERA_STRIP");
 /** A shot this far round from the target's facing arrives on the rear. */
-const REAR_ARC_DEG = 150;
+const REAR_ARC_DEG = figure("lethality.REAR_ARC_DEG");
 
 /** Penetration at a range: the munition's curve where there is one, else the 1 km figure. */
 export function penetrationAt(capability: Capability, rangeM: number): number | undefined {

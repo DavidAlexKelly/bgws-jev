@@ -3,6 +3,7 @@
  * for and take effect. No network: Jev is a fake that answers from a function.
  */
 
+import { trackFor } from "./picture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { distanceM, metresPerDegreeLon, type LatLng } from "../../lib/board";
@@ -294,9 +295,9 @@ describe("meeting the enemy", () => {
     for (const id of ["B1", "B2", "R1"]) state = setOrder(state, id, { kind: "hold" }, cfg, { roe: "never" });
     const after = tick(state, cfg).state;
     expect(after.units.B1.ownSeen.R1?.level).toBe("full");
-    expect(after.units.B2.picture.R1).toBeUndefined();
+    expect(trackFor(after, "B2", "R1")).toBeUndefined();
     const reported = run(after, cfg, DEFAULT_TIMING.reportDelayS).state;
-    expect(reported.units.B2.picture.R1).toMatchObject({ level: "full", from: "B1" });
+    expect(trackFor(reported, "B2", "R1")).toMatchObject({ level: "full", from: "B1" });
   });
 
   it("the rules engage what they sight instead of carrying on", async () => {
@@ -865,6 +866,10 @@ describe("context for decisions", () => {
     expect(r1.itsFireOnYou).toMatch(/within a minute|cannot|no chance/);
     // Friends nearby, and what they are doing, so units can work together.
     expect((b1.friendsNearby as { id: string }[]).map((f) => f.id)).toContain("B2");
+    // And what the side knows as a whole: the commander's view (SIDE_PICTURE.md).
+    const known = (sent.state as { sideKnows?: { id: string; knownTo: string }[] }).sideKnows ?? [];
+    expect(known.map((k) => k.id)).toContain("R1");
+    expect(known[0].knownTo).toMatch(/side|units/);
     const question = (sent.questions.u0 as { instructions: string }).instructions;
     expect(question).toMatch(/Decision point D8/);
     expect(question).toMatch(/The intent comes first/);

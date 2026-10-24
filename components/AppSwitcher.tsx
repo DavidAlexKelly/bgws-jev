@@ -1,5 +1,5 @@
 /**
- * AppSwitcher —floating pill button that opens a small popover menu for
+ * AppSwitcher — floating pill button that opens a small popover menu for
  * jumping between the BGWS sections.
  *
  * In the Mapplications repo this switched between the sibling apps (ORBAT
@@ -17,7 +17,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 const SECTIONS = [
   { path: "/bgws", label: "Main menu", icon: "▦", sub: "APBG Wargaming Hub", accent: "#e8c547" },
   { path: "/bgws/play", label: "Play", icon: "▶", sub: "Turn-based and real-time games", accent: "#81c784" },
-  { path: "/bgws/assets", label: "Asset explorer", icon: "☰", sub: "Equipment, profiles and cards", accent: "#ffb74d" },
+  { path: "/bgws/assets", label: "Asset manager", icon: "☰", sub: "Equipment, units and behaviours", accent: "#ffb74d" },
 ] as const;
 
 function isActivePath(sectionPath: string, pathname: string): boolean {

@@ -78,6 +78,7 @@ import {
   type FacetEntry,
 } from "./data/curatedFilters";
 import { resolveMildataImage, type ResolvedImage } from "./data/unitImages";
+import { BehaviourAssignment } from "./components/BehaviourAssignment";
 
 export type CuratedMode = "curated" | "munitions";
 
@@ -760,6 +761,10 @@ function PlatformDetail({
               {fmt(platform.csInputRangeM, " m")} reach.
             </div>
           )}
+        </Group>
+
+        <Group title="Behaviour">
+          <BehaviourAssignment assetId={platform.assetId} assetName={platform.displayName} targetClass={platform.targetClass} />
         </Group>
 
         <Group title="Platform">

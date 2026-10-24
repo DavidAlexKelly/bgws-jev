@@ -9,7 +9,7 @@ import { SYMMETRIC_CONTROL_V1 } from "../../rules/forceList";
 import { HOUSE_V1 } from "../../rules/ruleset";
 import { EventStreamQueue } from "../../data/eventStreamQueue";
 import { createRealtimeState } from "./engine";
-import { describeEntry, streamRow, type StreamRow } from "./feed";
+import { describeEntry, entryContext, streamRow, type StreamRow } from "./feed";
 import { heuristicInitialOrders } from "./orders";
 import { RealtimeRunner, type RtLogEntry } from "./runner";
 import { DEFAULT_TIMING } from "./timing";
@@ -59,7 +59,7 @@ async function playedGame(): Promise<{ rows: StreamRow[]; entries: RtLogEntry[] 
     logLimit: 1e6,
     onEntry: (entry, now) => {
       entries.push(entry);
-      rows.push(streamRow(entry, now, run, rows.length));
+      rows.push(streamRow(entry, entryContext(entry, now), run, rows.length));
     },
   });
   while (!runner.state.over) await runner.advance(300);

@@ -35,6 +35,7 @@
 
 import { distanceM } from "../../lib/board";
 import type { Side } from "../../lib/state";
+import { SIDES } from "../../lib/state";
 import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
 import { ruleDecider } from "./deciders";
 import type { Delivery } from "./comms";
@@ -87,7 +88,33 @@ export interface RunnerOptions {
   onEntry?: (entry: RtLogEntry, state: RtState) => void;
 }
 
-const DEFAULT_LOG_LIMIT = 500;
+export const DEFAULT_LOG_LIMIT = 500;
+
+/**
+ * The last few shots this side saw, as short lines, for Jev: the enemy named
+ * only if the side has seen it. From the feed and the state, so a runner in a
+ * worker can be asked it on the main thread.
+ */
+export function recentShots(log: readonly RtLogEntry[], state: RtState, side: Side): { time: number; text: string }[] {
+  const game = state.game;
+  const name = (id: string) => {
+    const fe = game.forceElements[id];
+    if (!fe || fe.side === side) return id;
+    return game.sighting[side][id] && game.sighting[side][id] !== "none" ? id : "unseen enemy";
+  };
+  return log
+    .filter((entry): entry is Extract<RtLogEntry, { type: "shot" }> => entry.type === "shot")
+    .filter((entry) => {
+      const firer = game.forceElements[entry.shot.firerId];
+      const target = game.forceElements[entry.shot.targetId];
+      return firer?.side === side || target?.side === side;
+    })
+    .slice(-8)
+    .map((entry) => ({
+      time: entry.time,
+      text: `${name(entry.shot.firerId)} fired at ${name(entry.shot.targetId)}: ${entry.shot.result}`,
+    }));
+}
 
 export class RealtimeRunner {
   state: RtState;
@@ -120,24 +147,7 @@ export class RealtimeRunner {
 
   /** The last few things this side saw happen, as short lines, for Jev. */
   recentFor(side: Side): { time: number; text: string }[] {
-    const game = this.state.game;
-    const name = (id: string) => {
-      const fe = game.forceElements[id];
-      if (!fe || fe.side === side) return id;
-      return game.sighting[side][id] && game.sighting[side][id] !== "none" ? id : "unseen enemy";
-    };
-    return this.log
-      .filter((entry): entry is Extract<RtLogEntry, { type: "shot" }> => entry.type === "shot")
-      .filter((entry) => {
-        const firer = game.forceElements[entry.shot.firerId];
-        const target = game.forceElements[entry.shot.targetId];
-        return firer?.side === side || target?.side === side;
-      })
-      .slice(-8)
-      .map((entry) => ({
-        time: entry.time,
-        text: `${name(entry.shot.firerId)} fired at ${name(entry.shot.targetId)}: ${entry.shot.result}`,
-      }));
+    return recentShots(this.log, this.state, side);
   }
 
   /**
@@ -239,7 +249,7 @@ export class RealtimeRunner {
   /** Heavy losses and objectives taken, once each. */
   private checkFlags(): void {
     const { state } = this;
-    for (const side of ["blue", "red"] as const) {
+    for (const side of SIDES) {
       const start = Math.max(1, state.startStrength?.[side] ?? 0);
       const own = Object.values(state.game.forceElements).filter((fe) => fe.side === side);
       const left = own.reduce((sum, fe) => sum + Math.max(0, fe.combatStrength), 0);
@@ -304,7 +314,7 @@ export class RealtimeRunner {
       if ((severe || settled) && (severe || rested)) ready[fe.side].push(unitId);
     }
 
-    for (const side of ["blue", "red"] as const) {
+    for (const side of SIDES) {
       if (ready[side].length === 0) continue;
       const requests: RtDecisionRequest[] = [];
       for (const unitId of ready[side]) {

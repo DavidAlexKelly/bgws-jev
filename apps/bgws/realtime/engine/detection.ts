@@ -1,3 +1,4 @@
+import { figure } from "./figures";
 // ── bgws/realtime/engine/detection.ts ──────────────────────────────────────
 // Spotting an enemy, second by second.
 //
@@ -17,34 +18,34 @@
 // plug in when they do.
 
 /** DECLARED. A halted, exposed vehicle at 1 km is found in 10 s on average. */
-const BASE_RATE_PER_S = 0.1;
-const REFERENCE_M = 1000;
+const BASE_RATE_PER_S = figure("detection.BASE_RATE_PER_S");
+const REFERENCE_M = figure("detection.REFERENCE_M");
 /** DECLARED. Inside this, nobody fails to see what is in plain view. */
-export const CERTAIN_M = 150;
+export const CERTAIN_M = figure("detection.CERTAIN_M");
 /** DECLARED. Inside this, a spotted target is identified (type known), not only "a contact". */
-export const IDENTIFY_M = 2000;
+export const IDENTIFY_M = figure("detection.IDENTIFY_M");
 
 /** DECLARED. What makes a target easier or harder to find: multipliers on the rate. */
 const FACTORS = {
-  targetMoving: 3,
+  targetMoving: figure("detection.FACTORS.targetMoving"),
   /** Muzzle flash, dust and smoke: a vehicle that has just fired gives itself away. */
-  targetFired: 5,
-  targetInCover: 0.3,
-  targetHullDown: 0.4,
+  targetFired: figure("detection.FACTORS.targetFired"),
+  targetInCover: figure("detection.FACTORS.targetInCover"),
+  targetHullDown: figure("detection.FACTORS.targetHullDown"),
   /** Still for a while: camouflaged, engine off. */
-  targetSettled: 0.7,
+  targetSettled: figure("detection.FACTORS.targetSettled"),
   /** Small and low: a section of infantry. */
-  targetOnFoot: 0.3,
+  targetOnFoot: figure("detection.FACTORS.targetOnFoot"),
   /** Buttoned up and bouncing. */
-  observerMoving: 0.5,
-  observerSuppressed: 0.5,
-  observerPinned: 0.2,
+  observerMoving: figure("detection.FACTORS.observerMoving"),
+  observerSuppressed: figure("detection.FACTORS.observerSuppressed"),
+  observerPinned: figure("detection.FACTORS.observerPinned"),
   /** Searching the bearing it was fired on from (D3): spotting doubled there. */
-  observerSearching: 2,
+  observerSearching: figure("detection.FACTORS.observerSearching"),
   /** Still and watching, not firing: observing, or waiting for a trigger. */
-  observerWatching: 1.5,
+  observerWatching: figure("detection.FACTORS.observerWatching"),
   /** Told where to look: a friend's report puts it in that direction (comms.ts). */
-  observerCued: 3,
+  observerCued: figure("detection.FACTORS.observerCued"),
 } as const;
 
 export type DetectionConditions = Partial<Record<keyof typeof FACTORS, boolean>>;

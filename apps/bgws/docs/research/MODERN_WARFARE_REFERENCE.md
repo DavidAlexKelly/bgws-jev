@@ -2,7 +2,7 @@
 
 Modern multi-domain warfare comes down to a contest over three quantities a simulation can represent directly. The first is **latency**: how long it takes to get from detection to effect. The second is **signature**: what each emission, movement or concentration reveals to the enemy. The third is **depth**: how many interceptors, shells, drones and litres of fuel are left. Ukraine's networked command-and-control (C2) has cut detect-to-strike from as much as **72 hours early in the war to about 2–5 minutes** ([AOL/Business Insider](https://www.aol.com/articles/ukraines-digital-war-tool-cut-151256172.html); [NV](https://english.nv.ua/nation/ukraine-cuts-drone-strike-loop-to-3-5-minutes-50635975.html)). Drones now account for roughly **60–70% of destroyed or damaged Russian systems** ([Kyiv Post](https://www.kyivpost.com/amp/post/49712)) and create a "kill zone" **5–20+ km deep**, where trucks, tanks and massed infantry barely survive ([Militarnyi](https://militarnyi.com/en/news/some-ukrainian-brigades-already-transferred-frontline-logistics-to-drones/); [Ukrainian News](https://ukranews.com/en/news/1114433-kill-zone-increased-to-20-km-syrskyi)). In the air and at sea, stockpiles rather than probability of kill set how long a defence lasts. Israel and the US intercepted about **85%** of Iranian ballistic missiles in June 2025, at the cost of roughly 14–25%+ of US THAAD stock in 12 days ([JINSA](https://jinsa.org/israel-facing-prospect-of-war-with-a-depleted-missile-defense/); [CRS](https://www.everycrsreport.com/changes/2025-09-15_IF12645_4201c155920eb33f7302b562da285181d968e238__2026-03-18_IF12645_242a4a165483684cee85749d692b6c3dd46d1188.html)). Electronic warfare (EW), space and cyber matter less as separate battlefields than as modifiers on every other domain's pipeline. GPS jamming, for example, cut Excalibur hit rates from over 50% to under 10% within months ([Stars and Stripes](https://www.stripes.com/theaters/europe/2024-05-24/russian-jamming-high-tech-weapons-ukraine-13964032.html)). Professional simulations (JTLS-GO, OneSAF, AFSIM, VBS4, SWORD, CMO) handle this by keeping three things apart: physical platforms built from components; composable behaviour trees that users can author; and inherited doctrine parameters such as weapon release authority and emissions control (EMCON). That structure fits a game in which a decision model picks among bounded options at the decision points of editable per-unit templates. Throughout the report, figures with an inline source are sourced. Figures tagged **[default]** are doctrinal or physics background that the research notes could not verify this session. They are reasonable starting values, not citable fact.
 
-## Planning runs on a shrinking clock, and command runs on an initiative dial
+## R1. Planning runs on a shrinking clock, and command runs on an initiative dial
 
 Western planning is a pipeline across echelons. Battalion and above uses the Military Decision-Making Process (MDMP). Company and below uses troop leading procedures (TLP). Joint and NATO operational staffs use JOPP and COPD. Army doctrine in FM 5-0 defines MDMP in seven steps: receipt of mission, mission analysis, course-of-action (COA) development, COA analysis (wargaming), COA comparison, COA approval, and orders production ([FM 5-0](https://elon.edu/assets/docs/rotc/FM%205-0%20Army%20Planning%20and%20Orders%20Production%20.pdf)). The key mechanic for a simulation is the **1/3–2/3 rule**. A headquarters spends no more than a third of the available time on its own planning and leaves at least two-thirds to its subordinates ([LegalClarity summary](https://legalclarity.org/1-3-2-3-rule-in-the-army-purpose-doctrine-and-best-practices/); [FM 3-19.4](https://www.theblackvault.com/documents/mpmanual/ch2.pdf)). Real units routinely break the rule. A CALL review found most units mismanaged time even though they knew the rule ([CALL 97-3](https://www.globalsecurity.org/military/library/report/call/call_97-3anly_ta4.htm)). The time left for the lowest echelon therefore shrinks geometrically: a brigade that gets 24 hours leaves about 16 for battalion, about 11 for company and about 7 for platoon. A designer can give each headquarters a planning clock and make order quality (how many branches it has, how well it is synchronised, how much rehearsal bonus it carries) a function of time spent. A warning order (WARNO) is an early partial broadcast that lets subordinates start their own clocks in parallel.
 
@@ -29,7 +29,7 @@ Orders and control measures are the game's rules layer. FM 5-0 carries the opera
 
 Decision points tie a named area of interest (NAI) observation to a latest time that information is of value. That maps directly onto a trigger in a decision-flow template. A fire mission that crosses a restrictive measure should incur a clearance round-trip on the fires net. That makes deconfliction a real-time latency cost rather than a hard block.
 
-## Communications are links with range, latency, bandwidth and a signature
+## R2. Communications are links with range, latency, bandwidth and a signature
 
 Radio physics is simple enough to model per link. US Marine Corps training material gives SINCGARS VHF combat net radio four power bands:
 
@@ -71,7 +71,7 @@ The research notes propose a COP mechanic built on track age and quality. Link 1
 
 US experiments achieved fast sensor-to-shooter pairing, but officials themselves warned that "the network will never be omniscient and omnipresent" in contested, low-bandwidth conditions ([C4ISRNET](https://www.c4isrnet.com/battlefield-tech/it-networks/2021/11/10/at-second-project-convergence-us-army-experiments-with-joint-operations-in-the-arizona-desert/)).
 
-## Kill chains collapsed from days to minutes, and networks and authority set the speed
+## R3. Kill chains collapsed from days to minutes, and networks and authority set the speed
 
 Doctrine defines targeting at two tempos. Deliberate targeting runs through the joint targeting cycle and the air tasking cycle. The USAF describes six iterative tasking stages: objectives and guidance; target development; weaponeering and allocation; ATO production; execution; assessment ([USAF Annex 3-0](https://www.doctrine.af.mil/Portals/61/documents/Annex_3-0/3-0-D29-I-OPS-The-Tasking-Cycle.pdf)). Three ATOs are normally in planning, production and execution at once, which gives roughly a **48–72 h** latency for a deliberate strike **[default; 72 h not confirmed by a retrieved source]**. Dynamic targeting covers targets not planned in advance, usually within the current 24-hour execution period. It runs the same six steps (find, fix, track, target, engage, assess: F2T2EA) "in a much more compressed timeline" ([USAF Annex 3-0](https://www.doctrine.af.mil/Portals/61/documents/Annex_3-0/3-0-D29-I-OPS-The-Tasking-Cycle.pdf); [USAF Annex 3-60](https://www.doctrine.af.mil/Portals/61/documents/Annex_3-60/3-60-D01-Target-Intro.pdf)). Special operations forces add exploitation and analysis feedback (F3EA) ([Australian Army Journal](https://researchcentre.army.gov.au/library/australian-army-journal-aaj/volume-10-number-1-autumn/f3ea-targeting-paradigm-contemporary-warfare)). The Army's D3A cycle (decide, detect, deliver, assess) produces three products **[default]**:
 
@@ -99,11 +99,11 @@ A clean mechanic is to model each kill chain as a pipeline of stages, each with 
 
 EW turns kill chains into contests that adapt over time. Excalibur rounds hit more than half the time in early 2023 and fell below 10% within months under GPS jamming, after which Ukraine stopped using them. The Washington Post noted the underlying data was thin, and Kyiv Post points to procedural errors as a co-cause ([Stars and Stripes](https://www.stripes.com/theaters/europe/2024-05-24/russian-jamming-high-tech-weapons-ukraine-13964032.html); [Kyiv Post](https://www.kyivpost.com/amp/post/33448)). JDAM-ER effectiveness fell within weeks of its February 2023 debut, with misses of about 65 ft to 0.75 mile, until a fix arrived ([Business Insider NL](https://businessinsider.nl/the-us-gave-ukraine-glide-bombs-but-they-keep-missing-because-russia-is-so-good-at-jamming-them/)). The US then supplied anti-jam sensors, completing a counter-countermeasure cycle ([Kyiv Post](https://www.kyivpost.com/amp/post/32163)). Every EW effect in the game should therefore decay as the enemy adapts and be refreshed through technology or procedure. The decay periods are weeks to months.
 
-## Land combat now happens inside a drone-observed kill zone
+## R4. Land combat now happens inside a drone-observed kill zone
 
 The defining fact of land warfare in 2024–26 is battlefield transparency. RUSI describes pervasive sensors, mainly UAVs, that make surprise very hard ([RUSI Emergent Approaches](https://www.rusi.org/explore-our-research/publications/insights-papers/emergent-approaches-combined-arms-manoeuvre-ukraine)). The depth of the kill zone is reported variously at about 15 km (FT), 20 km (Syrskyi), and 5 km typically but more than 20 km in hot sectors ([DroneXL/FT](https://dronexl.co/2026/02/23/kill-zone-ukraine-frontline-drone/); [Ukrainian News](https://ukranews.com/en/news/1114433-kill-zone-increased-to-20-km-syrskyi); [Militarnyi](https://militarnyi.com/en/news/some-ukrainian-brigades-already-transferred-frontline-logistics-to-drones/)). Fibre-optic FPVs push the threat deeper. Most fly 20 km or less, the longest reported by NATO was 41 km, and a manufacturer claims 50 km strikes ([JED Online](https://www.jedonline.com/2025/05/15/nato-seeks-solutions-for-fiber-optic-fpv-drones/?print=pdf); [Militarnyi](https://militarnyi.com/en/news/ptashka-drones-achieves-50-km-range-with-successful-fiber-optic-drone-use/)). In the forward ~15 km, road movement is largely confined to rain, snow and high wind, and thousands of kilometres of road sit under anti-drone netting ([DroneXL/FT](https://dronexl.co/2026/02/23/kill-zone-ukraine-frontline-drone/)). The model should be a depth band from the line of contact. Dense ISR and FPV coverage spans 0–10 km, fibre-optic and mid-range strike thins out to 20–40 km, and Lancet-class munitions reach 40–100 km. Each minute of movement carries a risk scaled by enemy drone density, weather, thermal conditions and own counter-UAS.
 
-### Infantry fights by concealment first
+### R4.1. Infantry fights by concealment first
 
 US doctrine (ATP 3-21.8, January 2024) still codifies battle drills: react to direct-fire contact (Battle Drill 1), break contact (Battle Drill 3), react to ambush, react to indirect fire ([InfantryDrills.com](https://infantrydrills.com/manuals/fm-atp-3-21-8-infantry-rifle-platoon-squad-2024/appendix-e-battle-drills/)). Breaking contact means a base of fire suppresses while a bounding element moves under smoke, and the leader then changes direction to throw off enemy indirect fire ([CourseHero BD3](https://www.coursehero.com/file/164140807/BD-3-Break-Contactpptx/)). These drills make good decision-flow skeletons. But the dominant behaviour on the Ukrainian front is **infiltration by groups of about five or fewer**, who slip through the kill zone unseen and then merge into larger strike groups. Ukrainian officials say that "with rare exceptions" no one attempts mass assaults any more ([Ukrainska Pravda/ISW](https://www.pravda.com.ua/eng/news/2024/05/15/7455843); [UNN](https://unn.ua/en/news/russia-changed-its-assault-tactics-due-to-ukrainian-drones-mass-attacks-are-almost-absent-tregubov)). Soldiers walk about 20 km on foot to reach positions ([Ukraine Today](https://ukrainetoday.org/%F0%9F%92%A5watch-surviving-the-kill-zone-20-km-on-foot-under-russian-drones-ukraine-video/)). Assaults are timed for thermal crossover and bad weather, which degrade drones. Pre-registered artillery on known positions is unaffected by either ([RUSI](https://static.rusi.org/emergent-approaches-combined-arms-manoeuvre-ukraine-oct-25.pdf)).
 
@@ -117,13 +117,13 @@ RUSI's sample of high-performing Ukrainian units shows a repeatable assault sequ
 
 ([RUSI Insights](https://www.rusi.org/explore-our-research/publications/insights-papers/emergent-approaches-combined-arms-manoeuvre-ukraine)). Concentrations above about squad size inside the observed zone should sharply raise detection and strike probability. A "weather/thermal window" node should gate assault launch for both sides. Further defaults **[default]**: dismounted movement of about 4 km/h on road, 2–3 km/h cross-country, 1–2 km/h at night or in close terrain, under 1 km/h under fire or in rubble, and 20–30 km/day sustained. ATGM and MANPADS ranges are Javelin 2.5–4 km, Kornet 5.5–8 km, NLAW about 800 m, RPG-7 200–300 m, and Stinger/Igla/Verba 4–6 km.
 
-### Armour has retreated to indirect fire and escorted raids
+### R4.2. Armour has retreated to indirect fire and escorted raids
 
 Ukrainian Leopards have been used as makeshift artillery from semi-static positions at about 5–8 km ([Kyiv Post](https://www.kyivpost.com/post/55415)). Loss reports for Ukraine's 31 M1A1 Abrams conflict: 19 destroyed or disabled mainly by kamikaze UAVs according to one source, at least 22 according to Oryx ([Defense Mirror](https://defensemirror.com/news/38981); [National Security Journal](https://nationalsecurityjournal.org/m1-abrams-leopard-and-challenger-2-tanks-smashed-to-bits-in-ukraine-war/)). Trophy active protection has defeated Kornet and RPG-29 in combat. Its roughly **55° elevation limit**, however, leaves steep-diving FPVs uncovered, and Ukraine's M1A1s carried no Trophy ([Army Recognition](https://www.armyrecognition.com/focus-analysis-conflicts/army/analysis-defense-and-security-industry/focus-adapting-protection-systems-against-drones-trophy-aps-put-to-test)). By October 2026, tanks were "back, but only because drones are escorting them" ([Euromaidan Press](https://euromaidanpress.com/2026/10/14/ukraines-tanks-are-back-but-only-because-drones-are-escorting-them)). From late 2024, Russia mostly used armoured vehicles as transport for small infantry groups ([Ukranews/ISW](https://ukranews.com/en/amp/news/1076137-russian-army-changes-its-offensive-tactics-isw-reveals-details)). In Nagorno-Karabakh in 2020, Armenia lost at least ~250 tanks, a figure based on visual confirmation ([Oryx](https://www.oryxspioenkop.com/2021/04/)).
 
 The tank template should take a "drone threat level" input. When the threat is high, the tank stays hull-down, fires indirect or pop-up and withdraws. When the threat is low (bad weather, an EW umbrella or escort drones), it gives direct-fire support. Ballistic defaults **[default]**: main-gun effective range 2–3 km (4–5 km with gun-launched ATGM); first-round hit probability above 70% against a stationary target at 2 km; 6–10 aimed rounds/min; 22 ready rounds in a T-72/T-90 carousel and 17–18 ready rounds in an Abrams. IFV 25–30 mm cannon is effective to about 2 km.
 
-### Artillery is sensor-limited, and the counter-battery fight is a drone fight
+### R4.3. Artillery is sensor-limited, and the counter-battery fight is a drone fight
 
 Ammunition use is enormous and asymmetric. Syrskyi put Russian fire at more than 44,000 rounds/day in August 2024, against Ukraine's ~14,600. Ukrainian sources reported about 27,000/day through 2025, with a ratio of about 1.8:1 in Russia's favour by July 2025 ([LIGA.net](https://news.liga.net/en/politics/news/russians-use-27-000-artillery-shells-every-day-a-year-ago-it-was-one-and-a-half-times-more)). Forbes gives a lower 10,000–15,000/day ([NV](https://english.nv.ua/amp/ukraine-targets-russian-ammo-convoys-50601727.html)). NATO estimated Russian production at about 250,000 rounds/month in March 2024 ([European Pravda](https://www.eurointegration.com.ua/eng/news/2024/03/11/7181464/)). Persistent Lancet hunting in 2023 meant Ukrainian guns could not be brought forward ([RUSI](https://static.rusi.org/lessons-learned-ukraine-offensive-2022-23.pdf)). Counter-battery radars are prime targets. Russia claims Zoopark-1M detects up to 40 km and locates guns at about 15 km. Ukraine has killed such radars with GMLRS, likely two rockets per kill, after a Shark drone found them ([Armada International](https://www.armadainternational.com/2022/12/the-art-of-countering-artillery-fires-in-ukraine/); [Militarnyi](https://militarnyi.com/en/articles/ukrainian-forces-target-russian-counter-battery-radars-what-was-hit-and-why-it-matters/)). HIMARS reaches about 80 km with GMLRS, and one pod holds 6 GMLRS or 1 ATACMS ([EurAsian Times](https://www.eurasiantimes.com/russia-shrinks-himars-attacks-radars-that-guide-us-systems/)). In 2020, TB2s destroyed 152 Armenian artillery pieces and 71 MRLs, mostly in open revetments ([Oryx](https://www.oryxspioenkop.com/2021/04/)).
 
@@ -135,13 +135,13 @@ A gun unit's lethality should depend on having an observer, either a drone or a 
 
 Weapon ranges are also **[default]**: 155 mm 24–30 km (40 km+ with rocket-assisted or base-bleed rounds, about 70 km guided), 120 mm mortar 7–8 km, 82 mm about 4 km.
 
-### Air defence is a weapon-target assignment problem under cost pressure
+### R4.4. Air defence is a weapon-target assignment problem under cost pressure
 
 Ground air defence economics now drive behaviour. A PAC-3 MSE costs about $4.2M in the FY2025 budget, and some press figures exceed $13.5M. A Shahed-type drone costs $20–50k ([Migflug](https://migflug.com/jetflights/air-defence-interceptor-cost-asymmetry-magazine-depth/); [Sentinel](https://sentinelgeopolitics.substack.com/p/a-game-of-drones-the-economics-of)). Ukrainian interceptor drones cost $1,400–3,500. The Sting costs about $2,100, at a claimed ~10,000/month ([Wikipedia: Sting](https://en.wikipedia.org/wiki/Sting_(drone)); [Quwa](https://quwa.org/middle-east-military-news/pentagon-and-gulf-states-turn-to-ukraines-2500-drone-interceptors-as-patriot-stocks-get-strained/)). Gulf states reportedly fired more than 800 PAC-3 MSE in three days of a 2026 conflict, against a record production of about 600 in 2025 ([Quwa](https://quwa.org/middle-east-military-news/pentagon-and-gulf-states-turn-to-ukraines-2500-drone-interceptors-as-patriot-stocks-get-strained/)). In 2020, Armenia's obsolete SAMs could not cope with UAVs: at least 18 Osa systems were lost ([Oryx](https://www.oryxspioenkop.com/search/label/Armenia?hl=tr_TR)).
 
 The air-defence template is: classify the threat by cost and value; assign the cheapest adequate effector (gun, interceptor drone or EW, then SHORAD, then MRAD, then long-range SAM); radiate only when cued; displace after engaging. Battery defaults **[default]**: Patriot fields 4–8 launchers with 12–16 PAC-3 MSE each and typically fires 2 per ballistic target; an S-400 battalion fields about 8 TELs × 4; Gepard is effective to 3.5–4 km.
 
-### Engineers and obstacles decide whether manoeuvre is possible at all
+### R4.5. Engineers and obstacles decide whether manoeuvre is possible at all
 
 The 2023 Ukrainian counteroffensive is the best-documented recent breach failure. Russian minefields deepened from a doctrinal 120 m to a goal of about **500 m**, and line charges cleared only **6 m lanes** ([The National on RUSI Stormbreak](https://www.thenationalnews.com/world/uk-news/2023/09/04/western-reforms-critical-for-ukraine-battlefield-success/)). Breaching the mine obstacle alone took about **1.5 h**, and longer with ditches and dragon's teeth, under drone observation ([Euro-SD](https://euro-sd.com/2026/01/articles/armament/48487/solving-the-counter-mobility-problem-of-minefields/)). Deliberate attacks made **700–1,200 m every five days**, which let Russian forces reset ([RUSI Stormbreak](https://static.rusi.org/Stormbreak-Special-Report-web-final_0.pdf)). At Novodarivka, two UR-77 charges opened two 6 m lanes, MRAPs bogged in soft ground, and the column was struck when Russian tanks unmasked ([RUSI Stormbreak](https://static.rusi.org/Stormbreak-Special-Report-web-final_0.pdf)). The US Army traces the campaign's shortfalls to the failed combined-arms breach ([Army.mil](https://www.army.mil/article/286857/blocked_and_bloodied_lessons_from_the_combined_arms_breach_during_the_2023_ukranian_counter_offensive)). Lacking enough mines, Russia used IEDs, wider spacing and stacked AT mines ([ISW](https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-september-4-2023)).
 
@@ -153,7 +153,7 @@ The obstacle rule for a simulation:
 
 Breach defaults **[default]**: SOSRA sequence (suppress, obscure, secure, reduce, assault); MICLIC clears about a 100 × 8 m lane; about 2 lanes per assaulting company; AVLB spans 18–20 m; a ribbon bridge assembles in under 1 h and is a high-value drone target.
 
-### Attrition and morale break well below most game thresholds
+### R4.6. Attrition and morale break well below most game thresholds
 
 Historical data argue against Lanchester-driven annihilation. Dupuy's battalion data show attackers near **20% casualties almost always halted**, and about 40% of those broke. Many models still use 30–40% breakpoints ([Dupuy Institute](https://dupuyinstitute.org/2018/04/16/c-wam-4-breakpoints/)). WWII divisions in Western Europe averaged **1–3% losses/day**: winners 1–2%, losers 2–3%, US divisions 1.2% and German divisions 1.8% ([Dupuy](http://www.dupuyinstitute.org/blog/2016/06/17/trevor-n-dupuys-combat-attrition-verities/)). Only 2 of 91 US WWII divisions ever lost more than 30% in a week ([Dupuy](https://dupuyinstitute.org/2017/06/23/battle-outcomes-casualty-rates-as-a-measure-of-defeat/)). Soviet defenders at Kursk exceeded 3%/day in 67 cases and 6%/day in 39 ([Dupuy](https://dupuyinstitute.org/2018/04/16/c-wam-4-breakpoints/)). Clark calls fixed-percentage breakpoints a "gross oversimplification" ([Dupuy](https://dupuyinstitute.org/2017/06/23/battle-outcomes-casualty-rates-as-a-measure-of-defeat/)).
 
@@ -161,9 +161,9 @@ The causes of casualties have also shifted. Artillery caused more than 70% of Uk
 
 The design implication is stochastic, morale-gated breakpoints. The probability of halting rises steeply from 10–20% losses, entrenched defenders hold higher, and attrition is driven by detection × strike availability rather than force-ratio exchange. Suppression is **[default]**: it cuts return fire by 50–90% while it lasts. Fatigue degrades effectiveness after 24–48 h of continuous operations, also **[default]**.
 
-## Drones, electronic warfare, space and cyber act as modifiers on every other domain
+## R5. Drones, electronic warfare, space and cyber act as modifiers on every other domain
 
-### Drones win by volume, not single-shot quality
+### R5.1. Drones win by volume, not single-shot quality
 
 Ukrainian FPV output grew from a few thousand in 2022 to about **3 million in 2025** ([Ukraine War Analytics](https://ukraine-war-analytics.com/analysis/drone-war-evolution-2026.html)). The run-rate was about 200,000/month at the end of 2024 ([War Quants](https://www.warquants.com/p/factory-to-frontline-pipeline)). OSW estimates that **60–80% of FPV strikes fail to destroy their target** ([OSW](https://www.osw.waw.pl/en/publikacje/osw-commentary/2025-10-14/game-drones-production-and-use-ukrainian-battlefield-unmanned)). Typical hit rates are 30–50%, falling to about 10% for novice pilots ([Ukraine's Arms Monitor](https://ukrainesarmsmonitor.substack.com/p/drone-warfare-in-ukraine-key-trends)). An FPV sortie therefore chains probabilities: launch, link survives EW, target acquired, hit (0.3–0.5 skilled, 0.1 novice), kill given hit. The cumulative result is about 0.2–0.4 against soft targets, which is consistent with OSW. Fibre-optic links are immune to jamming and give off no radio emissions, so RF detection cannot find them ([robotics.press](https://www.robotics.press/news/fiber-optic-fpv-drones-defeat-electronic-warfare/)). EW-umbrella modifiers must not apply to them, but they are range-capped and their cables can snag. The defaults below are **[default]**:
 
@@ -177,13 +177,13 @@ Ukrainian FPV output grew from a few thousand in 2022 to about **3 million in 20
 
 ([Wikipedia UAV](https://en.wikipedia.org/wiki/Unmanned_aerial_vehicle)). Loitering munitions **[default]**: Lancet-3 about 40 km with a 3–5 kg warhead; Switchblade 300 about 10 km and 15 min; Switchblade 600 about 40 km and 40 min.
 
-### Long-range one-way attack and interceptors
+### R5.2. Long-range one-way attack and interceptors
 
 Russian long-range drone launches (strike drones plus decoys) rose from about 2,600 in January 2025 to a peak of 6,297 in July 2025, then held at about 5,300–5,600/month ([CEPA](https://cepa.org/article/how-russian-drone-developers-outpace-the-west/)). About **60% were strike Shaheds and 40% Gerbera-type decoys** ([ISIS](https://isis-online.org/uploads/isis-reports/documents/December-2025-Updated-Analysis-of-Russian-Shahed-type-UAVs-Deployment-Against-Ukraine_Final.pdf)). Interception ran just over **85%**, which still let more than 1,000 of about 6,500 through in one month ([Kyiv Independent](https://kyivindependent.com/the-shahed-is-an-evolving-threat-that-will-keep-haunting-ukraine-and-the-rest-of-us/)). Ukraine built about 100,000 interceptor drones in 2025. They accounted for about **70% of Shaheds destroyed in January 2026**, a record 1,704 that month. Jet Gerans flying at 500–600 km/h outrun most interceptors and made up about 10–15% of launches by mid-2026 ([Kyiv Independent](https://kyivindependent.com/the-shahed-is-an-evolving-threat-that-will-keep-haunting-ukraine-and-the-rest-of-us/)).
 
 Ground robots now carry much of the last mile. Ukrainian UGV missions rose from 7,511 in January 2026 to **25,143 in August 2026**, and more than 22,000 UGVs were contracted for the year ([Ukrainian MoD](https://mod.gov.ua/en/news/robots-at-work-defence-forces-of-ukraine-more-than-triple-their-use-of-ug-vs); [Defense Post](https://thedefensepost.com/2026/08/25/ukraine-ground-robots-missions/)). The defender's decision model must classify tracks under uncertainty. The attacker's model should mix decoys in to drain interceptor stocks.
 
-### Electronic warfare: area effects with power, band and a signature cost
+### R5.3. Electronic warfare: area effects with power, band and a signature cost
 
 Russian EW "fell and rose" ([Hudson](https://www.hudson.org/national-security-defense/the-fall-and-rise-of-russian-electronic-warfare)). On static fronts it now cues artillery from direction-finding. It is organised in layers:
 
@@ -196,27 +196,27 @@ CSIS rates GNSS jamming and spoofing as the dominant global counterspace trend (
 
 In the game, every emitter accumulates detection risk: radios, drone ground stations, Starlink dishes, radars and jammers themselves. Pole-21 stations get destroyed for exactly this reason. That creates the core EMCON trade-off between staying silent and losing C2, or emitting and being found. Kursk in August 2024 shows the positive case. Ukraine leapfrogged counter-drone jammers forward behind advancing units, and a NATO official praised "impressive coordination between its EW and kinetic units" ([Al Jazeera](https://www.aljazeera.com/news/2024/8/15/ukraine-leverages-limited-resources-for-incursion-into-russias-kursk); [Armada](https://www.armadainternational.com/2024/10/ukraine-electronic-warfare-kursk-incursion)). The notes found no sourced figure for direction-finding-to-strike time. Treat "minutes to tens of minutes on a static front" as an explicit assumption.
 
-### Space: scheduled windows and political switches
+### R5.4. Space: scheduled windows and political switches
 
 Space contributes commercial imagery, PNT and SATCOM. ICEYE SAR, which sees through cloud and at night, kept Ukraine partly sighted during the March 2025 Maxar cutoff ([British Poles](https://www.britishpoles.uk/?p=41558)). In 2024–25 no kinetic ASAT use was known, and counterspace activity was GNSS interference plus satellite manoeuvring ([CSIS](https://www.csis.org/analysis/space-threat-assessment-2025)). Satellites should be modelled as scheduled windows. LEO sits at 400–1,000 km with a 90–105 min period and passes lasting minutes. A single satellite revisits every 1 to several days, and constellations cut that to hours. GPS orbits at about 20,200 km with a 12 h period, and GEO sits at 35,786 km ([Wikipedia LEO](https://en.wikipedia.org/wiki/Low_Earth_orbit)). EO imagery is gated by daylight and cloud; SAR is not. Commercial tasking-to-delivery takes hours, so space operates at operational tempo while drones supply tactical tempo. Supplier cutoffs (Maxar 2025, Starlink 2026) should be exogenous events that remove a capability for days to weeks.
 
-### Cyber: months of access for a one-shot effect
+### R5.5. Cyber: months of access for a one-shot effect
 
 The two consequential wartime cyber operations followed the same shape. The AcidRain wiper disabled tens of thousands of KA-SAT modems at H-hour on 24 February 2022, with the aim of disrupting Ukrainian military C2 ([EuRepoC](https://eurepoc.eu/publication/major-cyber-incident-ka-sat-9a/); [The Hacker News](https://thehackernews.com/2022/05/eu-blames-russia-for-cyberattack-on-ka.html?m=1)). Researchers judged its effect on the conventional campaign limited ([EuRepoC PDF](https://eurepoc.eu/wp-content/uploads/2023/12/Viasat-PL-Final.pdf)). At Kyivstar, Sandworm was inside from at least May 2023 and had full access by November. On 12 December 2023 it cut service to about 24 million users and disrupted air-raid alerts in some regions; service recovered around 14 December ([CyberScoop](https://cyberscoop.com/russia-ukraine-kyivstar-vitiuk/); [CFR](https://www.cfr.org/cyber-operations/targeting-of-ukrainian-telecommunications-operator-kyivstar)). The game representation is an access state per target system, built over **weeks to months** (Kyivstar took 6–8 months) with a daily detection risk. The effect is triggered at a chosen time, often H-hour, and lasts hours to weeks (2–3 days for Kyivstar, weeks of modem replacement for Viasat). Access usually burns on use. Targets are C2 bearers, warning systems, logistics IT and civilian infrastructure, and the main consequences are second-order: units lose SATCOM, populations lose air-raid warning.
 
-## Naval and air warfare turn on scouting first and magazine depth
+## R6. Naval and air warfare turn on scouting first and magazine depth
 
-### Salvo exchanges reward scouting and firing first
+### R6.1. Salvo exchanges reward scouting and firing first
 
 Hughes' salvo model treats naval combat as pulses. Offensive missiles accurately fired, minus defensive interceptions, are applied against staying power (hits needed to put a ship out of action). Hughes' principle is to "fire effectively first", which makes scouting as important as shooting ([CIMSEC](https://cimsec.org/distributed-maritime-operations-a-salvo-equation-analysis/); [USNI Proceedings](https://www.usni.org/magazines/proceedings/1991-07/punching-combats-equations)). The implementable form is ΔB = max(0, (α·A − b₃·B)/b₁), with modifiers for scouting, readiness and alertness **[default; standard Hughes form]**. Results are "very parameter dependent" ([NPS](https://calhoun.nps.edu/server/api/core/bitstreams/669bb166-b171-4ebe-b9b1-d8e2e5dd9bcd/content)). Distributed maritime operations raise the number of targets an enemy must find and service ([CIMSEC](https://cimsec.org/distributed-maritime-operations-a-salvo-equation-analysis/)). The effective α should decay with the age of the off-board track that supplies over-the-horizon targeting.
 
-### The Red Sea set the empirical baseline for magazine depth
+### R6.2. The Red Sea set the empirical baseline for magazine depth
 
 Between October 2023 and January 2025, US ships fired about **220 missiles** (about 120 SM-2, 80 SM-6) and **160 5-inch rounds** across about **380 engagements** ([Military.com](https://www.military.com/daily-news/2025/01/15/navys-fight-red-sea-used-220-missiles-officials-say-thats-changing.html)). That is about 0.58 missiles per engagement, so guns, fighters and EW carried much of the load. SM-2 costs about $2M and SM-6 about $4M, against drones costing "thousands of dollars". The Navy shifted toward fighter intercepts and EW, and Acting CNO Kilby called heavy SM-3/SM-6 use "unsustainable" ([Business Insider/Yahoo](https://www.yahoo.com/news/articles/us-navy-faced-learning-curve-183649267.html)). CSIS cautions that the cost-exchange framing ignores the value of what is defended ([CSIS](https://www.csis.org/analysis/cost-and-value-air-and-missile-defense-intercepts)). Ships must leave station to reload VLS cells ([RUSI](https://rusi.org/explore-our-research/publications/commentary/securing-red-sea-how-can-houthi-maritime-strikes-be-countered)).
 
 Physics defaults: radar horizon is d(km) ≈ 4.12(√h₁ + √h₂). A 20 m ship radar sees a 5 m sea-skimmer at about 27 km, which leaves 30–60 s of inner-layer reaction time, while an E-2D at about 8,000 m sees about 370 km. Layered defence defaults **[default]**: SM-6/SM-2ER 100–240 km, ESSM about 50 km, RAM about 9 km, Phalanx 1.5–2 km; a Burke-class destroyer has 90–96 VLS cells; shoot-shoot-look-shoot doubles interceptor use. Ships should withdraw to rearm below about 30% of VLS.
 
-### The littoral belongs to cheap uncrewed systems
+### R6.3. The littoral belongs to cheap uncrewed systems
 
 Ukraine, with no real navy, sank Moskva with Neptune missiles and sank Ivanovets and Sergey Kotov with sea drones ([Jamestown](https://jamestown.org/program/ukraine-launches-unprecedented-drone-attack-on-russian-black-sea-fleets-sevastopol-headquarters/); [Al Jazeera](https://www.aljazeera.com/news/2024/3/5/ukraine-claims-another-critical-strike-on-russias-black-sea-fleet)). The UK assessed in February 2024 that about 25% of Black Sea Fleet vessels were sunk, damaged or destroyed ([LBC summary](https://www.lbc.co.uk/article/5b2e76f373e64de797e43e3eeeffb4e9-5HjcdBg_2/)). Major units withdrew to Novorossiysk ([bne IntelliNews](https://www.intellinews.com/the-battle-of-the-black-sea-ukraine-s-drone-warfare-shifts-balance-of-power-as-russia-retreats-from-sevastopol-295756)). Uncrewed surface vessels (USVs) now shoot back at aircraft. Magura V5s with R-73s claimed an Mi-8 on 31 December 2024, and a Magura claimed a Su-30 on 2 May 2025 ([Liga.net](https://news.liga.net/en/amp/politics/video/defense-forces-destroy-russian-combat-aircraft-for-the-first-time-with-magura-naval-drone-strike-video)). Houthi attacks halved Suez transits, from more than 26,000 in 2023 to 13,213 in 2024 ([Arab News](https://www.arabnews.com/node/2597377/amp)). Operation Rough Rider struck more than 1,000 targets, spent about $1B of munitions in 30 days, and lost at least 7 MQ-9s and 2 F/A-18s. One of the F/A-18s went overboard during evasive manoeuvring, a reminder that evasion has its own risk ([Air & Space Forces](https://www.airandspaceforces.com/1000-targets-trump-campaign-houthi-centcom/); [Atalayar](https://www.atalayar.com/en/articulo/politics/the-united-states-ends-attacks-on-the-houthis-after-costly-two-month-military-operation/20250518130000214835.html)).
 
@@ -224,13 +224,13 @@ Littoral templates need three things: a USV-swarm saturation threat against the 
 
 ASW data were thin in the notes. The P-8 combines sonobuoys, ESM, ISAR and torpedoes, with air-to-air refuelling for endurance ([Boeing](https://www.boeing.com/defense/p-8-poseidon)). The kill chain is cue, area search, localise, track, attack, re-attack, with each step's probability tied to sea state, layer depth and target speed. Defaults **[default]**: about 120 sonobuoys and 5+4 Mk 54 torpedoes per P-8; convergence zones every 50–60 km; hull-sonar passive detection under 10 km against quiet boats; Mk 48 at 38–50 km, Mk 54 at about 9 km.
 
-### Air combat is decided by range belief, sensors and data links
+### R6.4. Air combat is decided by range belief, sensors and data links
 
 The May 2025 India–Pakistan clash turned on an "intelligence failure" about PL-15E range. Indian pilots believed they were safe at about 150 km, but the J-10C reportedly fired from about 200 km. IISS puts PL-15E range at 190 km, against the Meteor's quoted 150 km. Pakistan's kill chain paired Erieye AEW with a data link ([The Aviationist/Reuters](https://theaviationist.com/2025/08/03/indian-rafale-downed-reuters/); [The Wire/IISS](https://m.thewire.in/article/government/long-range-export-version-of-chinese-missile-led-to-loss-of-indian-aircraft-against-pakistan-iiss)). A pilot model therefore needs belief uncertainty about enemy weapon envelopes, not just true values. Physics default: radar detection range scales with RCS^¼, so cutting RCS from 5 m² to 0.001 m² shrinks detection range to about 12%. Launch range should be a fraction of maximum range that depends on target aspect and altitude **[default]**. Pk per AIM-120-class missile is about 0.4–0.6 in favourable conditions and much lower against a manoeuvring or jamming target **[default]**.
 
 In Ukraine, ground-based air defence produced mutual air denial. The VKS failed to achieve SEAD despite opening strikes on more than 100 fixed radars, bases and SAM positions ([RUSI review](https://thelookoutn.substack.com/p/new-rusi-report-the-russian-air-war)). Both air forces moved to stand-off weapons. Russian UMPK glide bombs rose from about 3,500/month in early 2025 ([JAPCC](https://www.japcc.org/articles/countering-russias-glide-bomb-warfare-in-ukraine/)) to 5,328 in October 2025 ([Militarnyi](https://militarnyi.com/en/news/russia-dropped-record-number-of-guided-bombs-in-a-month-since-beginning-of-2025/)), with OSINT counts of 8,000+/month by mid-2026 of uncertain provenance ([Migflug](https://migflug.com/afterburner/fr/?p=21663479)). UMPK range is about 40–70 km+ **[default]**. Russian attack helicopters lost at least 23 of 90 Ka-52s by October 2022 to MANPADS and missing top cover ([Janes](https://www.janes.com/defence-news/defence/latest/ukraine-conflict-russia-loses-more-than-a-quarter-of-hokum-attack-helo-fleet-says-uk-mod)), and 38 by 2023 according to Oryx ([Kyiv Post](https://www.kyivpost.com/amp/post/19552)). They then adapted to stand-off Vikhr and lofted-rocket fire from behind the lines, which hurt the 2023 counteroffensive. The helicopter template follows: pop up, fire at 8–10 km or more, unmask for under 30 s, re-mask, and never hover inside the 5–6 km MANPADS envelope **[default timings]**.
 
-### Sortie generation and the air tasking cycle
+### R6.5. Sortie generation and the air tasking cycle
 
 The RAND study of agile combat employment (ACE) for Pacific Air Forces found that dispersal protects aircraft but costs sortie potential. Smaller detachments have fewer spares and slower backshop repair ([RAND RRA999-3](https://www.rand.org/pubs/research_reports/RRA999-3.html)). An NPS model found airbase attacks cut production by 35–40% with about 60% aircraft survival ([NPS](https://calhoun.nps.edu/entities/publication/b2ac22a7-3fed-4078-b270-b533a5cb491f)). Defaults **[default]**: surge of 2–3 sorties per aircraft per day, sustained 1–1.5; hot-pit turnaround 30–60 min; 6–8 h Pacific missions cap sorties near 1 per day. Aircraft templates need these fuel and weapons states and evasion rules **[default]**:
 
@@ -242,13 +242,13 @@ The RAND study of agile combat employment (ACE) for Pacific Air Forces found tha
 
 Joint, multi-domain opening blows are well documented. On day one of Operation Rising Lion (June 2025), more than 200 Israeli fighters struck about 100 sites with more than 330 munitions. Air defences, leadership and missile launchers were the first wave. Over the campaign, Israel flew about 1,500 sorties and dropped 3,709 bombs on 2,879 targets, achieving air superiority over parts of Iran in under two weeks without manned aircraft losses ([JINSA](https://jinsa.org/rising-lions-air-offensive/)). Drones and Spike NLOS launchers pre-positioned covertly inside Iran hit radars and missile batteries at H-hour ([The War Zone](https://www.twz.com/air/israel-hid-drones-missiles-around-iran-to-target-nuclear-facilities-and-more-report)).
 
-### Missile defence: stockpiles set the duration of defended operations
+### R6.6. Missile defence: stockpiles set the duration of defended operations
 
 In the June 2025 Israel–Iran war, 273 of 322 Iranian ballistic missiles engaged were intercepted, about 85%. THAAD made almost half the intercepts ([JINSA](https://jinsa.org/israel-facing-prospect-of-war-with-a-depleted-missile-defense/)). Estimates of US THAAD expenditure range from 92 to 100–150 or more rounds, alongside about 80 SM-3s, near one-fifth of stock ([CRS](https://www.everycrsreport.com/changes/2025-09-15_IF12645_4201c155920eb33f7302b562da285181d968e238__2026-03-18_IF12645_242a4a165483684cee85749d692b6c3dd46d1188.html)). Israel nearly exhausted Arrow-3 ([Hvylya](https://en.hvylya.net/news/863-one-step-from-disaster-how-israel-nearly-lost-its-arrow-3-missile-shield-in-the-2025-war)). A raid-level 85% is reproduced by 1.5–2 interceptors per threat at a per-shot Pk of 0.6–0.7 **[default]**. Stocks then deplete within 1–2 weeks against 100+ missile salvos. Leakers per raid, not the intercept percentage, drive damage.
 
 CSIS's 24-iteration Taiwan wargame shows the same logic at theatre scale. The coalition usually won but lost "dozens of ships, hundreds of aircraft, and tens of thousands of servicemembers", with about 3,200 US killed in three weeks in the base case ([Present Danger China](https://presentdangerchina.org/release-will-china-lose-if-it-invades-taiwan/); [Taiwan News](https://www.taiwannews.com.tw/en/news/4775256)).
 
-## Logistics sets the hard ceiling: fuel burn, depot depth and the last kill-zone mile
+## R7. Logistics sets the hard ceiling: fuel burn, depot depth and the last kill-zone mile
 
 Consumption figures are large and partly sourced. An Abrams burns about **300 gal every 8 h** ([GlobalSecurity](https://www.globalsecurity.org/military/systems/ground/m1-specs.htm)), about 60 gal/h cross-country and about 10 gal/h idling ([CleanTechnica](https://cleantechnica.com/2022/10/07/next-generation-abrams-tank-stryker-to-be-hybrids/)). Per-mile estimates range from about 1.5 to 5 gal/mile ([National Interest](https://nationalinterest.org/node/207658); [StrategyPage](https://www.strategypage.com/htmw/htarm/articles/20031218.aspx)). An Australian brigade's high-intensity fuel planning jumped from about **40,000 L/day to over 300,000 L/day** after re-equipping with heavy armour, a 7.5× increase ([Defense News](https://www.defensenews.com/global/asia-pacific/2026/06/29/as-one-australian-army-brigade-bulks-up-with-armor-its-fuel-and-ammo-needs-spike/)). A HEMTT fueller carries 2,500 gal ([DTIC](https://apps.dtic.mil/sti/tr/pdf/ADA272826.pdf)). RUSI warned that British stockpiles "might last a week" at Ukrainian consumption rates ([RUSI](https://www.rusi.org/news-and-comment/in-the-news/military-briefing-ukraine-war-exposes-hard-reality-wests-weapons-capacity)). Ukraine lost about 10,000 drones/month in 2023 to jamming, gunfire and crashes ([LB.ua citing RUSI](https://en.lb.ua/news/2025/05/02/35778_artillery_age_drones.html)).
 
@@ -266,7 +266,7 @@ Doctrinal structure is **[default]**:
 - Basic loads cover 1–3 days of combat.
 - Units below about 70% strength need reconstitution.
 
-## Professional simulations separate platform, behaviour and doctrine parameters
+## R8. Professional simulations separate platform, behaviour and doctrine parameters
 
 Professional tools split by resolution, and nearly all mix it. JTLS-GO, used by the US Joint Staff and NATO, aggregates ground units at battalion or brigade size with Lanchester attrition. It models individual aircraft and ships, adjudicates precision strikes stochastically, and lets interdiction of network nodes (bridges, rail yards, pumping stations) change movement and supply flows ([Wikipedia: JTLS](https://en.wikipedia.org/wiki/Joint_Theater_Level_Simulation); [DTIC ADA328714](https://apps.dtic.mil/sti/tr/pdf/ADA328714.pdf)). MASA SWORD is aggregate at brigade and below, with doctrine-driven DirectAI, and is in service with about 25 armies. It disaggregates into VBS4 entities on demand. TARAN extends it to division and corps ([Janes](https://www.janes.com/defence-intelligence-insights/defence-news/c4isr/masa-expands-sword-simulation-with-taran-strategic-level-version); [BISim](https://bisimulations.com/?p=2161)). These SWORD claims are largely vendor material. Entity-level tools include:
 
@@ -292,40 +292,40 @@ AI decision makers carry known failure modes. All five off-the-shelf LLMs in Riv
 
 ## Parameter sheet: sourced anchors versus defaults awaiting verification
 
-| Parameter | Value | Status |
-|---|---|---|
-| Planning time split per echelon | ≤1/3 own, ≥2/3 subordinates | Sourced (secondary) |
-| Networked detect-to-strike (Ukraine) | 2–5 min; pre-network ~20 min; early war up to 72 h | Sourced (official claims) |
-| Lab sensor-to-shooter (PC20) | <20 s | Sourced (Army claim) |
-| SINCGARS range by power | 0.2–0.4 / 0.4–5 / 5–10 / 10–40 km | Sourced |
-| HF NVIS | 2–10 MHz, ~35–450 km, no skip | Sourced |
-| Link 16 | 7.8125 ms slots, 12.8 min epoch, 31.6–115.2 kbps | Sourced |
-| Starlink | 25–100 ms; ~10 Mbps/terminal crowded | Sourced |
-| Kill zone depth | 5–20 km typical; fibre FPV ≤20 km typical, 41 km max reported | Sourced |
-| FPV hit rate / fail-to-destroy | 30–50% (10% novice) / 60–80% fail | Sourced |
-| Shahed salvo mix / intercept rate | ~60% strike, 40% decoy / ~85% | Sourced |
-| Interceptor costs | drone $1.4–16k; SM-2 ~$2M; SM-6 ~$4M; PAC-3 MSE $4.2–13.5M | Sourced |
-| Russian shells/day | ~27,000 (2025); >44,000 (Aug 2024); alt. 10–15k | Sourced (Ukrainian / contested) |
-| Minefield depth / lane / breach time / advance | ~500 m / 6 m / ~1.5 h / 700–1,200 m per 5 days | Sourced |
-| Attack halt threshold | ~20% casualties; 1–3%/day sustained | Sourced (historical) |
-| Excalibur Pk under GPS jamming | >50% → <10% within months | Sourced (thin data) |
-| Pole-21 GNSS denial radius | ≥25 km per module | Sourced |
-| Abrams fuel | ~300 gal / 8 h; ~10 gal/h idle | Sourced |
-| Railhead reach / depot standoff | 90–120 mi / ~120 km | Sourced (analyst) |
-| Kill-zone resupply by drone/UGV | 50–80% in some brigades | Sourced |
-| Ballistic missile intercept | ~85% (273/322) | Sourced |
-| Cyber access build time / effect duration | ~6–8 months / ~2–3 days (Kyivstar) | Sourced |
-| ACQUIRE detection curve | E = 2.7 + 0.7(N/N₅₀) | Sourced |
-| Counter-battery survival window | displace within 2–3 min | **[default]** |
-| Call-for-fire analogue / CAS on call | 3–15 min / 10–30 min | **[default]** |
-| Planning time per echelon | Bde 12–24 h, Bn 6–12 h, Coy 2–6 h | **[default]** |
-| Dismounted movement | 4 / 2–3 / 1–2 / <1 km/h | **[default]** |
-| MBT engagement | 2–3 km, Ph >70% at 2 km | **[default]** |
-| Ship defence layers | 100–240 / ~50 / ~9 / 1.5–2 km | **[default]** |
-| Interceptors per ballistic threat / per-shot Pk | 1.5–2 / 0.6–0.7 | **[default]** |
-| Fighter sorties/day | surge 2–3, sustained 1–1.5 | **[default]** |
-| Suppression effect / fatigue onset | −50–90% / 24–48 h | **[default]** |
-| DF-to-strike time | minutes to tens of minutes | **Assumption; no source found** |
+| ID | Parameter | Value | Status |
+|---|---|---|---|
+| P1 | Planning time split per echelon | ≤1/3 own, ≥2/3 subordinates | Sourced (secondary) |
+| P2 | Networked detect-to-strike (Ukraine) | 2–5 min; pre-network ~20 min; early war up to 72 h | Sourced (official claims) |
+| P3 | Lab sensor-to-shooter (PC20) | <20 s | Sourced (Army claim) |
+| P4 | SINCGARS range by power | 0.2–0.4 / 0.4–5 / 5–10 / 10–40 km | Sourced |
+| P5 | HF NVIS | 2–10 MHz, ~35–450 km, no skip | Sourced |
+| P6 | Link 16 | 7.8125 ms slots, 12.8 min epoch, 31.6–115.2 kbps | Sourced |
+| P7 | Starlink | 25–100 ms; ~10 Mbps/terminal crowded | Sourced |
+| P8 | Kill zone depth | 5–20 km typical; fibre FPV ≤20 km typical, 41 km max reported | Sourced |
+| P9 | FPV hit rate / fail-to-destroy | 30–50% (10% novice) / 60–80% fail | Sourced |
+| P10 | Shahed salvo mix / intercept rate | ~60% strike, 40% decoy / ~85% | Sourced |
+| P11 | Interceptor costs | drone $1.4–16k; SM-2 ~$2M; SM-6 ~$4M; PAC-3 MSE $4.2–13.5M | Sourced |
+| P12 | Russian shells/day | ~27,000 (2025); >44,000 (Aug 2024); alt. 10–15k | Sourced (Ukrainian / contested) |
+| P13 | Minefield depth / lane / breach time / advance | ~500 m / 6 m / ~1.5 h / 700–1,200 m per 5 days | Sourced |
+| P14 | Attack halt threshold | ~20% casualties; 1–3%/day sustained | Sourced (historical) |
+| P15 | Excalibur Pk under GPS jamming | >50% → <10% within months | Sourced (thin data) |
+| P16 | Pole-21 GNSS denial radius | ≥25 km per module | Sourced |
+| P17 | Abrams fuel | ~300 gal / 8 h; ~10 gal/h idle | Sourced |
+| P18 | Railhead reach / depot standoff | 90–120 mi / ~120 km | Sourced (analyst) |
+| P19 | Kill-zone resupply by drone/UGV | 50–80% in some brigades | Sourced |
+| P20 | Ballistic missile intercept | ~85% (273/322) | Sourced |
+| P21 | Cyber access build time / effect duration | ~6–8 months / ~2–3 days (Kyivstar) | Sourced |
+| P22 | ACQUIRE detection curve | E = 2.7 + 0.7(N/N₅₀) | Sourced |
+| P23 | Counter-battery survival window | displace within 2–3 min | **[default]** |
+| P24 | Call-for-fire analogue / CAS on call | 3–15 min / 10–30 min | **[default]** |
+| P25 | Planning time per echelon | Bde 12–24 h, Bn 6–12 h, Coy 2–6 h | **[default]** |
+| P26 | Dismounted movement | 4 / 2–3 / 1–2 / <1 km/h | **[default]** |
+| P27 | MBT engagement | 2–3 km, Ph >70% at 2 km | **[default]** |
+| P28 | Ship defence layers | 100–240 / ~50 / ~9 / 1.5–2 km | **[default]** |
+| P29 | Interceptors per ballistic threat / per-shot Pk | 1.5–2 / 0.6–0.7 | **[default]** |
+| P30 | Fighter sorties/day | surge 2–3, sustained 1–1.5 | **[default]** |
+| P31 | Suppression effect / fatigue onset | −50–90% / 24–48 h | **[default]** |
+| P32 | DF-to-strike time | minutes to tens of minutes | **Assumption; no source found** |
 
 Several areas remain genuinely unsourced and should be treated as open tuning variables:
 

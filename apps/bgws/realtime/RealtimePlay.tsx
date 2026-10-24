@@ -52,18 +52,14 @@ import {
   centreOf,
   coversBoard,
   describeTerrainSource,
-  rasterTerrain,
   type TerrainSource,
 } from "../lib/rasterTerrain";
-import { rasterRoutePlanner } from "../lib/routePlan";
-import { mobilityClassFor } from "../lib/terrainAdapter";
 import { moveBoard, onBoard } from "./board";
 import { projectForSide } from "../lib/fogOfWar";
-import { proceduralTerrain, STANDARD_GROUND } from "../lib/proceduralTerrain";
+import { STANDARD_GROUND } from "../lib/proceduralTerrain";
 import type { Side } from "../lib/state";
 import { COMMANDER_MODELS, foundryModelCall, type CommanderModelName } from "../data/commanderClient";
 import { jevConfigured, openRouterJevCall } from "../data/jevClient";
-import { createRng } from "../rules/dice";
 import {
   FORCE_LISTS,
   PLATFORM_SNAPSHOT,
@@ -74,6 +70,7 @@ import {
 import { HOUSE_V1 } from "../rules/ruleset";
 import { activityOf, createRealtimeState, describeOrder } from "./engine/engine";
 import { agoBand, beliefsOf, selfBeliefOf, trackErrorM } from "./engine/knowledge";
+import { reportsHeldBy } from "./engine/picture";
 import { offsetBy } from "./engine/geometry";
 import { jevRealtimeDecider } from "./engine/jevDecider";
 import { applyOrders, commanderOrders, heuristicOrders, type OrdersResult } from "./engine/orders";
@@ -90,9 +87,20 @@ import {
   wreckOverlay,
   type Wreck,
 } from "./overlays";
-import { RealtimeRunner, type RunnerOptions } from "./engine/runner";
-import { clock, DEFAULT_TIMING, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
+import { InThreadRunner, spawnWorkerRunner, type HandleOptions, type RunnerHandle } from "./engine/runnerHandle";
+import { clock, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
+import { configFromSpec, type RtConfigSpec, type RtGroundSpec } from "./engine/configSpec";
+import { behaviourSnapshot } from "./behaviour/store";
+import type { Template } from "./behaviour/types";
+import {
+  parseScenario,
+  referencedTemplates,
+  scenarioFileName,
+  SCENARIO_FORMAT,
+  SCENARIO_VERSION,
+  type RealtimeScenario,
+} from "./scenario";
 import {
   Blockers,
   Callout,
@@ -110,6 +118,19 @@ import {
   Switch,
 } from "../components/setupUi";
 import "../setup.css";
+import { EventFingerprint } from "./engine/fingerprint";
+import { encodeRecord, gameSpec, GAME_RECORD_FORMAT, GAME_RECORD_VERSION, type GameRecord } from "./headless";
+import {
+  DOMAIN_LABEL,
+  DOMAINS,
+  effectiveScope,
+  playable,
+  SCENARIO_TYPE_INFO,
+  SCENARIO_TYPES,
+  scopeFor,
+  type Scope,
+  type ScenarioType,
+} from "./scope";
 
 type Phase = "setup" | "ordered" | "running";
 type Viewpoint = Side | "both";
@@ -128,14 +149,30 @@ const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
 /** The ground choices offered here: real land cover, or generated. */
 type GroundChoice = Extract<TerrainSource, "generated" | "raster+relief" | "raster">;
 
+/** Where units' behaviours come from, in a line: "2 by side assignment, 1 from the scenario file; the rest their type's default". */
+function describeBehaviourPlan(plan: { why: Record<string, "scenario" | "side" | "asset"> }): string {
+  const count = { scenario: 0, side: 0, asset: 0 };
+  for (const why of Object.values(plan.why)) count[why]++;
+  const parts = [
+    count.side ? `${count.side} by side assignment` : "",
+    count.asset ? `${count.asset} by unit type` : "",
+    count.scenario ? `${count.scenario} from the scenario file` : "",
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(", ")}; the rest their type's default` : "Every unit its type's default";
+}
+
 /** The setup wizard's steps, in order. `title` heads the panel. */
 const RT_STEPS = [
+  { id: "scope", label: "Scenario type", title: "What kind of game" },
   { id: "forces", label: "Forces", title: "Place your units" },
   { id: "command", label: "Command", title: "Who decides" },
   { id: "ground", label: "Battlefield", title: "Choose the ground" },
   { id: "victory", label: "Comms & victory", title: "Comms and victory" },
   { id: "review", label: "Review", title: "Review and generate orders" },
 ] as const;
+type RtStepId = (typeof RT_STEPS)[number]["id"];
+/** A setup step's position, by id: steps can be added without renumbering. */
+const stepAt = (id: RtStepId) => RT_STEPS.findIndex((s) => s.id === id);
 
 /** The counter shake when a vehicle is knocked out: defined once for the page. */
 if (typeof document !== "undefined" && !document.getElementById("rt-keyframes")) {
@@ -242,6 +279,10 @@ function EndOverlay(props: {
   onEdit: () => void;
   onNew: () => void;
   onClose: () => void;
+  /** The event stream's fingerprint (fingerprint.ts), to compare with a headless replay. */
+  played: { fingerprint: string; entries: number } | null;
+  replayable: boolean;
+  onDownloadRecord: () => void;
 }) {
   const { state } = props;
   const { headline, why } = howItEnded(state);
@@ -270,6 +311,18 @@ function EndOverlay(props: {
         <div style={{ ...subtle, marginBottom: 14 }}>
           {props.decisions} decisions, {props.byJev} by Jev
         </div>
+        {props.played && (
+          <div style={{ ...subtle, marginBottom: 14, lineHeight: 1.5 }}>
+            Event stream fingerprint <code>{props.played.fingerprint.slice(0, 16)}</code> ({props.played.entries} events).{" "}
+            <button onClick={props.onDownloadRecord} style={{ ...linkButton, color: "#8fd18f" }}>
+              Download game record
+            </button>
+            <br />
+            {props.replayable
+              ? "Replay it headless (npm run bgws:run -- <file>): the same fingerprint means the same game, event for event."
+              : "Jev decided here; a replay uses the rules, so it will differ."}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={props.onRunAgain}
@@ -557,13 +610,31 @@ export default function RealtimePlay() {
   /** How information travels between units: a radio net, or the old perfect sharing. */
   const [commsMode, setCommsMode] = useState<"radio" | "perfect">("radio");
   const [timeLimitMin, setTimeLimitMin] = useState(90);
+  /** What the game covers (scope.ts). Its duration is `timeLimitMin`, set on the victory step. */
+  const [scope, setScope] = useState<Scope>(() => scopeFor("skirmish"));
+  const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
+  const chooseScenarioType = (type: ScenarioType) => {
+    const next = scopeFor(type);
+    setScope(next);
+    setTimeLimitMin(next.durationMin);
+  };
   const [useJev, setUseJev] = useState(true);
   const [useCommander, setUseCommander] = useState(true);
   /** Stream the feed to the Foundry event stream as it happens. */
   const [streamLog, setStreamLog] = useState(true);
+  /** Run the engine in a Web Worker (WORKER_AND_SCHEDULER.md step 2). Off by default while it is new. */
+  const [useWorker, setUseWorker] = useState(false);
   const [model, setModel] = useState<CommanderModelName>(COMMANDER_MODELS[0]);
   const [blueDirective, setBlueDirective] = useState("");
   const [redDirective, setRedDirective] = useState("");
+  // Behaviours that came with a loaded scenario file: they take precedence,
+  // for its units, over this browser's per-asset assignments.
+  const [scenarioBehaviour, setScenarioBehaviour] = useState<{
+    name: string;
+    behaviours: Record<string, string>;
+    behaviourTemplates: Template[];
+  } | null>(null);
+  const [scenarioMessage, setScenarioMessage] = useState<{ tone: "ok" | "danger"; text: string; details?: string[] } | null>(null);
   /** Orders written and waiting for review: at the start, or while paused. */
   // ── The setup wizard: which step is open, and how far the user has got.
   // Presentation only — every setup choice is still the state above.
@@ -602,7 +673,7 @@ export default function RealtimePlay() {
   const wrecksRef = useRef<{ list: Wreck[]; after: number }>({ list: [], after: -1 });
   /** The selected unit's step labels on the map. */
   const planLabelsRef = useRef<{ key: string; markers: maplibregl.Marker[] }>({ key: "", markers: [] });
-  const runnerRef = useRef<RealtimeRunner | null>(null);
+  const runnerRef = useRef<RunnerHandle | null>(null);
   const orderedRef = useRef<RtState | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -627,41 +698,141 @@ export default function RealtimePlay() {
   const rasterUsable = wantsRaster && rasterLoaded && !!raster && coversBoard(raster, origin);
   const effectiveGround: GroundChoice = rasterUsable ? groundChoice : "generated";
   const bounds = useMemo(() => boardBounds(origin), [origin]);
-  const terrain = useMemo(() => {
-    if (rasterUsable && raster) {
-      return rasterTerrain(raster, {
-        relief: groundChoice === "raster+relief" ? { ...STANDARD_GROUND, seed: groundSeed, origin } : null,
-      });
-    }
-    return proceduralTerrain({ ...STANDARD_GROUND, seed: groundSeed, origin });
-  }, [rasterUsable, raster, groundChoice, groundSeed, origin]);
-  /** A* on the raster when there is one; otherwise the engine's bearing planner. */
-  const planner = useMemo(
-    () => (rasterUsable && raster ? rasterRoutePlanner(raster, mobilityClassFor) : undefined),
-    [rasterUsable, raster],
+  /**
+   * The ground as data (engine/configSpec.ts). With a usable raster: its land
+   * cover, A* routing and passable water; otherwise generated ground and the
+   * engine's bearing planner.
+   */
+  const groundSpec = useMemo<RtGroundSpec>(
+    () => ({
+      source: rasterUsable ? groundChoice : "generated",
+      seed: groundSeed,
+      origin,
+      ...(rasterUsable ? { rasterRid: DEFAULT_TERRAIN.rasterRid } : {}),
+    }),
+    [rasterUsable, groundChoice, groundSeed, origin],
   );
-  /** Rivers are rivers: the raster's own passability, where it offers one. */
-  const isPassable = useMemo(() => {
-    const check = rasterUsable ? (raster as { isPassable?: (lat: number, lon: number) => boolean } | null)?.isPassable : undefined;
-    return check ? (point: LatLng) => check.call(raster, point.lat, point.lng) : undefined;
-  }, [rasterUsable, raster]);
   // Not cached, here or across page loads: a moment that recurs in another
   // run is asked afresh, so running a scenario again can go differently.
   const jevCall = useMemo(() => openRouterJevCall({ cache: false }), []);
   const platforms = useMemo(() => playablePlatforms(), []);
 
+  /**
+   * Each unit's behaviour for this game, most specific first: a loaded
+   * scenario's own, else this browser's side assignments ("Red armour"),
+   * else its type's (store.ts `resolveBehaviour`).
+   */
+  const behaviourPlan = useCallback(() => {
+    const base = behaviourSnapshot(placed.map((p) => ({ ...p, targetClass: PLATFORM_SNAPSHOT[p.platform]?.targetClass })));
+    const why: Record<string, "scenario" | "side" | "asset"> = { ...base.why };
+    if (!scenarioBehaviour) return { behaviours: base.behaviours, behaviourTemplates: base.behaviourTemplates, why };
+    const present = new Set(placed.map((p) => p.id));
+    const behaviours = { ...base.behaviours };
+    for (const [unit, template] of Object.entries(scenarioBehaviour.behaviours)) {
+      if (!present.has(unit)) continue;
+      behaviours[unit] = template;
+      why[unit] = "scenario";
+    }
+    const byId = new Map(base.behaviourTemplates.map((t) => [t.id, t]));
+    for (const t of scenarioBehaviour.behaviourTemplates) byId.set(t.id, t);
+    return { behaviours, behaviourTemplates: [...byId.values()], why };
+  }, [placed, scenarioBehaviour]);
+  const gameBehaviours = useCallback(() => {
+    const { behaviours, behaviourTemplates } = behaviourPlan();
+    return { behaviours, behaviourTemplates };
+  }, [behaviourPlan]);
+
+  /** The game's config as data (engine/configSpec.ts). `run` > 0: another run of the same scenario, with its own dice. */
+  const makeSpec = useCallback(
+    (run = 0): RtConfigSpec =>
+      gameSpec({
+        gameSeed,
+        runSalt: run > 0 ? `:run${run}:${Math.random().toString(36).slice(2)}` : "",
+        breakpointPct,
+        timeLimitMin,
+        comms: commsMode,
+        ground: groundSpec,
+        scope,
+        // Each unit's behaviour template, fixed now so edits never change a game in progress.
+        ...gameBehaviours(),
+      }),
+    [gameSeed, breakpointPct, timeLimitMin, commsMode, groundSpec, scope, gameBehaviours],
+  );
   /** `run` > 0: another run of the same scenario, with its own dice. */
   const makeConfig = useCallback(
-    (run = 0): RtConfig => ({
-      ruleset: HOUSE_V1,
-      terrain,
-      rng: createRng(run > 0 ? `${gameSeed}:realtime:run${run}:${Math.random().toString(36).slice(2)}` : `${gameSeed}:realtime`),
-      timing: { ...DEFAULT_TIMING, breakpoint: breakpointPct / 100, maxDurationS: timeLimitMin * 60 },
-      planner,
-      isPassable,
-      comms: commsMode,
-    }),
-    [terrain, gameSeed, planner, isPassable, breakpointPct, timeLimitMin, commsMode],
+    (run = 0): RtConfig => configFromSpec(makeSpec(run), { raster: rasterUsable ? raster : null }),
+    [makeSpec, rasterUsable, raster],
+  );
+
+  // ── Scenario files ────────────────────────────────────────────────────────
+  const saveScenario = () => {
+    const name = window.prompt("Name this scenario", scenarioBehaviour?.name ?? "My scenario")?.trim();
+    if (!name) return;
+    const { behaviours, behaviourTemplates } = gameBehaviours();
+    const scenario: RealtimeScenario = {
+      format: SCENARIO_FORMAT,
+      version: SCENARIO_VERSION,
+      name,
+      savedAt: new Date().toISOString(),
+      seed: gameSeed,
+      ground: { choice: groundChoice, seed: String(groundSeed) },
+      scope: { ...scope, durationMin: timeLimitMin },
+      rules: { comms: commsMode, breakpointPct },
+      command: { useCommander, model, useJev, directives: { blue: blueDirective, red: redDirective } },
+      forces: placed,
+      behaviours,
+      behaviourTemplates: referencedTemplates(behaviours, behaviourTemplates),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(scenario, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = scenarioFileName(name);
+    link.click();
+    URL.revokeObjectURL(url);
+    setScenarioMessage({ tone: "ok", text: `Saved "${name}" (${placed.length} units).` });
+  };
+  const loadScenario = async (file: File) => {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await file.text());
+    } catch {
+      setScenarioMessage({ tone: "danger", text: `${file.name} isn't valid JSON.` });
+      return;
+    }
+    const { scenario, errors } = parseScenario(raw);
+    if (!scenario) {
+      setScenarioMessage({ tone: "danger", text: `Couldn't load ${file.name}:`, details: errors });
+      return;
+    }
+    setPlaced(scenario.forces);
+    setGameSeed(scenario.seed);
+    setGroundChoice(scenario.ground.choice);
+    setGroundSeed(scenario.ground.seed);
+    setCommsMode(scenario.rules.comms);
+    setBreakpointPct(scenario.rules.breakpointPct);
+    setScope(scenario.scope);
+    setTimeLimitMin(scenario.scope.durationMin);
+    setUseCommander(scenario.command.useCommander);
+    setUseJev(scenario.command.useJev);
+    if ((COMMANDER_MODELS as readonly string[]).includes(scenario.command.model)) setModel(scenario.command.model as CommanderModelName);
+    setBlueDirective(scenario.command.directives.blue);
+    setRedDirective(scenario.command.directives.red);
+    setScenarioBehaviour({ name: scenario.name, behaviours: scenario.behaviours, behaviourTemplates: scenario.behaviourTemplates });
+    const custom = Object.keys(scenario.behaviours).length;
+    setScenarioMessage({
+      tone: "ok",
+      text: `Loaded "${scenario.name}": ${scenario.forces.length} units${custom ? `, ${custom} with their own behaviour` : ""}.`,
+    });
+  };
+  const scenarioNotice = scenarioMessage && (
+    <Callout tone={scenarioMessage.tone}>
+      {scenarioMessage.text}
+      {scenarioMessage.details && (
+        <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+          {scenarioMessage.details.slice(0, 8).map((d) => <li key={d}>{d}</li>)}
+        </ul>
+      )}
+    </Callout>
   );
 
   // ── Placement ─────────────────────────────────────────────────────────────
@@ -774,13 +945,34 @@ export default function RealtimePlay() {
   const resume = useCallback(() => {
     const runner = runnerRef.current;
     if (!runner) return;
-    for (const result of draft) runner.issueOrders(result.orders, { side: result.side, text: result.plan });
+    for (const result of draft) {
+      recordRef.current?.issued.push({ time: runner.state.time, orders: result.orders, plan: { side: result.side, text: result.plan } });
+      runner.issueOrders(result.orders, { side: result.side, text: result.plan }).catch((thrown: unknown) => {
+        setError(thrown instanceof Error ? thrown.message : String(thrown));
+      });
+    }
     setDraft([]);
     setPlaying(true);
   }, [draft]);
 
   /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
   const runsRef = useRef(0);
+  /** This run as a game record (headless.ts), and its event stream's fingerprint. */
+  const recordRef = useRef<GameRecord | null>(null);
+  const fingerprintRef = useRef<EventFingerprint | null>(null);
+  const downloadRecord = useCallback(() => {
+    const record = recordRef.current;
+    if (!record) return;
+    const played = fingerprintRef.current?.value;
+    const time = runnerRef.current?.state.time ?? 0;
+    const full: GameRecord = { ...record, recordedAt: new Date().toISOString(), ...(played ? { played: { ...played, time } } : {}) };
+    const url = URL.createObjectURL(new Blob([encodeRecord(full)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${record.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-t${time}.bgws-game.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, []);
   /** The current run's stream queue: rows waiting to go to Foundry. */
   const streamRef = useRef<EventStreamQueue | null>(null);
   const stopStream = useCallback(() => {
@@ -792,20 +984,37 @@ export default function RealtimePlay() {
   const start = useCallback(() => {
     const initial = orderedRef.current;
     if (!initial) return;
-    const config = makeConfig(runsRef.current);
+    const spec = makeSpec(runsRef.current);
+    const config = configFromSpec(spec, { raster: rasterUsable ? raster : null });
     runsRef.current += 1;
     // Every run is its own run in the stream, "Run scenario again" included.
     stopStream();
-    let onEntry: RunnerOptions["onEntry"];
+    const fingerprint = new EventFingerprint();
+    fingerprintRef.current = fingerprint;
+    recordRef.current = {
+      format: GAME_RECORD_FORMAT,
+      version: GAME_RECORD_VERSION,
+      name: scenarioBehaviour?.name ?? `game ${gameSeed}`,
+      recordedAt: new Date().toISOString(),
+      spec,
+      initial,
+      issued: [],
+      deciders: useJev ? "jev" : "rules",
+    };
+    let push: ((entry: Parameters<NonNullable<HandleOptions["onEntry"]>>[0], context: Parameters<NonNullable<HandleOptions["onEntry"]>>[1]) => void) | undefined;
+    const onEntry: HandleOptions["onEntry"] = (entry, context) => {
+      fingerprint.add(entry);
+      push?.(entry, context);
+    };
     if (streamLog) {
       const queue = new EventStreamQueue(foundryStreamPublisher());
       queue.start();
       streamRef.current = queue;
       const run = { runId: `${gameSeed}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, gameSeed };
       let sequence = 0;
-      onEntry = (entry, state) => {
+      push = (entry, context) => {
         if (entry.type === "message" && !STREAM_MESSAGES) return;
-        queue.push(streamRow(entry, state, run, sequence++));
+        queue.push(streamRow(entry, context, run, sequence++));
       };
     }
     const deciders = useJev
@@ -814,14 +1023,20 @@ export default function RealtimePlay() {
           red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }),
         }
       : undefined;
-    const runner = new RealtimeRunner(initial, config, { deciders, onEntry });
+    runnerRef.current?.dispose();
+    const runner: RunnerHandle = useWorker
+      ? spawnWorkerRunner(
+          { spec, raster: rasterUsable && raster ? raster.exportGrid() : null, initial, config },
+          { deciders, onEntry },
+        )
+      : new InThreadRunner(initial, config, { deciders, onEntry });
     wrecksRef.current = { list: [], after: -1 };
     runnerRef.current = runner;
     setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
-  }, [makeConfig, useJev, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream]);
+  }, [makeSpec, rasterUsable, raster, useWorker, useJev, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
 
   const reset = useCallback(() => {
     stopStream();
@@ -829,6 +1044,7 @@ export default function RealtimePlay() {
     planLabelsRef.current = { key: "", markers: [] };
     runsRef.current = 0;
     setPlaying(false);
+    runnerRef.current?.dispose();
     runnerRef.current = null;
     orderedRef.current = null;
     setDraft([]);
@@ -1185,7 +1401,7 @@ export default function RealtimePlay() {
     const chosenFe = selectedRef.current ? state.game.forceElements[selectedRef.current] : undefined;
     const pictureFeatures =
       chosen && chosenFe && own(chosenFe.side)
-        ? Object.entries(chosen.picture ?? {})
+        ? reportsHeldBy(state, chosenFe.id)
             .filter(([enemyId]) => chosen.ownSeen[enemyId] == null)
             .flatMap(([enemyId, track]) => {
               const radius = Math.max(50, trackErrorM(track, state.time));
@@ -1392,12 +1608,107 @@ export default function RealtimePlay() {
             </>
           }
         >
-          {setupStep === 0 && (
+          {setupStep === stepAt("scope") && (
+            <>
+              <p className="su-step-intro">
+                Choose the kind of game first: it sets how long it runs, how big it is, and which parts of the war
+                are fought out in full. Only what the engine has built so far can be chosen.
+              </p>
+              <Section title="Scenario type">
+                <ChoiceCards
+                  label="Scenario type"
+                  value={scope.type}
+                  onChange={chooseScenarioType}
+                  columns={2}
+                  options={SCENARIO_TYPES.map((type) => {
+                    const info = SCENARIO_TYPE_INFO[type];
+                    const can = playable(type);
+                    return {
+                      value: type,
+                      title: info.name,
+                      description: info.blurb,
+                      badge: can ? undefined : `planned ${info.milestone}`,
+                      disabled: !can,
+                    };
+                  })}
+                />
+              </Section>
+              <Section title="What this game covers">
+                <div className="su-review">
+                  <div className="su-review-row">
+                    <span className="su-review-label">Runs for</span>
+                    <span className="su-review-value">{timeLimitMin} min (the time limit; change it under Comms &amp; victory)</span>
+                  </div>
+                  <div className="su-review-row">
+                    <span className="su-review-label">Area</span>
+                    <span className="su-review-value">
+                      {scopeCheck.scope.area.widthKm} × {scopeCheck.scope.area.depthKm} km
+                    </span>
+                  </div>
+                  <div className="su-review-row">
+                    <span className="su-review-label">Command levels</span>
+                    <span className="su-review-value">
+                      {scope.echelons.lowest} to {scope.echelons.highest}
+                    </span>
+                  </div>
+                  <div className="su-review-row">
+                    <span className="su-review-label">Won by</span>
+                    <span className="su-review-value">{SCENARIO_TYPE_INFO[scope.type].victory}</span>
+                  </div>
+                  {DOMAINS.map((domain) => (
+                    <div className="su-review-row" key={domain}>
+                      <span className="su-review-label">{DOMAIN_LABEL[domain]}</span>
+                      <span className="su-review-value">{scopeCheck.scope.domains[domain]}</span>
+                    </div>
+                  ))}
+                </div>
+                {scopeCheck.notes.length > 0 && (
+                  <Callout tone="info">
+                    Not built yet, so left out of this game:
+                    <ul>
+                      {scopeCheck.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  </Callout>
+                )}
+                {scopeCheck.errors.length > 0 && (
+                  <Callout tone="danger">
+                    <ul>
+                      {scopeCheck.errors.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </Callout>
+                )}
+              </Section>
+            </>
+          )}
+
+          {setupStep === stepAt("forces") && (
             <>
               <p className="su-step-intro">
                 Put both sides on the board. Start from a ready-made force list, or build your own and click
                 the map to place it.
               </p>
+              <Section title="Scenario file">
+                <div className="su-row">
+                  <label className="su-btn" data-variant="ghost">
+                    Load scenario…
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void loadScenario(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                {scenarioNotice}
+              </Section>
               <Section title="Quick start">
                 <div className="su-quick">
                   {Object.values(FORCE_LISTS).map((list) => (
@@ -1479,7 +1790,7 @@ export default function RealtimePlay() {
             </>
           )}
 
-          {setupStep === 1 && (
+          {setupStep === stepAt("command") && (
             <>
               <p className="su-step-intro">
                 Decide who writes the orders before the clock starts, and who makes the calls once it is
@@ -1547,6 +1858,15 @@ export default function RealtimePlay() {
                 </SideCard>
               ))}
 
+              <Disclosure summary="Advanced: engine" meta={useWorker ? "background thread" : "main thread"}>
+                <Switch
+                  checked={useWorker}
+                  onChange={setUseWorker}
+                  label="Run the engine in a background thread (experimental)"
+                  description="The simulation runs in a Web Worker so big fights do not stutter the map. Jev and the commander still answer from this page. The same seed plays the same game either way."
+                />
+              </Disclosure>
+
               <Disclosure summary="Advanced: event log" meta={streamLog ? "streaming" : "off"}>
                 <Switch
                   checked={streamLog}
@@ -1563,7 +1883,7 @@ export default function RealtimePlay() {
             </>
           )}
 
-          {setupStep === 2 && (
+          {setupStep === stepAt("ground") && (
             <>
               <p className="su-step-intro">
                 Choose what the engagement is fought over. Routes are planned on whatever ground you pick.
@@ -1616,7 +1936,7 @@ export default function RealtimePlay() {
             </>
           )}
 
-          {setupStep === 3 && (
+          {setupStep === stepAt("victory") && (
             <>
               <p className="su-step-intro">How units share what they see, and how the game is won.</p>
               <Section title="Communications">
@@ -1675,12 +1995,23 @@ export default function RealtimePlay() {
             </>
           )}
 
-          {setupStep === 4 && (
+          {setupStep === stepAt("review") && (
             <>
               <p className="su-step-intro">
                 Check the setup, then generate the opening orders. You&rsquo;ll see them drawn on the map and
                 can change them before the clock starts.
               </p>
+              <Section title="Scenario file">
+                <div className="su-row">
+                  <button className="su-btn" data-variant="ghost" disabled={placed.length === 0} onClick={saveScenario}>
+                    Save scenario
+                  </button>
+                </div>
+                <p className="su-hint">
+                  Saves the forces, ground, rules, commanders and each unit&rsquo;s behaviour to a file you can load again or share.
+                </p>
+                {scenarioNotice}
+              </Section>
               {!canGenerate && (
                 <Blockers
                   items={[
@@ -1689,7 +2020,7 @@ export default function RealtimePlay() {
                         counts.blue === 0 && counts.red === 0
                           ? "Can't start yet: no units placed."
                           : `Can't start yet: ${counts.blue === 0 ? "blue" : "red"} has no units.`,
-                      fix: () => goToSetupStep(0),
+                      fix: () => goToSetupStep(stepAt("forces")),
                       fixLabel: "Place units",
                     },
                   ]}
@@ -1698,18 +2029,20 @@ export default function RealtimePlay() {
               <Review
                 onEdit={goToSetupStep}
                 rows={[
-                  { label: "Blue", value: `${counts.blue} unit${counts.blue === 1 ? "" : "s"}`, step: 0 },
-                  { label: "Red", value: `${counts.red} unit${counts.red === 1 ? "" : "s"}`, step: 0 },
+                  { label: "Scenario type", value: SCENARIO_TYPE_INFO[scope.type].name, step: stepAt("scope") },
+                  { label: "Blue", value: `${counts.blue} unit${counts.blue === 1 ? "" : "s"}`, step: stepAt("forces") },
+                  { label: "Red", value: `${counts.red} unit${counts.red === 1 ? "" : "s"}`, step: stepAt("forces") },
                   {
                     label: "Command",
                     value: `${useCommander ? `AI orders (${model})` : "Simple orders"} · ${useJev ? "Jev leads units" : "rules decide"}`,
-                    step: 1,
+                    step: stepAt("command"),
                   },
-                  { label: "Ground", value: describeTerrainSource(effectiveGround, DEFAULT_TERRAIN.label, groundSeed), step: 2 },
+                  { label: "Ground", value: describeTerrainSource(effectiveGround, DEFAULT_TERRAIN.label, groundSeed), step: stepAt("ground") },
+                  { label: "Behaviour", value: describeBehaviourPlan(behaviourPlan()) },
                   {
                     label: "Victory",
                     value: `${commsMode === "radio" ? "Radio net" : "Perfect comms"} · breaks at ${breakpointPct}% · ${timeLimitMin} min · seed ${gameSeed}`,
-                    step: 3,
+                    step: stepAt("victory"),
                   },
                 ]}
               />
@@ -1810,6 +2143,7 @@ export default function RealtimePlay() {
                   {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
                   {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
+                  {runner?.where === "worker" ? " · engine in a background thread" : ""}
                   {streamRef.current && (
                     <span style={{ color: streamRef.current.lastError ? "#e07a5f" : undefined }}>
                       {" "}&middot; streamed {streamRef.current.sent}
@@ -1933,6 +2267,9 @@ export default function RealtimePlay() {
           onEdit={reset}
           onNew={newScenario}
           onClose={() => setEndDismissed(true)}
+          played={fingerprintRef.current?.value ?? null}
+          replayable={recordRef.current?.deciders === "rules"}
+          onDownloadRecord={downloadRecord}
         />
       )}
     </DechoBasemap>

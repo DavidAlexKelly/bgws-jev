@@ -37,12 +37,62 @@ import {
 import { printDecision } from "../../rules/jevConsole";
 import type { TacticalTrace } from "../../rules/tactical";
 import { BALANCE, DECISION_POINTS, effectWords } from "./decisions";
+import { behaviourDoctrine } from "../behaviour/actions/land";
+
+/** How a behaviour template's preference reads to Jev, appended to the option. */
+function preferenceWords(preference: number | undefined): string {
+  if (!preference) return "";
+  if (preference >= 2) return " [strongly preferred by its doctrine]";
+  if (preference > 0) return " [preferred by its doctrine]";
+  if (preference <= -2) return " [strongly discouraged by its doctrine]";
+  return " [discouraged by its doctrine]";
+}
 import { ruleTrace, type RtDecider, type RtDecision, type RtDecisionRequest } from "./deciders";
 import { activityOf, canHit, describeTrigger } from "./engine";
 import { agoBand, beliefsOf, compassWord, rangeBand, selfBeliefOf } from "./knowledge";
 import { damageEffect } from "./options";
 import { PINNED_AT, SUPPRESSED_AT } from "./timing";
+import { sideReports } from "./picture";
 import type { RtConfig, RtState, UnitOrders } from "./types";
+
+/** At most this many contacts, newest first: enough to see the battle, small enough for Jev's context. */
+const SIDE_KNOWS_MAX = 12;
+
+/**
+ * What the side knows of the enemy as a whole — the commander's view, not any
+ * one unit's (docs/plan/SIDE_PICTURE.md): for each enemy, the newest of what
+ * its living units have seen themselves and what its net has carried, and how
+ * widely that is known. Words, not numbers.
+ */
+function sideKnows(state: RtState, side: Side): { sideKnows?: Record<string, string>[] } {
+  const living = Object.values(state.game.forceElements).filter(
+    (fe) => fe.side === side && fe.combatStrength > 0 && state.units[fe.id] != null,
+  );
+  const best = new Map<string, { level: string; label?: string; seenAt: number; from: string; holders: number }>();
+  const offer = (enemyId: string, level: string, seenAt: number, from: string, holders: number, label?: string) => {
+    if ((state.game.forceElements[enemyId]?.combatStrength ?? 0) <= 0) return;
+    const had = best.get(enemyId);
+    const total = (had?.holders ?? 0) + holders;
+    if (!had || seenAt > had.seenAt) best.set(enemyId, { level, label: label ?? had?.label, seenAt, from, holders: total });
+    else had.holders = total;
+  };
+  for (const fe of living) {
+    for (const [enemyId, seen] of Object.entries(state.units[fe.id].ownSeen)) {
+      offer(enemyId, seen.level, seen.time, fe.id, 1, seen.level === "full" ? state.game.forceElements[enemyId]?.label : undefined);
+    }
+  }
+  for (const { enemyId, track, holders } of sideReports(state, side)) offer(enemyId, track.level, track.seenAt, track.from, holders, track.label);
+  const known = [...best.entries()]
+    .sort((x, y) => y[1].seenAt - x[1].seenAt)
+    .slice(0, SIDE_KNOWS_MAX)
+    .map(([id, k]) => ({
+      id,
+      ...(k.level === "full" && k.label ? { identifiedAs: k.label } : { level: k.level === "full" ? "identified" : "located" }),
+      seen: `${agoBand(state.time - k.seenAt)}, by ${k.from}`,
+      knownTo: k.holders >= living.length * 0.75 ? "most of the side" : k.holders >= living.length * 0.25 ? "part of the side" : "a few units",
+    }));
+  return known.length ? { sideKnows: known } : {};
+}
 
 export interface JevRealtimeOptions {
   side: Side;
@@ -241,9 +291,11 @@ export function jevRealtimeDecider(options: JevRealtimeOptions): RtDecider {
         you: side,
         ...(state.plan[side] ? { commandersPlan: state.plan[side] } : {}),
         units: requests.map((request) => unitPicture(state, request.unitId, config)),
+        ...sideKnows(state, side),
         note:
           "Only what each unit believes. Enemies it has not found are not listed, and their absence is not " +
-          "evidence that they are not there. A lost contact is where an enemy was last seen, not where it is.",
+          "evidence that they are not there. A lost contact is where an enemy was last seen, not where it is. " +
+          "sideKnows is what the side knows of the enemy as a whole — seen by any of its units or carried on its net; the commander's view — which a unit may not have heard yet.",
       };
       const keysFor = new Map<string, { key: string; id: string; summary: string; exact?: string }[]>();
       const questions: Record<string, JevQuestion> = {};
@@ -254,23 +306,26 @@ export function jevRealtimeDecider(options: JevRealtimeOptions): RtDecider {
           id: option.id,
           summary: option.summary,
           exact: option.exact,
+          preference: option.preference,
         }));
         keysFor.set(key, choices);
         const dp = DECISION_POINTS[item.point];
         const unit = state.units[item.unitId];
         const label = state.game.forceElements[item.unitId]?.label ?? item.unitId;
         const others = requests.filter((r) => r.unitId !== item.unitId).map((r) => r.unitId);
+        const doctrine = behaviourDoctrine(item.unitId, state, config);
         questions[key] = {
           type: "choice",
           instructions:
             `${directive}You lead ${item.unitId} (${label}). ${BALANCE}\n\n` +
+            (doctrine.length ? `Its doctrine: ${doctrine.join(" ")}\n\n` : "") +
             `Decision point ${item.point}, ${dp.title.toLowerCase()}. ${situationWords(state, item)} ${dp.question} ` +
             (unit?.orders
               ? `Its orders: ${unit.orders.task}. Intent: ${unit.orders.intent}. Urgency: ${unit.orders.urgency === "now" ? "now" : "when able"}. `
               : `Its purpose: ${unit?.mission.purpose ?? "hold its ground"}. `) +
             (others.length ? `Also deciding now, so choose to work together: ${others.join(", ")}. ` : "") +
             "The crew has already done its drill (cover, and return fire if it can see the shooter).",
-          criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary])),
+          criteria: Object.fromEntries(choices.map((choice) => [choice.key, choice.summary + preferenceWords(choice.preference)])),
         };
       }
 

@@ -141,8 +141,8 @@ export default function AssetExplorer() {
   return (
     <div className="ax-root">
       <header className="ax-topbar">
-        <Link to="/bgws" className="ax-back">
-          ‹ Main menu
+        <Link to="/bgws/assets" className="ax-back">
+          ‹ Asset Manager
         </Link>
         <div className="ax-title">
           <h1>Asset Explorer</h1>

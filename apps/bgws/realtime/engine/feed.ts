@@ -7,6 +7,8 @@
 // shot, decision or flag — with the others null. The row's `text` is the
 // screen's line, so the stream reads exactly like the feed.
 
+import type { LatLng } from "../../lib/board";
+import type { Side } from "../../lib/state";
 import type { RtLogEntry } from "./runner";
 import { clock } from "./timing";
 import type { RtState } from "./types";
@@ -112,19 +114,40 @@ export interface StreamRow {
   } | null;
 }
 
-/** A feed entry as a stream row. `state` is the game as it stands when the entry is made. */
-export function streamRow(entry: RtLogEntry, state: RtState, run: StreamRun, sequence: number, now = Date.now()): StreamRow {
-  const unitId =
-    entry.type === "event"
-      ? entry.event.unitId
-      : entry.type === "shot"
-        ? entry.shot.firerId
-        : entry.type === "decision"
-          ? entry.decision.unitId
-          : entry.type === "message"
-            ? entry.delivery.message.from
-            : (entry.flag.unitId ?? null);
+/** The unit a feed entry is about: who it happened to, who fired, decided or spoke. */
+export function entryUnitId(entry: RtLogEntry): string | null {
+  return entry.type === "event"
+    ? entry.event.unitId
+    : entry.type === "shot"
+      ? entry.shot.firerId
+      : entry.type === "decision"
+        ? entry.decision.unitId
+        : entry.type === "message"
+          ? entry.delivery.message.from
+          : (entry.flag.unitId ?? null);
+}
+
+/**
+ * What a stream row needs from the game as it stood when the entry was made:
+ * where its unit was, and (for a shot) the target's side. Small and plain, so
+ * a runner in a worker can send it with the entry instead of the whole state.
+ */
+export interface EntryContext {
+  at?: LatLng;
+  targetSide?: Side;
+}
+
+export function entryContext(entry: RtLogEntry, state: RtState): EntryContext {
+  const unitId = entryUnitId(entry);
   const at = unitId ? state.game.forceElements[unitId]?.position : undefined;
+  const targetSide = entry.type === "shot" ? state.game.forceElements[entry.shot.targetId]?.side : undefined;
+  return { ...(at ? { at } : {}), ...(targetSide ? { targetSide } : {}) };
+}
+
+/** A feed entry as a stream row, with its context as the game stood when the entry was made (`entryContext`). */
+export function streamRow(entry: RtLogEntry, context: EntryContext, run: StreamRun, sequence: number, now = Date.now()): StreamRow {
+  const unitId = entryUnitId(entry);
+  const at = context.at;
   const base = {
     runId: run.runId,
     sequence,
@@ -165,7 +188,7 @@ export function streamRow(entry: RtLogEntry, state: RtState, run: StreamRun, seq
         shot: {
           firerId: s.firerId,
           targetId: s.targetId,
-          targetSide: state.game.forceElements[s.targetId]?.side ?? "",
+          targetSide: context.targetSide ?? "",
           result: s.result,
           narrative: s.narrative ?? null,
           rangeM: s.rangeM ?? null,

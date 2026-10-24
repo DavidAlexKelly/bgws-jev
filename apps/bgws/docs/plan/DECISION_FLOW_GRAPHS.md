@@ -202,7 +202,9 @@ Rules that keep it fast and predictable:
 - **Every choose node has a fallback edge.** It is used on Jev error, timeout, confidence below 0.25, or an empty option set. Today's `ruleFallback` becomes these fallback edges.
 - **The graph version is stamped on every decision**, so a replay or AAR knows which rules applied.
 
-### 3.4 What Jev is told (changes to `jevDecider.ts`)
+### 3.4 What Jev is told (changes to `realtime/engine/jevDecider.ts`)
+
+The real-time decider only. Turn mode has its own `rules/jevDecider.ts`, which this does not touch.
 
 The `unitPicture` state is unchanged. The changes are in the instructions and criteria:
 
@@ -343,8 +345,22 @@ A new screen at `/bgws/behaviour`, linked from Home and from the real-time setup
 
 ## 6. Storage
 
-- **In code**: core templates as TypeScript objects, type-checked and unit-tested.
-- **In Foundry**: a `BgwsBehaviourTemplate` object type. It has id, name, version, parentId, parentVersion, archetype, JSON body and author, with create/edit actions through OSDK. This needs `api:use-ontologies-write`, already requested in `client.ts`. Templates are shared across a team.
+- **In the repository, as JSON files**: one file per template, in a folder per kind:
+
+  ```
+  realtime/behaviour/
+    templates/
+      core/     default.json  tank.json  ifv.json  infantry.json  atgm-team.json  mortar.json  recce.json  hq.json
+      custom/   tank-stand-fast.json      ← { "parent": "core/tank", "remove": ["pull-back"] }
+    schema.ts   validates every template when it is loaded
+    walk.ts     the engine walks the graph; Jev is asked only at choose nodes
+    actions/    land.ts … the verbs a template can name ("fire", "hull-down", "pull-back")
+  ```
+
+  Loaded with Vite's `import.meta.glob("./templates/**/*.json", { eager: true })`, so no package is needed. A test loads every file through `schema.ts`, so a malformed template fails CI rather than a game. Because JSON holds no code, conditions are data over a closed set of facts (`{ "fact": "ammo.main", "op": ">", "value": 0 }`) and actions are referenced by name. That is the same rule as §3.3: templates contain no code.
+- **The graph is not sent to Jev.** The engine walks it, applies every hard gate (ammunition, range, ROE) against the real state, and sends Jev one `choice` question with only the legal options as `criteria`, as `jevDecider.ts` does today. The template's words (node title, doctrine, each option's bias) go into `instructions` and `criteria`, so the template shapes Jev's judgement without Jev having to execute it.
+- **Golden test first.** `realtime/engine/decisions.golden.test.ts` records today's decisions (every named situation and 20 seeded games) in `__golden__/`. The JSON graphs must reproduce those snapshots exactly before the old switch statements are deleted (§7 steps 3–4).
+- **In Foundry, later**: a `BgwsBehaviourTemplate` object type. It has id, name, version, parentId, parentVersion, archetype, JSON body and author, with create/edit actions through OSDK. This needs `api:use-ontologies-write`, already requested in `client.ts`. Templates are shared across a team.
 - **Locally**: unsaved drafts go to `localStorage` as a convenience only, and JSON import and export are supported.
 - **Schema version** on every template. A migration function per bump lives in `realtime/behaviour/migrate.ts`.
 
@@ -354,9 +370,9 @@ A new screen at `/bgws/behaviour`, linked from Home and from the real-time setup
 |---|---|---|
 | 1 | `realtime/behaviour/types.ts`, `conditions.ts` (evaluator plus fact registry), `walk.ts` (pure walker) | Unit tests for every node kind |
 | 2 | Extract today's option builders into land verbs (`actions/land.ts`); `optionsAt` becomes a thin call into them | All existing `realtime.test.ts`, `command.test.ts`, `situations.test.ts` pass unchanged |
-| 3 | Write `core.land.default` as a graph that reproduces `decisionPointOf` + `optionsAt` + `ruleFallback` exactly | **Golden test**: for every scene in `situations.ts` and 20 seeded full games, the option lists and fallbacks are identical to the old path |
+| 3 | Write `core.land.default` as a graph (`templates/core/default.json`) that reproduces `decisionPointOf` + `optionsAt` + `ruleFallback` exactly | **Golden test**: for every scene in `situations.ts` and 20 seeded full games, the option lists and fallbacks are identical to the old path |
 | 4 | Switch the runner to `walk()` and delete the `switch` statements | Golden test still green; trace output contains the walked path |
-| 5 | Split `core.land.default` into archetype templates (tank, ifv, infantry, atgmTeam, mortar, recce, hq) with the archetype table | Each archetype's option list is reviewed against doctrine (research reference §Land) |
+| 5 | Split `core.land.default` into archetype templates, one JSON file each in `templates/core/` (tank, ifv, infantry, atgmTeam, mortar, recce, hq) with the archetype table | Each archetype's option list is reviewed against doctrine (research reference R4, Land) |
 | 6 | Patches, inheritance and assignment resolution | Tests: patch application, parent upgrade, precedence order |
 | 7 | Simple-view editor plus library plus validation, local storage only | A user can make "Tank: stand fast" and assign it in setup in under two minutes |
 | 8 | Test bench on `situations.ts` | Side-by-side compare of two templates on one scene |
@@ -365,6 +381,17 @@ A new screen at `/bgws/behaviour`, linked from Home and from the real-time setup
 | 11 | In-game inspector row plus decision log path view | — |
 
 Each later workstream adds its verbs, facts, triggers and core templates, and a golden scene in `situations.ts` for each new decision.
+
+### Status (October 2026), against milestone M1
+
+| Step | State |
+|---|---|
+| 1–4 | **Done.** `types.ts`, `walk.ts`, `actions/land.ts` (53 named verbs) and `templates/core/default.json`. The runner walks the graph, and the golden test is unchanged. |
+| 5 | **Partly.** `core/armour` and `core/infantry` exist (doctrine only, parent `core/default`). IFV, ATGM team, mortar, recce and HQ do not yet; they need those unit types in the catalogue (W14, M2). |
+| 6 | **Done.** Patches and inheritance (`parent`, `remove`, `bias`, `when`, `doctrine`). Assignment, most specific first (`store.ts` `resolveBehaviour`): a scenario file's own per-unit choice; a **side assignment by kind** ("Red armour uses *Stand fast*", set from the template's page in the Behaviour Manager: armour, infantry, soft-skinned vehicles); the unit type's assignment (Asset Manager); the kind's built-in default. The setup review says where units' behaviours come from. Assignment is by target class until the archetype table of step 5 exists. |
+| 7 | **Done:** the Behaviour Manager (`/bgws/assets/behaviours`), which covers the library, editing, validation and assignment. |
+| 8 | **Done:** the **Test bench** tab in the Behaviour Manager (`BehaviourBench.tsx`, `behaviour/bench.ts`). Pick a scene from `situations.ts` and one or two templates. Each column shows: the template's lineage and doctrine; the path walked; every option, either offered or why not (switched off by the template, condition not met, or nothing of that kind to offer here); and what the rules would choose, checked against the scene's hand-judged sensible options. `bench.test.ts` proves the bench shows exactly what the game offers and chooses in every scene. Jev is not asked on the bench. |
+| 9–11 | Not started. |
 
 ## 8. Risks
 

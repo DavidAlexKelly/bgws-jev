@@ -145,6 +145,8 @@ export interface ChoiceOption<T extends string> {
   title: string;
   description?: ReactNode;
   badge?: string;
+  /** Shown but not choosable (say why in the badge or description). */
+  disabled?: boolean;
 }
 
 /** Radio choices as cards, each saying what it means. */
@@ -170,6 +172,7 @@ export function ChoiceCards<T extends string>({
           role="radio"
           className="su-choice"
           aria-checked={option.value === value}
+          disabled={option.disabled}
           onClick={() => onChange(option.value)}
         >
           <span className="su-choice-radio" aria-hidden />

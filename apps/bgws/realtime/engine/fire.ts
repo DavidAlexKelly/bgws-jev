@@ -33,40 +33,41 @@
 import type { Capability, ForceElement } from "../../lib/state";
 import type { Aspect } from "./lethality";
 import type { RtTiming } from "./types";
+import { figure } from "./figures";
 
 /** DECLARED. One "modern fire control" class: laser rangefinder, ballistic computer, stabiliser. */
 const FIRE_CONTROL = {
-  biasMil: 0.2,
+  biasMil: figure("fire.FIRE_CONTROL.biasMil"),
   /** Laser rangefinder, 1σ. */
-  rangeErrorM: 10,
+  rangeErrorM: figure("fire.FIRE_CONTROL.rangeErrorM"),
   /** Error in the target's estimated speed, 1σ, with a lead-computing sight. */
-  speedErrorMs: 1.0,
+  speedErrorMs: figure("fire.FIRE_CONTROL.speedErrorMs"),
   /** Firing on the move, after stabilisation. */
-  firerMovingMil: 0.5,
+  firerMovingMil: figure("fire.FIRE_CONTROL.firerMovingMil"),
 };
 
 /** DECLARED. Round-to-round dispersion, 1σ. */
-const DISPERSION_MIL = { ke: 0.2, ce: 0.35, automatic: 1.5 };
+const DISPERSION_MIL = { ke: figure("fire.DISPERSION_MIL.ke"), ce: figure("fire.DISPERSION_MIL.ce"), automatic: figure("fire.DISPERSION_MIL.automatic") };
 
 /** DECLARED. Muzzle velocity when the weapon has none in the data. */
-const DEFAULT_MUZZLE_VELOCITY = { ke: 1600, ce: 900, automatic: 850, other: 800 };
+const DEFAULT_MUZZLE_VELOCITY = { ke: figure("fire.DEFAULT_MUZZLE_VELOCITY.ke"), ce: figure("fire.DEFAULT_MUZZLE_VELOCITY.ce"), automatic: figure("fire.DEFAULT_MUZZLE_VELOCITY.automatic"), other: figure("fire.DEFAULT_MUZZLE_VELOCITY.other") };
 
 /** DECLARED. Sustained aimed rounds a minute when the weapon has none. */
-const DEFAULT_ROF = { gun: 6, missile: 2, automatic: 200 };
+const DEFAULT_ROF = { gun: figure("fire.DEFAULT_ROF.gun"), missile: figure("fire.DEFAULT_ROF.missile"), automatic: figure("fire.DEFAULT_ROF.automatic") };
 
 /**
  * An automatic weapon fires bursts, not aimed rounds: one burst every this
  * many seconds counts as one "round" against its dispersion. DECLARED.
  */
-const BURST_CYCLE_S = 6;
+const BURST_CYCLE_S = figure("fire.BURST_CYCLE_S");
 /** Faster than this is automatic fire. */
-const AUTOMATIC_ROF = 30;
+const AUTOMATIC_ROF = figure("fire.AUTOMATIC_ROF");
 
 /** DECLARED. Guided missiles: hit chance from the guidance, not ballistics. */
-const GUIDED = { hit: 0.9, vsMoving: 0.9, firerMoving: 0.3 };
+const GUIDED = { hit: figure("fire.GUIDED.hit"), vsMoving: figure("fire.GUIDED.vsMoving"), firerMoving: figure("fire.GUIDED.firerMoving") };
 
 /** DECLARED. What degrades aim: multipliers on the angular error. */
-const NERVE = { suppressed: 1.4, pinned: 2.2, shaken: 1.8 };
+const NERVE = { suppressed: figure("fire.NERVE.suppressed"), pinned: figure("fire.NERVE.pinned"), shaken: figure("fire.NERVE.shaken") };
 
 /** DECLARED. Presented size by target class, metres. `exposed` is what shows over a crest when hull-down. */
 const TARGET_SIZE: Record<string, { width: number; length: number; height: number; exposed: number }> = {
@@ -77,7 +78,7 @@ const TARGET_SIZE: Record<string, { width: number; length: number; height: numbe
   foot: { width: 10, length: 10, height: 0.5, exposed: 0.4 },
 };
 /** DECLARED. Woods or buildings hide part of what is there. */
-const COVER_EXPOSED = { width: 0.7, height: 0.5 };
+const COVER_EXPOSED = { width: figure("fire.COVER_EXPOSED.width"), height: figure("fire.COVER_EXPOSED.height") };
 
 const G = 9.81;
 
@@ -210,10 +211,10 @@ export function hitChance(
 // sight, identify it, lase and lay. DECLARED: 4 s plus 2 s a kilometre; 4 s
 // more if the crew has only been told where it is and has not seen it
 // itself; slower under fire.
-const ACQUIRE_BASE_S = 4;
-const ACQUIRE_PER_KM_S = 2;
-const ACQUIRE_REPORTED_S = 4;
-const ACQUIRE_NERVE = { suppressed: 1.5, pinned: 2.5 };
+const ACQUIRE_BASE_S = figure("fire.ACQUIRE_BASE_S");
+const ACQUIRE_PER_KM_S = figure("fire.ACQUIRE_PER_KM_S");
+const ACQUIRE_REPORTED_S = figure("fire.ACQUIRE_REPORTED_S");
+const ACQUIRE_NERVE = { suppressed: figure("fire.ACQUIRE_NERVE.suppressed"), pinned: figure("fire.ACQUIRE_NERVE.pinned") };
 
 /** Seconds from choosing a new target to the first round at it. */
 export function acquisitionS(
