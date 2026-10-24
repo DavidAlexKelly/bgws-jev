@@ -74,4 +74,15 @@ describe("milestone scenarios", () => {
     expect(feed.some((l) => l.domain === "logistics" && (l.kind === "logstat" || l.kind === "convoy")), "LOGSTATs and convoys").toBe(true);
     expect(Object.values(w.land).some((l) => l.lod === "far"), "rules lead away from contact").toBe(true);
   }, 300_000);
+
+  it("M7: the task group's layers engage the raid, the coast fires on the group, and shipping is protected", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M7());
+    const feed: { kind: string; domain: string }[] = [];
+    const result = await playRecord(record, { untilS: 2 * 3600, onEntry: (e) => void (e.type === "world" && feed.push(e.item)) });
+    const w = result.state.world!;
+    expect(feed.filter((l) => l.kind === "engage").length, "interceptors fired").toBeGreaterThan(10);
+    expect(w.stats.spentUsd.blue, "the defence's bill").toBeGreaterThan(w.stats.lostUsd.red);
+    expect(w.stats.neutralHits ?? 0, "no merchant hit").toBe(0);
+    expect(["b-ddg", "b-ffg"].some((id) => w.entities[id].status === "active"), "the group survives the first raid").toBe(true);
+  }, 120_000);
 });

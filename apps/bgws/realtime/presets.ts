@@ -272,6 +272,49 @@ export function sustainedOffensive(): RealtimeScenario {
   );
 }
 
+/**
+ * M7 — Littoral: a task group holding a strait open against a coastal enemy
+ * (Red Sea), which throws one-way drones, anti-ship missiles cued by a drone
+ * overhead, and explosive USVs at it, while neutral merchants try to pass.
+ * The group's cells are refilled only in port, 150 km back (W8).
+ */
+export function littoral(): RealtimeScenario {
+  const forces: PlacedElement[] = [
+    unit("r-asm-1", "red", "generic/coastalAsm", 2, 150_000, -10_000, "Red coastal battery north"),
+    unit("r-asm-2", "red", "generic/coastalAsm", 2, 150_000, 25_000, "Red coastal battery south"),
+    unit("r-hq", "red", "generic/cp-brigade", 5, 170_000, 0, "Red coastal command", "regular", 3),
+  ];
+  const raid: EntitySpec[] = [];
+  for (let i = 0; i < 24; i++) {
+    const decoy = i % 4 === 3;
+    raid.push(entity(`r-owa-${i + 1}`, "red", decoy ? "generic/owaDecoy" : "generic/owaDrone", 145_000, -30_000 + i * 2500, { altM: 500, label: decoy ? `Decoy ${i + 1}` : `Drone ${i + 1}`, task: { kind: "strike", targetId: i % 3 === 0 ? "b-ffg" : "b-ddg", aimAt: p(0, 0), altM: 500 } }));
+  }
+  for (let i = 0; i < 4; i++) raid.push(entity(`r-usv-${i + 1}`, "red", "generic/usv", 120_000, -6000 + i * 4000, { label: `USV ${i + 1}`, task: { kind: "strike", targetId: "b-ffg", aimAt: p(5000, 3000) } }));
+  // The strait: sea between two coasts, 260 km across.
+  const sea = { waters: [[p(-400_000, -200_000), p(130_000, -200_000), p(130_000, 200_000), p(-400_000, 200_000)]] };
+  return scenario(
+    "M7 — Littoral: holding the strait",
+    "m7-littoral",
+    scopeOf("maritime", 24 * 60, { naval: "simulated", air: "simulated", airDefence: "simulated", drones: "simulated", ew: "simulated", land: "simulated", space: "abstracted", logistics: "abstracted", cyber: "off" }, { area: { widthKm: 600, depthKm: 400 }, echelons: { highest: "component", lowest: "platoon" }, planners: ["overall", "maritime", "air"] }),
+    forces,
+    {
+      entities: [
+        entity("b-ddg", "blue", "generic/destroyer", 0, 0, { label: "Blue destroyer", parent: "b-port", task: { kind: "station", at: p(0, 0), radiusM: 10_000 } }),
+        entity("b-ffg", "blue", "generic/frigate", 5000, 3000, { label: "Blue frigate", parent: "b-port", task: { kind: "station", at: p(5000, 3000), radiusM: 10_000 } }),
+        entity("b-port", "blue", "generic/port", -150_000, 0, { label: "Blue naval base" }),
+        entity("r-uav", "red", "generic/male", 30_000, 0, { altM: 5000, label: "Red surveillance drone", task: { kind: "orbit", at: p(20_000, 0), radiusM: 5000, altM: 5000 } }),
+        entity("m-1", "neutral", "generic/merchant", -120_000, 30_000, { label: "Bulk carrier", lane: [p(-120_000, 30_000), p(100_000, 30_000)] }),
+        entity("m-2", "neutral", "generic/merchant", 100_000, -30_000, { label: "Container ship", lane: [p(100_000, -30_000), p(-120_000, -30_000)] }),
+        ...raid,
+      ],
+      obstacles: [{ owner: "red", kind: "seaMines", at: p(110_000, 60_000), widthM: 20_000, depthM: 10_000, bearingDeg: 0, density: 0.6 }],
+      sea,
+      environment: { startHour: 6, seaState: 2 },
+      victory: [{ kind: "through", side: "blue", ids: ["m-1", "m-2"], at: p(100_000, 30_000), radiusM: 5000, count: 1, label: "Shipping through the strait" }],
+    },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
@@ -279,6 +322,7 @@ export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M4: droneLine,
   M5: airOverTheBattle,
   M6: sustainedOffensive,
+  M7: littoral,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };

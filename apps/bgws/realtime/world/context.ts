@@ -18,6 +18,9 @@ import type { MessageDraft } from "../engine/comms";
 import type { RtConfig, RtEvent, RtOrder, RtShot, RtState, RtUnit } from "../engine/types";
 import type { Domain, DomainMode } from "../scope";
 import type { Entity, LandComponents, WorldLogItem, WorldState } from "./types";
+import { seaTerrain } from "./sea";
+
+const SEA_CONFIGS = new WeakMap<RtConfig, WeakMap<object, RtConfig>>();
 
 export type Emit = (
   unitId: string,
@@ -92,8 +95,15 @@ export class WorldCtx {
   get time(): number {
     return this.land.time;
   }
+  /** The game's config, its terrain seen with the sea at sea level when there is one (W8). */
   get config(): RtConfig {
-    return this.land.config;
+    const sea = this.world.sea;
+    if (!sea) return this.land.config;
+    let byConfig = SEA_CONFIGS.get(this.land.config);
+    if (!byConfig) SEA_CONFIGS.set(this.land.config, (byConfig = new WeakMap()));
+    let config = byConfig.get(sea);
+    if (!config) byConfig.set(sea, (config = { ...this.land.config, terrain: seaTerrain(this.land.config.terrain, sea) }));
+    return config;
   }
   get rng(): Rng {
     return this.land.rng;

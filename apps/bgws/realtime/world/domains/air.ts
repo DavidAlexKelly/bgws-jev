@@ -395,7 +395,10 @@ export function adFire(c: WorldCtx, shooterId: string, weapon: WeaponSpec, targe
   if (!target || !from) return;
   const salvo = weapon.flight === "none" ? 1 : target.domain === "air" && !DRONE_LIKE.has(target.archetype) ? weapon.salvo : 1;
   const mounts = c.comps(shooterId)?.mounts ?? c.entity(shooterId)!.mounts;
-  const next = mounts.map((m) => (m.weaponId === weapon.id ? { ...m, rounds: Math.max(0, m.rounds - salvo), readyAt: c.time + weapon.reloadS } : m));
+  // A ship's vertical launch cells ripple-fire: no launcher to reload between shots, only a rate (naval.ts).
+  const vls = c.entity(shooterId)?.domain === "surface" && weapon.flight !== "none";
+  const next = mounts.map((m) => (m.weaponId === weapon.id ? { ...m, rounds: Math.max(0, m.rounds - salvo), readyAt: vls ? c.time : c.time + weapon.reloadS } : m));
+  if (vls) c.world.memo[`vls:${shooterId}:${c.time}`] = (c.world.memo[`vls:${shooterId}:${c.time}`] ?? 0) + salvo;
   const comps = c.comps(shooterId);
   if (comps) c.setLand(shooterId, { mounts: next, stores: { ...comps.stores, ammo: { ...comps.stores.ammo, [weapon.family]: Math.max(0, (comps.stores.ammo[weapon.family] ?? 0) - salvo) } } });
   else c.setEntity(shooterId, { mounts: next });
@@ -456,6 +459,9 @@ function gbad(c: WorldCtx): void {
       if ((t.domain !== "air" && t.domain !== "munition") || !t.truthId || c.time - t.seenAt > 5) continue;
       const truth = c.entity(t.truthId);
       if (!truth || truth.status !== "active" || truth.owner === side) continue;
+      // A ship alongside has its radars down; a warship's defence against missiles and drones is the naval domain's (vampireInbound).
+      if (ent?.domain === "surface" && ent.speedMs < 0.5 && Object.values(c.world.entities).some((p) => p.archetype === "generic/port" && p.owner === ent.owner && distanceM(p.pos, ent.pos) < 2000)) continue;
+      if (ent?.domain === "surface" && (truth.domain === "munition" || DRONE_LIKE.has(truth.archetype)) && c.simulated("naval")) continue;
       // Our own rounds in flight are not threats to engage (artillery shells, our missiles).
       if (truth.domain === "munition" && !["cruise", "ballistic", "ascm", "agm", "glideBomb", "arm", "owa"].includes(weaponSpec(truth.munition!.weaponId).kind)) continue;
       if (!adMounts(c, id, t.at).length) continue;

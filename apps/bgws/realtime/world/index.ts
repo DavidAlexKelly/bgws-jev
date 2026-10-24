@@ -14,6 +14,7 @@ import "./domains/c2";
 import "./domains/ew";
 import "./domains/drones";
 import "./domains/air";
+import "./domains/naval";
 import "./domains/logistics";
 import "./lod";
 import "./victory";

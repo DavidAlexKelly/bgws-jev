@@ -25,6 +25,7 @@ import type {
   MountState,
   Obstacle,
   Owner,
+  SeaArea,
   Stores,
   VictoryCondition,
   WorldState,
@@ -84,6 +85,8 @@ export interface WorldSetup {
   cyber?: Omit<CyberAccess, "executedAt" | "effectUntil" | "detected">[];
   /** Victory conditions the world judges (world/victory.ts). */
   victory?: VictoryCondition[];
+  /** Water areas (W8): polygons of sea; with none, all is open ocean. */
+  sea?: SeaArea;
 }
 
 /** Does this game need a world? */
@@ -109,7 +112,15 @@ export function mountsOf(record: CatalogueRecord): MountState[] {
   return record.weapons
     .filter((w) => w.kind !== "directFire" && w.kind !== "atgm")
     .filter((w) => !["fpv", "loitering", "owa"].includes(w.kind) || record.domain !== "land")
-    .map((w) => ({ weaponId: w.id, rounds: Math.min(w.magazine, record.stores.ammo[w.family] ?? w.magazine), readyAt: 0 }));
+    // A ship's or submarine's cells and tubes hold its whole load: nothing is reloaded at sea (W8).
+    .map((w) => ({ weaponId: w.id, rounds: cellLoad(record, w), readyAt: 0 }));
+}
+
+/** Rounds a mount holds: a launcher's magazine on land, every cell's worth at sea. */
+export function cellLoad(record: CatalogueRecord, w: CatalogueRecord["weapons"][number]): number {
+  const stores = record.stores.ammo[w.family];
+  if (record.domain === "surface" || record.domain === "subsurface") return stores ?? w.magazine;
+  return Math.min(w.magazine, stores ?? w.magazine);
 }
 
 const NO_DAMAGE = { mobility: false, firepower: false, sensor: false, comms: false };
@@ -259,6 +270,7 @@ export function createWorld(state: RtState, config: RtConfig, setup: WorldSetup)
   }));
   world.measures = setup.measures ?? [];
   if (setup.victory?.length) world.victory = setup.victory;
+  if (setup.sea?.waters.length) world.sea = setup.sea;
   world.cyber = (setup.cyber ?? []).map((a) => ({ ...a }));
   for (const { hook } of HOOKS) hook(world, state, config, setup);
   return world;

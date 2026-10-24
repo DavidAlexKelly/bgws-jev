@@ -269,7 +269,7 @@ export interface WorldTrack {
 export interface Obstacle {
   id: string;
   owner: Side;
-  kind: "minefield" | "ditch" | "dragonsTeeth";
+  kind: "minefield" | "ditch" | "dragonsTeeth" | "seaMines";
   /** A rectangle: centre, half-width along the front, half-depth, and the front's bearing. */
   at: LatLng;
   widthM: number;
@@ -607,6 +607,9 @@ export interface WorldStats {
   structureHits?: Partial<Record<Owner, number>>;
   /** Casualty evacuation times, s (W10). */
   evacuationS: number[];
+  /** Neutral ships that completed their passage, and neutral ships hit (W8). */
+  transits?: number;
+  neutralHits?: number;
   /** Casualties who died of wounds waiting for or during evacuation (W10). */
   diedOfWounds?: number;
   /** Time from a convoy's dispatch to its delivery, s (W10). */
@@ -666,6 +669,8 @@ export interface WorldState {
   memo: Record<string, number>;
   /** Strength of land units that joined during the game, by side: counted into the breakpoint's start. */
   joinedStrength: Record<Side, number>;
+  /** The sea (W8): water areas as polygons; none means open ocean everywhere. */
+  sea?: SeaArea;
   /** The supply network and casualty evacuation when logistics or medical is simulated (W10). */
   logistics?: LogisticsState;
   /** Victory conditions beyond the land breakpoint (world/victory.ts), and how far each has got. */
@@ -759,4 +764,9 @@ export interface LogisticsState {
   evacs: Evacuation[];
   /** Convoy and ambulance units on the board, free for the next job, by side. */
   pool: Record<Side, string[]>;
+}
+
+/** Water (W8): the sea as polygons, with bathymetry declared from the distance to the shore. */
+export interface SeaArea {
+  waters: LatLng[][];
 }

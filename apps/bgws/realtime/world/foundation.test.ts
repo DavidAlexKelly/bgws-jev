@@ -178,7 +178,8 @@ describe("the platform view (W2 adapter)", () => {
     expect(ifv.stores.ammo.cannon30).toBeGreaterThan(0);
     const ddg = toPlatform(game.state, "ddg")!;
     expect(ddg.domain).toBe("surface");
-    expect(ddg.weapons.find((w) => w.id === "samLong")?.rounds).toBe(16);
+    // A ship's cells hold its whole load: 40 long-range interceptors, reloaded only in port.
+    expect(ddg.weapons.find((w) => w.id === "samLong")?.rounds).toBe(40);
     expect(allPlatforms(game.state).map((p) => p.id)).toEqual(["ifv", "ddg"]);
   });
 });

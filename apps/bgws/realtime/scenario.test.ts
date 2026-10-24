@@ -71,9 +71,9 @@ describe("real-time scenario files", () => {
     const broken = parseScenario({ ...scenario(), scope: { ...scopeFor("skirmish"), durationMin: -1, domains: { land: "maybe" } } });
     expect(broken.errors.join("\n")).toMatch(/durationMin/);
     expect(broken.errors.join("\n")).toMatch(/scope.domains.land/);
-    const tooBig = parseScenario({ ...scenario(), scope: scopeFor("maritime") });
+    const tooBig = parseScenario({ ...scenario(), scope: scopeFor("strike") });
     expect(tooBig.scenario).toBeUndefined();
-    expect(tooBig.errors.join("\n")).toMatch(/scope: Naval cannot be simulated yet/);
+    expect(tooBig.errors.join("\n")).toMatch(/scope: Cyber cannot be simulated yet/);
   });
 
   it("rejects an invalid bundled template", () => {

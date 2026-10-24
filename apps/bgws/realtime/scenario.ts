@@ -188,10 +188,19 @@ function worldErrors(raw: unknown, unitIds: ReadonlySet<string>): string[] {
     obstacles.forEach((o, i) => {
       const at = `world.obstacles[${i}]`;
       if (!isObj(o)) return void errors.push(`${at}: must be an object`);
-      if (!["minefield", "ditch", "dragonsTeeth"].includes(o.kind as string)) errors.push(`${at}: "kind" must be minefield, ditch or dragonsTeeth`);
+      if (!["minefield", "ditch", "dragonsTeeth", "seaMines"].includes(o.kind as string)) errors.push(`${at}: "kind" must be minefield, ditch, dragonsTeeth or seaMines`);
       if (o.owner !== "blue" && o.owner !== "red") errors.push(`${at}: "owner" must be blue or red`);
       if (!(isNum(o.widthM) && o.widthM > 0 && isNum(o.depthM) && o.depthM > 0)) errors.push(`${at}: "widthM" and "depthM" must be positive`);
     });
   if (raw.environment !== undefined && !isObj(raw.environment)) errors.push('"world.environment" must be an object');
+  if (raw.sea !== undefined) {
+    const waters = isObj(raw.sea) ? raw.sea.waters : undefined;
+    const point = (q: unknown) => isObj(q) && isNum(q.lat) && isNum(q.lng);
+    if (!Array.isArray(waters) || waters.some((w) => !Array.isArray(w) || w.length < 3 || !w.every(point))) errors.push('"world.sea.waters" must be a list of polygons of at least three { lat, lng } points');
+  }
+  if (raw.victory !== undefined) {
+    const kinds = ["airSuperiority", "targetSet", "seaControl", "through", "all"];
+    if (!Array.isArray(raw.victory) || raw.victory.some((v) => !isObj(v) || !kinds.includes(v.kind as string) || (v.side !== "blue" && v.side !== "red"))) errors.push(`"world.victory" must be a list of conditions (${kinds.join(", ")}) each with a side`);
+  }
   return errors;
 }
