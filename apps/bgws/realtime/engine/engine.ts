@@ -2170,6 +2170,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     // A side with no land force at all (an air or sea scenario) cannot be
     // beaten on land: the world layer judges it (world/victory.ts).
     if (prev.world && (prev.startStrength?.[side] ?? 0) <= 0) return 0;
+    // A scenario with its own victory conditions is won by them, not by the land breakpoint.
+    if (prev.world?.victory?.length) return 0;
     // Troops that joined during the game (dismounted sections) count as if they had been there from the start.
     const start = Math.max(1, (prev.startStrength?.[side] ?? 0) + (world?.joinedStrength?.[side] ?? 0));
     const fighting = forceElementsOf(game, side)

@@ -47,6 +47,7 @@ export interface KitOptions {
   hqs?: HqSpec[];
   measures?: ControlMeasure[];
   cyber?: WorldSetup["cyber"];
+  victory?: WorldSetup["victory"];
   env?: Partial<Environment>;
   /** Domains to set, on top of a skirmish's (land simulated, the rest off). */
   domains?: Partial<Record<Domain, DomainMode>>;
@@ -96,6 +97,7 @@ export function kitGame(o: KitOptions): { state: RtState; config: RtConfig } {
     ...(o.hqs ? { hqs: o.hqs } : {}),
     ...(o.measures ? { measures: o.measures } : {}),
     ...(o.cyber ? { cyber: o.cyber as CyberAccess[] } : {}),
+    ...(o.victory ? { victory: o.victory } : {}),
     ...(o.env ? { environment: o.env } : {}),
   };
   state = { ...state, world: createWorld(state, config, setup) };

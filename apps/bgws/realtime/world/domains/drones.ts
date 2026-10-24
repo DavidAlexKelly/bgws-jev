@@ -32,7 +32,7 @@ import { smallDronesFly } from "../environment";
 import { wfig } from "../figures";
 import { bearingDeg, distanceM, groundAt, offsetBy, seesBetween, step3d } from "../geo";
 import { applyHit, impactOnLand } from "../landEffects";
-import { launch } from "../munitions";
+import { damageEntity, launch } from "../munitions";
 import { jamLoss } from "../net";
 import { raiseQuestion } from "../questions";
 import { onDetection } from "../hooks";
@@ -348,7 +348,13 @@ function strike(c: WorldCtx, d: Entity, targetId: string | undefined, at: LatLng
   const operator = d.parent ? c.where(d.parent) : undefined;
   if (operator) c.stat((s) => ({ ...s, droneStrikeRangesKm: [...(s.droneStrikeRangesKm ?? []), Math.round(distanceM(operator, at) / 100) / 10] }));
   const results = impactOnLand(c, target?.position ?? at, weapon, { firerSide: side, ...(target ? { targetId } : {}), label: `${rec.name} from ${d.parent ?? "far off"}`, firerAt: c.where(d.parent ?? "") ?? at });
-  const killed = results.reduce((s, r) => s + r.knocked, 0);
+  let killed = results.reduce((s, r) => s + r.knocked, 0);
+  // A fixed site or a ship where it lands: the airbase, depot or port a one-way drone was sent at.
+  for (const e of Object.values(c.world.entities)) {
+    if ((e.domain !== "node" && e.domain !== "surface") || e.owner === d.owner || e.hp <= 0 || distanceM(e.pos, at) > weapon.lethalRadiusM + 150) continue;
+    if (damageEntity(c, e.id, weapon, d.id).killed) killed++;
+    c.stat((s) => ({ ...s, structureHits: { ...s.structureHits, [e.owner]: (s.structureHits?.[e.owner] ?? 0) + 1 } }));
+  }
   if (killed > 0) {
     c.stat((s) => {
       const m = s.munitions[weapon.id];

@@ -203,6 +203,38 @@ export interface Entity {
   lane?: LatLng[];
   /** For the AAR: its decisions, the latest last. */
   history: { time: number; chose: string; by: "jev" | "rules" | "drill" }[];
+  /** Aircraft: the mission it is flying, and its sortie count (W7). */
+  air?: AirState;
+}
+
+/** A flight's air tasking (W7): a light version of the ATO. */
+export interface AirMission {
+  kind: "cap" | "strike" | "sead" | "cas" | "isr" | "tanker" | "aew" | "escort" | "asw";
+  /** Station, target area or orbit centre. */
+  at: LatLng;
+  radiusM: number;
+  /** A target platform, when the mission has one. */
+  targetId?: string;
+  altM: number;
+  /** When the mission ends and the flight comes home, at the latest. */
+  until: number;
+  tasked: number;
+  by: string;
+  /** Where to release stand-off weapons from (glide bombs). */
+  releaseAt?: LatLng;
+  /** A waypoint flown first: the way round a threat ring. */
+  via?: LatLng;
+}
+
+export interface AirState {
+  mission?: AirMission;
+  sorties: number;
+  /** On the ground: ready to fly again at. */
+  readyAt: number;
+  /** Defending against a missile until. */
+  defendingUntil?: number;
+  /** Has used its weapons on this sortie. */
+  winchester?: boolean;
 }
 
 /** One side's track on an entity or a land unit, as its sensors or reports hold it (§4.3). */
@@ -565,6 +597,8 @@ export interface WorldStats {
   landLossDepthKm: number[];
   /** How far from its operator each drone strike landed, km: the kill zone's reach (W5). */
   droneStrikeRangesKm?: number[];
+  /** Hits on fixed sites and ships, by owner: what got through to them. */
+  structureHits?: Partial<Record<Owner, number>>;
   /** Casualty evacuation times, s (W10). */
   evacuationS: number[];
   /** Breaches completed and how long each took, s (W3). */
@@ -622,6 +656,8 @@ export interface WorldState {
   memo: Record<string, number>;
   /** Strength of land units that joined during the game, by side: counted into the breakpoint's start. */
   joinedStrength: Record<Side, number>;
+  /** Victory conditions beyond the land breakpoint (world/victory.ts), and how far each has got. */
+  victory?: VictoryCondition[];
   /** Victory as the world judges it, for scopes whose aims are not a land breakpoint (world/victory.ts). */
   verdict?: { winner: Side | null; reason: string };
   nextId: number;
@@ -646,3 +682,15 @@ export interface SupportService {
   /** Pending deliveries. */
   pending: { at: number; dueAt: number; requestedBy: string; targetId?: string }[];
 }
+
+/**
+ * A victory condition the world judges (§5.3): air superiority over an area,
+ * a target set destroyed, sea control, ships through, or all of several (a
+ * joint operation's aims). `holdS` is how long a state must last to count.
+ */
+export type VictoryCondition =
+  | { kind: "airSuperiority"; side: Side; at: LatLng; radiusM: number; holdS: number; label?: string }
+  | { kind: "targetSet"; side: Side; targets: string[]; share: number; label?: string }
+  | { kind: "seaControl"; side: Side; at: LatLng; radiusM: number; holdS: number; label?: string }
+  | { kind: "through"; side: Side; ids: string[]; at: LatLng; radiusM: number; count: number; label?: string }
+  | { kind: "all"; side: Side; of: VictoryCondition[]; label?: string };

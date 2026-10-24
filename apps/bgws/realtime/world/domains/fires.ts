@@ -39,6 +39,8 @@ import { registerSystem } from "../step";
 import type { FireMission } from "../types";
 import type { LatLng } from "../../../lib/board";
 import { pntQualityAt } from "../pnt";
+import { aircraftInCorridor } from "../airspace";
+import { damageEntity } from "../munitions";
 
 const INDIRECT = new Set(["mortar", "howitzer", "rocket"]);
 
@@ -133,6 +135,8 @@ type Live = FireMission & {
   lastImpactAt?: number;
   /** GNSS jammed at the target (W6): what the gun chose. */
   pntChoice?: "asking" | "anyway" | "unguided" | "laser";
+  /** Own aircraft in the gun line (W7): what the fires cell chose. */
+  airspace?: "asking" | "clear" | "accepted";
 };
 
 // ── Calls for fire ───────────────────────────────────────────────────────
@@ -261,6 +265,23 @@ function fire(c: WorldCtx): void {
         setMission(c, m.id, { nextAt: Infinity, pntChoice: "asking" });
         raiseQuestion(c, { agentId: shooter, side: m.side, trigger: "pntDegraded", about: { missionId: m.id, pnt: Math.round(q * 100) / 100 }, quality: c.fe(shooter)?.troopQuality ?? 4 });
         continue;
+      }
+    }
+    // Own aircraft under the trajectory: the fires cell deconflicts before the guns fire (W7 airspaceConflict).
+    if (!offBoard && m.airspace !== "accepted" && m.airspace !== "clear" && c.simulated("air")) {
+      const inWay = aircraftInCorridor(c, m.side, from, m.targetAt);
+      if (inWay.length) {
+        setMission(c, m.id, { nextAt: Infinity, airspace: "asking" });
+        raiseQuestion(c, { agentId: shooter, side: m.side, trigger: "airspaceConflict", about: { missionId: m.id, flightId: inWay[0].id, flights: inWay.length }, quality: c.fe(shooter)?.troopQuality ?? 4 });
+        continue;
+      }
+    }
+    // Firing through an accepted conflict: the aircraft in the way may be hit.
+    if (m.airspace === "accepted" && !offBoard) {
+      for (const f of aircraftInCorridor(c, m.side, from, m.targetAt)) {
+        if (!c.chance(wfig("world/airspace.FRATRICIDE_P"))) continue;
+        const r = damageEntity(c, f.id, w, shooter);
+        c.log({ side: m.side, domain: "fires", kind: "fratricide", text: `${shooter}'s rounds hit ${f.label} (${f.id}) in the gun line: ${r.text}`, ids: [shooter, f.id], at: f.pos });
       }
     }
     if (m.pntChoice === "unguided") {
@@ -467,6 +488,38 @@ registerHandlers({
   },
 });
 
+registerHandlers({
+  "killweb.holdGuns": {
+    available: (c, q) => missionOf(c, q) != null,
+    apply(c, q) {
+      const m = missionOf(c, q);
+      // Held, then looked at again: asked once more if the aircraft is still there.
+      if (m) setMission(c, m.id, { airspace: undefined, nextAt: c.time + wfig("world/airspace.HOLD_S") });
+    },
+  },
+  "killweb.shiftAircraft": {
+    available: (c, q) => c.entity(q.about.flightId as string)?.air?.mission != null && missionOf(c, q) != null,
+    apply(c, q) {
+      const m = missionOf(c, q);
+      const f = c.entity(q.about.flightId as string);
+      if (!m || !f?.air?.mission) return;
+      const from = c.where(q.agentId) ?? f.pos;
+      const aside = (bearingDeg(from, m.targetAt) + 90) % 360;
+      const shifted = { ...f.air.mission, at: offsetBy(f.air.mission.at, aside, wfig("world/airspace.SHIFT_M")) };
+      c.setEntity(f.id, { pos: offsetBy(f.pos, aside, wfig("world/airspace.SHIFT_M") / 4), air: { ...f.air, mission: shifted } });
+      c.log({ side: q.side, domain: "fires", kind: "deconflict", text: `${f.label} (${f.id}) shifted out of ${q.agentId}'s gun line`, ids: [f.id, q.agentId] });
+      setMission(c, m.id, { airspace: undefined, nextAt: c.time + 30 });
+    },
+  },
+  "killweb.acceptRisk": {
+    available: (c, q) => missionOf(c, q) != null,
+    apply(c, q) {
+      const m = missionOf(c, q);
+      if (m) setMission(c, m.id, { airspace: "accepted", nextAt: c.time });
+    },
+  },
+});
+
 function pntChoose(c: WorldCtx, q: { about: Record<string, unknown> }, choice: "anyway" | "unguided" | "laser"): void {
   const m = missionOf(c, q);
   if (m) setMission(c, m.id, { pntChoice: choice, nextAt: c.time });
@@ -479,6 +532,11 @@ registerRules({
     // A gun that has already fired from here twice shoots and scoots.
     if (firedFromHere(c, q.agentId) >= 2) return prefer(options, "fires.fireThenScoot", "fires.fireNow");
     return prefer(options, "fires.fireNow");
+  },
+  airspaceConflict: (c, q, options) => {
+    // An urgent mission shifts the aircraft if it can; otherwise the guns wait.
+    const m = missionOf(c, q);
+    return m && m.priority >= 4 ? prefer(options, "killweb.shiftAircraft", "killweb.holdGuns") : prefer(options, "killweb.holdGuns", "killweb.shiftAircraft");
   },
   pntDegraded: (_c, _q, options) => prefer(options, "ew.requestDroneGuidance", "ew.switchMunition", "ew.waitForPnt", "ew.fireAnyway"),
   counterBatteryThreat: (_c, q, options) => (q.about.located ? prefer(options, "fires.displaceNow") : prefer(options, "fires.finishThenDisplace", "fires.stay")),

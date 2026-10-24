@@ -396,7 +396,7 @@ const AIR: CatalogueRecord[] = [
     body: { count: 2, vulnerability: "aircraft", crew: 1 }, signatures: { visual: 1, ir: 2, rcsM2: 5 },
     sensors: [radar(150_000, 2, 0, true, 120), { kind: "rwr", rangeM: 300_000, arcDeg: 360, scanS: 1, classifies: "class", seesAir: true, active: false, heightM: 0 }],
     weapons: [WEAPONS.aamBvr, WEAPONS.aamWvr, WEAPONS.glideBomb, WEAPONS.arm], emitters: [radarEmitter("x", 5000), { kind: "datalink", band: "l", powerW: 200, dutyCycle: 0.3 }],
-    bearers: ["uhf", "datalink"], stores: { fuelL: 7000, burnLph: { moving: 3000, idle: 0 }, ammo: { aam: 6, bomb: 2, missile: 2 } },
+    bearers: ["uhf", "vhf", "datalink"], stores: { fuelL: 7000, burnLph: { moving: 3000, idle: 0 }, ammo: { aam: 6, bomb: 2, missile: 2 } },
     costUsd: 70_000_000, rationale: "Surge 2–3 sorties a day, 1–1.5 sustained.",
     sources: { "role": { kind: "reference", ref: "P30 (default)" } },
   }),
@@ -406,7 +406,7 @@ const AIR: CatalogueRecord[] = [
     body: { count: 2, vulnerability: "aircraft", crew: 1 }, signatures: { visual: 1, ir: 1.5, rcsM2: 0.005 },
     sensors: [radar(170_000, 2, 0, true, 120), { kind: "rwr", rangeM: 300_000, arcDeg: 360, scanS: 1, classifies: "type", seesAir: true, active: false, heightM: 0 }],
     weapons: [WEAPONS.aamBvr, WEAPONS.glideBomb, WEAPONS.arm], emitters: [radarEmitter("x", 3000), { kind: "datalink", band: "l", powerW: 100, dutyCycle: 0.2 }],
-    bearers: ["uhf", "datalink"], stores: { fuelL: 8000, burnLph: { moving: 3200, idle: 0 }, ammo: { aam: 4, bomb: 2, missile: 2 } },
+    bearers: ["uhf", "vhf", "datalink"], stores: { fuelL: 8000, burnLph: { moving: 3200, idle: 0 }, ammo: { aam: 4, bomb: 2, missile: 2 } },
     costUsd: 100_000_000, rationale: "A radar cross-section a thousand times smaller than a 4th-generation fighter's.",
   }),
   rec({

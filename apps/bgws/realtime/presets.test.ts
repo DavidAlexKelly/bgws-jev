@@ -50,4 +50,16 @@ describe("milestone scenarios", () => {
     expect(Object.keys(w.fixes.blue).length + Object.keys(w.fixes.red).length, "ESM hears emitters").toBeGreaterThan(0);
     void kinds;
   }, 60_000);
+
+  it("M5: SEAD on the fixed SAM, air defence against the raid, flights tasked and turned round", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M5());
+    const result = await playRecord(record, { untilS: 2 * 3600 });
+    const w = result.state.world!;
+    const raid = Object.values(w.entities).filter((e) => e.id.startsWith("r-owa-"));
+    expect(raid.filter((e) => e.status === "destroyed").length, "raid intercepted").toBeGreaterThan(raid.length / 2);
+    expect(w.stats.interceptsTried, "interceptors fired").toBeGreaterThan(0);
+    expect(w.stats.spentUsd.blue, "the defence's bill").toBeGreaterThan(0);
+    expect(Object.values(w.entities).some((e) => e.air?.sorties != null && e.air.sorties > 0), "a flight landed and turned round").toBe(true);
+    expect(Object.keys(w.fixes.blue).includes("r-sam") || (w.stats.munitions.arm?.fired ?? 0) > 0, "the SAM found").toBe(true);
+  }, 120_000);
 });

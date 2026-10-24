@@ -151,11 +151,60 @@ export function droneLine(): RealtimeScenario {
   );
 }
 
+/**
+ * M5 — Air over the battle: a contested front with SEAD and CAS overhead,
+ * and a Shahed-style raid on the blue airbase's layered defence (W7). Blue's
+ * SIGINT fixes the red SAM for the SEAD flights; blue's guns share the sky
+ * with its own aircraft. Blue wins by clearing the air over the front; red
+ * by putting the airbase out of action.
+ */
+export function airOverTheBattle(): RealtimeScenario {
+  const forces: PlacedElement[] = [
+    // The land front.
+    unit("b-hq", "blue", "generic/cp-company", 2, 0, -6000, "Blue company HQ", "regular", 2),
+    unit("b-tanks", "blue", "generic/mbt", 4, -800, -1500, "Blue tanks"),
+    unit("b-ifv", "blue", "generic/ifv", 3, 800, -1500, "Blue mech"),
+    unit("b-guns", "blue", "generic/sph155", 3, 0, -14_000, "Blue artillery"),
+    unit("b-esm-1", "blue", "generic/esmTeam", 1, -12_000, -5000, "Blue SIGINT west"),
+    unit("b-esm-2", "blue", "generic/esmTeam", 1, 12_000, -5000, "Blue SIGINT east"),
+    unit("r-hq", "red", "generic/cp-company", 2, 0, 12_000, "Red company HQ", "regular", 2),
+    unit("r-inf-1", "red", "generic/infantrySection", 3, -1500, 5000, "Red 1 Platoon"),
+    unit("r-inf-2", "red", "generic/infantrySection", 3, 1500, 5000, "Red 2 Platoon"),
+    unit("r-shorad", "red", "generic/shorad", 2, 0, 8000, "Red SHORAD"),
+    unit("r-sam", "red", "generic/samMedium", 2, 4000, 40_000, "Red SAM battery"),
+    // The airbase's layered defence.
+    unit("b-sam", "blue", "generic/samMedium", 2, 0, -52_000, "Blue SAM battery"),
+    unit("b-shorad-1", "blue", "generic/shorad", 2, -2000, -58_000, "Blue SHORAD west"),
+    unit("b-shorad-2", "blue", "generic/shorad", 2, 2000, -58_000, "Blue SHORAD east"),
+  ];
+  const raid: EntitySpec[] = [];
+  for (let i = 0; i < 24; i++) {
+    // About 60% armed, 40% decoys [P10], launched from far behind red's lines at the airbase.
+    const decoy = i % 5 >= 3;
+    raid.push(entity(`r-owa-${i + 1}`, "red", decoy ? "generic/owaDecoy" : "generic/owaDrone", -25_000 + i * 2000, 90_000 + (i % 3) * 3000, { altM: 1500, label: decoy ? `Decoy ${i + 1}` : `Shahed ${i + 1}`, task: { kind: "strike", aimAt: p((i % 3) * 60 - 60, -60_000 + (i % 2) * 60), altM: 1500 } }));
+  }
+  return scenario(
+    "M5 — Air over the battle",
+    "m5-air",
+    scopeOf("airCampaign", 360, { land: "simulated", fires: "simulated", drones: "simulated", ew: "simulated", air: "simulated", airDefence: "simulated", space: "abstracted", logistics: "abstracted" }, { area: { widthKm: 100, depthKm: 200 }, echelons: { highest: "component", lowest: "platoon" } }),
+    forces,
+    {
+      entities: [entity("b-base", "blue", "generic/airbase", 0, -60_000, { label: "Blue airbase" }), entity("r-base", "red", "generic/airbase", 0, 160_000, { label: "Red airbase" }), ...raid],
+      environment: { startHour: 6 },
+      victory: [
+        { kind: "airSuperiority", side: "blue", at: p(0, 30_000), radiusM: 25_000, holdS: 1800, label: "Air superiority over the front" },
+        { kind: "targetSet", side: "red", targets: ["b-base"], share: 1, label: "The blue airbase out of action" },
+      ],
+    },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
   M3: battalionAttack,
   M4: droneLine,
+  M5: airOverTheBattle,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };

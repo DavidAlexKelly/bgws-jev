@@ -27,7 +27,7 @@ describe("scenario scope", () => {
     expect(effectiveScope({ ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } }).errors.join(" ")).toMatch(
       /Land cannot be off/,
     );
-    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 2000 }).errors.join(" ")).toMatch(/5–600 minutes/);
+    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 2000 }).errors.join(" ")).toMatch(/5–1440 minutes/);
   });
 
   it("every preset names a victory and a milestone", () => {

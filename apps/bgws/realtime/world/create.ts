@@ -26,6 +26,7 @@ import type {
   Obstacle,
   Owner,
   Stores,
+  VictoryCondition,
   WorldState,
 } from "./types";
 
@@ -81,11 +82,13 @@ export interface WorldSetup {
   hqs?: HqSpec[];
   measures?: ControlMeasure[];
   cyber?: Omit<CyberAccess, "executedAt" | "effectUntil" | "detected">[];
+  /** Victory conditions the world judges (world/victory.ts). */
+  victory?: VictoryCondition[];
 }
 
 /** Does this game need a world? */
 export function needsWorld(scope: Scope | undefined, setup?: Partial<WorldSetup>): boolean {
-  if (setup && ((setup.entities?.length ?? 0) > 0 || (setup.obstacles?.length ?? 0) > 0 || (setup.hqs?.length ?? 0) > 0 || setup.environment)) return true;
+  if (setup && ((setup.entities?.length ?? 0) > 0 || (setup.obstacles?.length ?? 0) > 0 || (setup.hqs?.length ?? 0) > 0 || (setup.victory?.length ?? 0) > 0 || setup.environment)) return true;
   if (!scope) return false;
   return DOMAINS.some((d) => d !== "land" && scope.domains[d] !== "off");
 }
@@ -255,6 +258,7 @@ export function createWorld(state: RtState, config: RtConfig, setup: WorldSetup)
     knownTo: [o.owner],
   }));
   world.measures = setup.measures ?? [];
+  if (setup.victory?.length) world.victory = setup.victory;
   world.cyber = (setup.cyber ?? []).map((a) => ({ ...a }));
   for (const { hook } of HOOKS) hook(world, state, config, setup);
   return world;

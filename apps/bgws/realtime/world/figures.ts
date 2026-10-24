@@ -179,6 +179,35 @@ export const WORLD_FIGURES = {
   "world/domains/drones.RELOCATE_M": { value: 800, unit: "m", module: "world/domains/drones", source: declared, range: [400, 2000], note: "How far a drone team moves when it relocates." },
   "world/domains/drones.WAIT_S": { value: 900, unit: "s", module: "world/domains/drones", source: declared, range: [300, 1800], note: "A team that waits out jamming stays off the air this long." },
   "world/domains/drones.OPERATOR_EXPOSED_S": { value: 900, unit: "s", module: "world/domains/drones", source: declared, range: [300, 1800], note: "Flying this long from one place, a team asks whether its operators have been located." },
+
+  // ── Airspace (world/airspace) ──
+  "world/airspace.ORDINATE_SHARE": { value: 0.25, unit: "×", module: "world/airspace", source: declared, range: [0.15, 0.35], note: "A shell's trajectory peaks at this share of its range." },
+  "world/airspace.ORDINATE_CAP_M": { value: 15000, unit: "m", module: "world/airspace", source: declared, range: [10000, 25000], note: "The highest any trajectory climbs." },
+  "world/airspace.CORRIDOR_M": { value: 2000, unit: "m", module: "world/airspace", source: declared, range: [1000, 5000], note: "An aircraft this close to the gun–target line is in the way of the rounds." },
+  "world/airspace.FRATRICIDE_P": { value: 0.02, unit: "×", module: "world/airspace", source: declared, range: [0.005, 0.05], note: "Chance per salvo that rounds fired through a corridor an own aircraft is in bring it down." },
+  "world/airspace.HOLD_S": { value: 120, unit: "s", module: "world/airspace", source: declared, range: [60, 300], note: "Guns held for an aircraft wait this long before checking the airspace again." },
+  "world/airspace.SHIFT_M": { value: 8000, unit: "m", module: "world/airspace", source: declared, range: [4000, 15000], note: "An aircraft shifted out of the gun line moves its station this far aside." },
+  // ── Air and air defence (world/domains/air) ──
+  "world/domains/air.TURNAROUND_S": { value: 7200, unit: "s", module: "world/domains/air", source: ref("P30 (default)"), range: [3600, 14400], note: "Turning a fighter round between sorties (surge 2–3 sorties a day, sustained 1–1.5)." },
+  "world/domains/air.TURNAROUND_HELO_S": { value: 3600, unit: "s", module: "world/domains/air", source: declared, range: [1800, 7200], note: "Turning a helicopter round between sorties." },
+  "world/domains/air.TASKING_S": { value: 3600, unit: "s", module: "world/domains/air", source: declared, range: [1800, 14400], note: "The air tasking cycle: idle flights get missions this often (a light ATO)." },
+  "world/domains/air.SORTIE_S": { value: 5400, unit: "s", module: "world/domains/air", source: declared, range: [3600, 10800], note: "How long a tasked mission lasts before the flight comes home." },
+  "world/domains/air.WEZ_ASK_S": { value: 60, unit: "s", module: "world/domains/air", source: declared, range: [30, 120], note: "A flight is asked about the same target in its envelope no more often than this." },
+  "world/domains/air.SEE_IR_MISSILE": { value: 0.3, unit: "×", module: "world/domains/air", source: declared, range: [0.1, 0.6], note: "Chance a flight sees an infrared missile coming without a missile-approach warner." },
+  "world/domains/air.ENERGY_FALLOFF": { value: 0.6, unit: "×", module: "world/domains/air", source: declared, range: [0.3, 0.8], note: "A missile fired at its maximum range loses this share of its kill probability (falling with the square of range)." },
+  "world/domains/air.DEFEND_FACTOR": { value: 0.35, unit: "×", module: "world/domains/air", source: declared, range: [0.2, 0.6], note: "A flight that defends (notch, chaff, flares) leaves a missile this share of its kill probability." },
+  "world/domains/air.DEFEND_S": { value: 30, unit: "s", module: "world/domains/air", source: declared, range: [15, 60], note: "How long a defensive manoeuvre lasts." },
+  "world/domains/air.STEALTH_FACTOR": { value: 0.6, unit: "×", module: "world/domains/air", source: declared, range: [0.3, 0.9], note: "A radar-guided weapon against a target of tiny radar cross-section keeps this share of its kill probability." },
+  "world/domains/air.LOW_FACTOR": { value: 0.7, unit: "×", module: "world/domains/air", source: declared, range: [0.5, 0.9], note: "A radar seeker against a target low in the ground clutter keeps this share." },
+  "world/domains/air.AD_ASK_S": { value: 20, unit: "s", module: "world/domains/air", source: declared, range: [10, 60], note: "An air-defence unit is asked about the same track no more often than this." },
+  "world/domains/air.SEE_ARM": { value: 0.6, unit: "×", module: "world/domains/air", source: declared, range: [0.3, 0.9], note: "Chance a radar crew sees an anti-radiation missile launched at it in time to shut down." },
+  "world/domains/air.AD_RELOAD_S": { value: 900, unit: "s", module: "world/domains/air", source: declared, range: [300, 2700], note: "Reloading an empty SAM launcher from the battery's transloaders." },
+  "world/domains/air.NCTR_M": { value: 40000, unit: "m", module: "world/domains/air", source: declared, range: [20000, 80000], note: "A fighter's own radar identifies a classified air track that does not answer IFF inside this range (non-cooperative target recognition)." },
+  "world/domains/air.SILENT_S": { value: 600, unit: "s", module: "world/domains/air", source: declared, range: [300, 1800], note: "A radar shut down against an anti-radiation missile stays off this long." },
+  "world/domains/air.DETOUR_MARGIN": { value: 1.3, unit: "×", module: "world/domains/air", source: declared, range: [1.1, 1.6], note: "Going round a threat ring, a flight passes this many ring radii from the site." },
+  "world/domains/air.NINE_LINE_GAP_S": { value: 300, unit: "s", module: "world/domains/air", source: declared, range: [120, 900], note: "A unit does not send another 9-line within this long." },
+  "world/domains/air.CAS_REACH_M": { value: 60000, unit: "m", module: "world/domains/air", source: declared, range: [30000, 100000], note: "A CAS flight this far from a unit in contact can be asked for support." },
+  "world/domains/air.CAS_DELAY_S": { value: 300, unit: "s", module: "world/domains/air", source: ref("P24 (default)"), range: [120, 900], note: "Accepted with delay: the flight comes this much later (CAS on call is 10–30 min end to end)." },
 } as const satisfies Record<string, WorldFigure>;
 
 export type WorldFigureKey = keyof typeof WORLD_FIGURES;
