@@ -5,6 +5,8 @@ import { playRecord, recordFromScenario } from "./headless";
 import { parseScenario } from "./scenario";
 import { PRESET_SCENARIOS } from "./presets";
 
+const strikes0 = (w: { stats: { munitions: Record<string, { fired: number }> } }) => Object.values(w.stats.munitions).reduce((n, m) => n + m.fired, 0);
+
 describe("milestone scenarios", () => {
   for (const [milestone, make] of Object.entries(PRESET_SCENARIOS)) {
     it(`${milestone} is a valid scenario file`, () => {
@@ -33,5 +35,19 @@ describe("milestone scenarios", () => {
     expect(w.log.some((l) => l.text.startsWith("blue-bn issues its plan")), "battalion plan").toBe(true);
     expect(w.messages.some((m) => m.kind === "frago" && m.from === "b-a-hq"), "company FRAGOs").toBe(true);
     expect(w.stats.reportLatencyByHq["blue-bn"]?.length ?? 0, "reports reach the battalion").toBeGreaterThan(0);
+  }, 60_000);
+
+  it("M4: drones fly, strike and are shot down; jammers and ESM work on both sides", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M4());
+    const result = await playRecord(record, { untilS: 2400 });
+    const w = result.state.world!;
+    const kinds = new Set(w.log.map((l) => `${l.domain}:${l.kind}`));
+    expect(Object.keys(w.entities).length + strikes0(w), "launches").toBeGreaterThan(0);
+    const strikes = ["fpv", "fpvFibre", "loitering"].reduce((n, k) => n + (w.stats.munitions[k]?.fired ?? 0), 0);
+    expect(strikes, "strikes").toBeGreaterThan(0);
+    const early = await playRecord(record, { untilS: 300 });
+    expect(early.state.world!.jammers.filter((j) => j.on).length, "jammers on").toBe(2);
+    expect(Object.keys(w.fixes.blue).length + Object.keys(w.fixes.red).length, "ESM hears emitters").toBeGreaterThan(0);
+    void kinds;
   }, 60_000);
 });

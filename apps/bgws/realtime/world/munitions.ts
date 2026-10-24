@@ -30,6 +30,7 @@ import { closestApproachM, distanceM, groundAt, scatter, step3d, bearingDeg } fr
 import { impactOnLand } from "./landEffects";
 import { guidedCepM, pntQualityAt } from "./pnt";
 import { registerSystem } from "./step";
+import { HIT_MODIFIERS, IMPACT_LISTENERS } from "./hooks";
 import type { Entity } from "./types";
 
 export interface LaunchSpec {
@@ -47,19 +48,7 @@ export interface LaunchSpec {
   chainId?: string;
 }
 
-/** Modifies a hit's chance for a target: decoys, a defending aircraft, cages. 1 is no change. */
-export type HitModifier = (c: WorldCtx, munition: Entity, weapon: WeaponSpec, targetId: string) => number;
-const HIT_MODIFIERS: HitModifier[] = [];
-export function registerHitModifier(m: HitModifier): void {
-  HIT_MODIFIERS.push(m);
-}
-
-/** Called when a munition reaches or misses its target, for the domains that care (BDA, intercept stats). */
-export type ImpactListener = (c: WorldCtx, munition: Entity, outcome: { hit: boolean; killed: boolean; targetId?: string; at: LatLng }) => void;
-const LISTENERS: ImpactListener[] = [];
-export function onImpact(listener: ImpactListener): void {
-  LISTENERS.push(listener);
-}
+export { registerHitModifier, onImpact, type HitModifier, type ImpactListener } from "./hooks";
 
 /** Put a round in the air. Its magazine is the launcher's business. */
 export function launch(c: WorldCtx, spec: LaunchSpec): Entity {
@@ -176,7 +165,7 @@ function finish(c: WorldCtx, m: Entity, outcome: { hit: boolean; killed: boolean
       return { ...s, munitions: { ...s.munitions, [k]: { ...rec, hits: rec.hits + 1, kills: rec.kills + (outcome.killed ? 1 : 0) } } };
     });
   }
-  for (const l of LISTENERS) l(c, c.entity(m.id)!, outcome);
+  for (const l of IMPACT_LISTENERS) l(c, c.entity(m.id)!, outcome);
 }
 
 /** Resolve a munition reaching its target or aim point. */
@@ -184,6 +173,8 @@ function arrive(c: WorldCtx, m: Entity, weapon: WeaponSpec, at: LatLng, targetId
   const owner = m.owner === "neutral" ? "blue" : m.owner;
   if (m.munition?.decoy) return finish(c, m, { hit: false, killed: false, at });
   const target = targetId ? c.entity(targetId) : undefined;
+  const intercept = target != null && (target.domain === "air" || target.domain === "munition");
+  if (intercept) c.stat((s) => ({ ...s, interceptsTried: s.interceptsTried + 1 }));
   if (target) {
     let p = weapon.pk;
     for (const mod of HIT_MODIFIERS) p *= mod(c, m, weapon, targetId!);
@@ -192,6 +183,14 @@ function arrive(c: WorldCtx, m: Entity, weapon: WeaponSpec, at: LatLng, targetId
       return finish(c, m, { hit: false, killed: false, targetId, at });
     }
     const result = damageEntity(c, targetId!, weapon, m.munition!.launcherId);
+    if (intercept && result.killed) c.stat((s) => ({ ...s, interceptsMade: s.interceptsMade + 1 }));
+    if (intercept && target.domain === "munition") {
+      c.stat((s) => {
+        const k = target.munition?.weaponId ?? target.label;
+        const rec = s.munitions[k] ?? { fired: 0, hits: 0, kills: 0, intercepted: 0 };
+        return { ...s, munitions: { ...s.munitions, [k]: { ...rec, intercepted: rec.intercepted + (result.killed ? 1 : 0) } } };
+      });
+    }
     c.log({ side: owner, domain: "munitions", kind: "hit", text: `${weapon.id} from ${m.munition!.launcherId}: ${result.text}`, ids: [m.munition!.launcherId, targetId!], at });
     return finish(c, m, { hit: true, killed: result.killed, targetId, at });
   }

@@ -22,8 +22,8 @@ describe("scenario scope", () => {
   });
 
   it("refuses, with reasons, a scope that needs what is not built", () => {
-    const { errors } = effectiveScope(scopeFor("combinedArms"));
-    expect(errors.join(" ")).toMatch(/Drones cannot be simulated yet \(planned for M2\)/);
+    const { errors } = effectiveScope(scopeFor("maritime"));
+    expect(errors.join(" ")).toMatch(/Naval cannot be simulated yet \(planned for M7\)/);
     expect(effectiveScope({ ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } }).errors.join(" ")).toMatch(
       /Land cannot be off/,
     );

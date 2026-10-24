@@ -29,6 +29,7 @@ import { DEFAULT_TIMING } from "./engine/timing";
 import type { RtConfig, RtState, UnitOrders } from "./engine/types";
 import type { RealtimeScenario, ScenarioWorld } from "./scenario";
 import { withWorld } from "./world/create";
+import { holdSupport } from "./world/command/heuristicPlanner";
 import type { Scope } from "./scope";
 
 export const GAME_RECORD_FORMAT = "bgws.realtime.game";
@@ -111,7 +112,12 @@ export function scenarioSpec(scenario: RealtimeScenario, raster?: { origin: { la
 export function openingState(forces: PlacedElement[], gameSeed: string, config: RtConfig, world?: ScenarioWorld): RtState {
   let state = createRealtimeState(toGameStateFromPlaced(forces, HOUSE_V1, { gameId: gameSeed }));
   state = withWorld(state, config, { platforms: Object.fromEntries(forces.map((f) => [f.id, f.platform])), ...world });
-  for (const side of ["blue", "red"] as const) state = applyOrders(state, heuristicOrders(state, side), config);
+  for (const side of ["blue", "red"] as const) {
+    const simple = heuristicOrders(state, side);
+    // With a world, support units hold where they were placed rather than charge.
+    const support = state.world ? holdSupport(state) : {};
+    state = applyOrders(state, { ...simple, orders: { ...simple.orders, ...Object.fromEntries(Object.entries(support).filter(([id]) => simple.orders[id])) } }, config);
+  }
   return state;
 }
 

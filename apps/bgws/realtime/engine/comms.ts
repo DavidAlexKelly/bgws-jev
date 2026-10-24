@@ -80,6 +80,12 @@ export interface CommsContext {
   /** What units have been told, to read and to change. Only `tick` delivers reports, and gives both. */
   pictures?: PictureSource;
   reports?: ReportWriter;
+  /**
+   * Jamming (realtime/world, W6): does this hearer lose this sender's
+   * transmission? Only given when the game's world has a jammer on; absent,
+   * the net is as it always was.
+   */
+  jammed?: (senderId: string, hearerId: string) => boolean;
 }
 
 /** One message delivered: for the feed and the stream. */
@@ -164,7 +170,8 @@ export function stepComms(comms: CommsState, ctx: CommsContext): Delivery[] {
   comms.pending = comms.pending.filter((m) => !(m.dueAt != null && m.dueAt <= ctx.time));
   for (const message of due) {
     if (!alive(ctx, message.sender) && message.sender !== message.from) continue;
-    const to = recipients(ctx, message);
+    const heard = recipients(ctx, message);
+    const to = ctx.jammed ? heard.filter((id) => !ctx.jammed!(message.sender, id)) : heard;
     // An HQ passing on a message addressed to someone else only relays it.
     const relayOnly = (id: string) => message.hop === 1 && id === message.via && message.to !== "all" && message.to !== id;
     for (const id of to) if (!relayOnly(id)) receive(ctx, id, message);

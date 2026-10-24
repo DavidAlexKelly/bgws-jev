@@ -40,6 +40,22 @@ function enemyNear(cop: Record<string, WorldTrack>, at: LatLng, radiusM: number,
   return Object.values(cop).filter((t) => t.domain === "land" && distanceM(t.at, at) <= radiusM).length * perTrack;
 }
 
+/**
+ * The simple opening orders, made sensible for a world game: the
+ * everyone-advances heuristic is right for manoeuvre units, but drone teams,
+ * EW, air defence, artillery and command posts hold where they were placed
+ * and do their own work from there.
+ */
+export function holdSupport(state: RtState): Record<string, UnitOrders> {
+  const out: Record<string, UnitOrders> = {};
+  for (const id of Object.keys(state.world?.land ?? {}).sort()) {
+    if (roleOf(state, id) === "manoeuvre" || roleOf(state, id) === "engineer") continue;
+    if ((state.game.forceElements[id]?.combatStrength ?? 0) <= 0) continue;
+    out[id] = orders(state, [{ label: "work from this position", order: { kind: "hold" } }], "support from here", "support the force from where it stands", { onContact: "avoid" });
+  }
+  return out;
+}
+
 export function heuristicPlan(state: RtState, hq: Headquarters): PlanAnswer {
   const world = state.world!;
   const game = state.game;

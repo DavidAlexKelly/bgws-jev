@@ -204,6 +204,8 @@ export interface EmitterSpec {
   jams?: Band[];
   /** Jammers: radius it denies against a typical victim link, m. */
   jamRadiusM?: number;
+  /** Jammers: the radius by band, where it differs (GNSS is denied much further than a radio link). */
+  jamRadiiM?: Partial<Record<Band, number>>;
 }
 
 /** A way of passing messages (W4 bearers). */

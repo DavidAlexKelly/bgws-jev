@@ -16,10 +16,11 @@ export function pntQualityAt(world: Pick<WorldState, "pnt" | "jammers">, side: S
   let q = world.pnt[side]?.global ?? 1;
   for (const j of world.jammers) {
     if (!j.on || !j.bands.includes("gnss")) continue;
+    const radius = j.radii?.gnss ?? j.radiusM;
     const d = distanceM(j.at, at);
-    if (d >= j.radiusM) continue;
+    if (d >= radius) continue;
     // Deepest at the jammer, shallowest at the edge of its footprint.
-    const depth = 1 - d / j.radiusM;
+    const depth = 1 - d / radius;
     q *= 1 - wfig("world/pnt.JAM_DEPTH") * Math.sqrt(depth) - (1 - wfig("world/pnt.JAM_DEPTH")) * 0.5 * depth;
   }
   return Math.max(0, Math.min(1, q));

@@ -31,12 +31,14 @@ import { registerHandlers, registerRules, prefer } from "../actions";
 import type { WorldCtx } from "../context";
 import { wfig } from "../figures";
 import { bearingDeg, distanceM, offsetBy, scatter } from "../geo";
-import { launch, onImpact } from "../munitions";
+import { launch } from "../munitions";
+import { onImpact } from "../hooks";
 import { raiseQuestion } from "../questions";
-import { onDetection } from "../sensing";
+import { onDetection } from "../hooks";
 import { registerSystem } from "../step";
 import type { FireMission } from "../types";
 import type { LatLng } from "../../../lib/board";
+import { pntQualityAt } from "../pnt";
 
 const INDIRECT = new Set(["mortar", "howitzer", "rocket"]);
 
@@ -52,6 +54,15 @@ function mountFor(c: WorldCtx, shooterId: string, to: LatLng, preferGuided = fal
   // Unguided first unless a precise round is wanted: precision rounds are few and dear.
   usable.sort((a, b) => (preferGuided ? Number(b.weapon.guidance !== "none") - Number(a.weapon.guidance !== "none") : Number(a.weapon.guidance !== "none") - Number(b.weapon.guidance !== "none")));
   return usable[0];
+}
+
+/** An unguided indirect weapon this shooter carries that reaches `to`. */
+function unguidedMount(c: WorldCtx, shooterId: string, to: LatLng): WeaponSpec | undefined {
+  const from = c.where(shooterId);
+  const mounts = c.comps(shooterId)?.mounts ?? [];
+  if (!from) return undefined;
+  const range = distanceM(from, to);
+  return mounts.map((m) => weaponSpec(m.weaponId)).find((w) => INDIRECT.has(w.kind) && w.guidance === "none" && range >= w.minRangeM && range <= w.maxRangeM);
 }
 
 /** The side's indirect-fire shooters: land units with indirect mounts, steady and alive; ships with guns. */
@@ -111,7 +122,18 @@ function setMission(c: WorldCtx, id: string, patch: Partial<FireMission> & Recor
   if (i >= 0) c.world.missions[i] = { ...c.world.missions[i], ...patch };
 }
 
-type Live = FireMission & { heardAt?: number; fireAt?: number; careful?: boolean; scoot?: boolean; left?: number; nextAt?: number; weaponId?: string; lastImpactAt?: number };
+type Live = FireMission & {
+  heardAt?: number;
+  fireAt?: number;
+  careful?: boolean;
+  scoot?: boolean;
+  left?: number;
+  nextAt?: number;
+  weaponId?: string;
+  lastImpactAt?: number;
+  /** GNSS jammed at the target (W6): what the gun chose. */
+  pntChoice?: "asking" | "anyway" | "unguided" | "laser";
+};
 
 // ── Calls for fire ───────────────────────────────────────────────────────
 
@@ -231,7 +253,20 @@ function fire(c: WorldCtx): void {
       setMission(c, m.id, { state: m.left != null && m.left < (m.rounds || Infinity) ? "inFlight" : "refused", result: "out of range or out of rounds" });
       continue;
     }
-    const w = mount.weapon;
+    let w = mount.weapon;
+    // GNSS jammed at the target: a gun about to fire a GNSS-guided round asks first (W6 pntDegraded).
+    if (w.guidance === "gnss" && !offBoard && !m.pntChoice) {
+      const q = pntQualityAt(c.world, m.side, m.targetAt);
+      if (q < wfig("world/domains/ew.PNT_ASK")) {
+        setMission(c, m.id, { nextAt: Infinity, pntChoice: "asking" });
+        raiseQuestion(c, { agentId: shooter, side: m.side, trigger: "pntDegraded", about: { missionId: m.id, pnt: Math.round(q * 100) / 100 }, quality: c.fe(shooter)?.troopQuality ?? 4 });
+        continue;
+      }
+    }
+    if (m.pntChoice === "unguided") {
+      const plain = unguidedMount(c, shooter, m.targetAt);
+      if (plain) w = plain;
+    }
     const tubes = offBoard ? 4 : c.fe(shooter) ? c.land.units[shooter].vehicles.fit : 1;
     const left = m.left ?? (m.rounds || w.salvo * wfig("world/domains/fires.SALVOS")) * Math.max(1, tubes);
     const salvo = Math.min(left, Math.max(1, tubes) * (offBoard ? 1 : 1), mount.rounds);
@@ -239,7 +274,9 @@ function fire(c: WorldCtx): void {
     for (let k = 0; k < salvo; k++) {
       // Each tube's round is aimed at the believed target; a carefully laid mission spreads less.
       const aim = careful < 1 ? m.targetAt : scatter(m.targetAt, w.cepM * 0.2, (n) => c.rng.int(n));
-      launch(c, { launcherId: offBoard ? shooter : shooter, owner: m.side, weaponId: w.id, from, fromAltM: 2, aimAt: aim, ...(m.targetId && w.guidance !== "none" ? { targetId: undefined } : {}), missionId: m.id, ...(m.chainId ? { chainId: m.chainId } : {}) });
+      // Laser-designated by a drone on the target: it is guided onto the target itself.
+      const laser = m.pntChoice === "laser" && m.targetId != null;
+      launch(c, { launcherId: shooter, owner: m.side, weaponId: laser ? "agm" : w.id, from, fromAltM: laser ? 300 : 2, aimAt: aim, ...(laser ? { targetId: m.targetId } : {}), missionId: m.id, ...(m.chainId ? { chainId: m.chainId } : {}) });
     }
     if (!offBoard) spend(c, shooter, w.id, salvo);
     const remaining = left - salvo;
@@ -406,7 +443,34 @@ registerHandlers({
     },
   },
   "fires.stay": { apply: () => {} },
+  "ew.fireAnyway": { available: (c, q) => missionOf(c, q) != null, apply: (c, q) => pntChoose(c, q, "anyway") },
+  "ew.switchMunition": {
+    available: (c, q) => {
+      const m = missionOf(c, q);
+      return m != null && unguidedMount(c, q.agentId, m.targetAt) != null;
+    },
+    apply: (c, q) => pntChoose(c, q, "unguided"),
+  },
+  "ew.waitForPnt": {
+    apply(c, q) {
+      const m = missionOf(c, q);
+      if (m) setMission(c, m.id, { pntChoice: undefined, nextAt: c.time + wfig("world/domains/fires.PNT_WAIT_S") });
+    },
+  },
+  "ew.requestDroneGuidance": {
+    // A friendly ISR drone close enough to the target to put a laser on it.
+    available: (c, q) => {
+      const m = missionOf(c, q);
+      return m != null && m.targetId != null && Object.values(c.world.entities).some((e) => e.owner === q.side && e.status === "active" && e.archetype === "generic/quadIsr" && distanceM(e.pos, m.targetAt) <= 3000);
+    },
+    apply: (c, q) => pntChoose(c, q, "laser"),
+  },
 });
+
+function pntChoose(c: WorldCtx, q: { about: Record<string, unknown> }, choice: "anyway" | "unguided" | "laser"): void {
+  const m = missionOf(c, q);
+  if (m) setMission(c, m.id, { pntChoice: choice, nextAt: c.time });
+}
 
 registerRules({
   fireRequestReceived: (c, q, options) => {
@@ -416,6 +480,7 @@ registerRules({
     if (firedFromHere(c, q.agentId) >= 2) return prefer(options, "fires.fireThenScoot", "fires.fireNow");
     return prefer(options, "fires.fireNow");
   },
+  pntDegraded: (_c, _q, options) => prefer(options, "ew.requestDroneGuidance", "ew.switchMunition", "ew.waitForPnt", "ew.fireAnyway"),
   counterBatteryThreat: (_c, q, options) => (q.about.located ? prefer(options, "fires.displaceNow") : prefer(options, "fires.finishThenDisplace", "fires.stay")),
 });
 

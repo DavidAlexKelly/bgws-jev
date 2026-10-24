@@ -195,16 +195,19 @@ export function nodeOf(c: WorldCtx, id: string): Node | undefined {
 }
 
 /** How badly jamming touches a transmission on this bearer between these two points: 0 (not) to 1 (lost). */
-export function jamLoss(c: WorldCtx, bearer: BearerId, a: LatLng, b: LatLng): number {
-  const model = BEARERS[bearer];
+export function jamLoss(c: WorldCtx, bearer: BearerId, a: LatLng, b: LatLng, override?: { band: string; resistance: number; side?: string; ownFactor?: number }): number {
+  const model = override ? { band: override.band, resistance: () => override.resistance } : BEARERS[bearer];
   if (!model.band) return 0;
   let worst = 0;
   for (const j of c.world.jammers) {
     if (!j.on || !j.bands.includes(model.band)) continue;
     // The receiving end is what jamming denies; a sender in the footprint suffers too.
+    const radius = j.radii?.[model.band] ?? j.radiusM;
     const d = Math.min(distanceM(j.at, b), distanceM(j.at, a) * 1.5);
-    if (d >= j.radiusM) continue;
-    worst = Math.max(worst, (1 - d / j.radiusM) * (1 - model.resistance()) + 0.15);
+    if (d >= radius) continue;
+    // A side's own jammer can be deconflicted from some of its own links (drone frequency plans): weaker on them.
+    const own = override?.side != null && j.side === override.side ? (override.ownFactor ?? 1) : 1;
+    worst = Math.max(worst, ((1 - d / radius) * (1 - model.resistance()) + 0.15) * own);
   }
   // A cyber effect on the bearer degrades it everywhere.
   if ((c.world.outages[`degrade:${bearer}`] ?? 0) > c.time) worst = Math.max(worst, 0.6);

@@ -66,7 +66,8 @@ export class WorldCtx {
       obstacles: [...prev.obstacles],
       breaches: [...prev.breaches],
       missions: [...prev.missions],
-      emissions: [],
+      // Emissions of the last few seconds: what a listener scanning now can have heard.
+      emissions: prev.emissions.filter((e) => e.time > land.time - 10),
       fixes: { blue: { ...prev.fixes.blue }, red: { ...prev.fixes.red } },
       jammers: [...prev.jammers],
       hqs: { ...prev.hqs },

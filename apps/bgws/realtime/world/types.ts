@@ -304,6 +304,8 @@ export interface JammerState {
   side: Side;
   at: LatLng;
   radiusM: number;
+  /** By band, where it differs from `radiusM`. */
+  radii?: Record<string, number>;
   bands: string[];
   on: boolean;
 }
@@ -561,6 +563,8 @@ export interface WorldStats {
   munitions: Record<string, { fired: number; hits: number; kills: number; intercepted: number }>;
   /** Where land units were hit, by distance from their own side's start line, km (kill-zone depth, W5). */
   landLossDepthKm: number[];
+  /** How far from its operator each drone strike landed, km: the kill zone's reach (W5). */
+  droneStrikeRangesKm?: number[];
   /** Casualty evacuation times, s (W10). */
   evacuationS: number[];
   /** Breaches completed and how long each took, s (W3). */

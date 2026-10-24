@@ -114,10 +114,48 @@ export function battalionAttack(): RealtimeScenario {
   );
 }
 
+/**
+ * M4 — Transparent battlefield: a drone line. Drone teams on both sides 5–15
+ * km apart, jammers, fibre FPVs, an interceptor screen, and a mechanised
+ * push across the gap (W5, W6).
+ */
+export function droneLine(): RealtimeScenario {
+  const forces: PlacedElement[] = [
+    unit("b-hq", "blue", "generic/cp-company", 2, 0, -5000, "Blue company HQ", "regular", 2),
+    unit("b-tanks", "blue", "generic/mbt", 4, -800, -1000, "Blue tanks"),
+    unit("b-ifv", "blue", "generic/ifv", 3, 800, -1000, "Blue mech"),
+    unit("b-isr", "blue", "generic/droneIsrTeam", 1, 0, -3500, "Blue ISR team"),
+    unit("b-fpv", "blue", "generic/fpvTeamRf", 1, -1500, -3000, "Blue FPV team"),
+    unit("b-fibre", "blue", "generic/fpvTeamFibre", 1, 1500, -3000, "Blue fibre FPV team"),
+    unit("b-int", "blue", "generic/interceptorTeam", 1, 0, -2500, "Blue interceptor team"),
+    unit("b-jam", "blue", "generic/ewJammer", 1, 0, -2000, "Blue EW"),
+    unit("b-esm", "blue", "generic/esmTeam", 1, 3000, -4000, "Blue SIGINT"),
+    unit("b-guns", "blue", "generic/sph155", 3, 0, -9000, "Blue artillery"),
+    unit("r-hq", "red", "generic/cp-company", 2, 0, 11_000, "Red company HQ", "regular", 2),
+    unit("r-inf-1", "red", "generic/infantrySection", 3, -1500, 6000, "Red 1 Platoon"),
+    unit("r-inf-2", "red", "generic/infantrySection", 3, 1500, 6000, "Red 2 Platoon"),
+    unit("r-isr", "red", "generic/droneIsrTeam", 1, -2000, 9000, "Red ISR team"),
+    unit("r-fpv-1", "red", "generic/fpvTeamRf", 1, 0, 9500, "Red FPV team 1"),
+    unit("r-fpv-2", "red", "generic/fpvTeamRf", 1, 2500, 9000, "Red FPV team 2"),
+    unit("r-loiter", "red", "generic/loiterTeam", 1, 0, 13_000, "Red loitering munitions"),
+    unit("r-jam", "red", "generic/ewJammer", 1, 0, 8000, "Red EW"),
+    unit("r-shorad", "red", "generic/shorad", 2, 1000, 8500, "Red SHORAD"),
+    unit("r-guns", "red", "generic/sph155", 3, 0, 15_000, "Red artillery"),
+  ];
+  return scenario(
+    "M4 — Drone line",
+    "m4-drone-line",
+    scopeOf("droneLine", 360, { logistics: "abstracted", medical: "off" }, { echelons: { highest: "company", lowest: "platoon" }, planners: ["tactical"], area: { widthKm: 30, depthKm: 15 } }),
+    forces,
+    { obstacles: [obstacle("red", "minefield", 0, 4500, 5000, 300, 0.4)], environment: { startHour: 5, windMs: 5 } },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
   M3: battalionAttack,
+  M4: droneLine,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };

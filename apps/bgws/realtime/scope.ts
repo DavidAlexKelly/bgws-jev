@@ -252,8 +252,8 @@ export function scopeFor(type: ScenarioType): Scope {
 const BUILT: Record<Domain, readonly DomainMode[]> = {
   land: ["simulated"],
   fires: ["simulated", "abstracted", "off"],
-  drones: ["abstracted", "off"],
-  ew: ["off"],
+  drones: ["simulated", "abstracted", "off"],
+  ew: ["simulated", "abstracted", "off"],
   air: ["abstracted", "off"],
   airDefence: ["off"],
   naval: ["off"],

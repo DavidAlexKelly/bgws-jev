@@ -217,10 +217,10 @@ const LAND: CatalogueRecord[] = [
     sidc: "SFGPUUMSE", template: "core/ewJammer", mover: wheeled(80, 40),
     body: { count: 1, vulnerability: "soft", crew: 4 }, signatures: { visual: 0.8, ir: 0.8, rcsM2: 8 },
     sensors: [esm(30_000, 8)],
-    emitters: [radio(), { kind: "jammer", band: "uhf", powerW: 1000, dutyCycle: 1, jams: ["vhf", "uhf", "l", "gnss"], jamRadiusM: 25_000 }],
+    emitters: [radio(), { kind: "jammer", band: "uhf", powerW: 1000, dutyCycle: 1, jams: ["vhf", "uhf", "l", "gnss"], jamRadiusM: 8000, jamRadiiM: { gnss: 25_000, l: 6000, vhf: 8000, uhf: 8000 } }],
     stores: { fuelL: 300, burnLph: { moving: 30, idle: 10 } }, costUsd: 5_000_000,
     rationale: "A Pole-21-like module denies GNSS out to about 25 km.",
-    sources: { "emitters.1.jamRadiusM": { kind: "reference", ref: "R5.3, P16" } },
+    sources: { "emitters.1.jamRadiiM.gnss": { kind: "reference", ref: "R5.3, P16" } },
   }),
   rec({
     id: "generic/esmTeam", name: "Electronic support (SIGINT) team", domain: "land", role: "Finds emitters and fixes them by bearings.",

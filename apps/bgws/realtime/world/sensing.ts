@@ -32,6 +32,7 @@ import { sensorConditions } from "./environment";
 import { wfig } from "./figures";
 import { distanceM, groundAt, horizonM, seesBetween, bearingDeg } from "./geo";
 import { registerSystem } from "./step";
+import { DETECTION_LISTENERS } from "./hooks";
 import type { Entity, WorldTrack } from "./types";
 
 /** Something a sensor could see: a land unit or an entity, flattened for the sensor models. */
@@ -336,12 +337,7 @@ function reportToLand(c: WorldCtx, reporterId: string, t: Target, classification
   });
 }
 
-export type DetectionListener = (c: WorldCtx, o: Observer, t: Target, track: WorldTrack, isNew: boolean) => void;
-const DETECTION_LISTENERS: DetectionListener[] = [];
-/** Domains that act on detections (a drone team's targetFound, a destroyer's vampire inbound). */
-export function onDetection(listener: DetectionListener): void {
-  DETECTION_LISTENERS.push(listener);
-}
+export { onDetection, type DetectionListener } from "./hooks";
 
 registerSystem({
   name: "sensing",

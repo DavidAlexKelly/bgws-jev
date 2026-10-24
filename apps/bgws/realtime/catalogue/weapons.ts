@@ -102,7 +102,7 @@ export const WEAPONS = {
   // ── Drones as munitions ──
   fpv: w({
     id: "fpv", kind: "fpv", minRangeM: 0, maxRangeM: 15_000, salvo: 1, magazine: 12, reloadS: 120, flight: "pursuit", speedMs: 30,
-    guidance: "operator", pk: 0.45, cepM: 0, lethalRadiusM: 4, penetrationMm: 300, topAttack: true, targets: ["land"], family: "drone", costUsd: 500,
+    guidance: "operator", pk: 0.65, cepM: 0, lethalRadiusM: 4, penetrationMm: 300, topAttack: true, targets: ["land"], family: "drone", costUsd: 500,
   }),
   loitering: w({
     id: "loitering", kind: "loitering", minRangeM: 0, maxRangeM: 40_000, salvo: 1, magazine: 4, reloadS: 300, flight: "cruise", speedMs: 30,

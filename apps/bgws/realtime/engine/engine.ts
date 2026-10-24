@@ -61,6 +61,7 @@ import { elementRank, type ElementRank } from "./rank";
 export { elementRank, type ElementRank } from "./rank";
 import { stepWorld } from "../world/tickHook";
 import { landSightConditions } from "../world/environment";
+import { landRadioJamming } from "../world/jamming";
 import type { WorldLogItem } from "../world/types";
 
 /**
@@ -967,7 +968,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     });
   };
   /** The net's view of this tick. */
-  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known, pictures, reports });
+  const jammed = prev.world && prev.world.jammers.some((j) => j.on) ? landRadioJamming(prev.world, () => game, rng) : undefined;
+  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known, pictures, reports, ...(jammed ? { jammed } : {}) });
 
   /**
    * React to contact (Battle Drill 1): return fire at once, get into the
