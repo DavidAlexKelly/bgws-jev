@@ -3,6 +3,7 @@
 // that keep it complete (W14 "consistency checks", run in catalogue.test.ts).
 
 import { GENERIC_RECORDS } from "./generic";
+import { WEAPONS } from "./weapons";
 import type { CatalogueRecord, PlatformDomain, WeaponSpec } from "./schema";
 
 export type { CatalogueRecord } from "./schema";
@@ -69,4 +70,15 @@ export function catalogueProblems(records: readonly CatalogueRecord[] = GENERIC_
     }
   }
   return problems;
+}
+
+const WEAPON_BY_ID: ReadonlyMap<string, WeaponSpec> = new Map(
+  [...Object.values(WEAPONS), ...GENERIC_RECORDS.flatMap((r) => r.weapons)].map((w) => [w.id, w]),
+);
+
+/** A weapon by id: the shared table, or a record's own variant (fpvFibre). Throws for an unknown id. */
+export function weaponSpec(id: string): WeaponSpec {
+  const w = WEAPON_BY_ID.get(id);
+  if (!w) throw new Error(`Unknown weapon "${id}"`);
+  return w;
 }

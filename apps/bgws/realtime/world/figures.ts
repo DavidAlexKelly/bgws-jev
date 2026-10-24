@@ -44,6 +44,17 @@ export const WORLD_FIGURES = {
   // ── PNT (world/pnt) ──
   "world/pnt.JAM_DEPTH": { value: 0.9, unit: "×", module: "world/pnt", source: declared, range: [0.7, 0.98], note: "At a GNSS jammer's centre, GNSS quality falls by this share; less towards the edge of its footprint." },
   "world/pnt.INERTIAL_CEP_M": { value: 150, unit: "m", module: "world/pnt", source: declared, range: [80, 300], note: "A GNSS-guided round with no GNSS at all falls back on inertial guidance: its circular error grows to about this." },
+
+  // ── Munitions in flight (world/munitions) ──
+  "world/munitions.FUZE_M": { value: 15, unit: "m", module: "world/munitions", source: declared, range: [5, 30], note: "A guided round passing its target this close (closest approach within the second) has reached it; then its kill probability is rolled." },
+  "world/munitions.KEEP_SPENT_S": { value: 60, unit: "s", module: "world/munitions", source: declared, range: [60, 60], note: "A spent round stays in the world this long, for the map, then is removed." },
+
+  // ── World sensors (world/sensing) ──
+  "world/sensing.OPTIC_RATE": { value: 0.5, unit: "/s", module: "world/sensing", source: declared, range: [0.2, 1], note: "An optical or thermal sensor's detection hazard per second against a target at no range, falling to zero at its reach." },
+  "world/sensing.SONAR_NOISE_DB": { value: 70, unit: "dB", module: "world/sensing", source: declared, range: [60, 80], note: "Ambient sea noise in the passive sonar equation (NL)." },
+  "world/sensing.SONAR_DI_DB": { value: 15, unit: "dB", module: "world/sensing", source: declared, range: [10, 20], note: "Directivity index of a hull or towed array (DI)." },
+  "world/sensing.SONAR_DT_DB": { value: 10, unit: "dB", module: "world/sensing", source: declared, range: [5, 15], note: "Detection threshold (DT)." },
+  "world/sensing.TRACK_DROP_S": { value: 300, unit: "s", module: "world/sensing", source: declared, range: [120, 900], note: "A track nothing has updated for this long is dropped." },
 } as const satisfies Record<string, WorldFigure>;
 
 export type WorldFigureKey = keyof typeof WORLD_FIGURES;

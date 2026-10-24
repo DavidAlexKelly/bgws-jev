@@ -5,3 +5,5 @@
 // The order here does not matter; each system carries its own `order`.
 
 import "./domains/environment";
+import "./munitions";
+import "./sensing";

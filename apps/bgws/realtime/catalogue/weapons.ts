@@ -133,3 +133,34 @@ export type WeaponId = keyof typeof WEAPONS;
 export function weaponById(id: string): WeaponSpec | undefined {
   return (WEAPONS as Record<string, WeaponSpec>)[id];
 }
+
+/**
+ * How much of a ship's or an installation's staying power one round takes,
+ * in standard hits (a 200 kg warhead is 1). Synthetic, by warhead size.
+ */
+const STRUCTURAL_HITS: Partial<Record<WeaponSpec["kind"], number>> = {
+  ascm: 1,
+  torpedo: 2,
+  cruise: 1.2,
+  ballistic: 1.5,
+  glideBomb: 1.2,
+  agm: 0.25,
+  arm: 0.3,
+  fpv: 0.02,
+  loitering: 0.06,
+  owa: 0.3,
+  howitzer: 0.05,
+  mortar: 0.03,
+  rocket: 0.15,
+  samLong: 0.1,
+  samMedium: 0.08,
+  samShort: 0.04,
+  ciws: 0.01,
+  gunAd: 0.01,
+  directFire: 0.03,
+  atgm: 0.05,
+};
+
+export function structuralHits(weapon: WeaponSpec): number {
+  return STRUCTURAL_HITS[weapon.kind] ?? 0.05;
+}

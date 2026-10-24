@@ -23,6 +23,12 @@ export type QuestionDraft = Pick<WorldQuestion, "agentId" | "side" | "trigger" |
 export interface ActionHandler {
   available?(c: WorldCtx, q: QuestionDraft, params: WorldOption["params"]): boolean;
   describe?(c: WorldCtx, q: QuestionDraft, params: WorldOption["params"]): string;
+  /**
+   * One option per choice the rules generate: which shooter, which request,
+   * which target. Each becomes its own option ("shooter:mlrs-1"), with these
+   * params merged in. Absent: the option is offered once.
+   */
+  expand?(c: WorldCtx, q: QuestionDraft, params: WorldOption["params"]): { key: string; summary: string; params: Record<string, string | number | boolean | null> }[];
   apply(c: WorldCtx, q: WorldQuestion, option: WorldOption): void;
 }
 

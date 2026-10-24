@@ -366,7 +366,7 @@ const DRONES: CatalogueRecord[] = [
     id: "generic/owaDrone", name: "One-way attack drone", domain: "air", role: "Flies a planned route hundreds of kilometres to a fixed target.",
     sidc: "SFAPWMU", template: "core/drone", plannedBy: "air", mover: { kind: "cruise", speedKmh: 185, cruiseKmh: 180, ceilingM: 4000, enduranceH: 10 },
     body: { count: 1, vulnerability: "missile", crew: 0 }, signatures: { visual: 0.4, ir: 0.4, rcsM2: 0.1 },
-    sensors: [], weapons: [WEAPONS.owa], emitters: [], stores: { fuelL: 30 }, costUsd: 40_000,
+    sensors: [], weapons: [WEAPONS.owa], emitters: [], stores: { fuelL: 30, burnLph: { moving: 3, idle: 0 } }, costUsd: 40_000,
     rationale: "Shahed-like: $30–50k; raids mix about 60% armed with 40% decoys, and about 85% are intercepted.",
     sources: { "costUsd": { kind: "reference", ref: "R4.4, P11" }, "role": { kind: "reference", ref: "R5.2, P10" } },
   }),
@@ -374,7 +374,7 @@ const DRONES: CatalogueRecord[] = [
     id: "generic/owaDecoy", name: "Decoy drone", domain: "air", role: "Looks like a one-way attack drone; draws interceptors.",
     sidc: "SFAPWMU", template: "core/drone", mover: { kind: "cruise", speedKmh: 185, cruiseKmh: 180, ceilingM: 4000, enduranceH: 10 },
     body: { count: 1, vulnerability: "missile", crew: 0 }, signatures: { visual: 0.4, ir: 0.4, rcsM2: 0.1 },
-    sensors: [], weapons: [], emitters: [], stores: { fuelL: 30 }, costUsd: 10_000,
+    sensors: [], weapons: [], emitters: [], stores: { fuelL: 30, burnLph: { moving: 3, idle: 0 } }, costUsd: 10_000,
     rationale: "Gerbera-like: cheap foam, no warhead.",
   }),
   rec({
@@ -383,7 +383,7 @@ const DRONES: CatalogueRecord[] = [
     body: { count: 1, vulnerability: "aircraft", crew: 0 }, signatures: { visual: 0.5, ir: 0.6, rcsM2: 1 },
     sensors: [{ kind: "eo", rangeM: 15_000, arcDeg: 360, scanS: 3, classifies: "type", seesAir: false, active: false, heightM: 0 }],
     weapons: [WEAPONS.agm], emitters: [{ kind: "satcom", band: "ku", powerW: 50, dutyCycle: 1 }], bearers: ["satcomMil"],
-    stores: { fuelL: 300, ammo: { agm: 4 } }, costUsd: 5_000_000, rationale: "TB2/Reaper-like; slow, and easy prey for air defence.",
+    stores: { fuelL: 300, burnLph: { moving: 12, idle: 0 }, ammo: { agm: 4 } }, costUsd: 5_000_000, rationale: "TB2/Reaper-like; slow, and easy prey for air defence.",
   }),
 ];
 
@@ -510,7 +510,7 @@ const SEA: CatalogueRecord[] = [
     body: { count: 1, vulnerability: "ship", crew: 0, stayingPower: 0.3 }, signatures: { visual: 0.2, ir: 0.3, rcsM2: 2, acousticDb: 140 },
     sensors: [{ kind: "eo", rangeM: 5000, arcDeg: 180, scanS: 1, classifies: "class", seesAir: false, active: false, heightM: 1 }],
     weapons: [], emitters: [{ kind: "satcom", band: "ku", powerW: 20, dutyCycle: 1 }], bearers: ["satcomLeo"],
-    stores: { fuelL: 600 }, costUsd: 250_000, rationale: "Magura-like: 300 kg of explosive, steered over LEO SATCOM.",
+    stores: { fuelL: 600, burnLph: { moving: 60, idle: 5 } }, costUsd: 250_000, rationale: "Magura-like: 300 kg of explosive, steered over LEO SATCOM.",
   }),
   rec({
     id: "generic/merchant", name: "Merchant ship", domain: "surface", role: "Neutral traffic: what ROE protects.",

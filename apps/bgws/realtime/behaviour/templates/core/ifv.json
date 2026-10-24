@@ -1,0 +1,10 @@
+{
+  "id": "core/ifv",
+  "version": 1,
+  "name": "Infantry fighting vehicle",
+  "parent": "core/default",
+  "doctrine": "An IFV carries its infantry to where they fight and supports them with its cannon. It dismounts them in cover short of the enemy, never on top of it.",
+  "bias": {
+    "dismountInCover": 1
+  }
+}

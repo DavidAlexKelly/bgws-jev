@@ -1,0 +1,10 @@
+{
+  "id": "core/ewEsm",
+  "version": 1,
+  "name": "Electronic support",
+  "parent": "core/default",
+  "doctrine": "An ESM team listens, finds emitters by their bearings and reports them for a strike. It never transmits more than it must.",
+  "bias": {
+    "report": 1
+  }
+}

@@ -2150,6 +2150,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   // is destroyed or broken — a
   // breakpoint, not the last tank.
   const lost = (side: Side) => {
+    // A side with no land force at all (an air or sea scenario) cannot be
+    // beaten on land: the world layer judges it (world/victory.ts).
+    if (prev.world && (prev.startStrength?.[side] ?? 0) <= 0) return 0;
     const start = Math.max(1, prev.startStrength?.[side] ?? 0);
     const fighting = forceElementsOf(game, side)
       .filter((one) => one.combatStrength > 0 && units[one.id]?.cohesion !== "broken")

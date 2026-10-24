@@ -1,0 +1,10 @@
+{
+  "id": "core/warship",
+  "version": 1,
+  "name": "Warship",
+  "parent": "core/world",
+  "doctrine": "A warship's magazine cannot be reloaded at sea: it engages with the cheapest layer that will do, and leaves station to reload before it is empty.",
+  "bias": {
+    "medium": 1
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "core/node",
+  "version": 1,
+  "name": "Installation",
+  "parent": "core/world",
+  "doctrine": "An installation keeps its stocks and runways working, and disperses when it is struck."
+}

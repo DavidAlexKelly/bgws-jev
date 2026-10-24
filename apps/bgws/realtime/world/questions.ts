@@ -43,22 +43,36 @@ function archetypeOf(c: Pick<WorldCtx, "world">, agentId: string): string | unde
   return c.world.entities[agentId]?.archetype ?? c.world.land[agentId]?.archetype;
 }
 
-/** The template that answers this trigger for this agent, resolved. */
+/**
+ * The template that answers this trigger for this agent, resolved. The
+ * agent's own template (its assignment, else its archetype's) answers if it
+ * has the trigger. If not — a land template knows only D0–D12 — core/world's
+ * node answers, with the agent's template's doctrine, removals, biases and
+ * conditions applied to it: a variant that says "never pull back" still
+ * means it when the question comes from a world system.
+ */
 export function templateForTrigger(c: Pick<WorldCtx, "world" | "config">, agentId: string, trigger: string): ResolvedTemplate | null {
   const reg = behaviourRegistry(c.config.behaviourTemplates);
   const archetype = archetypeOf(c, agentId);
-  const candidates = [
-    c.config.behaviours?.[agentId],
-    c.world.entities[agentId]?.template,
-    archetype && hasRecord(archetype) ? recordFor(archetype).template : undefined,
-    WORLD_DEFAULT_TEMPLATE,
-  ];
-  for (const id of candidates) {
-    if (!id || !reg.has(id)) continue;
-    const t = resolvedTemplate(id, reg);
-    if (t.triggers[trigger]) return t;
-  }
-  return null;
+  const own = [c.config.behaviours?.[agentId], c.world.entities[agentId]?.template, archetype && hasRecord(archetype) ? recordFor(archetype).template : undefined]
+    .filter((id): id is string => id != null && reg.has(id))
+    .map((id) => resolvedTemplate(id, reg));
+  const answering = own.find((t) => t.triggers[trigger]);
+  if (answering) return answering;
+  if (!reg.has(WORLD_DEFAULT_TEMPLATE)) return null;
+  const world = resolvedTemplate(WORLD_DEFAULT_TEMPLATE, reg);
+  if (!world.triggers[trigger]) return null;
+  const mine = own[0];
+  if (!mine) return world;
+  return {
+    ...world,
+    id: mine.id,
+    lineage: [...mine.lineage, ...world.lineage.filter((id) => !mine.lineage.includes(id))],
+    doctrine: [...world.doctrine, ...mine.doctrine.filter((d) => !world.doctrine.includes(d))],
+    remove: new Set([...world.remove, ...mine.remove]),
+    bias: { ...world.bias, ...mine.bias },
+    when: { ...world.when, ...mine.when },
+  };
 }
 
 /**
@@ -98,10 +112,14 @@ export function raiseQuestion(c: WorldCtx, spec: RaiseSpec): WorldQuestion | nul
   } else {
     options = result.options
       .filter((o) => usable(o.action, o.params))
-      .map((o) => ({ id: o.id, action: o.action, summary: word(o.action, o.params), bias: o.bias, ...(o.params ? { params: o.params } : {}) }));
+      .flatMap((o): WorldOption[] => {
+        const expand = handlerFor(o.action)?.expand;
+        if (!expand) return [{ id: o.id, action: o.action, summary: word(o.action, o.params), bias: o.bias, ...(o.params ? { params: o.params } : {}) }];
+        return expand(c, draft, o.params).map((x) => ({ id: `${o.id}:${x.key}`, action: o.action, summary: x.summary, bias: o.bias, params: { ...o.params, ...x.params } }));
+      });
     title = result.title;
     question = result.question;
-    fallback = options.some((o) => o.id === result.fallback) ? result.fallback : (options[0]?.id ?? null);
+    fallback = options.some((o) => o.id === result.fallback) ? result.fallback : (options.find((o) => o.id.startsWith(`${result.fallback}:`))?.id ?? options[0]?.id ?? null);
   }
   if (!options.length || !fallback) return null;
   const ruled = ruleFor(spec.trigger)?.(c, draft, options);

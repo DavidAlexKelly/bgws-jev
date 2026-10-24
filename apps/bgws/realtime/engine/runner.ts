@@ -277,7 +277,7 @@ export class RealtimeRunner {
     if (!world) return;
     const due = world.questions.filter((q) => q.dueAt <= this.state.time && (q.answer || this.worldInflight.has(q.id))).sort((a, b) => a.dueAt - b.dueAt || a.id - b.id);
     for (const q of due) {
-      let answer = q.answer ? { questionId: q.id, optionId: q.answer.optionId, by: q.answer.by, rationale: q.answer.rationale } : undefined;
+      let answer: WorldAnswer | undefined = q.answer ? { questionId: q.id, optionId: q.answer.optionId, by: q.answer.by, rationale: q.answer.rationale } : undefined;
       if (!answer) {
         const batch = this.worldInflight.get(q.id)!;
         if (!batch.result) {
@@ -286,6 +286,7 @@ export class RealtimeRunner {
         }
         answer = batch.result.find((a) => a.questionId === q.id) ?? { questionId: q.id, optionId: q.fallback, by: "rules" as const };
       }
+      if (!answer) continue;
       this.worldInflight.delete(q.id);
       const applied = answerQuestion(this.state, this.config, q.id, answer.optionId, answer.by, answer.rationale);
       this.state = applied.state;
