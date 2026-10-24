@@ -44,6 +44,7 @@ import { knownEnemies, remember, sendMessage, setOrder, tick } from "./engine";
 import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
 import type { WorldLogItem } from "../world/types";
 import { ruleWorldDecider, type WorldAnswer, type WorldDecider } from "../world/deciders";
+import { rulesOnly } from "../world/lod";
 import { answerQuestion, markAsked, unaskedQuestions } from "../world/questions";
 import { seatAt, type PlannerSeat } from "../world/command/seat";
 import { heuristicPlan } from "../world/command/heuristicPlanner";
@@ -334,14 +335,20 @@ export class RealtimeRunner {
     for (const side of SIDES) {
       const questions = fresh.filter((q) => q.side === side);
       if (!questions.length) continue;
-      const decider = this.options.worldDeciders?.[side] ?? ruleWorldDecider;
-      const batch: { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] } = {
-        promise: decider.decide(this.state, side, questions, this.config).catch(() => ruleWorldDecider.decide(this.state, side, questions, this.config)),
-      };
-      batch.promise.then((result) => {
-        batch.result = result;
-      });
-      for (const q of questions) this.worldInflight.set(q.id, batch);
+      const chosen = this.options.worldDeciders?.[side] ?? ruleWorldDecider;
+      const byRules = questions.filter((q) => rulesOnly(this.state, q.agentId));
+      const groups: [WorldDecider, typeof questions][] =
+        chosen === ruleWorldDecider || !byRules.length ? [[chosen, questions]] : [[chosen, questions.filter((q) => !byRules.includes(q))], [ruleWorldDecider, byRules]];
+      for (const [decider, group] of groups) {
+        if (!group.length) continue;
+        const batch: { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] } = {
+          promise: decider.decide(this.state, side, group, this.config).catch(() => ruleWorldDecider.decide(this.state, side, group, this.config)),
+        };
+        batch.promise.then((result) => {
+          batch.result = result;
+        });
+        for (const q of group) this.worldInflight.set(q.id, batch);
+      }
     }
   }
 
@@ -470,26 +477,38 @@ export class RealtimeRunner {
       }
       if (requests.length === 0) continue;
 
-      const decider = this.options.deciders?.[side] ?? ruleDecider;
-      const batch: InFlight = {
-        side,
-        askedAt: time,
-        dueAt: new Map(
-          requests.map((request) => [
-            request.unitId,
-            time + timing.reactionS(state.game.forceElements[request.unitId].troopQuality),
-          ]),
-        ),
-        requests: new Map(requests.map((request) => [request.unitId, request])),
-        // A decider must not reject; if one does anyway, the rules answer.
-        promise: decider.decide(state, side, requests, config).catch(() =>
-          ruleDecider.decide(state, side, requests, config),
-        ),
-      };
-      batch.promise.then((result) => {
-        batch.result = result;
-      });
-      this.inflight.push(batch);
+      // Formations aggregated away from contact (§4.2) are decided by the rules, not Jev.
+      const side_ = this.options.deciders?.[side] ?? ruleDecider;
+      const byRules = requests.filter((r) => rulesOnly(state, r.unitId));
+      const groups: [RtDecider, RtDecisionRequest[]][] =
+        side_ === ruleDecider || byRules.length === 0
+          ? [[side_, requests]]
+          : [
+              [side_, requests.filter((r) => !byRules.includes(r))],
+              [ruleDecider, byRules],
+            ];
+      for (const [decider, group] of groups) {
+        if (!group.length) continue;
+        const batch: InFlight = {
+          side,
+          askedAt: time,
+          dueAt: new Map(
+            group.map((request) => [
+              request.unitId,
+              time + timing.reactionS(state.game.forceElements[request.unitId].troopQuality),
+            ]),
+          ),
+          requests: new Map(group.map((request) => [request.unitId, request])),
+          // A decider must not reject; if one does anyway, the rules answer.
+          promise: decider.decide(state, side, group, config).catch(() =>
+            ruleDecider.decide(state, side, group, config),
+          ),
+        };
+        batch.promise.then((result) => {
+          batch.result = result;
+        });
+        this.inflight.push(batch);
+      }
     }
   }
 

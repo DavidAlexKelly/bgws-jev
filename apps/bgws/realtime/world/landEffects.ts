@@ -194,7 +194,7 @@ export function applyHit(
 }
 
 /** People hurt when vehicles or teams are knocked out: killed now, wounded waiting for evacuation. */
-function casualties(ctx: WorldCtx, id: string, lost: number): void {
+export function casualties(ctx: WorldCtx, id: string, lost: number): void {
   const comps = ctx.comps(id);
   if (!comps) return;
   let crew = 3;

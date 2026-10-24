@@ -199,12 +199,86 @@ export function airOverTheBattle(): RealtimeScenario {
   );
 }
 
+/**
+ * M6 — Sustained fight: a three-day division offensive against a defending
+ * brigade, each side fed by a railhead and a depot through convoys on the
+ * board, wounded evacuated by ambulance to treatment (W10). Formations far
+ * from the enemy move aggregated and come apart as they close (§4.2).
+ */
+export function sustainedOffensive(): RealtimeScenario {
+  const forces: PlacedElement[] = [unit("b-div", "blue", "generic/cp-division", 8, 0, -32_000, "Division main HQ", "regular", 4)];
+  const hqs: HqSpec[] = [{ id: "blue-div", side: "blue", echelon: "division", postId: "b-div", subordinates: [], planner: "land", seat: "heuristic" }];
+  ["1", "2"].forEach((bde, b) => {
+    const east = (b - 0.5) * 12_000;
+    const bdeId = `blue-bde-${bde}`;
+    forces.push(unit(`b-bde-${bde}`, "blue", "generic/cp-brigade", 5, east, -26_000, `${bde} Brigade HQ`, "regular", 3));
+    hqs.push({ id: bdeId, side: "blue", echelon: "brigade", postId: `b-bde-${bde}`, parent: "blue-div", subordinates: [], planner: "land", seat: "heuristic", alternate: "blue-div" });
+    hqs[0].subordinates.push(bdeId);
+    ["a", "b"].forEach((bn, n) => {
+      const x = east + (n - 0.5) * 5000;
+      const bnId = `blue-${bde}${bn}`;
+      forces.push(unit(`b-${bde}${bn}-hq`, "blue", "generic/cp-battalion", 3, x, -22_000, `${bde}${bn.toUpperCase()} Battalion HQ`, "regular", 3));
+      forces.push(unit(`b-${bde}${bn}-1`, "blue", "generic/mbt", 4, x - 800, -20_000, `${bde}${bn.toUpperCase()} tanks`));
+      forces.push(unit(`b-${bde}${bn}-2`, "blue", "generic/ifv", 3, x + 800, -20_000, `${bde}${bn.toUpperCase()} mech`));
+      forces.push(unit(`b-${bde}${bn}-3`, "blue", "generic/ifv", 3, x, -21_000, `${bde}${bn.toUpperCase()} mech reserve`));
+      hqs.push({ id: bnId, side: "blue", echelon: "battalion", postId: `b-${bde}${bn}-hq`, parent: bdeId, subordinates: [`b-${bde}${bn}-1`, `b-${bde}${bn}-2`, `b-${bde}${bn}-3`], planner: "land", seat: "heuristic", alternate: bdeId });
+      hqs.find((h) => h.id === bdeId)!.subordinates.push(bnId);
+    });
+    forces.push(unit(`b-${bde}-guns`, "blue", "generic/sph155", 3, east, -30_000, `${bde} Brigade artillery`));
+    forces.push(unit(`b-${bde}-shorad`, "blue", "generic/shorad", 2, east, -24_000, `${bde} Brigade SHORAD`));
+    forces.push(unit(`b-${bde}-isr`, "blue", "generic/droneIsrTeam", 1, east, -19_000, `${bde} Brigade ISR`));
+    hqs.find((h) => h.id === bdeId)!.subordinates.push(`b-${bde}-guns`, `b-${bde}-shorad`, `b-${bde}-isr`);
+  });
+  forces.push(unit("b-convoy-1", "blue", "generic/convoyTruck", 4, -1000, -44_000, "Divisional transport 1"));
+  forces.push(unit("b-convoy-2", "blue", "generic/convoyTruck", 4, 1000, -44_000, "Divisional transport 2"));
+  forces.push(unit("b-amb-1", "blue", "generic/medevac", 2, 0, -43_000, "Divisional ambulances"));
+  // The defending brigade, in depth.
+  forces.push(unit("r-bde", "red", "generic/cp-brigade", 5, 0, 30_000, "Red brigade HQ", "regular", 3));
+  const red: HqSpec = { id: "red-bde", side: "red", echelon: "brigade", postId: "r-bde", subordinates: [], planner: "land", seat: "heuristic" };
+  hqs.push(red);
+  ["x", "y"].forEach((bn, n) => {
+    const x = (n - 0.5) * 14_000;
+    const bnId = `red-${bn}`;
+    forces.push(unit(`r-${bn}-hq`, "red", "generic/cp-battalion", 3, x, 16_000, `Red ${bn.toUpperCase()} Battalion HQ`, "regular", 3));
+    const subs = [`r-${bn}-1`, `r-${bn}-2`, `r-${bn}-at`, `r-${bn}-tanks`];
+    forces.push(unit(subs[0], "red", "generic/infantrySection", 3, x - 1500, 8000, `Red ${bn.toUpperCase()}1 platoon`));
+    forces.push(unit(subs[1], "red", "generic/infantrySection", 3, x + 1500, 8000, `Red ${bn.toUpperCase()}2 platoon`));
+    forces.push(unit(subs[2], "red", "generic/atgmTeam", 2, x, 9000, `Red ${bn.toUpperCase()} ATGM`));
+    forces.push(unit(subs[3], "red", "generic/mbt", 4, x, 13_000, `Red ${bn.toUpperCase()} counter-attack`));
+    hqs.push({ id: bnId, side: "red", echelon: "battalion", postId: `r-${bn}-hq`, parent: "red-bde", subordinates: subs, planner: "land", seat: "heuristic", alternate: "red-bde" });
+    red.subordinates.push(bnId);
+  });
+  forces.push(unit("r-guns", "red", "generic/sph155", 3, 0, 24_000, "Red artillery"));
+  forces.push(unit("r-fpv", "red", "generic/fpvTeamRf", 1, 0, 12_000, "Red FPV team"));
+  forces.push(unit("r-convoy", "red", "generic/convoyTruck", 4, 0, 46_000, "Red transport"));
+  forces.push(unit("r-amb", "red", "generic/medevac", 2, 0, 45_000, "Red ambulances"));
+  red.subordinates.push("r-guns", "r-fpv");
+  return scenario(
+    "M6 — Sustained offensive",
+    "m6-sustained",
+    scopeOf("sustainedOffensive", 3 * 24 * 60, { land: "simulated", drones: "simulated", ew: "simulated", fires: "simulated", airDefence: "simulated", logistics: "simulated", medical: "simulated", air: "abstracted", space: "abstracted", cyber: "off" }, { area: { widthKm: 60, depthKm: 200 }, echelons: { highest: "division", lowest: "platoon" } }),
+    forces,
+    {
+      hqs,
+      entities: [
+        entity("b-depot", "blue", "generic/depot", 0, -45_000, { label: "Blue divisional depot" }),
+        entity("b-rail", "blue", "generic/railhead", 0, -130_000, { label: "Blue railhead" }),
+        entity("r-depot", "red", "generic/depot", 0, 48_000, { label: "Red brigade depot" }),
+        entity("r-rail", "red", "generic/railhead", 0, 140_000, { label: "Red railhead" }),
+      ],
+      obstacles: [obstacle("red", "minefield", -7000, 6000, 5000, 300, 0.4), obstacle("red", "minefield", 7000, 6000, 5000, 300, 0.4)],
+      environment: { startHour: 5 },
+    },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
   M3: battalionAttack,
   M4: droneLine,
   M5: airOverTheBattle,
+  M6: sustainedOffensive,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };

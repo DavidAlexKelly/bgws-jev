@@ -259,8 +259,8 @@ const BUILT: Record<Domain, readonly DomainMode[]> = {
   naval: ["off"],
   space: ["abstracted", "off"],
   cyber: ["off"],
-  logistics: ["abstracted", "off"],
-  medical: ["off"],
+  logistics: ["simulated", "abstracted", "off"],
+  medical: ["simulated", "abstracted", "off"],
 };
 
 export const ENGINE_CAN = {
@@ -280,11 +280,11 @@ export const ENGINE_CAN = {
     medical: "M4",
   } satisfies Record<Domain, string>,
   limits: {
-    durationMin: { min: 5, max: 24 * 60 },
+    durationMin: { min: 5, max: 10 * 24 * 60 },
     /** Ground is generated, so the board can be as large as an air campaign needs. */
     areaKm: { max: 300 },
-    echelons: ["platoon", "company", "battalion", "brigade", "component"] as readonly Echelon[],
-    planners: ["tactical", "overall", "land", "air"] as readonly Planner[],
+    echelons: ["platoon", "company", "battalion", "brigade", "division", "component"] as readonly Echelon[],
+    planners: ["tactical", "overall", "land", "air", "sustainment"] as readonly Planner[],
   },
 };
 
@@ -331,7 +331,6 @@ export function effectiveScope(scope: Scope): ScopeCheck {
     out.planners = out.planners.filter((p) => planners.includes(p));
     notes.push(`Only the tactical planner exists today; ${unbuilt.join(", ")} come later.`);
   }
-  if (scope.detail.aggregateAwayFromContact) errors.push("Aggregating units away from contact is not built yet.");
   return { scope: out, notes, errors };
 }
 

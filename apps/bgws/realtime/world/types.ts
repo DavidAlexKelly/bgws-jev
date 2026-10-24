@@ -27,7 +27,7 @@ import type { LatLng } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import type { AmmoFamily, BearerId, Classification, PlatformDomain } from "../catalogue/schema";
 import type { Echelon, Planner } from "../scope";
-import type { UnitOrders } from "../engine/types";
+import type { RtOrder, UnitOrders } from "../engine/types";
 
 export type Owner = Side | "neutral";
 
@@ -83,6 +83,12 @@ export type WeaponControl = "free" | "tight" | "hold";
 export interface LandComponents {
   archetype: string;
   stores: Stores;
+  /** Level of detail (§4.2): aggregated into its formation away from contact, or far enough that the rules decide for it. */
+  lod?: "aggregated" | "far";
+  /** While aggregated: the formation's lead unit and this unit's place relative to it, m. */
+  formation?: { lead: string; eastM: number; northM: number };
+  /** The order it was on when its fuel ran out: resumed when it is resupplied (W10). */
+  stalledOrder?: RtOrder;
   /** Its own world weapons: indirect fire, air defence, anti-ship. */
   mounts: MountState[];
   /** Drones carried and not yet launched. */
@@ -601,6 +607,10 @@ export interface WorldStats {
   structureHits?: Partial<Record<Owner, number>>;
   /** Casualty evacuation times, s (W10). */
   evacuationS: number[];
+  /** Casualties who died of wounds waiting for or during evacuation (W10). */
+  diedOfWounds?: number;
+  /** Time from a convoy's dispatch to its delivery, s (W10). */
+  resupplyS?: number[];
   /** Breaches completed and how long each took, s (W3). */
   breachS: number[];
   /** Report latency at HQs, s, by side (W4). */
@@ -656,6 +666,8 @@ export interface WorldState {
   memo: Record<string, number>;
   /** Strength of land units that joined during the game, by side: counted into the breakpoint's start. */
   joinedStrength: Record<Side, number>;
+  /** The supply network and casualty evacuation when logistics or medical is simulated (W10). */
+  logistics?: LogisticsState;
   /** Victory conditions beyond the land breakpoint (world/victory.ts), and how far each has got. */
   victory?: VictoryCondition[];
   /** Victory as the world judges it, for scopes whose aims are not a land breakpoint (world/victory.ts). */
@@ -694,3 +706,57 @@ export type VictoryCondition =
   | { kind: "seaControl"; side: Side; at: LatLng; radiusM: number; holdS: number; label?: string }
   | { kind: "through"; side: Side; ids: string[]; at: LatLng; radiusM: number; count: number; label?: string }
   | { kind: "all"; side: Side; of: VictoryCondition[]; label?: string };
+
+/** A unit's request for resupply (its LOGSTAT), waiting for the logistics cell. */
+export interface LogRequest {
+  unitId: string;
+  side: Side;
+  at: number;
+  /** Lowest share of basic load left, fuel or ammunition, when it asked. */
+  need: number;
+}
+
+/** One delivery under way: a convoy, ground robot or drone from a node to a unit. */
+export interface SupplyJob {
+  id: string;
+  side: Side;
+  unitId: string;
+  nodeId: string;
+  means: "convoy" | "ugv" | "drone";
+  /** The convoy unit on the board (convoys only). */
+  vehicleId?: string;
+  state: "waiting" | "outbound" | "returning" | "done" | "failed";
+  /** Held until this time (waiting for dark, scattered). */
+  holdUntil?: number;
+  waitForDark?: boolean;
+  /** A detour round a threat on the route. */
+  via?: LatLng;
+  startedAt: number;
+  deliveredAt?: number;
+}
+
+/** Casualties being evacuated from one unit (W10 medical). */
+export interface Evacuation {
+  id: string;
+  side: Side;
+  unitId: string;
+  /** When each casualty was hit. */
+  hitAt: number[];
+  means: "ambulance" | "ugv" | "abstract";
+  vehicleId?: string;
+  state: "waiting" | "inbound" | "carrying" | "done";
+  waitForDark?: boolean;
+  /** Where the casualties are being taken. */
+  to: LatLng;
+  /** The casualty collection point, back from the fighting, where the ambulance collects them. */
+  ccp: LatLng;
+  doneAt?: number;
+}
+
+export interface LogisticsState {
+  requests: LogRequest[];
+  jobs: SupplyJob[];
+  evacs: Evacuation[];
+  /** Convoy and ambulance units on the board, free for the next job, by side. */
+  pool: Record<Side, string[]>;
+}

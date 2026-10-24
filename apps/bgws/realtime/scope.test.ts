@@ -11,8 +11,8 @@ describe("scenario scope", () => {
     for (const type of SCENARIO_TYPES) expect(scopeErrors(scopeFor(type)), type).toEqual([]);
   });
 
-  it("only what the engine has built can be played: a Skirmish (and Custom) today", () => {
-    expect(SCENARIO_TYPES.filter(playable)).toEqual(["skirmish", "custom"]);
+  it("only what the engine has built can be played: the land, drone, sustained and custom types today", () => {
+    expect(SCENARIO_TYPES.filter(playable)).toEqual(["skirmish", "combinedArms", "droneLine", "sustainedOffensive", "custom"]);
   });
 
   it("a Skirmish loads as the plan sets it: land simulated, drones and fires abstracted, the rest off", () => {
@@ -27,7 +27,7 @@ describe("scenario scope", () => {
     expect(effectiveScope({ ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } }).errors.join(" ")).toMatch(
       /Land cannot be off/,
     );
-    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 2000 }).errors.join(" ")).toMatch(/5–1440 minutes/);
+    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 20_000 }).errors.join(" ")).toMatch(/5–14400 minutes/);
   });
 
   it("every preset names a victory and a milestone", () => {

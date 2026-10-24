@@ -62,4 +62,16 @@ describe("milestone scenarios", () => {
     expect(Object.values(w.entities).some((e) => e.air?.sorties != null && e.air.sorties > 0), "a flight landed and turned round").toBe(true);
     expect(Object.keys(w.fixes.blue).includes("r-sam") || (w.stats.munitions.arm?.fired ?? 0) > 0, "the SAM found").toBe(true);
   }, 120_000);
+
+  it("M6: formations move aggregated, come apart near the enemy, and the supply chain and medics work", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M6());
+    // The world feed as it streams (the state keeps only its latest lines).
+    const feed: { kind: string; domain: string }[] = [];
+    const result = await playRecord(record, { untilS: 4 * 3600, onEntry: (e) => void (e.type === "world" && feed.push(e.item)) });
+    const w = result.state.world!;
+    expect(feed.some((l) => l.kind === "aggregate"), "aggregated away from contact").toBe(true);
+    expect(feed.some((l) => l.kind === "disaggregate"), "comes apart near the enemy").toBe(true);
+    expect(feed.some((l) => l.domain === "logistics" && (l.kind === "logstat" || l.kind === "convoy")), "LOGSTATs and convoys").toBe(true);
+    expect(Object.values(w.land).some((l) => l.lod === "far"), "rules lead away from contact").toBe(true);
+  }, 300_000);
 });

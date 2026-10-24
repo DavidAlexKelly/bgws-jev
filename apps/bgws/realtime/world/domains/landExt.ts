@@ -31,7 +31,7 @@ import type { WorldCtx } from "../context";
 import { landComponents } from "../create";
 import { wfig } from "../figures";
 import { bearingDeg, distanceM, offsetBy, seesBetween, groundAt } from "../geo";
-import { applyHit } from "../landEffects";
+import { applyHit, casualties } from "../landEffects";
 import { raiseQuestion } from "../questions";
 import { registerSystem } from "../step";
 import type { Obstacle } from "../types";
@@ -121,6 +121,7 @@ function sustain(c: WorldCtx): void {
     if (fuel !== comps.stores.fuelL) c.setLand(id, { stores: { ...c.comps(id)!.stores, fuelL: fuel } });
     // At zero the capability goes: no fuel, no moving; no rounds, no firing.
     if (rec.stores.fuelL > 0 && fuel <= 0 && (unit.order.kind === "move" || unit.order.kind === "withdraw") && fe.moveType !== "F") {
+      c.setLand(id, { stalledOrder: unit.order });
       c.land.setUnit(id, { order: { kind: "hold" }, bound: undefined });
       c.land.emit(id, "blocked", "out of fuel: it cannot move until resupplied");
     }
@@ -157,6 +158,16 @@ export function refill(c: WorldCtx, id: string, share = 1): void {
     }),
     stocksLowAt: null,
   });
+  resumeStalled(c, id);
+}
+
+/** A unit stopped for want of fuel goes on with the order it was on, once it has fuel again. */
+export function resumeStalled(c: WorldCtx, id: string): void {
+  const comps = c.comps(id);
+  if (!comps?.stalledOrder || comps.stores.fuelL <= 0 || !c.landAlive(id)) return;
+  const order = comps.stalledOrder;
+  c.setLand(id, { stalledOrder: undefined });
+  if (c.land.units[id].order.kind === "hold") c.land.order(id, order);
 }
 
 // ── Obstacles ────────────────────────────────────────────────────────────
@@ -532,6 +543,20 @@ registerRules({
   dismountPoint: (_c, q, options) => (q.about.enemyNear ? prefer(options, "land.dismountInCover", "land.dismountHere") : prefer(options, "land.dismountHere")),
   stocksLow: (_c, q, options) => ((q.about.ammoPct as number) < 10 ? prefer(options, "land.withdrawToResupply", "land.requestResupply") : prefer(options, "land.requestResupply")),
   settledInPosition: (_c, _q, options) => prefer(options, "land.digIn"),
+});
+
+/** Vehicles the land engine's direct fire knocked out this second: their crews are casualties too (W10). */
+registerSystem({
+  name: "directFireCasualties",
+  order: 1,
+  when: (c) => c.simulated("land"),
+  run(c) {
+    for (const id of Object.keys(c.world.land).sort()) {
+      const before = c.land.prev.units[id]?.vehicles.fit;
+      const now = c.land.units[id]?.vehicles.fit;
+      if (before != null && now != null && now < before) casualties(c, id, before - now);
+    }
+  },
 });
 
 registerSystem({
