@@ -27,7 +27,7 @@ import type { LatLng } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import type { AmmoFamily, BearerId, Classification, PlatformDomain } from "../catalogue/schema";
 import type { Echelon, Planner } from "../scope";
-import type { RtOrder } from "../engine/types";
+import type { UnitOrders } from "../engine/types";
 
 export type Owner = Side | "neutral";
 
@@ -359,6 +359,62 @@ export interface Headquarters {
   guidance?: Guidance;
 }
 
+/** A plan an HQ is making (§4.4.2): asked of its seat, applied when planning time is up. */
+export interface PlanRequest {
+  id: number;
+  hq: string;
+  side: Side;
+  planner: Planner;
+  seat: "claude" | "heuristic" | "human";
+  raisedAt: number;
+  /** Planning takes sim-time: the one-third/two-thirds rule (P1). */
+  readyAt: number;
+  why: string;
+  /** Handed to the seat (runner bookkeeping, kept in state for replays). */
+  asked?: boolean;
+  answer?: PlanAnswer;
+}
+
+/** What a seat answers with: orders for its subordinates, and guidance for the HQs below. */
+export interface PlanAnswer {
+  by: "claude" | "heuristic" | "human";
+  plan: string;
+  orders: Record<string, UnitOrders>;
+  structured?: Record<string, StructuredOrder>;
+  guidance?: Guidance;
+  /** Which subordinate is held back as the reserve. */
+  reserve?: string;
+  warnings?: string[];
+}
+
+/**
+ * The five-paragraph order, shaped after C2SIM (W4): what UnitOrders carries
+ * for the land engine, plus phase triggers, branches, control measures with
+ * real geometry, weapon control, EMCON and the PACE plan.
+ */
+export interface StructuredOrder {
+  mission: string;
+  intent: string;
+  /** When each phase after the first may start: at a time, on an event, or at a place. */
+  phaseTriggers: (PhaseTrigger | null)[];
+  branches: { label: string; when: PhaseTrigger; phases: UnitOrders["phases"] }[];
+  measures: string[];
+  /** A polygon it must stay inside. */
+  boundary?: LatLng[];
+  weaponControl: WeaponControl;
+  emcon: Emcon;
+  pace: BearerId[];
+  sustainment?: string;
+  issuedAt: number;
+  by: string;
+}
+
+export type PhaseTrigger =
+  | { kind: "time"; at: number }
+  | { kind: "event"; event: "objectiveTaken" | "enemyBroken" | "lanesOpen" | "reserveCommitted"; side?: Side }
+  | { kind: "position"; at: LatLng; withinM: number }
+  | { kind: "enemySeen"; atLeast: number; withinM: number };
+
 /** What the HQ above says (§4.4.2 JointGuidance, simplified for every level). */
 export interface Guidance {
   issuedAt: number;
@@ -371,6 +427,8 @@ export interface Guidance {
   roe: { weaponsFree: boolean; escalationLimit: "conventional" | "noStrategicStrike" | "noCrossBorder" };
   /** Control measures in force. */
   measures: ControlMeasure[];
+  /** Where the HQ below is to go (its objective), if the task has one. */
+  objective?: LatLng;
 }
 
 /** Control measures with real geometry (W4). */
@@ -509,6 +567,8 @@ export interface WorldStats {
   breachS: number[];
   /** Report latency at HQs, s, by side (W4). */
   reportLatencyS: Record<Side, number[]>;
+  /** The same, by HQ: how late contacts reached each HQ's picture. */
+  reportLatencyByHq: Record<string, number[]>;
 }
 
 /** The scheduler's queue (§4.2): future events keyed by time, ties by kind then key. */
@@ -548,8 +608,12 @@ export interface WorldState {
   outages: Record<string, number>;
   /** Abstracted domains: support services and when each is next available (§5.2). */
   support: SupportService[];
-  /** Orders waiting to take effect on a land unit when its message arrives (W4). */
-  orderQueue: { unitId: string; order: RtOrder; dueAt: number; messageId: number }[];
+  /** Orders that have ARRIVED at a land unit by message (W4), for the runner to hand over (D0 if it is in a fight). */
+  orderQueue: { unitId: string; orders: UnitOrders; dueAt: number; messageId: number; plan?: string }[];
+  /** Plans being made at HQs (W4 planners): the runner asks the HQ's seat, and the plan goes out at `readyAt`. */
+  plans: PlanRequest[];
+  /** Structured orders in force, by unit (W4): what the land engine's UnitOrders do not hold. */
+  structured: Record<string, StructuredOrder>;
   /** Rate limits and small per-game memories, by key ("call:b1:r2" → last time). Kept in state, never in modules, so games never leak into each other. */
   memo: Record<string, number>;
   /** Strength of land units that joined during the game, by side: counted into the breakpoint's start. */

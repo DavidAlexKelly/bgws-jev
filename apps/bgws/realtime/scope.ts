@@ -282,9 +282,9 @@ export const ENGINE_CAN = {
   limits: {
     durationMin: { min: 5, max: 600 },
     /** The board is one 10 km square today. */
-    areaKm: { max: 10 },
-    echelons: ["platoon", "company"] as readonly Echelon[],
-    planners: ["tactical"] as readonly Planner[],
+    areaKm: { max: 50 },
+    echelons: ["platoon", "company", "battalion", "brigade"] as readonly Echelon[],
+    planners: ["tactical", "overall", "land"] as readonly Planner[],
   },
 };
 

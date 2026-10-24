@@ -10,3 +10,4 @@ import "./sensing";
 import "./domains/fires";
 import "./domains/landExt";
 import "./domains/support";
+import "./domains/c2";

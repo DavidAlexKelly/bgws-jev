@@ -45,6 +45,11 @@ import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
 import type { WorldLogItem } from "../world/types";
 import { ruleWorldDecider, type WorldAnswer, type WorldDecider } from "../world/deciders";
 import { answerQuestion, markAsked, unaskedQuestions } from "../world/questions";
+import { seatAt, type PlannerSeat } from "../world/command/seat";
+import { heuristicPlan } from "../world/command/heuristicPlanner";
+import { issuePlan } from "../world/domains/c2";
+import { withWorldCtx } from "../world/standalone";
+import type { PlanAnswer } from "../world/types";
 
 /** Something the player should know about, while the clock runs. */
 export interface RtFlag {
@@ -89,6 +94,8 @@ export interface RunnerOptions {
   deciders?: Partial<Record<Side, RtDecider>>;
   /** Per side, for world questions (realtime/world). Absent means the rules decide. */
   worldDeciders?: Partial<Record<Side, WorldDecider>>;
+  /** Per side, the planner in Claude-commanded HQ seats (world/command/seat.ts). Absent: the heuristic plans. */
+  planners?: Partial<Record<Side, PlannerSeat>>;
   /** How many feed entries to keep. */
   logLimit?: number;
   /** Called with every feed entry as it is made — to stream the log elsewhere. Must not throw. */
@@ -138,6 +145,8 @@ export class RealtimeRunner {
   private readonly raised = new Set<string>();
   private readonly lastAsked = new Map<string, number>();
   private readonly inflight: InFlight[] = [];
+  /** Plans asked of a Claude (or human) seat: request id → its answer. */
+  private readonly planInflight = new Map<number, { promise: Promise<PlanAnswer>; result?: PlanAnswer }>();
   /** World questions handed to a decider: question id → its batch's answers. */
   private readonly worldInflight = new Map<number, { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] }>();
 
@@ -249,6 +258,71 @@ export class RealtimeRunner {
       this.checkFlags();
       this.dispatch();
       this.dispatchWorld();
+      this.deliverOrders();
+      this.dispatchPlans();
+    }
+  }
+
+  /** Orders that have arrived at units by message (W4): handed over as orders issued while paused are. */
+  private deliverOrders(): void {
+    const queue = this.state.world?.orderQueue;
+    if (!queue?.length) return;
+    const due = queue.filter((o) => o.dueAt <= this.state.time);
+    if (!due.length) return;
+    this.state = { ...this.state, world: { ...this.state.world!, orderQueue: queue.filter((o) => o.dueAt > this.state.time) } };
+    const orders: Record<string, UnitOrders> = {};
+    for (const o of due) orders[o.unitId] = o.orders;
+    this.issueOrders(orders);
+  }
+
+  /** Hand new plan requests to Claude-commanded seats. */
+  private dispatchPlans(): void {
+    const world = this.state.world;
+    if (!world?.plans.length) return;
+    for (const request of world.plans) {
+      if (request.asked || request.seat === "heuristic") continue;
+      const planner = this.options.planners?.[request.side];
+      const seat = seatAt(this.state, request.hq);
+      const hq = world.hqs[request.hq];
+      if (!planner || !seat || !hq) continue;
+      const snapshot = this.state;
+      const fallback = () => heuristicPlan(snapshot, hq);
+      const batch: { promise: Promise<PlanAnswer>; result?: PlanAnswer } = {
+        promise: planner.plan(snapshot, request, seat).catch((err: unknown) => ({ ...fallback(), warnings: [`the planner could not be reached (${err instanceof Error ? err.message : String(err)}): the heuristic planned`] })),
+      };
+      batch.promise.then((r) => {
+        batch.result = r;
+      });
+      this.planInflight.set(request.id, batch);
+    }
+    const asked = new Set(this.planInflight.keys());
+    if (world.plans.some((p) => asked.has(p.id) && !p.asked)) {
+      this.state = { ...this.state, world: { ...world, plans: world.plans.map((p) => (asked.has(p.id) ? { ...p, asked: true } : p)) } };
+    }
+  }
+
+  /** Plans due now from non-heuristic seats: waiting for the answer if it is late, as for every decision. */
+  private async applyPlansDue(): Promise<void> {
+    const world = this.state.world;
+    if (!world?.plans.length) return;
+    for (const request of world.plans.filter((p) => p.seat !== "heuristic" && p.readyAt <= this.state.time)) {
+      let answer: PlanAnswer | undefined;
+      const batch = this.planInflight.get(request.id);
+      if (batch) {
+        if (!batch.result) {
+          this.waits += 1;
+          batch.result = await batch.promise;
+        }
+        answer = batch.result;
+        this.planInflight.delete(request.id);
+      } else {
+        const hq = this.state.world!.hqs[request.hq];
+        if (!hq) continue;
+        answer = heuristicPlan(this.state, hq);
+      }
+      const applied = withWorldCtx(this.state, this.config, (c) => issuePlan(c, request, answer!));
+      this.state = applied.state;
+      for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
     }
   }
 
@@ -422,6 +496,7 @@ export class RealtimeRunner {
   /** Apply every answer that is due now, waiting for it if it is not back yet. */
   private async applyDue(): Promise<void> {
     await this.applyWorldDue();
+    await this.applyPlansDue();
     const time = this.state.time;
     for (const batch of [...this.inflight]) {
       const due = [...batch.dueAt.entries()].filter(([, at]) => at <= time);

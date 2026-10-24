@@ -80,13 +80,59 @@ export const WORLD_FIGURES = {
   "world/domains/landExt.STRIKE_PER_100M": { value: 0.35, unit: "/100 m", module: "world/domains/landExt", source: declared, range: [0.15, 0.6], note: "Chance a vehicle platoon strikes a mine for every 100 m it drives into a standard-density field (0.5 mines per metre of front)." },
   "world/domains/landExt.MINE_KILL": { value: 0.5, unit: "×", module: "world/domains/landExt", source: declared, range: [0.3, 0.8], note: "A mine strike knocks the vehicle out this share of the time; otherwise it is a mobility kill waiting for recovery." },
   "world/domains/landExt.LOOK_AHEAD_M": { value: 150, unit: "m", module: "world/domains/landExt", source: declared, range: [50, 300], note: "A moving unit stops this far short of an obstacle it knows of." },
-  "world/domains/landExt.DISMOUNT_AT_M": { value: 1200, unit: "m", module: "world/domains/landExt", source: declared, range: [600, 2000], note: "An IFV is asked whether to dismount once an enemy it knows is this close." },
+  "world/domains/landExt.DISMOUNT_AT_M": { value: 2000, unit: "m", module: "world/domains/landExt", source: declared, range: [800, 3000], note: "An IFV is asked whether to dismount once an enemy it knows is this close, or as soon as it is fired on." },
   "world/domains/landExt.DISMOUNT_ASK_S": { value: 120, unit: "s", module: "world/domains/landExt", source: declared, range: [60, 300], note: "An IFV that stayed mounted is not asked again for this long." },
   "world/domains/landExt.DIG_IN_S": { value: 7200, unit: "s", module: "world/domains/landExt", source: declared, range: [3600, 14400], note: "Time to prepare a position fully." },
   "world/domains/landExt.SETTLE_TO_DIG_S": { value: 600, unit: "s", module: "world/domains/landExt", source: declared, range: [300, 1800], note: "A unit still for this long is asked whether to dig in." },
 
   // ── Support services (world/domains/support) ──
   "world/domains/support.ISR_RADIUS_M": { value: 4000, unit: "m", module: "world/domains/support", source: declared, range: [2000, 8000], note: "An abstracted ISR overflight reports enemy within this distance of the side's own units." },
+
+  // ── Networks (world/net) ──
+  "world/net.VHF_RANGE_M": { value: 8000, unit: "m", module: "world/net", source: ref("R2, P4"), range: [5000, 10000], note: "Combat net radio on high power, between two vehicles with line of sight." },
+  "world/net.VHF_POST_RANGE_M": { value: 25000, unit: "m", module: "world/net", source: ref("R2, P4"), range: [10000, 40000], note: "Combat net radio with an amplifier and a mast at a command post." },
+  "world/net.VHF_NO_LOS": { value: 0.4, unit: "×", module: "world/net", source: declared, range: [0.2, 0.6], note: "Without line of sight between the two antennas, VHF reaches this share of its range." },
+  "world/net.VHF_HOP_RESIST": { value: 0.5, unit: "×", module: "world/net", source: declared, range: [0.2, 0.8], note: "How much frequency hopping resists jamming (0 none, 1 immune)." },
+  "world/net.HF_RANGE_M": { value: 450000, unit: "m", module: "world/net", source: ref("R2, P5"), range: [300000, 600000], note: "HF NVIS reach." },
+  "world/net.HF_TRANSMIT_S": { value: 30, unit: "s", module: "world/net", source: declared, range: [15, 60], note: "Sending one message on HF, slow and repeated." },
+  "world/net.VOICE_COMPOSE_S": { value: 15, unit: "s", module: "world/net", source: declared, range: [5, 30], note: "Composing a voice message." },
+  "world/net.VOICE_TRANSMIT_S": { value: 10, unit: "s", module: "world/net", source: declared, range: [5, 20], note: "Sending a voice message on combat net radio." },
+  "world/net.DATALINK_RANGE_M": { value: 300000, unit: "m", module: "world/net", source: declared, range: [150000, 500000], note: "A Link-16-like data link's line-of-sight reach between high terminals." },
+  "world/net.DATALINK_S": { value: 1, unit: "s", module: "world/net", source: ref("R2, P6"), range: [0.5, 12], note: "Data link delivery: slots of 7.8 ms, a frame a few seconds at worst." },
+  "world/net.DATALINK_RESIST": { value: 0.8, unit: "×", module: "world/net", source: declared, range: [0.6, 0.95], note: "Spread-spectrum data link resistance to jamming." },
+  "world/net.SATCOM_MIL_S": { value: 5, unit: "s", module: "world/net", source: declared, range: [2, 15], note: "GEO military SATCOM: compose, queue and the 0.5 s round trip." },
+  "world/net.SATCOM_LEO_S": { value: 2, unit: "s", module: "world/net", source: ref("R2, P7"), range: [1, 5], note: "Commercial LEO SATCOM: 25–100 ms latency, plus handling." },
+  "world/net.MESH_HOP_M": { value: 2000, unit: "m", module: "world/net", source: declared, range: [1000, 4000], note: "A mesh radio reaches the next friend this far." },
+  "world/net.MESH_HOP_S": { value: 2, unit: "s", module: "world/net", source: declared, range: [1, 5], note: "Delay per mesh hop." },
+  "world/net.COURIER_MS": { value: 10, unit: "m/s", module: "world/net", source: declared, range: [5, 20], note: "A courier vehicle's average speed." },
+  "world/net.COURIER_SETUP_S": { value: 300, unit: "s", module: "world/net", source: declared, range: [120, 900], note: "Getting a courier on the road." },
+  "world/net.RETRY_S": { value: 30, unit: "s", module: "world/net", source: declared, range: [10, 120], note: "A message lost to jamming is tried on the next bearer after this long." },
+  "world/net.KEEP_S": { value: 900, unit: "s", module: "world/net", source: declared, range: [900, 900], note: "Delivered messages are kept this long for the AAR, then dropped." },
+
+  // ── HQ pictures (world/command/fusion) ──
+  "world/command/fusion.SPOTREP_S": { value: 60, unit: "s", module: "world/command/fusion", source: declared, range: [30, 300], note: "Each HQ passes what is new in its picture up to the HQ above this often." },
+  "world/command/fusion.QUALITY_DECAY_S": { value: 30, unit: "s", module: "world/command/fusion", source: declared, range: [15, 120], note: "A track in an HQ's picture loses one point of quality (0–15) for every this many seconds since it was seen." },
+
+  // ── Command and control (world/domains/c2) ──
+  "world/domains/c2.RHYTHM_COMPANY_S": { value: 1200, unit: "s", module: "world/domains/c2", source: declared, range: [900, 1800], note: "A company or tactical planner re-plans this often (15–30 sim-minutes, §8)." },
+  "world/domains/c2.RHYTHM_BATTALION_S": { value: 1800, unit: "s", module: "world/domains/c2", source: declared, range: [1200, 3600], note: "A battalion HQ re-plans this often (default 30 min, W4)." },
+  "world/domains/c2.RHYTHM_BRIGADE_S": { value: 3600, unit: "s", module: "world/domains/c2", source: declared, range: [1800, 7200], note: "A brigade (formation) HQ re-plans this often (30–60 min, §8)." },
+  "world/domains/c2.RHYTHM_HIGH_S": { value: 14400, unit: "s", module: "world/domains/c2", source: declared, range: [7200, 43200], note: "A division, component or joint HQ re-plans this often (2–12 h, §8)." },
+  "world/domains/c2.PLAN_COMPANY_S": { value: 300, unit: "s", module: "world/domains/c2", source: ref("R1, P1"), range: [120, 900], note: "A hasty company plan; the HQ uses at most a third of the time available (P1)." },
+  "world/domains/c2.PLAN_BATTALION_S": { value: 900, unit: "s", module: "world/domains/c2", source: ref("R1, P1"), range: [600, 2400], note: "A hasty battalion plan." },
+  "world/domains/c2.PLAN_BRIGADE_S": { value: 2400, unit: "s", module: "world/domains/c2", source: ref("R1, P1"), range: [1200, 7200], note: "A hasty brigade plan (the vignette's 40 sim-minutes)." },
+  "world/domains/c2.PLAN_HIGH_S": { value: 5400, unit: "s", module: "world/domains/c2", source: ref("P25 (default)"), range: [3600, 21600], note: "A division, component or joint plan, hasty." },
+  "world/domains/c2.CCIR_MIN_GAP_S": { value: 600, unit: "s", module: "world/domains/c2", source: declared, range: [300, 1800], note: "An HQ does not re-plan on a CCIR trigger within this long of its last plan." },
+  "world/domains/c2.CCIR_NEW_CONTACTS": { value: 3, module: "world/domains/c2", source: declared, range: [2, 6], note: "New enemy contacts in the COP since the last plan that count as a major enemy force found." },
+  "world/domains/c2.HEARTBEAT_S": { value: 300, unit: "s", module: "world/domains/c2", source: declared, range: [120, 900], note: "An HQ restates its intent to its subordinates this often; each answers with a situation report." },
+  "world/domains/c2.OUT_OF_COMMS_S": { value: 900, unit: "s", module: "world/domains/c2", source: declared, range: [300, 1800], note: "A unit that has heard nothing from its HQ for this long is out of comms (the outOfComms decision)." },
+  "world/domains/c2.EMIT_LIMIT_S": { value: 1200, unit: "s", module: "world/domains/c2", source: declared, range: [600, 3600], note: "A command post on the air this long since it last moved is asked whether to displace." },
+  "world/domains/c2.FIRES_RANK_S": { value: 120, unit: "s", module: "world/domains/c2", source: declared, range: [60, 300], note: "The fires cell ranks competing calls for fire no more often than this." },
+  "world/domains/c2.SEAT_MOVE_S": { value: 900, unit: "s", module: "world/domains/c2", source: declared, range: [300, 3600], note: "After its post is destroyed, an HQ's seat takes this long to move to the alternate." },
+  "world/domains/c2.DISPLACE_M": { value: 1000, unit: "m", module: "world/domains/c2", source: declared, range: [500, 3000], note: "How far a command post moves when it displaces." },
+  "world/domains/c2.FIRES_CELL_S": { value: 30, unit: "s", module: "world/domains/c2", source: declared, range: [10, 120], note: "The fires cell's own handling of a call for fire, between receiving it and tasking a shooter." },
+  "world/domains/c2.COP_S": { value: 10, unit: "s", module: "world/domains/c2", source: declared, range: [10, 10], note: "HQ pictures are fused this often." },
+  "world/domains/c2.INBOX_KEEP": { value: 200, module: "world/domains/c2", source: declared, range: [200, 200], note: "Messages kept in an HQ's inbox." },
 } as const satisfies Record<string, WorldFigure>;
 
 export type WorldFigureKey = keyof typeof WORLD_FIGURES;

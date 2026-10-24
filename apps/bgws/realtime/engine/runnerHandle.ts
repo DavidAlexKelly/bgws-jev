@@ -23,6 +23,7 @@ import { applyPatch } from "./statePatch";
 import type { RtConfig, RtState, UnitOrders } from "./types";
 import type { FromWorker, MessageEndpoint, RunnerSnapshot, ToWorker } from "./workerHost";
 import type { WorldDecider } from "../world/deciders";
+import type { PlannerSeat } from "../world/command/seat";
 
 export interface RunnerHandle {
   /** Where the game runs, for the status line. */
@@ -52,6 +53,8 @@ export interface HandleOptions {
   deciders?: Partial<Record<Side, RtDecider>>;
   /** Per side, for world questions (realtime/world); absent means the rules decide. */
   worldDeciders?: Partial<Record<Side, WorldDecider>>;
+  /** Per side, the planner for Claude-commanded HQ seats; absent means the heuristic. */
+  planners?: Partial<Record<Side, PlannerSeat>>;
   logLimit?: number;
   /** Every feed entry as it is made, with its context then (feed.ts). Must not throw. */
   onEntry?: (entry: RtLogEntry, context: EntryContext) => void;
@@ -67,6 +70,7 @@ export class InThreadRunner implements RunnerHandle {
     this.runner = new RealtimeRunner(initial, config, {
       deciders: options.deciders,
       worldDeciders: options.worldDeciders,
+      planners: options.planners,
       logLimit: options.logLimit,
       onEntry: onEntry ? (entry, state) => onEntry(entry, entryContext(entry, state)) : undefined,
     });

@@ -343,9 +343,11 @@ function dismounts(c: WorldCtx): void {
       return enemy.side !== fe.side && c.landAlive(e) && c.land.known(id, e) !== "none" && distanceM(enemy.position, fe.position) <= wfig("world/domains/landExt.DISMOUNT_AT_M");
     });
     const objective = unit.mission.at && distanceM(fe.position, unit.mission.at) <= 300;
-    if (!enemyNear && !objective) continue;
+    // Fired on: the infantry are safer out than in a vehicle being shot at.
+    const underFire = c.time - unit.lastIncomingAt <= 10;
+    if (!enemyNear && !objective && !underFire) continue;
     c.mark(`dismountAsk:${id}`);
-    raiseQuestion(c, { agentId: id, side: fe.side, trigger: "dismountPoint", about: { enemyNear, objective: !!objective }, quality: fe.troopQuality });
+    raiseQuestion(c, { agentId: id, side: fe.side, trigger: "dismountPoint", about: { enemyNear: enemyNear || underFire, objective: !!objective }, quality: fe.troopQuality });
   }
 }
 

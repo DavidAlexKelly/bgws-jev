@@ -81,6 +81,8 @@ export class WorldCtx {
       outages: { ...prev.outages },
       support: [...prev.support],
       orderQueue: [...prev.orderQueue],
+      plans: [...prev.plans],
+      structured: { ...prev.structured },
       memo: { ...prev.memo },
       log: prev.log,
     };

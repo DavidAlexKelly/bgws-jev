@@ -24,4 +24,14 @@ describe("milestone scenarios", () => {
     const fuelUsed = ["b-ifv-1", "b-ifv-2", "b-tanks"].some((id) => w.land[id].stores.fuelL < record.initial.world!.land[id].stores.fuelL);
     expect(fuelUsed, "fuel drawn down").toBe(true);
   }, 60_000);
+
+  it("M3: the battalion plans, its companies plan to its guidance, and FRAGOs go down the nets", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M3());
+    const result = await playRecord(record, { untilS: 2400 });
+    const w = result.state.world!;
+    expect(Object.keys(w.hqs).sort()).toEqual(["blue-a", "blue-b", "blue-bn", "blue-c", "red-hq"]);
+    expect(w.log.some((l) => l.text.startsWith("blue-bn issues its plan")), "battalion plan").toBe(true);
+    expect(w.messages.some((m) => m.kind === "frago" && m.from === "b-a-hq"), "company FRAGOs").toBe(true);
+    expect(w.stats.reportLatencyByHq["blue-bn"]?.length ?? 0, "reports reach the battalion").toBeGreaterThan(0);
+  }, 60_000);
 });

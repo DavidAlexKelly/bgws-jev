@@ -77,9 +77,47 @@ export function mechCompanyAttack(): RealtimeScenario {
   );
 }
 
+/**
+ * M3 — Battalion C2: a battalion attack. Three company HQs and a battalion
+ * HQ, each on its own nets, with terrain-limiting VHF; planners on their
+ * battle rhythm and on CCIR; air and space abstracted (W4).
+ */
+export function battalionAttack(): RealtimeScenario {
+  const forces: PlacedElement[] = [unit("b-bn", "blue", "generic/cp-battalion", 3, 0, -8000, "Battalion HQ", "regular", 3)];
+  const hqs: HqSpec[] = [{ id: "blue-bn", side: "blue", echelon: "battalion", postId: "b-bn", subordinates: ["blue-a", "blue-b", "blue-c"], planner: "land", seat: "claude" }];
+  ["a", "b", "c"].forEach((coy, i) => {
+    const east = (i - 1) * 2500;
+    forces.push(unit(`b-${coy}-hq`, "blue", "generic/cp-company", 2, east, -2800, `${coy.toUpperCase()} Company HQ`, "regular", 2));
+    forces.push(unit(`b-${coy}-1`, "blue", "generic/mbt", 4, east - 400, -2000, `${coy.toUpperCase()}1 tanks`));
+    forces.push(unit(`b-${coy}-2`, "blue", "generic/ifv", 3, east + 400, -2000, `${coy.toUpperCase()}2 mech`));
+    hqs.push({ id: `blue-${coy}`, side: "blue", echelon: "company", postId: `b-${coy}-hq`, parent: "blue-bn", subordinates: [`b-${coy}-1`, `b-${coy}-2`], planner: "land", seat: "heuristic", alternate: "blue-bn" });
+  });
+  forces.push(unit("b-mortar", "blue", "generic/mortar120", 2, 0, -4500, "Battalion mortars"));
+  hqs[0].subordinates.push("b-mortar");
+  forces.push(unit("r-hq", "red", "generic/cp-company", 2, 0, 4500, "Red company HQ", "regular", 2));
+  const redSubs: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    forces.push(unit(`r-${i}`, "red", "generic/infantrySection", 3, (i - 1) * 2200, 2000, `Red ${i + 1} platoon`));
+    forces.push(unit(`r-at-${i}`, "red", "generic/atgmTeam", 2, (i - 1) * 2200 + 300, 2400, `Red ATGM ${i + 1}`));
+    redSubs.push(`r-${i}`, `r-at-${i}`);
+  }
+  forces.push(unit("r-tanks", "red", "generic/mbt", 4, 0, 3800, "Red counter-attack force"));
+  forces.push(unit("r-mortar", "red", "generic/mortar120", 2, 0, 5500, "Red mortars"));
+  redSubs.push("r-tanks", "r-mortar");
+  hqs.push({ id: "red-hq", side: "red", echelon: "company", postId: "r-hq", subordinates: redSubs, planner: "land", seat: "heuristic" });
+  return scenario(
+    "M3 — Battalion attack",
+    "m3-battalion",
+    scopeOf("combinedArms", 240, { drones: "abstracted", ew: "off", fires: "simulated", logistics: "abstracted", air: "abstracted", space: "abstracted" }, { echelons: { highest: "battalion", lowest: "platoon" }, planners: ["overall", "land"], area: { widthKm: 20, depthKm: 20 } }),
+    forces,
+    { hqs, obstacles: [obstacle("red", "minefield", 0, 1200, 6000, 200, 0.4)], environment: { startHour: 4.5 } },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
+  M3: battalionAttack,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };
