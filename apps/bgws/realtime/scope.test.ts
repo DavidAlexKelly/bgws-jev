@@ -15,13 +15,10 @@ describe("scenario scope", () => {
     expect(SCENARIO_TYPES.filter(playable)).toEqual(["skirmish", "custom"]);
   });
 
-  it("a Skirmish loads with every domain but land off, saying why", () => {
-    const { scope, notes, errors } = effectiveScope(scopeFor("skirmish"));
+  it("a Skirmish loads as the plan sets it: land simulated, drones and fires abstracted, the rest off", () => {
+    const { scope, errors } = effectiveScope(scopeFor("skirmish"));
     expect(errors).toEqual([]);
-    for (const d of DOMAINS) expect(scope.domains[d], d).toBe(d === "land" ? "simulated" : "off");
-    // The plan gives a Skirmish abstracted drones and fires; they are not built, and the notes say so.
-    expect(notes.join(" ")).toMatch(/Drones: abstracted support comes with M2/);
-    expect(notes.join(" ")).toMatch(/Fires \(artillery\): abstracted support comes with M3/);
+    for (const d of DOMAINS) expect(scope.domains[d], d).toBe(d === "land" ? "simulated" : d === "drones" || d === "fires" ? "abstracted" : "off");
   });
 
   it("refuses, with reasons, a scope that needs what is not built", () => {
@@ -55,7 +52,8 @@ describe("scope in the engine's config", () => {
   it("carries the runnable scope; the engine reads each domain's mode", () => {
     const config = configFromSpec(spec({ scope: scopeFor("skirmish") }));
     expect(domainMode(config, "land")).toBe("simulated");
-    expect(domainMode(config, "drones")).toBe("off");
+    expect(domainMode(config, "drones")).toBe("abstracted");
+    expect(domainMode(config, "naval")).toBe("off");
   });
 
   it("no scope is a skirmish, as every game was before", () => {

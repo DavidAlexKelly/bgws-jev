@@ -38,7 +38,7 @@ describe("real-time scenario files", () => {
   it("refuses other files and versions outright", () => {
     expect(parseScenario([]).errors[0]).toMatch(/JSON object/);
     expect(parseScenario({ format: "something" }).errors[0]).toMatch(/Not a real-time scenario/);
-    expect(parseScenario({ ...scenario(), version: 3 }).errors[0]).toMatch(/version 3 is not supported/);
+    expect(parseScenario({ ...scenario(), version: 4 }).errors[0]).toMatch(/version 4 is not supported/);
   });
 
   it("lists every problem at once", () => {

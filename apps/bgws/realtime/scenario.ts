@@ -11,15 +11,22 @@
 // runs, the area, command levels and which domains are simulated. Its
 // `durationMin` is the time limit, which version 1 kept in `rules`. A
 // version 1 file is read as a Skirmish with its time limit as the duration.
+//
+// Version 3 adds the WORLD (realtime/world): entities beyond the land forces
+// (ships, aircraft at their bases, satellites, depots, command posts),
+// obstacles, weather and light, the command tree, control measures and
+// prepared cyber accesses. A version 2 file has none of these.
 
 import type { PlacedElement } from "../lib/forceBuilder";
 import { vocabulary } from "./behaviour/vocabulary";
 import { buildRegistry, bundledTemplateFiles, type TemplateFiles } from "./behaviour/load";
 import type { Template } from "./behaviour/types";
 import { effectiveScope, scopeErrors, scopeFor, type Scope } from "./scope";
+import type { WorldSetup } from "./world/create";
+import { hasRecord } from "./catalogue";
 
 export const SCENARIO_FORMAT = "bgws.realtime.scenario";
-export const SCENARIO_VERSION = 2;
+export const SCENARIO_VERSION = 3;
 export const GROUND_CHOICES = ["generated", "raster+relief", "raster"] as const;
 export type ScenarioGround = (typeof GROUND_CHOICES)[number];
 
@@ -40,7 +47,12 @@ export interface RealtimeScenario {
   behaviours: Record<string, string>;
   /** The user templates `behaviours` uses, with their parents. */
   behaviourTemplates: Template[];
+  /** Everything beyond the land forces (version 3). */
+  world?: ScenarioWorld;
 }
+
+/** A scenario's world content, as the world layer builds it (world/create.ts). */
+export type ScenarioWorld = Omit<WorldSetup, "platforms">;
 
 /** The user templates these behaviours need: each one named, and its custom ancestors. */
 export function referencedTemplates(behaviours: Record<string, string>, available: readonly Template[]): Template[] {
@@ -83,8 +95,9 @@ export function parseScenario(raw: unknown): { scenario?: RealtimeScenario; erro
   if (!isObj(raw)) return { errors: ["Not a scenario file (expected a JSON object)."] };
   if (raw.format !== SCENARIO_FORMAT) return { errors: [`Not a real-time scenario file (format is "${String(raw.format)}").`] };
   if (raw.version === 1) raw = fromVersion1(raw);
-  else if (raw.version !== SCENARIO_VERSION)
-    return { errors: [`Scenario version ${String(raw.version)} is not supported (this app reads versions 1 and ${SCENARIO_VERSION}).`] };
+  if (isObj(raw) && raw.version === 2) raw = { ...raw, version: SCENARIO_VERSION };
+  else if (isObj(raw) && raw.version !== SCENARIO_VERSION)
+    return { errors: [`Scenario version ${String(raw.version)} is not supported (this app reads versions 1 to ${SCENARIO_VERSION}).`] };
   if (!isObj(raw)) return { errors: ["Not a scenario file (expected a JSON object)."] };
 
   need(isStr(raw.name), '"name" must be text');
@@ -144,5 +157,41 @@ export function parseScenario(raw: unknown): { scenario?: RealtimeScenario; erro
     need(isStr(tid) && known.has(tid), `behaviours.${unit}: unknown template "${String(tid)}"`);
   }
 
+  if (raw.world !== undefined) errors.push(...worldErrors(raw.world, ids));
+
   return errors.length ? { errors } : { scenario: raw as unknown as RealtimeScenario, errors };
+}
+
+/** Check a scenario's world section. Every problem is listed. */
+function worldErrors(raw: unknown, unitIds: ReadonlySet<string>): string[] {
+  const errors: string[] = [];
+  if (!isObj(raw)) return ['"world" must be an object'];
+  const entities = raw.entities ?? [];
+  if (!Array.isArray(entities)) errors.push('"world.entities" must be a list');
+  else {
+    const ids = new Set<string>();
+    entities.forEach((e, i) => {
+      const at = `world.entities[${i}]`;
+      if (!isObj(e)) return void errors.push(`${at}: must be an object`);
+      if (!isStr(e.id) || !e.id) errors.push(`${at}: "id" is required`);
+      else if (ids.has(e.id) || unitIds.has(e.id)) errors.push(`${at}: duplicate id "${e.id}"`);
+      else ids.add(e.id);
+      if (!["blue", "red", "neutral"].includes(e.owner as string)) errors.push(`${at}: "owner" must be blue, red or neutral`);
+      if (!isStr(e.archetype) || !hasRecord(e.archetype)) errors.push(`${at}: unknown archetype "${String(e.archetype)}"`);
+      const p = isObj(e.at) ? e.at : {};
+      if (!(isNum(p.lat) && isNum(p.lng))) errors.push(`${at}: "at" must be { lat, lng }`);
+    });
+  }
+  const obstacles = raw.obstacles ?? [];
+  if (!Array.isArray(obstacles)) errors.push('"world.obstacles" must be a list');
+  else
+    obstacles.forEach((o, i) => {
+      const at = `world.obstacles[${i}]`;
+      if (!isObj(o)) return void errors.push(`${at}: must be an object`);
+      if (!["minefield", "ditch", "dragonsTeeth"].includes(o.kind as string)) errors.push(`${at}: "kind" must be minefield, ditch or dragonsTeeth`);
+      if (o.owner !== "blue" && o.owner !== "red") errors.push(`${at}: "owner" must be blue or red`);
+      if (!(isNum(o.widthM) && o.widthM > 0 && isNum(o.depthM) && o.depthM > 0)) errors.push(`${at}: "widthM" and "depthM" must be positive`);
+    });
+  if (raw.environment !== undefined && !isObj(raw.environment)) errors.push('"world.environment" must be an object');
+  return errors;
 }

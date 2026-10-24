@@ -170,7 +170,6 @@ function assign(c: WorldCtx): void {
     for (const m of waiting) {
       const candidates = shooters
         .filter((s) => mountFor(c, s, m.targetAt))
-        .filter((s) => !(c.fe(s) && c.land.units[s].lastMovedAt === c.time))
         .sort((a, b) => distanceM(c.where(a)!, m.targetAt) - distanceM(c.where(b)!, m.targetAt));
       const shooter = candidates[0];
       if (!shooter) {
@@ -221,6 +220,8 @@ function fire(c: WorldCtx): void {
       setMission(c, m.id, { state: "refused", result: "the shooter was lost" });
       continue;
     }
+    // In action: the gun stays where it is until the mission is fired (a decision to move it ends the mission).
+    if (!offBoard && c.fe(shooter) && c.land.units[shooter].order.kind === "move" && c.land.units[shooter].cohesion === "steady") halt(c, shooter);
     if ((m.fireAt ?? Infinity) > c.time || (m.nextAt ?? 0) > c.time) continue;
     // A gun on the move does not fire.
     if (!offBoard && c.fe(shooter) && c.land.units[shooter].lastMovedAt === c.time) continue;
@@ -295,6 +296,12 @@ function spend(c: WorldCtx, id: string, weaponId: string, rounds: number): void 
   if (e) c.setEntity(id, { mounts: e.mounts.map((m) => (m.weaponId === weaponId ? { ...m, rounds: Math.max(0, m.rounds - rounds) } : m)) });
 }
 
+/** A gun on the move stops to fire: it comes into action where it is (its mission stands; it moves on after). */
+function halt(c: WorldCtx, id: string): void {
+  const unit = c.land.units[id];
+  if (unit && (unit.order.kind === "move" || unit.order.kind === "withdraw")) c.land.setUnit(id, { order: { kind: "hold" }, bound: undefined });
+}
+
 /** Move a gun a few hundred metres to a new position. */
 function displace(c: WorldCtx, id: string, why: string): void {
   const fe = c.fe(id);
@@ -357,21 +364,27 @@ registerHandlers({
     },
     apply(c, q) {
       const m = missionOf(c, q);
-      if (m) setMission(c, m.id, { state: "laying", fireAt: c.time + layS(c, q.agentId) });
+      if (!m) return;
+      halt(c, q.agentId);
+      setMission(c, m.id, { state: "laying", fireAt: c.time + layS(c, q.agentId) });
     },
   },
   "fires.fireWhenLaid": {
     available: (c, q) => missionOf(c, q) != null,
     apply(c, q) {
       const m = missionOf(c, q);
-      if (m) setMission(c, m.id, { state: "laying", fireAt: c.time + 2 * layS(c, q.agentId), careful: true });
+      if (!m) return;
+      halt(c, q.agentId);
+      setMission(c, m.id, { state: "laying", fireAt: c.time + 2 * layS(c, q.agentId), careful: true });
     },
   },
   "fires.fireThenScoot": {
     available: (c, q) => missionOf(c, q) != null && c.fe(q.agentId) != null,
     apply(c, q) {
       const m = missionOf(c, q);
-      if (m) setMission(c, m.id, { state: "laying", fireAt: c.time + layS(c, q.agentId), scoot: true });
+      if (!m) return;
+      halt(c, q.agentId);
+      setMission(c, m.id, { state: "laying", fireAt: c.time + layS(c, q.agentId), scoot: true });
     },
   },
   "fires.refuse": {

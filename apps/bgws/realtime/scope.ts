@@ -248,8 +248,23 @@ export function scopeFor(type: ScenarioType): Scope {
  * What the engine can actually do today. Each domain lists the modes that
  * are built; `limits` are what today's board, rules and command allow.
  */
+/** Which modes each domain has built, as the workstreams land (§7). */
+const BUILT: Record<Domain, readonly DomainMode[]> = {
+  land: ["simulated"],
+  fires: ["simulated", "abstracted", "off"],
+  drones: ["abstracted", "off"],
+  ew: ["off"],
+  air: ["abstracted", "off"],
+  airDefence: ["off"],
+  naval: ["off"],
+  space: ["abstracted", "off"],
+  cyber: ["off"],
+  logistics: ["abstracted", "off"],
+  medical: ["off"],
+};
+
 export const ENGINE_CAN = {
-  domains: Object.fromEntries(DOMAINS.map((d): [Domain, readonly DomainMode[]] => [d, d === "land" ? ["simulated"] : ["off"]])) as Record<Domain, readonly DomainMode[]>,
+  domains: BUILT,
   /** The milestone that first builds each domain (§7), for the notes. */
   builtIn: {
     land: "now",
