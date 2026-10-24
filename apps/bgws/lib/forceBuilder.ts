@@ -33,7 +33,7 @@ import {
   type PlatformSnapshot,
   type TroopQualityName,
 } from "../rules/forceList";
-import { GENERIC_LAND_SNAPSHOTS } from "../realtime/catalogue/snapshots";
+import { GENERIC_LAND_SNAPSHOTS, genericSidc } from "../realtime/catalogue/snapshots";
 import {
   combatStrengthFor as rulesetCombatStrength,
   type RuleSet,
@@ -121,7 +121,8 @@ export function toForceElement(
     id: spec.id,
     side: spec.side,
     label: spec.label,
-    sidc: defaultSidc(spec.side),
+    // A force list's own platforms take the placeholder; a generic catalogue type carries its type's symbol (W13).
+    sidc: (PLATFORM_SNAPSHOT[spec.platform] ? undefined : genericSidc(spec.platform, spec.side)) ?? defaultSidc(spec.side),
     moveType: platform.moveType,
     targetClass: platform.targetClass,
     // Copied, not shared: the snapshot is module-level and a game must not be

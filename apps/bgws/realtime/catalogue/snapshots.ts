@@ -74,3 +74,8 @@ export function snapshotFromRecord(record: CatalogueRecord): PlatformSnapshot {
 export const GENERIC_LAND_SNAPSHOTS: Readonly<Record<string, PlatformSnapshot>> = Object.fromEntries(
   CATALOGUE.filter((r) => r.domain === "land").map((r) => [r.id, snapshotFromRecord(r)]),
 );
+
+/** A generic catalogue record's symbol for a side (2525), for a unit placed as that type. */
+export function genericSidc(platform: string, side: "blue" | "red"): string | undefined {
+  return CATALOGUE.find((r) => r.id === platform)?.sidc[side];
+}

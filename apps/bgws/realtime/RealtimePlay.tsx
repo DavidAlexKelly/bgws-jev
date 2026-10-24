@@ -78,6 +78,10 @@ import { EVENT_STREAM_RID, STREAM_MESSAGES, foundryStreamPublisher } from "../da
 import { EventStreamQueue } from "../data/eventStreamQueue";
 import { describeEntry, jevFailure, streamRow } from "./engine/feed";
 import { OVERLAY_SOURCES, overlayLayerSpecs, SOURCE } from "./overlayLayers";
+import { PRESET_SCENARIOS } from "./presets";
+import WorldPanel from "./WorldPanel";
+import { withWorld } from "./world/create";
+import { WORLD_LAYERS, WORLD_SOURCE, worldLayerSpecs, worldOverlay, type WorldLayer } from "./worldOverlays";
 import {
   fireOverlay,
   newWrecks,
@@ -100,6 +104,7 @@ import {
   SCENARIO_FORMAT,
   SCENARIO_VERSION,
   type RealtimeScenario,
+  type ScenarioWorld,
 } from "./scenario";
 import {
   Blockers,
@@ -576,10 +581,39 @@ function UnitInspector(props: {
         </Line>
       ))}
 
+      {state.world?.land[id] && <WorldComponents state={state} id={id} />}
+
       {unit.history.length > 0 && <div style={{ ...groupTitle, marginTop: 8 }}>Last decisions</div>}
       {[...unit.history].reverse().map((memory, index) => (
         <Line key={index} label={clock(memory.time)}>
           {memory.chose} <span style={{ color: memory.by === "jev" ? "#e8c547" : "#6a7292" }}>({memory.by}; {memory.because})</span>
+        </Line>
+      ))}
+    </>
+  );
+}
+
+/** A unit's world components (W2, W13 step 4): stores, mounts, damage, wounded, emissions, level of detail, its HQ. */
+function WorldComponents({ state, id }: { state: RtState; id: string }) {
+  const c = state.world!.land[id];
+  const ammo = Object.entries(c.stores.ammo).filter(([, n]) => n != null);
+  const damage = Object.entries(c.damage).filter(([, d]) => d).map(([k]) => k);
+  const questions = state.world!.questions.filter((q) => q.agentId === id).slice(-3);
+  return (
+    <>
+      <div style={{ ...groupTitle, marginTop: 8 }}>Stores and state</div>
+      <Line label="type">{c.archetype.replace("generic/", "")}{c.hq ? ` · under ${c.hq}` : ""}{c.lod ? ` · ${c.lod === "aggregated" ? "moving aggregated" : "rules lead (far from contact)"}` : ""}</Line>
+      <Line label="fuel">{Math.round(c.stores.fuelL)} L</Line>
+      {ammo.length > 0 && <Line label="ammunition">{ammo.map(([f, n]) => `${f} ${n}`).join(" · ")}</Line>}
+      {c.mounts.length > 0 && <Line label="mounts">{c.mounts.map((m) => `${m.weaponId} ${m.rounds}`).join(" · ")}</Line>}
+      {c.drones > 0 && <Line label="drones">{c.drones} to launch</Line>}
+      {damage.length > 0 && <Line label="damaged">{damage.join(", ")}</Line>}
+      {(c.wounded.length > 0 || c.killed > 0) && <Line label="casualties">{c.killed} killed · {c.wounded.length} wounded waiting</Line>}
+      {c.disabled > 0 && <Line label="disabled">{c.disabled} vehicles awaiting recovery</Line>}
+      <Line label="emissions">{c.emcon}{c.onAirS > 0 ? ` · on the air ${Math.round(c.onAirS)} s` : ""}{c.dugIn > 0 ? ` · dug in ${Math.round(c.dugIn * 100)}%` : ""}</Line>
+      {questions.map((q) => (
+        <Line key={q.id} label={clock(q.raisedAt)}>
+          {q.title}: {q.answer ? (q.options.find((o) => o.id === q.answer!.optionId)?.summary ?? q.answer.optionId) : "waiting"} <span style={{ color: "#6a7292" }}>({q.answer?.by ?? "…"})</span>
         </Line>
       ))}
     </>
@@ -612,6 +646,13 @@ export default function RealtimePlay() {
   const [timeLimitMin, setTimeLimitMin] = useState(90);
   /** What the game covers (scope.ts). Its duration is `timeLimitMin`, set on the victory step. */
   const [scope, setScope] = useState<Scope>(() => scopeFor("skirmish"));
+  /** The scenario's world (entities, HQs, obstacles, sea, events…), from a loaded file or preset. */
+  const [scenarioWorld, setScenarioWorld] = useState<ScenarioWorld | undefined>(undefined);
+  /** Which world layers the map draws (worldOverlays.ts), and whether the world panel is open. */
+  const [worldLayers, setWorldLayers] = useState<ReadonlySet<WorldLayer>>(() => new Set(WORLD_LAYERS));
+  const worldLayersRef = useRef(worldLayers);
+  worldLayersRef.current = worldLayers;
+  const [worldPanelOpen, setWorldPanelOpen] = useState(false);
   const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
   const chooseScenarioType = (type: ScenarioType) => {
     const next = scopeFor(type);
@@ -782,6 +823,7 @@ export default function RealtimePlay() {
       forces: placed,
       behaviours,
       behaviourTemplates: referencedTemplates(behaviours, behaviourTemplates),
+      ...(scenarioWorld ? { world: scenarioWorld } : {}),
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(scenario, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
@@ -804,6 +846,21 @@ export default function RealtimePlay() {
       setScenarioMessage({ tone: "danger", text: `Couldn't load ${file.name}:`, details: errors });
       return;
     }
+    applyScenario(scenario);
+  };
+  /** A milestone scenario (presets.ts), loaded exactly as its file would be. */
+  const loadPreset = (key: string) => {
+    const make = PRESET_SCENARIOS[key];
+    if (!make) return;
+    const { scenario, errors } = parseScenario(JSON.parse(JSON.stringify(make())));
+    if (!scenario) {
+      setScenarioMessage({ tone: "danger", text: `Couldn't load the ${key} scenario:`, details: errors });
+      return;
+    }
+    applyScenario(scenario);
+  };
+  const applyScenario = (scenario: RealtimeScenario) => {
+    setScenarioWorld(scenario.world);
     setPlaced(scenario.forces);
     setGameSeed(scenario.seed);
     setGroundChoice(scenario.ground.choice);
@@ -905,6 +962,8 @@ export default function RealtimePlay() {
     try {
       const config = makeConfig();
       let state = createRealtimeState(toGameStateFromPlaced(placed, HOUSE_V1, { gameId: gameSeed }));
+      // The world layer, when the scope or the scenario needs one (world/create.ts): otherwise the game is as it always was.
+      state = withWorld(state, config, { platforms: Object.fromEntries(placed.map((f) => [f.id, f.platform])), ...scenarioWorld });
       const results: OrdersResult[] = [];
       for (const s of ["blue", "red"] as const) {
         const result = await ordersFor(state, s, config, {});
@@ -919,7 +978,7 @@ export default function RealtimePlay() {
     } finally {
       setBusy(false);
     }
-  }, [makeConfig, placed, gameSeed, ordersFor]);
+  }, [makeConfig, placed, gameSeed, ordersFor, scenarioWorld]);
 
   /** Paused: new orders for one side or both, for review before the clock resumes. */
   const generatePausedOrders = useCallback(async () => {
@@ -1068,6 +1127,7 @@ export default function RealtimePlay() {
   const newScenario = useCallback(() => {
     reset();
     setPlaced([]);
+    setScenarioWorld(undefined);
   }, [reset]);
 
   // The loop: wall time × speed → simulated seconds. One advance in flight at
@@ -1189,6 +1249,11 @@ export default function RealtimePlay() {
         // The overlays (overlayLayers.ts): impacts, wrecks, spotting, bearings, radio, the selected unit's plan.
         for (const id of OVERLAY_SOURCES) if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyCollection() });
         for (const spec of overlayLayerSpecs(SIDE_COLOUR)) {
+          if (!map.getLayer(spec.id as string)) map.addLayer(spec as unknown as maplibregl.LayerSpecification);
+        }
+        // The world layer (worldOverlays.ts): aircraft, ships, satellites, missiles, jammers, air-defence rings.
+        for (const id of Object.values(WORLD_SOURCE)) if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyCollection() });
+        for (const spec of worldLayerSpecs(SIDE_COLOUR)) {
           if (!map.getLayer(spec.id as string)) map.addLayer(spec as unknown as maplibregl.LayerSpecification);
         }
       };
@@ -1452,6 +1517,11 @@ export default function RealtimePlay() {
     const radioTraffic = radioOverlay(state, log, overlay);
     set(SOURCE.radio, radioTraffic.lines);
     set(SOURCE.pulse, radioTraffic.pulses);
+    // The world, as the chosen picture shows it: the truth, or one side's own and what it holds tracks of.
+    const world = worldOverlay(state, { seenBy: viewpointRef.current === "both" ? "truth" : viewpointRef.current, layers: worldLayersRef.current });
+    set(WORLD_SOURCE.entity, world.entities);
+    set(WORLD_SOURCE.area, world.areas);
+    set(WORLD_SOURCE.line, world.lines);
     const plan = planOverlay(state, selectedRef.current, overlay);
     set(SOURCE.plan, plan.lines);
     set(SOURCE.planZone, plan.zones);
@@ -1706,6 +1776,22 @@ export default function RealtimePlay() {
                       }}
                     />
                   </label>
+                  <select
+                    className="su-btn"
+                    data-variant="ghost"
+                    value=""
+                    title="The milestone scenarios: each exercises what its milestone built"
+                    onChange={(e) => {
+                      if (e.target.value) loadPreset(e.target.value);
+                    }}
+                  >
+                    <option value="">Milestone scenario…</option>
+                    {Object.entries(PRESET_SCENARIOS).map(([key, make]) => (
+                      <option key={key} value={key}>
+                        {make().name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {scenarioNotice}
               </Section>
@@ -2168,6 +2254,32 @@ export default function RealtimePlay() {
                 </button>
               ))}
             </div>
+            {state?.world && (
+              <>
+                <div style={{ ...groupTitle, marginTop: 10 }}>World layers</div>
+                <div style={{ ...row, flexWrap: "wrap" }}>
+                  {WORLD_LAYERS.map((layer) => (
+                    <button
+                      key={layer}
+                      onClick={() =>
+                        setWorldLayers((was) => {
+                          const next = new Set(was);
+                          if (next.has(layer)) next.delete(layer);
+                          else next.add(layer);
+                          return next;
+                        })
+                      }
+                      style={{ ...chip, borderColor: worldLayers.has(layer) ? "#e8c547" : "transparent", color: worldLayers.has(layer) ? "#e8c547" : "#8a91a8" }}
+                    >
+                      {layer}
+                    </button>
+                  ))}
+                  <button onClick={() => setWorldPanelOpen((o) => !o)} style={{ ...chip, color: worldPanelOpen ? "#e8c547" : "#8a91a8" }} title="Feed, kill chains, HQs, logistics, network, figures">
+                    {worldPanelOpen ? "hide" : "show"} the world panel
+                  </button>
+                </div>
+              </>
+            )}
             {view && (
               <div style={{ ...subtle, lineHeight: 1.5 }}>
                 {view.contacts.length} enemy contact{view.contacts.length === 1 ? "" : "s"} in sight
@@ -2243,6 +2355,11 @@ export default function RealtimePlay() {
             </div>
           ))}
           </div>
+          {worldPanelOpen && state?.world && (
+            <div style={{ flex: "0 0 auto", maxHeight: "45%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
+              <WorldPanel state={state} onClose={() => setWorldPanelOpen(false)} />
+            </div>
+          )}
           <div style={{ flex: "0 0 auto", maxHeight: "48%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
             {selectedId && state ? (
               <UnitInspector
