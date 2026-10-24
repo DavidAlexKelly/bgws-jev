@@ -42,6 +42,9 @@ import type { Delivery } from "./comms";
 import { decisionPointOf, inContact, optionsAt, ruleFallback } from "./decisions";
 import { knownEnemies, remember, sendMessage, setOrder, tick } from "./engine";
 import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
+import type { WorldLogItem } from "../world/types";
+import { ruleWorldDecider, type WorldAnswer, type WorldDecider } from "../world/deciders";
+import { answerQuestion, markAsked, unaskedQuestions } from "../world/questions";
 
 /** Something the player should know about, while the clock runs. */
 export interface RtFlag {
@@ -67,7 +70,9 @@ export type RtLogEntry =
     }
   | { type: "flag"; time: number; side: Side; flag: RtFlag }
   /** A radio message, as it was heard (comms.ts). */
-  | { type: "message"; time: number; side: Side; delivery: Delivery };
+  | { type: "message"; time: number; side: Side; delivery: Delivery }
+  /** Something in the world layer (realtime/world): another domain, a world decision, a network. */
+  | { type: "world"; time: number; side: Side; item: WorldLogItem };
 
 interface InFlight {
   side: Side;
@@ -82,6 +87,8 @@ interface InFlight {
 export interface RunnerOptions {
   /** Per side. Absent means the rules decide for that side. */
   deciders?: Partial<Record<Side, RtDecider>>;
+  /** Per side, for world questions (realtime/world). Absent means the rules decide. */
+  worldDeciders?: Partial<Record<Side, WorldDecider>>;
   /** How many feed entries to keep. */
   logLimit?: number;
   /** Called with every feed entry as it is made — to stream the log elsewhere. Must not throw. */
@@ -131,6 +138,8 @@ export class RealtimeRunner {
   private readonly raised = new Set<string>();
   private readonly lastAsked = new Map<string, number>();
   private readonly inflight: InFlight[] = [];
+  /** World questions handed to a decider: question id → its batch's answers. */
+  private readonly worldInflight = new Map<number, { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] }>();
 
   constructor(
     initial: RtState,
@@ -142,7 +151,7 @@ export class RealtimeRunner {
 
   /** Is a decision outstanding right now? For the "Jev thinking" indicator. */
   get thinking(): boolean {
-    return this.inflight.some((batch) => batch.result === undefined);
+    return this.inflight.some((batch) => batch.result === undefined) || [...this.worldInflight.values()].some((b) => b.result === undefined);
   }
 
   /** The last few things this side saw happen, as short lines, for Jev. */
@@ -216,6 +225,9 @@ export class RealtimeRunner {
         const side = this.state.game.forceElements[shot.firerId]?.side ?? "blue";
         this.push({ type: "shot", time: shot.time, side, shot });
       }
+      for (const item of result.world ?? []) {
+        this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
+      }
       for (const event of result.events) {
         const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
         this.push({ type: "event", time: event.time, side, event });
@@ -236,6 +248,56 @@ export class RealtimeRunner {
       }
       this.checkFlags();
       this.dispatch();
+      this.dispatchWorld();
+    }
+  }
+
+  /** Hand every new world question to its side's world decider, one batch per side. */
+  private dispatchWorld(): void {
+    const fresh = unaskedQuestions(this.state);
+    if (!fresh.length) return;
+    this.state = markAsked(this.state, new Set(fresh.map((q) => q.id)));
+    for (const side of SIDES) {
+      const questions = fresh.filter((q) => q.side === side);
+      if (!questions.length) continue;
+      const decider = this.options.worldDeciders?.[side] ?? ruleWorldDecider;
+      const batch: { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] } = {
+        promise: decider.decide(this.state, side, questions, this.config).catch(() => ruleWorldDecider.decide(this.state, side, questions, this.config)),
+      };
+      batch.promise.then((result) => {
+        batch.result = result;
+      });
+      for (const q of questions) this.worldInflight.set(q.id, batch);
+    }
+  }
+
+  /** Apply every world answer due now, waiting for it if it is not back yet; in question order. */
+  private async applyWorldDue(): Promise<void> {
+    const world = this.state.world;
+    if (!world) return;
+    const due = world.questions.filter((q) => q.dueAt <= this.state.time && (q.answer || this.worldInflight.has(q.id))).sort((a, b) => a.dueAt - b.dueAt || a.id - b.id);
+    for (const q of due) {
+      let answer = q.answer ? { questionId: q.id, optionId: q.answer.optionId, by: q.answer.by, rationale: q.answer.rationale } : undefined;
+      if (!answer) {
+        const batch = this.worldInflight.get(q.id)!;
+        if (!batch.result) {
+          this.waits += 1;
+          batch.result = await batch.promise;
+        }
+        answer = batch.result.find((a) => a.questionId === q.id) ?? { questionId: q.id, optionId: q.fallback, by: "rules" as const };
+      }
+      this.worldInflight.delete(q.id);
+      const applied = answerQuestion(this.state, this.config, q.id, answer.optionId, answer.by, answer.rationale);
+      this.state = applied.state;
+      for (const event of applied.events) {
+        const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
+        this.push({ type: "event", time: event.time, side, event });
+        if (event.info) continue;
+        const held = this.pending.get(event.unitId);
+        if (held) held.events.push(event);
+        else this.pending.set(event.unitId, { events: [event], firstAt: event.time });
+      }
+      for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
     }
   }
 
@@ -358,6 +420,7 @@ export class RealtimeRunner {
 
   /** Apply every answer that is due now, waiting for it if it is not back yet. */
   private async applyDue(): Promise<void> {
+    await this.applyWorldDue();
     const time = this.state.time;
     for (const batch of [...this.inflight]) {
       const due = [...batch.dueAt.entries()].filter(([, at]) => at <= time);

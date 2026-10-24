@@ -407,6 +407,12 @@ export interface RtState {
   /** Each side's plan, in its commander's words. */
   plan: Partial<Record<Side, string>>;
   over?: { winner: Side | null; reason: string };
+  /**
+   * Everything beyond the land engine (realtime/world): other domains'
+   * entities, land units' stores and mounts, networks, HQs. Absent in a game
+   * that needs none, which then plays exactly as it always has.
+   */
+  world?: import("../world/types").WorldState;
 }
 
 export type RtEventKind =

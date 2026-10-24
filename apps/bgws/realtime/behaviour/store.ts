@@ -7,9 +7,8 @@
 // read-only. User templates are always ids "custom/<slug>" and are checked
 // with the same validation CI runs on the shipped files.
 
-import { LAND_ACTIONS } from "./actions/land";
 import { DEFAULT_TEMPLATE_ID, defaultTemplateForClass } from "./archetypes";
-import { LAND_FACTS } from "./facts";
+import { vocabulary } from "./vocabulary";
 import { buildRegistry, bundledTemplateFiles, type TemplateFiles } from "./load";
 import type { Template } from "./types";
 
@@ -70,7 +69,7 @@ export function allTemplateFiles(custom: Template[] = customTemplates()): Templa
 /** Validate the whole set as it would be with `custom` saved. Empty = valid. */
 export function checkTemplates(custom: Template[] = customTemplates()): string[] {
   try {
-    buildRegistry(allTemplateFiles(custom), { actions: new Set(LAND_ACTIONS), facts: new Set<string>(LAND_FACTS) });
+    buildRegistry(allTemplateFiles(custom), vocabulary());
     return [];
   } catch (e) {
     const text = e instanceof Error ? e.message : String(e);

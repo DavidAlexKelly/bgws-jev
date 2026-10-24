@@ -33,6 +33,7 @@ import {
   type PlatformSnapshot,
   type TroopQualityName,
 } from "../rules/forceList";
+import { GENERIC_LAND_SNAPSHOTS } from "../realtime/catalogue/snapshots";
 import {
   combatStrengthFor as rulesetCombatStrength,
   type RuleSet,
@@ -102,7 +103,9 @@ export function toForceElement(
   origin: LatLng,
   ruleset: RuleSet,
 ): ForceElement {
-  const platform = PLATFORM_SNAPSHOT[spec.platform];
+  // The real-time catalogue's generic land records (realtime/catalogue) are
+  // placeable too; a sourced or pinned platform of the same id wins.
+  const platform = PLATFORM_SNAPSHOT[spec.platform] ?? GENERIC_LAND_SNAPSHOTS[spec.platform];
   if (!platform) {
     // Loud, because the alternative is an FE with no capabilities that loses
     // every engagement for a reason nobody would find.
@@ -334,7 +337,7 @@ export function placedStrength(
 ): Record<Side, number> {
   const totals: Record<Side, number> = { blue: 0, red: 0 };
   for (const element of placed) {
-    const platform = PLATFORM_SNAPSHOT[element.platform];
+    const platform = PLATFORM_SNAPSHOT[element.platform] ?? GENERIC_LAND_SNAPSHOTS[element.platform];
     if (!platform) continue;
     totals[element.side] += combatStrengthFor(ruleset, platform, element.platformCount);
   }
@@ -368,7 +371,7 @@ export function placedFromList(list: ForceList): PlacedElement[] {
 export function startingStrength(list: ForceList, ruleset: RuleSet): Record<Side, number> {
   const totals: Record<Side, number> = { blue: 0, red: 0 };
   for (const spec of list.elements) {
-    const platform = PLATFORM_SNAPSHOT[spec.platform];
+    const platform = PLATFORM_SNAPSHOT[spec.platform] ?? GENERIC_LAND_SNAPSHOTS[spec.platform];
     if (!platform) continue;
     totals[spec.side] += combatStrengthFor(ruleset, platform, spec.platformCount);
   }
@@ -379,7 +382,7 @@ export function startingStrength(list: ForceList, ruleset: RuleSet): Record<Side
 export function proxiesIn(list: ForceList): { label: string; proxyFor: string }[] {
   const proxies: { label: string; proxyFor: string }[] = [];
   for (const spec of list.elements) {
-    const platform = PLATFORM_SNAPSHOT[spec.platform];
+    const platform = PLATFORM_SNAPSHOT[spec.platform] ?? GENERIC_LAND_SNAPSHOTS[spec.platform];
     if (platform?.proxyFor) {
       proxies.push({ label: `${spec.label} (${platform.displayName})`, proxyFor: platform.proxyFor });
     }

@@ -22,6 +22,7 @@ import { DEFAULT_LOG_LIMIT, RealtimeRunner, recentShots, type RtFlag, type RtLog
 import { applyPatch } from "./statePatch";
 import type { RtConfig, RtState, UnitOrders } from "./types";
 import type { FromWorker, MessageEndpoint, RunnerSnapshot, ToWorker } from "./workerHost";
+import type { WorldDecider } from "../world/deciders";
 
 export interface RunnerHandle {
   /** Where the game runs, for the status line. */
@@ -49,6 +50,8 @@ export interface RunnerHandle {
 export interface HandleOptions {
   /** Per side; absent means the rules decide. */
   deciders?: Partial<Record<Side, RtDecider>>;
+  /** Per side, for world questions (realtime/world); absent means the rules decide. */
+  worldDeciders?: Partial<Record<Side, WorldDecider>>;
   logLimit?: number;
   /** Every feed entry as it is made, with its context then (feed.ts). Must not throw. */
   onEntry?: (entry: RtLogEntry, context: EntryContext) => void;
@@ -63,6 +66,7 @@ export class InThreadRunner implements RunnerHandle {
     const { onEntry } = options;
     this.runner = new RealtimeRunner(initial, config, {
       deciders: options.deciders,
+      worldDeciders: options.worldDeciders,
       logLimit: options.logLimit,
       onEntry: onEntry ? (entry, state) => onEntry(entry, entryContext(entry, state)) : undefined,
     });

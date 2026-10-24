@@ -59,6 +59,9 @@ import { PositionGrid } from "./grid";
 import { heldTrack, holderOf, ReportWriter, trackFor, trackedBy, type Holder, type PictureSource } from "./picture";
 import { elementRank, type ElementRank } from "./rank";
 export { elementRank, type ElementRank } from "./rank";
+import { stepWorld } from "../world/tickHook";
+import { landSightConditions } from "../world/environment";
+import type { WorldLogItem } from "../world/types";
 
 /**
  * How this game treats a domain (scope.ts): simulated, abstracted or off.
@@ -191,6 +194,8 @@ export interface TickResult {
   shots: RtShot[];
   /** Radio messages delivered this second (comms.ts). */
   messages: Delivery[];
+  /** The world layer's feed lines this second (realtime/world), if the game has a world. */
+  world?: WorldLogItem[];
 }
 
 /** "3:05" for a span of seconds. */
@@ -1252,6 +1257,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   }
 
   // ── 4. Sighting ───────────────────────────────────────────────────────────
+  // Light and weather, when the game has a world to say what they are; a
+  // game without one is fought in the clear daylight it always was.
+  const sightConditions = prev.world ? landSightConditions(prev.world.env, time) : null;
   for (const side of SIDES) {
     const observers = ids.filter((id) => fe(id).side === side && alive(id));
     const enemies = ids.filter((id) => fe(id).side !== side && alive(id));
@@ -1268,6 +1276,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         const observer = fe(observerId);
         const range = distanceM(observer.position, enemy.position);
         if (range > LOS_CAP_M) continue;
+        if (sightConditions && range > sightConditions.maxRangeM) continue;
         if (!sees(observer.position, enemy.position)) continue;
 
         // Already found by this crew: tracked while in sight, no roll — and
@@ -1284,7 +1293,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
         // Not yet found: a chance per second (detection.ts).
         const mine = units[observerId];
-        const p = detectChance(
+        const p = (sightConditions?.factor ?? 1) * detectChance(
           range,
           {
             targetMoving: their.lastMovedAt === time,
@@ -2092,6 +2101,34 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   }
 
+  // ── 12. The world layer ───────────────────────────────────────────────────
+  //
+  // Other domains, land units' stores and mounts, networks and HQs
+  // (realtime/world), one second at a time, through the same closures as the
+  // rest of this tick. Absent in a game without a world.
+  let world = prev.world;
+  let worldLog: WorldLogItem[] | undefined;
+  if (world) {
+    const stepped = stepWorld(world, {
+      time,
+      config,
+      rng,
+      get game() {
+        return game;
+      },
+      units,
+      setFe,
+      setUnit,
+      order: (id, order, extra = {}) => setUnit(id, { ...extra, order: routed(order, fe(id), config), bound: undefined, laying: undefined }),
+      emit,
+      radio: (draft) => void queueMessage(comms, commsContext(), draft),
+      known,
+      prev,
+    });
+    world = stepped.world;
+    worldLog = stepped.log;
+  }
+
   // Morale as the shared rules see it.
   for (const id of ids) {
     const unit = units[id];
@@ -2105,7 +2142,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   }
 
-  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms, reports: reports.reports };
+  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms, reports: reports.reports, ...(world ? { world } : {}) };
 
   // ── 11. Is it over? ───────────────────────────────────────────────────────
   //
@@ -2153,5 +2190,5 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     state = { ...state, over: { winner: verdict.winner, reason: "time limit" } };
   }
 
-  return { state, events, shots, messages };
+  return { state, events, shots, messages, ...(worldLog ? { world: worldLog } : {}) };
 }

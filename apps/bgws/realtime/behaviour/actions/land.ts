@@ -52,6 +52,7 @@ import {
 } from "../../engine/decisions";
 import { DEFAULT_TEMPLATE_ID, defaultTemplateForClass } from "../archetypes";
 import { LAND_FACTS, type LandFact } from "../facts";
+import { WORLD_ACTIONS, WORLD_FACTS } from "./world";
 import { buildRegistry, bundledTemplateFiles, type TemplateFiles } from "../load";
 import type { Bias, FactTable, FactValue, ResolvedTemplate, Template, WalkResult } from "../types";
 import { resolveTemplate, walk } from "../walk";
@@ -85,13 +86,16 @@ const registries = new WeakMap<object, Registry>();
  * validated once per set. An invalid user set is ignored (bundled only): a bad
  * template can cost units their custom behaviour, never break a game.
  */
+export function behaviourRegistry(extra: readonly Template[] = NO_EXTRA): Registry {
+  return registryFor(extra);
+}
 function registryFor(extra: readonly Template[] = NO_EXTRA): Registry {
   let reg = registries.get(extra);
   if (!reg) {
     const files: TemplateFiles = { ...bundledTemplateFiles() };
     for (const t of extra) files[`./templates/${t.id}.json`] = t;
     try {
-      reg = buildRegistry(files, { actions: new Set(LAND_ACTIONS), facts: new Set<string>(LAND_FACTS) });
+      reg = buildRegistry(files, { actions: new Set([...LAND_ACTIONS, ...WORLD_ACTIONS]), facts: new Set<string>([...LAND_FACTS, ...WORLD_FACTS]) });
     } catch (e) {
       if (extra === NO_EXTRA) throw e;
       console.warn("[behaviour] user templates invalid; using the built-in ones", e);
@@ -103,7 +107,7 @@ function registryFor(extra: readonly Template[] = NO_EXTRA): Registry {
 }
 const resolvedCache = new WeakMap<Registry, Map<string, ResolvedTemplate>>();
 /** A resolved template; an id the registry does not know falls back to core/default. */
-function resolvedTemplate(id: string, reg: Registry): ResolvedTemplate {
+export function resolvedTemplate(id: string, reg: Registry): ResolvedTemplate {
   let byId = resolvedCache.get(reg);
   if (!byId) resolvedCache.set(reg, (byId = new Map()));
   let r = byId.get(id);

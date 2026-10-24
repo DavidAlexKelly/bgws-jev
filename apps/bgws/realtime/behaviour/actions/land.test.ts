@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { DECISION_POINTS, type DecisionPoint } from "../../engine/decisions";
 import { buildRegistry, bundledTemplateFiles } from "../load";
 import { resolveTemplate, walk } from "../walk";
-import { LAND_FACTS } from "../facts";
+import { vocabulary } from "../vocabulary";
 import { LAND_ACTIONS, landPlan } from "./land";
 
 describe("the default land template", () => {
   const points = Object.keys(DECISION_POINTS) as DecisionPoint[];
 
   it("validates against the land action library", () => {
-    expect(() => buildRegistry(bundledTemplateFiles(), { actions: new Set(LAND_ACTIONS), facts: new Set<string>(LAND_FACTS) })).not.toThrow();
+    expect(() => buildRegistry(bundledTemplateFiles(), vocabulary())).not.toThrow();
   });
 
   it("runs, at every decision point, the actions that point has always used, in order", () => {
@@ -38,7 +38,7 @@ describe("the default land template", () => {
         ...bundledTemplateFiles(),
         "./templates/custom/stand-fast.json": { id: "custom/stand-fast", version: 1, parent: "core/default", remove: ["pullBack"] },
       },
-      { actions: new Set(LAND_ACTIONS) },
+      vocabulary(),
     );
     const plan = (id: string) => {
       const r = walk(resolveTemplate(id, registry), "D1", {}, null);

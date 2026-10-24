@@ -13,8 +13,7 @@
 // version 1 file is read as a Skirmish with its time limit as the duration.
 
 import type { PlacedElement } from "../lib/forceBuilder";
-import { LAND_ACTIONS } from "./behaviour/actions/land";
-import { LAND_FACTS } from "./behaviour/facts";
+import { vocabulary } from "./behaviour/vocabulary";
 import { buildRegistry, bundledTemplateFiles, type TemplateFiles } from "./behaviour/load";
 import type { Template } from "./behaviour/types";
 import { effectiveScope, scopeErrors, scopeFor, type Scope } from "./scope";
@@ -135,7 +134,7 @@ export function parseScenario(raw: unknown): { scenario?: RealtimeScenario; erro
   const files: TemplateFiles = { ...bundledTemplateFiles() };
   for (const t of templates) if (isObj(t) && isStr(t.id)) files[`./templates/${t.id}.json`] = t;
   try {
-    buildRegistry(files, { actions: new Set(LAND_ACTIONS), facts: new Set<string>(LAND_FACTS) });
+    buildRegistry(files, vocabulary());
   } catch (e) {
     errors.push(`Behaviour templates in the file are invalid: ${e instanceof Error ? e.message.split("\n").slice(1, 4).join(" ").trim() : String(e)}`);
   }
