@@ -206,6 +206,14 @@ function logCycle(c: WorldCtx): void {
   for (const side of SIDES) {
     const waiting = state(c).requests.filter((r) => r.side === side && c.landAlive(r.unitId));
     if (!waiting.length) continue;
+    // A cyber effect on the logistics system: the cell cannot work its requests (W9).
+    if ((c.world.outages[`logistics:${side}`] ?? -Infinity) > c.time) {
+      if (c.time - c.last(`logDown:${side}`) > 3600) {
+        c.mark(`logDown:${side}`);
+        c.log({ side, domain: "logistics", kind: "systemDown", text: `the logistics system is down: ${waiting.length} requests wait`, ids: waiting.map((r) => r.unitId) });
+      }
+      continue;
+    }
     const unitAt = (id: string) => c.fe(id)!.position;
     const urgent = [...waiting].sort((a, b) => needOf(c, a.unitId) - needOf(c, b.unitId) || a.at - b.at)[0];
     const node = nodesOf(c, side, unitAt(urgent.unitId), "generic/depot")[0] ?? nodesOf(c, side, unitAt(urgent.unitId))[0];

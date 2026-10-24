@@ -148,8 +148,10 @@ export interface MunitionState {
   from: LatLng;
   /** Expected impact time, for ballistic and glide rounds. */
   impactAt?: number;
-  /** The fire mission or kill chain it belongs to. */
+  /** The fire mission it belongs to. */
   missionId?: string;
+  /** The kill chain it is the engagement of (W11). */
+  chainId?: string;
   /** Guided by GNSS with the side's PNT degraded here at launch: its error grows. */
   pntFactor: number;
   /** A decoy: no warhead, looks the same on radar. */
@@ -197,6 +199,10 @@ export interface Entity {
   munition?: MunitionState;
   /** Satellites: orbit phase at t = 0, degrees. */
   orbitPhaseDeg?: number;
+  /** Satellites: the orbit's ascending node, degrees east (with the phase, where its passes fall). */
+  orbitRaanDeg?: number;
+  /** Satellites: whose service it is — a military system, or a commercial provider that can cut it off (W9). */
+  provider?: "military" | "commercial";
   /** Cost of the platform, for the cost-exchange report. */
   costUsd: number;
   /** Planner that owns it. */
@@ -499,6 +505,8 @@ export interface KillChain {
   assessed?: number;
   shooterId?: string;
   means?: string;
+  /** When the engagement's effect is due: no assessment before it. */
+  effectAt?: number;
   result?: "destroyed" | "damaged" | "missed" | "stale" | "deferred" | "unknown";
   /** Network the reports went over: voice or data link (the reference contrast). */
   network: "voice" | "datalink" | "mixed";
@@ -518,9 +526,13 @@ export interface CyberAccess {
   target: "bearer" | "logistics" | "airDefence" | "public";
   /** The bearer or system it hits. */
   system: string;
+  /** Sim time from which it can be used, s (months of preparation before the game come to this). */
   readiness: number;
+  /** Chance it takes effect when executed, 0–1. */
   pEffect: number;
+  /** How long the effect lasts, s. */
   durationS: number;
+  /** Chance the victim finds it when it is used, 0–1. */
   detectionRisk: number;
   /** Executed and, if it worked, until when. */
   executedAt?: number;
@@ -607,6 +619,10 @@ export interface WorldStats {
   structureHits?: Partial<Record<Owner, number>>;
   /** Casualty evacuation times, s (W10). */
   evacuationS: number[];
+  /** How late satellite imagery reached its side, s (W9). */
+  imageryLatencyS?: number[];
+  /** Kill chains finished: find to engage, s, by side (W11). */
+  killChainS?: Record<Side, number[]>;
   /** Neutral ships that completed their passage, and neutral ships hit (W8). */
   transits?: number;
   neutralHits?: number;
@@ -673,6 +689,12 @@ export interface WorldState {
   sea?: SeaArea;
   /** The supply network and casualty evacuation when logistics or medical is simulated (W10). */
   logistics?: LogisticsState;
+  /** Named areas of interest: where each side's collection plan wants to look (CCIR, W9). */
+  nais?: NamedArea[];
+  /** Satellite imagery taken, and when each batch reaches its side (W9). */
+  imagery?: ImageryBatch[];
+  /** How each side's kill web passes targets (W11): flat over data links, or up and down the voice nets. */
+  network?: Record<Side, "voice" | "datalink">;
   /** Victory conditions beyond the land breakpoint (world/victory.ts), and how far each has got. */
   victory?: VictoryCondition[];
   /** Victory as the world judges it, for scopes whose aims are not a land breakpoint (world/victory.ts). */
@@ -769,4 +791,38 @@ export interface LogisticsState {
 /** Water (W8): the sea as polygons, with bathymetry declared from the distance to the shore. */
 export interface SeaArea {
   waters: LatLng[][];
+}
+
+/** One satellite image: what it saw, when, and when the side gets it after processing (W9). */
+export interface ImageryBatch {
+  id: string;
+  side: Side;
+  satelliteId: string;
+  takenAt: number;
+  deliveredAt: number;
+  at: LatLng;
+  detections: WorldTrack[];
+}
+
+/** A scenario event at a set time (W9): a provider cutting its service, counterspace, a cyber window. */
+export interface ScenarioEvent {
+  at: number;
+  kind: "cutCommercialImagery" | "cutLeoSatcom" | "jamSatcom" | "jamGnss" | "dazzleEo" | "asat" | "restore";
+  /** The side that suffers it. */
+  side: Side;
+  /** How long it lasts, s (none: for the rest of the game). */
+  durationS?: number;
+  /** A satellite, for ASAT and dazzling. */
+  target?: string;
+  /** GNSS quality left, for jamGnss. */
+  quality?: number;
+}
+
+/** A named area of interest in a side's collection plan. */
+export interface NamedArea {
+  side: Side;
+  label: string;
+  at: LatLng;
+  /** Higher is looked at first (the CCIR's order). */
+  priority: number;
 }

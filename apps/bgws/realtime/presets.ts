@@ -315,6 +315,62 @@ export function littoral(): RealtimeScenario {
   );
 }
 
+/**
+ * M8 — Joint strike: the opening of a Rising Lion-like operation [ref R6.5].
+ * Loitering drones staged close to the enemy's air-defence radars hit them
+ * first; a cyber access blinds the shared air picture; SEAD flights open a
+ * corridor on the radars SIGINT has fixed; then strikes follow on what the
+ * kill web nominates — from the air, from a submarine's cruise missiles, from
+ * imagery of the depots behind. Blue wins by taking down the defences and
+ * the command that runs them (W9, W11).
+ */
+export function jointStrike(): RealtimeScenario {
+  const forces: PlacedElement[] = [
+    unit("b-jfc", "blue", "generic/cp-division", 8, 0, -120_000, "Joint force HQ", "veteran", 5),
+    unit("b-loiter-1", "blue", "generic/loiterTeam", 1, -8000, 52_000, "Staged drone team west"),
+    unit("b-loiter-2", "blue", "generic/loiterTeam", 1, 9000, 48_000, "Staged drone team east"),
+    unit("b-esm-1", "blue", "generic/esmTeam", 1, -25_000, 20_000, "SIGINT west"),
+    unit("b-esm-2", "blue", "generic/esmTeam", 1, 25_000, 20_000, "SIGINT east"),
+    unit("r-ad-hq", "red", "generic/cp-brigade", 5, 0, 110_000, "Red air-defence command", "regular", 3),
+    unit("r-sam-long", "red", "generic/samLong", 2, 0, 90_000, "Red long-range SAM"),
+    unit("r-sam-1", "red", "generic/samMedium", 2, -10_000, 60_000, "Red SAM west"),
+    unit("r-sam-2", "red", "generic/samMedium", 2, 12_000, 55_000, "Red SAM east"),
+    unit("r-shorad", "red", "generic/shorad", 2, 0, 105_000, "Red point defence"),
+  ];
+  const hqs: HqSpec[] = [
+    { id: "blue-jfc", side: "blue", echelon: "joint", postId: "b-jfc", subordinates: ["b-loiter-1", "b-loiter-2", "b-esm-1", "b-esm-2"], planner: "overall", seat: "heuristic" },
+    { id: "red-ad", side: "red", echelon: "brigade", postId: "r-ad-hq", subordinates: ["r-sam-long", "r-sam-1", "r-sam-2", "r-shorad"], planner: "air", seat: "heuristic" },
+  ];
+  return scenario(
+    "M8 — Joint strike",
+    "m8-joint",
+    scopeOf("strike", 24 * 60, { land: "simulated", air: "simulated", airDefence: "simulated", space: "simulated", ew: "simulated", cyber: "simulated", drones: "simulated", naval: "simulated", fires: "off", logistics: "abstracted" }, { area: { widthKm: 400, depthKm: 400 }, planners: ["overall", "air", "maritime", "spaceCyber"] }),
+    forces,
+    {
+      hqs,
+      entities: [
+        entity("b-base", "blue", "generic/airbase", 0, -150_000, { label: "Blue airbase" }),
+        entity("b-ssn", "blue", "generic/ssn", 0, -220_000, { altM: -100, label: "Blue submarine" }),
+        entity("b-sar", "blue", "generic/satSar", 0, 0, { label: "Blue radar satellite" }),
+        entity("b-eo", "blue", "generic/satEo", 0, 0, { label: "Commercial imaging satellite", provider: "commercial" }),
+        entity("b-mw", "blue", "generic/missileWarning", 0, 0, { label: "Blue missile warning" }),
+        entity("b-cyber", "blue", "generic/cyberCell", 0, -200_000, { label: "Blue cyber cell" }),
+        entity("r-depot", "red", "generic/depot", 20_000, 140_000, { label: "Red missile depot" }),
+        entity("r-base", "red", "generic/airbase", -30_000, 180_000, { label: "Red airbase" }),
+      ],
+      sea: { waters: [[p(-300_000, -300_000), p(300_000, -300_000), p(300_000, -180_000), p(-300_000, -180_000)]] },
+      cyber: [{ id: "access-ad", side: "blue", target: "airDefence", system: "red air-defence network", readiness: 0, pEffect: 0.7, durationS: 6 * 3600, detectionRisk: 0.3, window: { from: 0, until: 2 * 3600 } }],
+      nais: [
+        { side: "blue", label: "NAI 1: the air-defence command", at: p(0, 108_000), priority: 5 },
+        { side: "blue", label: "NAI 2: the missile depot", at: p(18_000, 140_000), priority: 4 },
+      ],
+      network: { blue: "datalink", red: "voice" },
+      environment: { startHour: 2, cloudCover: 0.3 },
+      victory: [{ kind: "targetSet", side: "blue", targets: ["r-sam-long", "r-sam-1", "r-sam-2", "r-ad-hq"], share: 0.75, label: "The air defences and their command down" }],
+    },
+  );
+}
+
 /** Every milestone scenario, by milestone. */
 export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M2: mechCompanyAttack,
@@ -323,6 +379,7 @@ export const PRESET_SCENARIOS: Record<string, () => RealtimeScenario> = {
   M5: airOverTheBattle,
   M6: sustainedOffensive,
   M7: littoral,
+  M8: jointStrike,
 };
 
 export const presetHelpers = { unit, entity, obstacle, scopeOf, scenario };

@@ -198,6 +198,11 @@ function worldErrors(raw: unknown, unitIds: ReadonlySet<string>): string[] {
     const point = (q: unknown) => isObj(q) && isNum(q.lat) && isNum(q.lng);
     if (!Array.isArray(waters) || waters.some((w) => !Array.isArray(w) || w.length < 3 || !w.every(point))) errors.push('"world.sea.waters" must be a list of polygons of at least three { lat, lng } points');
   }
+  if (raw.events !== undefined) {
+    const kinds = ["cutCommercialImagery", "cutLeoSatcom", "jamSatcom", "jamGnss", "dazzleEo", "asat", "restore"];
+    if (!Array.isArray(raw.events) || raw.events.some((e) => !isObj(e) || !isNum(e.at) || !kinds.includes(e.kind as string) || (e.side !== "blue" && e.side !== "red"))) errors.push(`"world.events" must be a list of { at, kind (${kinds.join(", ")}), side }`);
+  }
+  if (raw.network !== undefined && (!isObj(raw.network) || Object.entries(raw.network).some(([k, v]) => !["blue", "red"].includes(k) || !["voice", "datalink"].includes(v as string)))) errors.push('"world.network" must give blue and red each "voice" or "datalink"');
   if (raw.victory !== undefined) {
     const kinds = ["airSuperiority", "targetSet", "seaControl", "through", "all"];
     if (!Array.isArray(raw.victory) || raw.victory.some((v) => !isObj(v) || !kinds.includes(v.kind as string) || (v.side !== "blue" && v.side !== "red"))) errors.push(`"world.victory" must be a list of conditions (${kinds.join(", ")}) each with a side`);

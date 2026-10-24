@@ -257,8 +257,8 @@ const BUILT: Record<Domain, readonly DomainMode[]> = {
   air: ["simulated", "abstracted", "off"],
   airDefence: ["simulated", "off"],
   naval: ["simulated", "off"],
-  space: ["abstracted", "off"],
-  cyber: ["off"],
+  space: ["simulated", "abstracted", "off"],
+  cyber: ["simulated", "off"],
   logistics: ["simulated", "abstracted", "off"],
   medical: ["simulated", "abstracted", "off"],
 };
@@ -280,11 +280,11 @@ export const ENGINE_CAN = {
     medical: "M4",
   } satisfies Record<Domain, string>,
   limits: {
-    durationMin: { min: 5, max: 10 * 24 * 60 },
-    /** Ground is generated, so the board can be as large as an air campaign needs. */
-    areaKm: { max: 300 },
-    echelons: ["platoon", "company", "battalion", "brigade", "division", "component"] as readonly Echelon[],
-    planners: ["tactical", "overall", "land", "air", "maritime", "sustainment"] as readonly Planner[],
+    durationMin: { min: 5, max: 14 * 24 * 60 },
+    /** Ground is generated, so the board can be as large as a theatre needs. */
+    areaKm: { max: 1500 },
+    echelons: ECHELONS,
+    planners: PLANNERS,
   },
 };
 

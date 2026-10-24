@@ -71,9 +71,9 @@ describe("real-time scenario files", () => {
     const broken = parseScenario({ ...scenario(), scope: { ...scopeFor("skirmish"), durationMin: -1, domains: { land: "maybe" } } });
     expect(broken.errors.join("\n")).toMatch(/durationMin/);
     expect(broken.errors.join("\n")).toMatch(/scope.domains.land/);
-    const tooBig = parseScenario({ ...scenario(), scope: scopeFor("strike") });
-    expect(tooBig.scenario).toBeUndefined();
-    expect(tooBig.errors.join("\n")).toMatch(/scope: Cyber cannot be simulated yet/);
+    const landless = parseScenario({ ...scenario(), scope: { ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } } });
+    expect(landless.scenario).toBeUndefined();
+    expect(landless.errors.join("\n")).toMatch(/scope: Land cannot be off/);
   });
 
   it("rejects an invalid bundled template", () => {

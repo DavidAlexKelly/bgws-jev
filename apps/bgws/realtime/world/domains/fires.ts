@@ -107,10 +107,22 @@ export function requestFire(
     ...(r.chainId ? { chainId: r.chainId } : {}),
     ...(r.reason ? { reason: r.reason } : {}),
   };
-  (mission as FireMission & { heardAt?: number }).heardAt = r.heardAt ?? c.time + (ROUTE_DELAY ? ROUTE_DELAY(c, mission) : 0);
+  (mission as FireMission & { heardAt?: number }).heardAt = (r.heardAt ?? c.time + (ROUTE_DELAY ? ROUTE_DELAY(c, mission) : 0)) + voiceStaffS(c, r.side, r.requestedBy, r.chainId);
   c.world.missions.push(mission);
   c.log({ side: r.side, domain: "fires", kind: "request", text: `${r.requestedBy} calls for fire${r.targetId ? ` on ${r.targetId}` : ""}${r.reason ? ` (${r.reason})` : ""}`, ids: [r.requestedBy, ...(r.targetId ? [r.targetId] : [])], at: r.targetAt });
   return mission;
+}
+
+/**
+ * On hierarchical voice nets a sensor's call for fire is passed up through each
+ * HQ above it, each staff taking its time (W11); over a data link it goes
+ * straight to the shooter. A kill chain's nomination has already paid this.
+ */
+function voiceStaffS(c: WorldCtx, side: Side, requester: string, chainId?: string): number {
+  if (chainId || c.world.network?.[side] !== "voice") return 0;
+  let echelons = 0;
+  for (let hq = c.comps(requester)?.hq ?? c.entity(requester)?.parent; hq && c.world.hqs[hq] && echelons < 6; hq = c.world.hqs[hq].parent) echelons++;
+  return wfig("world/domains/killweb.VOICE_STAFF_S") * Math.max(1, echelons);
 }
 
 /** How long a call for fire takes to reach the fires cell: set by the C2 domain once it is loaded. */

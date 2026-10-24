@@ -25,6 +25,8 @@ import type {
   MountState,
   Obstacle,
   Owner,
+  NamedArea,
+  ScenarioEvent,
   SeaArea,
   Stores,
   VictoryCondition,
@@ -43,6 +45,8 @@ export interface EntitySpec {
   parent?: string;
   /** Satellites: where in the orbit at t = 0, degrees. */
   orbitPhaseDeg?: number;
+  orbitRaanDeg?: number;
+  provider?: "military" | "commercial";
   /** Neutral shipping: its lane. */
   lane?: LatLng[];
   template?: string;
@@ -87,11 +91,17 @@ export interface WorldSetup {
   victory?: VictoryCondition[];
   /** Water areas (W8): polygons of sea; with none, all is open ocean. */
   sea?: SeaArea;
+  /** Named areas of interest for each side's collection (W9). */
+  nais?: NamedArea[];
+  /** Scenario events at set times (W9): providers cutting service, counterspace. */
+  events?: ScenarioEvent[];
+  /** Each side's kill-web network (W11): data link (flat) or voice (hierarchical). Data link by default. */
+  network?: Partial<Record<Side, "voice" | "datalink">>;
 }
 
 /** Does this game need a world? */
 export function needsWorld(scope: Scope | undefined, setup?: Partial<WorldSetup>): boolean {
-  if (setup && ((setup.entities?.length ?? 0) > 0 || (setup.obstacles?.length ?? 0) > 0 || (setup.hqs?.length ?? 0) > 0 || (setup.victory?.length ?? 0) > 0 || setup.environment)) return true;
+  if (setup && ((setup.entities?.length ?? 0) > 0 || (setup.obstacles?.length ?? 0) > 0 || (setup.hqs?.length ?? 0) > 0 || (setup.victory?.length ?? 0) > 0 || (setup.events?.length ?? 0) > 0 || setup.environment)) return true;
   if (!scope) return false;
   return DOMAINS.some((d) => d !== "land" && scope.domains[d] !== "off");
 }
@@ -175,6 +185,8 @@ export function makeEntity(spec: EntitySpec): Entity {
     emcon: "free",
     weaponControl: "tight",
     ...(spec.orbitPhaseDeg != null ? { orbitPhaseDeg: spec.orbitPhaseDeg } : {}),
+    ...(spec.orbitRaanDeg != null ? { orbitRaanDeg: spec.orbitRaanDeg } : {}),
+    ...(spec.provider ? { provider: spec.provider } : {}),
     costUsd: record.costUsd,
     ...(record.plannedBy ? { plannedBy: record.plannedBy } : {}),
     lastFiredAt: -Infinity,
@@ -271,6 +283,11 @@ export function createWorld(state: RtState, config: RtConfig, setup: WorldSetup)
   world.measures = setup.measures ?? [];
   if (setup.victory?.length) world.victory = setup.victory;
   if (setup.sea?.waters.length) world.sea = setup.sea;
+  if (setup.nais?.length) world.nais = setup.nais;
+  if (setup.network) world.network = { blue: setup.network.blue ?? "datalink", red: setup.network.red ?? "datalink" };
+  // Scenario events go on the scheduler's queue, in order.
+  for (const [i, e] of (setup.events ?? []).entries()) world.queue.push({ at: e.at, kind: "scenarioEvent", key: String(i), data: { kind: e.kind, side: e.side, ...(e.durationS != null ? { durationS: e.durationS } : {}), ...(e.target ? { target: e.target } : {}), ...(e.quality != null ? { quality: e.quality } : {}) } });
+  world.queue.sort((a, b) => a.at - b.at || a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
   world.cyber = (setup.cyber ?? []).map((a) => ({ ...a }));
   for (const { hook } of HOOKS) hook(world, state, config, setup);
   return world;

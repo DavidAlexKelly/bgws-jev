@@ -465,6 +465,12 @@ function gbad(c: WorldCtx): void {
       // Our own rounds in flight are not threats to engage (artillery shells, our missiles).
       if (truth.domain === "munition" && !["cruise", "ballistic", "ascm", "agm", "glideBomb", "arm", "owa"].includes(weaponSpec(truth.munition!.weaponId).kind)) continue;
       if (!adMounts(c, id, t.at).length) continue;
+      // The shared air picture cut by cyber: each launcher engages only what its own radar can hold.
+      if ((c.world.outages[`adNet:${side}`] ?? -Infinity) > c.time) {
+        const archetype = comps?.archetype ?? ent?.archetype ?? "";
+        const own = hasRecord(archetype) ? Math.max(0, ...recordFor(archetype).sensors.filter((s) => s.kind === "radar").map((s) => s.rangeM)) : 0;
+        if (distanceM(c.where(id)!, t.at) > own * wfig("world/domains/air.OWN_RADAR_SHARE")) continue;
+      }
       if (Object.values(c.world.entities).some((m) => m.status === "active" && m.munition?.targetId === t.truthId && m.owner === side)) continue;
       if (c.time - c.last(`ad:${id}:${t.truthId}`) < wfig("world/domains/air.AD_ASK_S")) continue;
       c.mark(`ad:${id}:${t.truthId}`);

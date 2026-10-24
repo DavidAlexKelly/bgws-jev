@@ -85,4 +85,17 @@ describe("milestone scenarios", () => {
     expect(w.stats.neutralHits ?? 0, "no merchant hit").toBe(0);
     expect(["b-ddg", "b-ffg"].some((id) => w.entities[id].status === "active"), "the group survives the first raid").toBe(true);
   }, 120_000);
+
+  it("M8: drones and SEAD on the radars, cyber on the air picture, imagery and the kill web choosing strikes", async () => {
+    const record = recordFromScenario(PRESET_SCENARIOS.M8());
+    const feed: { kind: string; domain: string }[] = [];
+    const result = await playRecord(record, { untilS: 4 * 3600, onEntry: (e) => void (e.type === "world" && feed.push(e.item)) });
+    const w = result.state.world!;
+    const kinds = new Set(feed.map((l) => `${l.domain}:${l.kind}`));
+    expect(kinds.has("drones:launch"), "staged drones away").toBe(true);
+    expect(kinds.has("cyber:effect") || kinds.has("cyber:failed"), "the cyber access used").toBe(true);
+    expect(kinds.has("air:release"), "SEAD or strikes released").toBe(true);
+    expect(kinds.has("space:imaged") || kinds.has("space:clouded"), "satellite passes").toBe(true);
+    expect(w.chains.filter((k) => k.side === "blue" && k.engaged != null).length, "kill chains engaged").toBeGreaterThan(0);
+  }, 300_000);
 });

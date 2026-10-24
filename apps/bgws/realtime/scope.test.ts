@@ -11,8 +11,8 @@ describe("scenario scope", () => {
     for (const type of SCENARIO_TYPES) expect(scopeErrors(scopeFor(type)), type).toEqual([]);
   });
 
-  it("only what the engine has built can be played: the land, drone, sustained and custom types today", () => {
-    expect(SCENARIO_TYPES.filter(playable)).toEqual(["skirmish", "combinedArms", "droneLine", "sustainedOffensive", "custom"]);
+  it("with every domain built, every type of scenario can be played", () => {
+    expect(SCENARIO_TYPES.filter(playable)).toEqual([...SCENARIO_TYPES]);
   });
 
   it("a Skirmish loads as the plan sets it: land simulated, drones and fires abstracted, the rest off", () => {
@@ -21,13 +21,16 @@ describe("scenario scope", () => {
     for (const d of DOMAINS) expect(scope.domains[d], d).toBe(d === "land" ? "simulated" : d === "drones" || d === "fires" ? "abstracted" : "off");
   });
 
-  it("refuses, with reasons, a scope that needs what is not built", () => {
-    const { errors } = effectiveScope(scopeFor("strike"));
-    expect(errors.join(" ")).toMatch(/Cyber cannot be simulated yet \(planned for M8\)/);
+  it("refuses, with reasons, a scope the engine cannot run; turns off an abstraction it does not have, saying so", () => {
     expect(effectiveScope({ ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } }).errors.join(" ")).toMatch(
       /Land cannot be off/,
     );
-    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 20_000 }).errors.join(" ")).toMatch(/5–14400 minutes/);
+    expect(effectiveScope({ ...scopeFor("skirmish"), durationMin: 30_000 }).errors.join(" ")).toMatch(/5–20160 minutes/);
+    // Air defence is simulated or off: there is no abstracted air defence.
+    const abstracted = effectiveScope({ ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, airDefence: "abstracted" } });
+    expect(abstracted.errors).toEqual([]);
+    expect(abstracted.scope.domains.airDefence).toBe("off");
+    expect(abstracted.notes.join(" ")).toMatch(/Air defence/);
   });
 
   it("every preset names a victory and a milestone", () => {
@@ -63,6 +66,6 @@ describe("scope in the engine's config", () => {
   });
 
   it("refuses to build a config for a scope it cannot run", () => {
-    expect(() => configFromSpec(spec({ scope: scopeFor("joint") }))).toThrow(/cannot be played yet/);
+    expect(() => configFromSpec(spec({ scope: { ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } } }))).toThrow(/cannot be played yet/);
   });
 });

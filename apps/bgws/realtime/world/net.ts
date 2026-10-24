@@ -96,14 +96,14 @@ export const BEARERS: Record<BearerId, BearerModel> = {
     emits: true,
   },
   satcomMil: {
-    reach: (c) => satelliteUp(c, "generic/satcomGeo") && !c.world.outages["satcomMil"],
+    reach: (c, a) => satelliteUp(c, "generic/satcomGeo") && !outaged(c, "satcomMil", a.id),
     delayS: () => f("world/net.SATCOM_MIL_S"),
     band: "ku",
     resistance: () => 0.7,
     emits: true,
   },
   satcomLeo: {
-    reach: (c) => !c.world.outages["satcomLeo"],
+    reach: (c, a) => !outaged(c, "satcomLeo", a.id),
     delayS: () => f("world/net.SATCOM_LEO_S"),
     band: "ku",
     resistance: () => 0.5,
@@ -133,6 +133,13 @@ export const BEARERS: Record<BearerId, BearerModel> = {
 };
 
 /** In a space-simulated game a SATCOM bearer needs its satellite; otherwise it is assumed. */
+/** A bearer or system cut, for everyone or for this node's side (cyber, counterspace, a provider): until when it is out. */
+export function outaged(c: WorldCtx, key: string, nodeId?: string): boolean {
+  const side = nodeId ? c.sideOf(nodeId) : undefined;
+  const until = Math.max(c.world.outages[key] ?? -Infinity, side ? (c.world.outages[`${key}:${side}`] ?? -Infinity) : -Infinity);
+  return until > c.time;
+}
+
 function satelliteUp(c: WorldCtx, archetype: string): boolean {
   if (!c.simulated("space")) return true;
   return Object.values(c.world.entities).some((e) => e.archetype === archetype && e.status === "active" && !e.damage.comms);
@@ -244,7 +251,7 @@ export function sendNet(c: WorldCtx, spec: SendSpec): NetMessage {
   let delay = 0;
   for (const bearer of pace) {
     const model = BEARERS[bearer];
-    if (!model.reach(c, a, b)) continue;
+    if (outaged(c, bearer, a.id) || !model.reach(c, a, b)) continue;
     if (model.emits && (c.comps(a.id)?.emcon === "silent" || c.entity(a.id)?.emcon === "silent") && bearer !== "fibre") continue;
     delay += model.delayS(c, a, b);
     if (model.emits) {
@@ -275,7 +282,7 @@ export function deliveryDelayS(c: WorldCtx, from: string, to: string): number | 
   for (const bearer of DEFAULT_PACE) {
     if (!a.bearers.includes(bearer) || !b.bearers.includes(bearer)) continue;
     const model: BearerModel = BEARERS[bearer];
-    if (model.reach(c, a, b)) return model.delayS(c, a, b);
+    if (!outaged(c, bearer, a.id) && model.reach(c, a, b)) return model.delayS(c, a, b);
   }
   return null;
 }

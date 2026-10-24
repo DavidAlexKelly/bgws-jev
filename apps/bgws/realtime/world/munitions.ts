@@ -94,6 +94,7 @@ export function launch(c: WorldCtx, spec: LaunchSpec): Entity {
       from: spec.from,
       ...(ballistic ? { impactAt: c.time + flightS } : {}),
       ...(spec.missionId ? { missionId: spec.missionId } : {}),
+      ...(spec.chainId ? { chainId: spec.chainId } : {}),
       pntFactor: pnt,
       ...(spec.decoy ? { decoy: true } : {}),
     },

@@ -17,6 +17,9 @@ import type { Side } from "../../../lib/state";
 import { trackedBy } from "../../engine/picture";
 import type { WorldCtx } from "../context";
 import { wfig } from "../figures";
+import { hasRecord, recordFor } from "../../catalogue";
+import { deliveredImagery } from "../imagery";
+import { outaged } from "../net";
 import type { Headquarters, WorldTrack } from "../types";
 
 const LEVEL_CLASS = { veryPartial: "track", partial: "class", full: "identity" } as const;
@@ -32,6 +35,14 @@ export function subtree(c: Pick<WorldCtx, "world">, hqId: string, seen = new Set
     else out.push(sub);
   }
   return out;
+}
+
+/** Is this sensor's only way home a SATCOM bearer that is cut? */
+function feedCut(c: WorldCtx, sensorId: string): boolean {
+  const e = c.entity(sensorId);
+  if (!e || !hasRecord(e.archetype)) return false;
+  const bearers = recordFor(e.archetype).bearers;
+  return bearers.length > 0 && bearers.every((b) => b.startsWith("satcom")) && bearers.every((b) => outaged(c, b, sensorId));
 }
 
 /** The HQ's COP as of now. */
@@ -60,6 +71,8 @@ export function fuse(c: WorldCtx, hq: Headquarters): Record<string, WorldTrack> 
   const linkS = wfig("world/net.DATALINK_S");
   for (const t of Object.values(c.world.tracks[hq.side])) {
     if (!mine.has(t.by) && !(c.entity(t.by)?.parent && mine.has(c.entity(t.by)!.parent!))) continue;
+    // A sensor that reports only over SATCOM goes dark when its SATCOM is cut (W9).
+    if (feedCut(c, t.by)) continue;
     if (c.time - t.seenAt < linkS) continue;
     offer({ ...t, quality: quality(t.seenAt, t.quality) });
   }
@@ -70,6 +83,13 @@ export function fuse(c: WorldCtx, hq: Headquarters): Record<string, WorldTrack> 
     if (m?.kind !== "spotrep" || !Array.isArray(m.body.tracks)) continue;
     for (const t of m.body.tracks as WorldTrack[]) if (c.landAlive(t.id) || c.entity(t.id)?.status === "active") offer({ ...t, quality: quality(t.seenAt, t.quality - 1) });
   }
+  // Emitters the side's SIGINT has fixed by bearings (W6): where a radar or a radio was, to the fix's error.
+  for (const f of Object.values(c.world.fixes[hq.side])) {
+    if (age(f.time) > wfig("world/sensing.TRACK_DROP_S") * 3 || !(c.landAlive(f.emitterId) || c.entity(f.emitterId)?.status === "active")) continue;
+    offer({ id: f.emitterId, truthId: f.emitterId, at: f.at, altM: 0, seenAt: f.time, quality: quality(f.time, 8), classification: "class", thought: `${f.kind} emitter`, domain: "land", by: "esm", errorM: f.errorM });
+  }
+  // Satellite imagery the side has received: old, and only what was there when the image was taken (W9).
+  for (const t of deliveredImagery(c, hq.side)) if (c.landAlive(t.id) || c.entity(t.id)?.status === "active") offer({ ...t, quality: quality(t.seenAt, t.quality) });
   // What the HQ above passed down: its COP, older still.
   if (hq.parent && c.world.hqs[hq.parent]) {
     for (const t of Object.values(c.world.hqs[hq.parent].cop)) if (age(t.seenAt) < wfig("world/sensing.TRACK_DROP_S")) offer({ ...t, quality: Math.max(0, t.quality - 2) });
