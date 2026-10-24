@@ -195,6 +195,8 @@ function landView(game: ReturnType<typeof kitGame>) {
     setFe: () => {},
     setUnit: () => {},
     order: () => {},
+    addUnit: () => {},
+    shots: [],
     emit: () => {},
     radio: () => {},
     known: () => "none" as const,

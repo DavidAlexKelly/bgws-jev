@@ -212,6 +212,13 @@ export class ReportWriter {
     // Listeners to the same message usually end up with the same track: one version between them.
     for (const version of list) {
       if (this.ownVersions.has(version) && sameTrack(version.track, track)) {
+        // A unit added during the game (a dismounted section) may sit past
+        // the end of a version made before it existed: the bitset grows.
+        if (byte >= version.heardBy.length) {
+          const grown = new Uint8Array(Math.max(this.bytes, byte + 1));
+          grown.set(version.heardBy);
+          version.heardBy = grown;
+        }
         version.heardBy[byte] |= bit;
         return;
       }

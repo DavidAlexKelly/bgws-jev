@@ -46,6 +46,11 @@ export function withWorldCtx(state: RtState, config: RtConfig, fn: (c: WorldCtx)
       if (!fe || !units[id]) return;
       units[id] = { ...units[id], ...extra, order: routed(order, fe, config), bound: undefined, laying: undefined };
     },
+    addUnit(fe, unit) {
+      game = { ...game, forceElements: { ...game.forceElements, [fe.id]: fe } };
+      units[fe.id] = unit;
+    },
+    shots: [],
     emit(unitId, kind, detail, severe = false, extra = {}) {
       if ((game.forceElements[unitId]?.combatStrength ?? 0) <= 0) return;
       events.push({ time, unitId, kind, detail, severe, ...extra });

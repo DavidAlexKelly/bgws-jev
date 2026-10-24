@@ -55,6 +55,38 @@ export const WORLD_FIGURES = {
   "world/sensing.SONAR_DI_DB": { value: 15, unit: "dB", module: "world/sensing", source: declared, range: [10, 20], note: "Directivity index of a hull or towed array (DI)." },
   "world/sensing.SONAR_DT_DB": { value: 10, unit: "dB", module: "world/sensing", source: declared, range: [5, 15], note: "Detection threshold (DT)." },
   "world/sensing.TRACK_DROP_S": { value: 300, unit: "s", module: "world/sensing", source: declared, range: [120, 900], note: "A track nothing has updated for this long is dropped." },
+
+  // ── Indirect fire (world/domains/fires) ──
+  "world/domains/fires.RECALL_S": { value: 120, unit: "s", module: "world/domains/fires", source: declared, range: [60, 300], note: "A unit does not call for fire on the same enemy again within this long." },
+  "world/domains/fires.GIVE_UP_S": { value: 300, unit: "s", module: "world/domains/fires", source: declared, range: [120, 600], note: "A call for fire no shooter can take for this long is dropped." },
+  "world/domains/fires.LAY_MORTAR_S": { value: 45, unit: "s", module: "world/domains/fires", source: ref("P24 (default)"), range: [30, 120], note: "A mortar section lays on a new target in about this long; call-for-fire to rounds is 3–15 min with the chain." },
+  "world/domains/fires.LAY_GUN_S": { value: 90, unit: "s", module: "world/domains/fires", source: ref("P24 (default)"), range: [60, 240], note: "A howitzer or rocket section lays on a new target in about this long." },
+  "world/domains/fires.SALVOS": { value: 2, module: "world/domains/fires", source: declared, range: [1, 4], note: "Salvos per tube in a standard mission, when the request does not say." },
+  "world/domains/fires.CAREFUL_CEP": { value: 0.6, unit: "×", module: "world/domains/fires", source: declared, range: [0.4, 0.8], note: "A carefully laid mission spreads this much less (it takes twice as long to lay)." },
+  "world/domains/fires.OFF_BOARD_M": { value: 15000, unit: "m", module: "world/domains/fires", source: declared, range: [8000, 25000], note: "Abstracted fires come from this far behind the side's start line." },
+  "world/domains/fires.CB_ERROR_M": { value: 50, unit: "m", module: "world/domains/fires", source: declared, range: [20, 150], note: "A counter-battery radar's back-plotted gun position is off by about this." },
+  "world/domains/fires.NEAR_MISS_M": { value: 300, unit: "m", module: "world/domains/fires", source: declared, range: [150, 500], note: "Rounds landing this close to a gun tell its crew it has been found." },
+  "world/domains/fires.DISPLACE_M": { value: 500, unit: "m", module: "world/domains/fires", source: ref("P23 (default)"), range: [300, 1500], note: "How far a gun moves when it displaces; the survival window against counter-battery fire is 2–3 minutes." },
+
+  // ── Land combined arms (world/domains/landExt) ──
+  "world/domains/landExt.AMMO_LOW": { value: 0.25, unit: "×", module: "world/domains/landExt", source: declared, range: [0.15, 0.4], note: "Below this share of its basic load, a unit's leader is asked about stocks." },
+  "world/domains/landExt.FUEL_LOW": { value: 0.2, unit: "×", module: "world/domains/landExt", source: declared, range: [0.1, 0.3], note: "Below this share of its fuel, a unit's leader is asked about stocks." },
+  "world/domains/landExt.LANE_SLACK_M": { value: 10, unit: "m", module: "world/domains/landExt", source: declared, range: [0, 20], note: "A vehicle this far either side of a cleared lane's edge still counts as on it." },
+  "world/domains/landExt.LANE_WIDTH_M": { value: 6, unit: "m", module: "world/domains/landExt", source: ref("R4.5, P13"), range: [4, 8], note: "Width of a lane cleared through a minefield." },
+  "world/domains/landExt.BREACH_S": { value: 5400, unit: "s", module: "world/domains/landExt", source: ref("R4.5, P13"), range: [2700, 10800], note: "Time to clear one lane through a minefield of standard density (about 1.5 h)." },
+  "world/domains/landExt.NON_ENGINEER_SLOW": { value: 1.6, unit: "×", module: "world/domains/landExt", source: declared, range: [1.2, 3], note: "A tank with a plough or a unit without engineers breaches this much slower." },
+  "world/domains/landExt.UNDER_FIRE_SLOW": { value: 0.5, unit: "×", module: "world/domains/landExt", source: declared, range: [0.2, 1], note: "Seconds added to a breach for every second the engineers are suppressed." },
+  "world/domains/landExt.SPOT_MINES_PER_S": { value: 0.05, unit: "/s", module: "world/domains/landExt", source: declared, range: [0.01, 0.2], note: "Chance per second that a unit close enough, with sight of it, notices a minefield before striking it." },
+  "world/domains/landExt.STRIKE_PER_100M": { value: 0.35, unit: "/100 m", module: "world/domains/landExt", source: declared, range: [0.15, 0.6], note: "Chance a vehicle platoon strikes a mine for every 100 m it drives into a standard-density field (0.5 mines per metre of front)." },
+  "world/domains/landExt.MINE_KILL": { value: 0.5, unit: "×", module: "world/domains/landExt", source: declared, range: [0.3, 0.8], note: "A mine strike knocks the vehicle out this share of the time; otherwise it is a mobility kill waiting for recovery." },
+  "world/domains/landExt.LOOK_AHEAD_M": { value: 150, unit: "m", module: "world/domains/landExt", source: declared, range: [50, 300], note: "A moving unit stops this far short of an obstacle it knows of." },
+  "world/domains/landExt.DISMOUNT_AT_M": { value: 1200, unit: "m", module: "world/domains/landExt", source: declared, range: [600, 2000], note: "An IFV is asked whether to dismount once an enemy it knows is this close." },
+  "world/domains/landExt.DISMOUNT_ASK_S": { value: 120, unit: "s", module: "world/domains/landExt", source: declared, range: [60, 300], note: "An IFV that stayed mounted is not asked again for this long." },
+  "world/domains/landExt.DIG_IN_S": { value: 7200, unit: "s", module: "world/domains/landExt", source: declared, range: [3600, 14400], note: "Time to prepare a position fully." },
+  "world/domains/landExt.SETTLE_TO_DIG_S": { value: 600, unit: "s", module: "world/domains/landExt", source: declared, range: [300, 1800], note: "A unit still for this long is asked whether to dig in." },
+
+  // ── Support services (world/domains/support) ──
+  "world/domains/support.ISR_RADIUS_M": { value: 4000, unit: "m", module: "world/domains/support", source: declared, range: [2000, 8000], note: "An abstracted ISR overflight reports enemy within this distance of the side's own units." },
 } as const satisfies Record<string, WorldFigure>;
 
 export type WorldFigureKey = keyof typeof WORLD_FIGURES;

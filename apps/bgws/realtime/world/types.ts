@@ -252,6 +252,8 @@ export interface Breach {
   startedAt: number;
   doneAt: number;
   at: LatLng;
+  /** Engineers on their way to the breach point, or at work. */
+  state?: "moving" | "working";
 }
 
 /** A fire mission (W3, W11): request → fires cell → shooter → lay → fire → impact → BDA. */
@@ -548,6 +550,12 @@ export interface WorldState {
   support: SupportService[];
   /** Orders waiting to take effect on a land unit when its message arrives (W4). */
   orderQueue: { unitId: string; order: RtOrder; dueAt: number; messageId: number }[];
+  /** Rate limits and small per-game memories, by key ("call:b1:r2" → last time). Kept in state, never in modules, so games never leak into each other. */
+  memo: Record<string, number>;
+  /** Strength of land units that joined during the game, by side: counted into the breakpoint's start. */
+  joinedStrength: Record<Side, number>;
+  /** Victory as the world judges it, for scopes whose aims are not a land breakpoint (world/victory.ts). */
+  verdict?: { winner: Side | null; reason: string };
   nextId: number;
   log: WorldLogItem[];
 }

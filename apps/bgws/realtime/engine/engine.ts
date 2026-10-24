@@ -550,6 +550,15 @@ export function remember(unit: RtUnit, entry: DecisionMemory): DecisionMemory[] 
 
 /** A fresh real-time game from a placed board. Everyone holds until ordered. */
 export function createRealtimeState(game: GameState): RtState {
+  return createState(game);
+}
+
+/** A fresh RtUnit for an element joining a game already running (a dismounted section). */
+export function freshUnitFor(fe: ForceElement): RtUnit {
+  return freshUnit(fe);
+}
+
+function createState(game: GameState): RtState {
   const units: Record<string, RtUnit> = {};
   const forceElements: GameState["forceElements"] = {};
   const startStrength: Record<Side, number> = { blue: 0, red: 0 };
@@ -2120,6 +2129,12 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
       setFe,
       setUnit,
       order: (id, order, extra = {}) => setUnit(id, { ...extra, order: routed(order, fe(id), config), bound: undefined, laying: undefined }),
+      addUnit: (element, unit) => {
+        // Appended: every existing element keeps its place in element order.
+        game = { ...game, forceElements: { ...game.forceElements, [element.id]: element } };
+        units[element.id] = unit;
+      },
+      shots,
       emit,
       radio: (draft) => void queueMessage(comms, commsContext(), draft),
       known,
@@ -2153,7 +2168,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     // A side with no land force at all (an air or sea scenario) cannot be
     // beaten on land: the world layer judges it (world/victory.ts).
     if (prev.world && (prev.startStrength?.[side] ?? 0) <= 0) return 0;
-    const start = Math.max(1, prev.startStrength?.[side] ?? 0);
+    // Troops that joined during the game (dismounted sections) count as if they had been there from the start.
+    const start = Math.max(1, (prev.startStrength?.[side] ?? 0) + (world?.joinedStrength?.[side] ?? 0));
     const fighting = forceElementsOf(game, side)
       .filter((one) => one.combatStrength > 0 && units[one.id]?.cohesion !== "broken")
       .reduce((sum, one) => sum + one.combatStrength, 0);
@@ -2188,6 +2204,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
               )} of its strength destroyed or broken`,
       },
     };
+  } else if (world?.verdict) {
+    // The world layer judged it: air superiority won, a fleet sunk, the operation's aims met (world/victory.ts).
+    state = { ...state, over: world.verdict };
   } else if (time >= timing.maxDurationS) {
     const verdict = judgeVictory(game, config.ruleset);
     state = { ...state, over: { winner: verdict.winner, reason: "time limit" } };

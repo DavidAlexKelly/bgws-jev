@@ -15,7 +15,7 @@ import type { LatLng } from "../../lib/board";
 import type { ForceElement, GameState, SightingLevel } from "../../lib/state";
 import type { Rng } from "../../rules/dice";
 import type { MessageDraft } from "../engine/comms";
-import type { RtConfig, RtEvent, RtOrder, RtState, RtUnit } from "../engine/types";
+import type { RtConfig, RtEvent, RtOrder, RtShot, RtState, RtUnit } from "../engine/types";
 import type { Domain, DomainMode } from "../scope";
 import type { Entity, LandComponents, WorldLogItem, WorldState } from "./types";
 
@@ -38,6 +38,10 @@ export interface LandView {
   setUnit(id: string, patch: Partial<RtUnit>): void;
   /** Give a land unit a new order, routed from where it stands (engine.ts `routed`). */
   order(id: string, order: RtOrder, extra?: Partial<RtUnit>): void;
+  /** Put a new land unit on the board (a dismounted section), appended in element order. */
+  addUnit(fe: ForceElement, unit: RtUnit): void;
+  /** Direct-fire shots the land engine made this second (empty outside a tick). */
+  shots: readonly RtShot[];
   emit: Emit;
   /** A message on the land radio net (comms.ts). */
   radio(draft: MessageDraft): void;
@@ -77,6 +81,7 @@ export class WorldCtx {
       outages: { ...prev.outages },
       support: [...prev.support],
       orderQueue: [...prev.orderQueue],
+      memo: { ...prev.memo },
       log: prev.log,
     };
   }
@@ -172,6 +177,14 @@ export class WorldCtx {
     let n = 0;
     while (n < queue.length && queue[n].at <= this.time) n++;
     return n ? queue.splice(0, n) : [];
+  }
+
+  /** When this key last happened (rate limits); −∞ if never. */
+  last(key: string): number {
+    return this.world.memo[key] ?? -Infinity;
+  }
+  mark(key: string): void {
+    this.world.memo[key] = this.time;
   }
 
   /** Copy-on-write for the stats record. */

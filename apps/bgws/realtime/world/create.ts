@@ -207,6 +207,8 @@ export function emptyWorld(env: Partial<Environment> = {}): WorldState {
     outages: {},
     support: [],
     orderQueue: [],
+    joinedStrength: { blue: 0, red: 0 },
+    memo: {},
     nextId: 1,
     log: [],
   };
