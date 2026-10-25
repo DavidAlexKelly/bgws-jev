@@ -10,7 +10,7 @@ members = [
   "crates/bgws-behaviour",
   "crates/bgws-scenario",
   "crates/bgws-models",
-  # "crates/bgws-domains",  (paused: see commit message)
+  "crates/bgws-domains",
   "crates/bgws-ops",
   "crates/bgws-sim",
   "crates/bgws-decide",

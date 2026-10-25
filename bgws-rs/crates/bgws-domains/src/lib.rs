@@ -3,7 +3,7 @@
 //! guided munitions, §8.12 space):
 //!
 //! - [`air`]: point-mass aircraft, steering, drones, fibre tethers, sortie generation;
-//! - [`missile`]: 3-DoF flyout, guidance laws, seekers, ballistic missiles, CPA, launch envelopes;
+//! - [`missile`]: munitions in flight on kinematic profiles, radar-horizon exposure, CEP at the aim point;
 //! - [`air_defence`]: kill chains, layered defence with magazines, weapon-target assignment, cost exchange;
 //! - [`naval`]: ships, submarines, small craft, salvo defence, damage control, mines, ports and replenishment;
 //! - [`space`]: SGP4 satellites, ground tracks, access windows, footprints, manoeuvres, imagery, GNSS, satcom.
