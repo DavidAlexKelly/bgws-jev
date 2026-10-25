@@ -23,6 +23,7 @@ bgws-analysis.workspace = true
 bgws-models.workspace = true
 bgws-ops.workspace = true
 bgws-domains.workspace = true
+bgws-env.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

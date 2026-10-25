@@ -110,6 +110,23 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     r
 }
 
+/// The scenario's theatre pack, if it names one, assembled over the area its
+/// positions cover (with a margin): the host does the disk, the sim stays pure.
+pub fn load_pack_terrain(scenario: &ScenarioV4) -> Result<Option<bgws_env::Terrain>> {
+    let Some(dir) = &scenario.theatre.pack else { return Ok(None) };
+    let mut pack = bgws_env::TheatrePack::open(Path::new(dir)).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    let frame = scenario.frame();
+    let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
+    for (_, g) in scenario.positions() {
+        let v = frame.geodetic_to_enu(g);
+        lo = (lo.0.min(v.e), lo.1.min(v.n));
+        hi = (hi.0.max(v.e), hi.1.max(v.n));
+    }
+    let m = 5_000.0;
+    let aoi = bgws_env::Aoi { min_e: lo.0 - m, min_n: lo.1 - m, max_e: hi.0 + m, max_n: hi.1 + m };
+    Ok(Some(pack.assemble(&aoi).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?))
+}
+
 /// What a played game produced.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,7 +157,11 @@ pub struct Host {
 impl Host {
     pub fn new(scenario: &ScenarioV4, seed: Seed, figures: Figures, opts: &HostOptions) -> Result<Host> {
         let router = router_for(scenario, &figures, opts);
-        let sim = Sim::with_options(scenario, seed, figures, opts.sim.clone()).map_err(|e| anyhow!("{e}"))?;
+        let mut sim_opts = opts.sim.clone();
+        if sim_opts.terrain.is_none() {
+            sim_opts.terrain = load_pack_terrain(scenario)?;
+        }
+        let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;
         let mut machine = MachineInfo::compiled_for();
         machine.threads = Some(rayon::current_num_threads() as u32);
         let record = GameRecord::new(scenario.clone(), seed, BuildInfo::this(option_env!("BGWS_BUILD_ID").unwrap_or("dev")), machine);
@@ -157,6 +178,11 @@ impl Host {
         let mut h = Host::new(&record.scenario, record.seed, f, &HostOptions { deciders: DeciderChoice::Rules, ..Default::default() })?;
         h.replay = Some(record);
         Ok(h)
+    }
+
+    /// Leave replay mode: from now on the router answers (a "what if" branch).
+    pub fn stop_replay(&mut self) {
+        self.replay = None;
     }
 
     pub fn write_events_to(&mut self, path: &Path) -> Result<()> {

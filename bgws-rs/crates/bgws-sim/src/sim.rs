@@ -87,11 +87,13 @@ pub struct SimOptions {
     pub plan_at_start: bool,
     /// A weather field loaded by the host (ERA5), overriding the scenario's.
     pub weather: Option<WeatherField>,
+    /// Terrain loaded by the host from the scenario's theatre pack (§14.2).
+    pub terrain: Option<bgws_env::Terrain>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None }
     }
 }
 
@@ -193,7 +195,9 @@ impl Sim {
             let v = frame.geodetic_to_enu(g);
             half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
         }
-        let ground = if opts.flat_ground || scenario.theatre.ground == "flat" {
+        let ground = if let Some(t) = opts.terrain.clone() {
+            Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures)
+        } else if opts.flat_ground || scenario.theatre.ground == "flat" {
             Ground::flat(origin, half, &figures)
         } else {
             let seed_text = if scenario.theatre.ground_seed.is_empty() { scenario.name.clone() } else { scenario.theatre.ground_seed.clone() };

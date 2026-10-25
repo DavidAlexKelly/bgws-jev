@@ -523,6 +523,7 @@ dependencies = [
  "bgws-core",
  "bgws-decide",
  "bgws-domains",
+ "bgws-env",
  "bgws-models",
  "bgws-ops",
  "bgws-scenario",

@@ -5,6 +5,8 @@
 //! bgws play <scenario> [--deciders rules|jev|claude|local] [--seed N] [--minutes M]
 //!           [--record game.json] [--events events.jsonl] [--flat]
 //! bgws replay <game.json>                 replay a record without calling any model
+//! bgws branch <game.json> --at M [--deciders jev]   "what if": replay to minute M, then play on
+//! bgws pack <dir> --name N --lat --lon      build a theatre pack of synthetic ground
 //! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
 //! bgws vignettes [--only id] [-n 200]     benchmark vignettes against their bands
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
@@ -65,6 +67,37 @@ enum Cmd {
     },
     /// Replay a game record exactly, without calling any decider.
     Replay { record: PathBuf },
+    /// "What if": replay a record to a moment, then play on with other deciders (§12).
+    Branch {
+        record: PathBuf,
+        /// Simulated minutes to replay before branching.
+        #[arg(long)]
+        at: f64,
+        #[arg(long, default_value = "rules")]
+        deciders: DeciderChoice,
+        /// Play this many minutes after the branch point (default: to the scenario's limit).
+        #[arg(long)]
+        minutes: Option<f64>,
+        #[arg(long)]
+        record_out: Option<PathBuf>,
+    },
+    /// Build a theatre pack (§14.2): synthetic ground for an area, tiled, for scenarios to name.
+    Pack {
+        out: PathBuf,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        lat: f64,
+        #[arg(long)]
+        lon: f64,
+        /// Side of the square area, km.
+        #[arg(long, default_value_t = 40.0)]
+        size_km: f64,
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+    },
     /// Play many seeded games with the rules deciders.
     Batch {
         scenario: String,
@@ -186,6 +219,33 @@ fn main() -> Result<()> {
             host.verify_replay()?;
             println!("{}", serde_json::to_string_pretty(&host.report())?);
             eprintln!("replay matches the record");
+        }
+        Cmd::Branch { record, at, deciders, minutes, record_out } => {
+            let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
+            let branch_at = SimTime::from_secs(at * 60.0);
+            let mut host = Host::replay(rec.clone(), default_figures())?;
+            host.play_until(branch_at, |_| {})?;
+            eprintln!("replayed to {}; branching with {:?}", host.sim.now(), deciders);
+            let opts = HostOptions { deciders, ..Default::default() };
+            host.router = bgws_run::router_for(&rec.scenario, &default_figures(), &opts);
+            host.stop_replay();
+            let until = SimTime::from_secs(minutes.map(|m| at + m).unwrap_or(rec.scenario.scope.duration_min) * 60.0);
+            host.play_until(until, |_| {})?;
+            println!("{}", serde_json::to_string_pretty(&host.report())?);
+            if let Some(p) = record_out {
+                let mut r = host.record.clone();
+                r.fingerprint = Some(host.sim.fingerprint());
+                r.save(&p).map_err(|e| anyhow!("{e}"))?;
+            }
+        }
+        Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed } => {
+            let f = default_figures();
+            let n = ((size_km * 1000.0 / cell_m).ceil() as usize + 1).max(16);
+            let mut p = bgws_env::SynthParams::new(seed, n, n, cell_m, &f);
+            p.frame_origin = bgws_core::Geodetic::new(lat, lon, 0.0);
+            let world = bgws_env::generate(&p, &f);
+            let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
+            eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
         }
         Cmd::Batch { scenario, n, seed, minutes, flat, json } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
