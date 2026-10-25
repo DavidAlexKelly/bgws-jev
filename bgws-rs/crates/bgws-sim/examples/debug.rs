@@ -1,6 +1,6 @@
+//! Print a scenario's state at a few moments: `cargo run -p bgws-sim --example debug -- <scenario>` (FLAT=1 for flat ground).
 use bgws_core::{Seed, SimTime};
 use bgws_scenario::v4::ScenarioV4;
-//! Print a scenario's state at a few moments: `cargo run -p bgws-sim --example debug -- <scenario>` (FLAT=1 for flat ground).
 use bgws_sim::{default_figures, Viewer};
 fn main() {
     let name = std::env::args().nth(1).unwrap_or("skirmish-advance-to-contact-v1".into());
