@@ -21,6 +21,9 @@ use rand_chacha::ChaCha8Rng;
 /// One replicate's value for a vignette metric (None: nothing to measure).
 pub type Value = Option<f64>;
 
+/// A vignette experiment.
+pub type ExperimentFn = dyn Fn(&Figures, Seed) -> Value + Sync;
+
 fn rng(seed: Seed, what: &'static str) -> ChaCha8Rng {
     seed.stream(StreamKey::new(what, 0, 0, 0))
 }
@@ -300,20 +303,6 @@ impl<F: Fn(&Figures, Seed) -> Value + Sync> Experiment for Wrap<'_, F> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn component_vignettes_are_in_band() {
-        let f = crate::default_figures();
-        let opts = CheckOptions { level: 0.95, replicates: Some(60) };
-        let results = run_vignettes(&f, Seed(1), &opts, None, None);
-        assert!(results.len() >= 10, "{}", results.len());
-        let out: Vec<_> = results.iter().filter(|r| r.verdict != bgws_analysis::vignettes::Verdict::InBand).map(|r| format!("{} = {:.3} not in [{}, {}]", r.id, r.estimate, r.band.lo, r.band.hi)).collect();
-        assert!(out.is_empty(), "{out:#?}");
-    }
-}
 
 /// Morris screening then Sobol indices for a vignette over its figures, and
 /// the research backlog of unsourced figures ranked by sensitivity (§15.4).
@@ -321,7 +310,7 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     use bgws_analysis::sensitivity::*;
     let figures = crate::default_figures();
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
-    let exp: Box<dyn Fn(&Figures, Seed) -> Value + Sync> = match id {
+    let exp: Box<ExperimentFn> = match id {
         "mbt-engagement" => Box::new(mbt_engagement),
         "fpv-effectiveness" => Box::new(fpv),
         "shahed-raid" => Box::new(shahed),
@@ -353,4 +342,19 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let report = analyse(&v.id, &figures, &facs, &resp, &morris, &sobol, seed);
     println!("{}", bgws_analysis::report::sensitivity_markdown(&report));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn component_vignettes_are_in_band() {
+        let f = crate::default_figures();
+        let opts = CheckOptions { level: 0.95, replicates: Some(60) };
+        let results = run_vignettes(&f, Seed(1), &opts, None, None);
+        assert!(results.len() >= 10, "{}", results.len());
+        let out: Vec<_> = results.iter().filter(|r| r.verdict != bgws_analysis::vignettes::Verdict::InBand).map(|r| format!("{} = {:.3} not in [{}, {}]", r.id, r.estimate, r.band.lo, r.band.hi)).collect();
+        assert!(out.is_empty(), "{out:#?}");
+    }
 }
