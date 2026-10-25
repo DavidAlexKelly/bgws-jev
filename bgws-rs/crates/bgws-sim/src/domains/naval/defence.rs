@@ -148,7 +148,7 @@ pub(crate) fn claim_air_threats(s: &mut Sim) {
         if !matches!(platform.domain, Domain::Air | Domain::Munition) {
             continue;
         }
-        let Some(bgws_scenario::v4::EntityTask::Strike { target_id, aim_at, alt_m }) = s.ctx.scenario.forces[idx].task.clone() else { continue };
+        let Some(bgws_scenario::v4::EntityTask::Strike { target_id, aim_at, alt_m }) = s.ctx.scenario.forces.get(idx).and_then(|f| f.task.clone()) else { continue };
         let aim = s.ctx.frame.geodetic_to_enu(aim_at);
         let is_ship = |s: &Sim, t: EntityId| s.world.get::<Ident>(s.ctx.entity(t)).map(|i| matches!(i.domain, Domain::Surface | Domain::Subsurface) && i.side != side).unwrap_or(false);
         let target = target_id.and_then(|t| s.ctx.by_name.get(&t).copied()).filter(|t| is_ship(s, *t)).or_else(|| {

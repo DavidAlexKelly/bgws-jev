@@ -23,7 +23,14 @@ macro_rules! each {
 
 /// After the forces are spawned: domain state, schedules.
 pub fn setup(s: &mut Sim) {
-    each!(setup(s));
+    // Naval first: it claims the strike forces aimed at ships (`NavalStrike`),
+    // which the air module then leaves to it.
+    fires::setup(s);
+    naval::setup(s);
+    air::setup(s);
+    drones::setup(s);
+    space::setup(s);
+    lod::setup(s);
 }
 
 /// Is anything fast in flight (munitions, interceptors)? Then 20 Hz.

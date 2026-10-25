@@ -236,7 +236,8 @@ pub(crate) fn setup(s: &mut Sim) {
         if i.domain != Domain::Space {
             continue;
         }
-        let force = &s.ctx.scenario.forces[idx];
+        // Entities spawned during play (munitions, flights) have no scenario force.
+        let Some(force) = s.ctx.scenario.forces.get(idx) else { continue };
         let p = &i.platform;
         let kind = if p.sensors.iter().any(|x| x.kind == CatSensor::Sar) {
             SatKind::Sar

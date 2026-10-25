@@ -281,7 +281,8 @@ pub(crate) fn setup_vessels(s: &mut Sim) {
         if !matches!(platform.domain, Domain::Surface | Domain::Subsurface) {
             continue;
         }
-        let force = &s.ctx.scenario.forces[idx];
+        // Entities spawned during play (munitions, flights) have no scenario force.
+        let Some(force) = s.ctx.scenario.forces.get(idx) else { continue };
         let class = hull_class(&platform);
         let hull = HullParams::from_figures(class, &f);
         let kind = vessel_kind(&platform, class);

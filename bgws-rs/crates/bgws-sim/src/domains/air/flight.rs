@@ -257,6 +257,10 @@ pub fn setup(s: &mut Sim, aw: &mut AirWorld) {
         if !super::is_munition_like(&i.platform) {
             continue;
         }
+        // A strike on a ship is the naval module's to fly and defend.
+        if s.world.get::<crate::domains::naval::defence::NavalStrike>(e).is_some() {
+            continue;
+        }
         let platform = i.platform.clone();
         let side = i.side;
         let dummy = i.dummy;
