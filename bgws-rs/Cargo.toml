@@ -16,6 +16,7 @@ members = [
   "crates/bgws-decide",
   "crates/bgws-analysis",
   "crates/bgws-run",
+  "apps/server",
 ]
 
 [workspace.package]
@@ -39,6 +40,7 @@ bgws-ops = { path = "crates/bgws-ops" }
 bgws-sim = { path = "crates/bgws-sim" }
 bgws-decide = { path = "crates/bgws-decide" }
 bgws-analysis = { path = "crates/bgws-analysis" }
+bgws-run = { path = "crates/bgws-run" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
@@ -67,9 +69,11 @@ approx = "0.5"
 
 [profile.dev]
 opt-level = 1
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2
+debug = false
 
 [profile.release]
-debug = 1
+debug = "line-tables-only"

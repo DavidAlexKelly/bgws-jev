@@ -68,6 +68,18 @@ impl Side {
     }
 }
 
+impl std::str::FromStr for Side {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Side, String> {
+        match s.to_ascii_lowercase().as_str() {
+            "blue" => Ok(Side::Blue),
+            "red" => Ok(Side::Red),
+            "neutral" => Ok(Side::Neutral),
+            _ => Err(format!("unknown side `{s}` (blue, red, neutral)")),
+        }
+    }
+}
+
 impl fmt::Display for Side {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())

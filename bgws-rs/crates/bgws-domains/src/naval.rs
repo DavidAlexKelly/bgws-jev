@@ -529,7 +529,8 @@ mod tests {
             let mut sys = vec![
                 AdSystem::from_figures("lrsam", "SM-2/6", V3::ZERO, &f),
                 AdSystem::from_figures("mrsam", "ESSM", V3::ZERO, &f),
-                AdSystem::from_figures("gun", "5-inch/CIWS", V3::ZERO, &f),
+                AdSystem::from_figures("gun5in", "5-inch", V3::ZERO, &f),
+                AdSystem::from_figures("gun", "CIWS", V3::ZERO, &f),
                 AdSystem::from_figures("fighter", "CAP1", V3::new(-15_000.0, 30_000.0, 6_000.0), &f),
                 AdSystem::from_figures("fighter", "CAP2", V3::new(15_000.0, 30_000.0, 6_000.0), &f),
                 AdSystem::from_figures("ewSoftKill", "EW", V3::ZERO, &f),

@@ -1,0 +1,23 @@
+[package]
+name = "bgws-server"
+description = "A local host that plays a scenario and serves the map viewer over HTTP and a WebSocket (the browser stand-in for the Tauri desktop shell)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "bgws-server"
+path = "src/main.rs"
+
+[dependencies]
+bgws-core.workspace = true
+bgws-sim.workspace = true
+bgws-run.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio = { workspace = true, features = ["net", "rt-multi-thread", "macros", "sync", "time"] }
+axum = { version = "0.7", features = ["ws"] }
+futures-util = "0.3"

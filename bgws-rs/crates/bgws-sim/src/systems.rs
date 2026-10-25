@@ -403,6 +403,12 @@ pub fn sensing(s: &mut Sim, dt: f64) {
             s.ctx.triggers.push(Trigger { entity: o.id, point: "D1", about: Some(t.id) });
             if let Some(mut a) = s.world.get_mut::<Act>(o.e) {
                 a.last_event = now;
+                // React to contact: a marching unit drops to tactical, and fires.
+                if let Activity::Move { mode, .. } = &mut a.activity {
+                    if *mode == MoveModeS::March {
+                        *mode = MoveModeS::Tactical;
+                    }
+                }
             }
         }
         let level = match sg.level {
@@ -490,17 +496,18 @@ fn armour_zones(p: &bgws_catalogue::Platform) -> ArmourZones {
 pub fn direct_fire(s: &mut Sim) {
     let now = s.ctx.now;
     let order = s.ctx.order.clone();
-    for &e in &order {
-        if !alive(s, e) || !is_land(s, e) {
+    // Fire within a tick is simultaneous: every firer acts on its state at the
+    // start of the tick, so being earlier in the id order is no advantage.
+    let start: Vec<Option<(bool, u32)>> = order.iter().map(|&e| s.world.get::<Health>(e).map(|h| (h.can_fire(), h.fit))).collect();
+    for (k, &e) in order.iter().enumerate() {
+        let Some((could_fire, fit0)) = start[k] else { continue };
+        if !could_fire || !is_land(s, e) {
             continue;
         }
         let (id, side, platform, quality) = {
             let i = s.world.get::<Ident>(e).expect("ident");
             (i.id, i.side, i.platform.clone(), i.quality)
         };
-        if !s.world.get::<Health>(e).expect("h").can_fire() {
-            continue;
-        }
         let act = s.world.get::<Act>(e).expect("act").clone();
         if !act.activity.may_fire() || act.roe == RoeS::Never {
             continue;
@@ -533,12 +540,12 @@ pub fn direct_fire(s: &mut Sim) {
         candidates.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
         let target = wanted.and_then(|w| candidates.iter().find(|c| c.0 == w).copied()).or_else(|| if matches!(act.activity, Activity::Move { mode: MoveModeS::March, .. }) { None } else { candidates.first().copied() });
         let Some((tid, range)) = target else { continue };
-        fire_volley(s, e, id, side, &platform, quality, mount.index, &mun, cat_mount, tid, range);
+        fire_volley(s, e, id, side, fit0, quality, mount.index, &mun, cat_mount, tid, range);
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, _platform: &bgws_catalogue::Platform, _quality: u8, mount_i: usize, mun: &bgws_catalogue::Munition, cat_mount: &bgws_catalogue::Mount, tid: EntityId, range: f64) {
+fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _quality: u8, mount_i: usize, mun: &bgws_catalogue::Munition, cat_mount: &bgws_catalogue::Mount, tid: EntityId, range: f64) {
     let now = s.ctx.now;
     let te = s.ctx.entity(tid);
     let tk = *s.world.get::<Kin>(te).expect("kin");
@@ -546,7 +553,6 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, _platform: &bgw
     let tplat = s.world.get::<Ident>(te).expect("ident").platform.clone();
     let tposture = s.world.get::<Act>(te).expect("act").posture;
     let tcover = s.ctx.ground.micro(tk.pos.e, tk.pos.n).cover;
-    let fit = s.world.get::<Health>(e).expect("h").fit;
     let p = s.ctx.p.direct.clone();
     let crew = s.world.get::<Crew>(e).expect("crew").clone();
     let skill = crew.skill.error_mult(&s.ctx.p.people);
@@ -573,7 +579,18 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, _platform: &bgw
     if rounds == 0 {
         return;
     }
-    let mut engagement = s.world.get::<Arms>(e).expect("arms").engagements.get(&tid).cloned().unwrap_or_else(|| df::Engagement::new(&budget, &mut rng));
+    let existing = s.world.get::<Arms>(e).expect("arms").engagements.get(&tid).cloned();
+    let Some(mut engagement) = existing else {
+        // A new target: the crew lays on it before the first round (§8.8).
+        let lay = cat_mount.fire_control.lay_s.max(s.ctx.p.lay_min_s) * (1.0 + supp);
+        let fresh = df::Engagement::new(&budget, &mut rng);
+        let mut arms = s.world.get_mut::<Arms>(e).expect("arms");
+        arms.engagements.insert(tid, fresh);
+        if let Some(m) = arms.mounts.iter_mut().find(|m| m.index == mount_i) {
+            m.ready_at = now + bgws_core::SimDuration::from_secs(lay);
+        }
+        return;
+    };
     let (mut hits, mut kills, mut near) = (0u32, 0u32, 0.0f64);
     let mut ph_last = 0.0;
     let armour = armour_zones(&tplat);
