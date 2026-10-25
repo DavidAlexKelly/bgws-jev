@@ -152,7 +152,7 @@ impl AccessCampaign {
                     self.state = CampaignState::Discovered { at: t };
                     out.push(CyberEvent::Discovered { campaign: self.id, at: t, p_step: ps });
                 } else if progress_days + dt_days >= self.required_days {
-                    let ready_at = t - SimDuration::from_secs((progress_days + dt_days - self.required_days) * 86_400.0);
+                    let ready_at = SimTime(t.0 - SimDuration::from_secs((progress_days + dt_days - self.required_days) * 86_400.0).0);
                     self.state = CampaignState::Ready { since: ready_at };
                     out.push(CyberEvent::AccessReady { campaign: self.id, at: ready_at });
                     // Exposure while waiting ready, for the rest of this step.

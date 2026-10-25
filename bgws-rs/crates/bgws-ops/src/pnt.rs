@@ -14,7 +14,7 @@
 //! - **Precision munitions' CEP** follows from the navigation state at
 //!   release and in flight, combined with the guidance error; with a bias
 //!   (spoofing) the miss distance is Rician. Excalibur-type Pk falling from
-//!   >50% to <10% under jamming **[P15]** and jamming radii of ≥25 km per
+//!   above 50% to below 10% under jamming **[P15]** and jamming radii of ≥25 km per
 //!   module **[P16]** are acceptance tests, not inputs.
 
 use crate::math::{bisect, db_to_ratio, ratio_to_db};

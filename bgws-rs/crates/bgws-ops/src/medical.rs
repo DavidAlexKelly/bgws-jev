@@ -618,7 +618,7 @@ mod tests {
         assert!(out120.iter().filter(|o| !o.survived).all(|o| o.p_death > 0.0 && o.died_at.is_some()));
         // T3 mostly returns to duty, and nobody dies before injury.
         assert!(out15.iter().filter(|o| o.triage == Triage::T3).all(|o| o.stage_reached == Stage::ReturnedToDuty || !o.survived));
-        assert!(out15.iter().all(|o| o.died_at.map_or(true, |d| d >= o.injured_at)));
+        assert!(out15.iter().all(|o| o.died_at.is_none_or(|d| d >= o.injured_at)));
         let surgery = out15.iter().filter(|o| o.times.surgery_start.is_some()).count();
         assert!(surgery > 0);
         // Same seed, same result.

@@ -275,6 +275,14 @@ pub struct AttritionCoeffs {
     pub k_b_on_a: f64,
 }
 
+impl AttritionCoeffs {
+    /// The **[default]** coefficients for a pair with no fit yet.
+    pub fn unfitted(f: &Figures) -> Self {
+        let k = f.get("agg.k_default_per_h");
+        Self { k_a_on_b: k, k_b_on_a: k }
+    }
+}
+
 /// One step's attrition (rule 10).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AttritionStep {
@@ -539,6 +547,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use proptest::prelude::*;
+    use rand::Rng;
 
     fn figs() -> Figures {
         crate::default_figures()
@@ -585,6 +594,7 @@ mod tests {
     fn modifiers_change_rates() {
         let f = figs();
         let k = AttritionCoeffs { k_a_on_b: 0.05, k_b_on_a: 0.05 };
+        assert!(AttritionCoeffs::unfitted(&f).k_a_on_b > 0.0);
         let a = aggregate(1, Side::Blue, &members(100, 0), 0, FireType::Aimed, Posture::Attack);
         let mut b = aggregate(2, Side::Red, &members(100, 0), 0, FireType::Aimed, Posture::PreparedDefence);
         let open = EngagementEnv { terrain: TerrainClass::Open, supply: (1.0, 1.0) };

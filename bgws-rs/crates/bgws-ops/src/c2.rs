@@ -291,9 +291,8 @@ impl StaffCell {
     /// Work until `until`.
     pub fn process(&mut self, until: SimTime) -> StaffReport {
         let mut rep = StaffReport { processed: Vec::new(), dropped: std::mem::take(&mut self.dropped) };
-        loop {
-            // The next item starts when the cell is free and something has arrived.
-            let Some(earliest) = self.queue.iter().map(|q| q.arrived).min() else { break };
+        // The next item starts when the cell is free and something has arrived.
+        while let Some(earliest) = self.queue.iter().map(|q| q.arrived).min() {
             let start = self.busy_until.max(earliest);
             if start > until {
                 break;

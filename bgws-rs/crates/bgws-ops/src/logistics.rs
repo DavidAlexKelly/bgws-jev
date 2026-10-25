@@ -424,6 +424,8 @@ pub struct Movement {
     pub tonnes: f64,
     /// Vehicles (trucks, trains, ships, aircraft, drones, UGVs).
     pub vehicles: u32,
+    /// Separate packets on the move (road convoys of `log.convoy_size`; else one per vehicle).
+    pub packets: u32,
     pub depart: SimTime,
     pub arrive: SimTime,
 }
@@ -621,7 +623,9 @@ fn movement_for(l: &SupplyLink, tonnes: f64, depart: SimTime, arrive: SimTime, f
         LinkMode::Drone => (MovementKind::DroneDelivery, f.get("log.payload.drone_t")),
         LinkMode::Ugv => (MovementKind::UgvRun, f.get("log.payload.ugv_t")),
     };
-    Movement { link: l.id, kind, tonnes, vehicles: (tonnes / payload).ceil().max(1.0) as u32, depart, arrive }
+    let vehicles = (tonnes / payload).ceil().max(1.0) as u32;
+    let packets = if kind == MovementKind::Convoy { (vehicles as f64 / f.get("log.convoy_size")).ceil().max(1.0) as u32 } else { vehicles };
+    Movement { link: l.id, kind, tonnes, vehicles, packets, depart, arrive }
 }
 
 /// Hub placement against the enemy's reach **[P18]**.
@@ -1019,7 +1023,9 @@ mod tests {
         let total: f64 = plan.paths.iter().map(|p| p.tonnes).sum();
         assert_relative_eq!(total, 220.0, epsilon = 1e-9);
         let moves = n.dispatch(&plan, SimTime::ZERO, &f);
-        assert!(moves.iter().all(|(_, legs)| legs.iter().all(|m| m.arrive > m.depart && m.vehicles >= 1)));
+        assert!(moves.iter().all(|(_, legs)| legs.iter().all(|m| m.arrive > m.depart && m.vehicles >= 1 && m.packets <= m.vehicles)));
+        let convoy = moves.iter().flat_map(|(_, l)| l).find(|m| m.kind == MovementKind::Convoy).unwrap();
+        assert_eq!(convoy.packets, (convoy.vehicles as f64 / 10.0).ceil() as u32);
         assert_relative_eq!(n.sites[&SiteId(2)].stock_t[&SupplyClass::III], 0.0, epsilon = 1e-9);
         // Strike the depot: next cycle must route around it at higher cost.
         n.sites.get_mut(&SiteId(2)).unwrap().stock_t.insert(SupplyClass::III, 100.0);

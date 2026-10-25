@@ -135,7 +135,63 @@ pub struct JsResult {
     pub snr_db: f64,
 }
 
+/// General EW parameters from figures.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EwParams {
+    pub sidelobe_dbi: f64,
+    pub look_through: f64,
+    pub comms_js_required_db: f64,
+    pub fhss_gain_db: f64,
+    pub radar_detect_snr_db: f64,
+    pub esm_sensitivity_dbw: f64,
+}
+
+impl EwParams {
+    pub fn from_figures(f: &Figures) -> Self {
+        Self {
+            sidelobe_dbi: f.get("ew.sidelobe_dbi"),
+            look_through: f.get("ew.look_through_fraction"),
+            comms_js_required_db: f.get("ew.comms_js_required_db"),
+            fhss_gain_db: f.get("ew.fhss_processing_gain_db"),
+            radar_detect_snr_db: f.get("ew.radar.detect_snr_db"),
+            esm_sensitivity_dbw: f.get("ew.esm_sensitivity_dbw"),
+        }
+    }
+
+    /// A sector antenna with the declared sidelobe level.
+    pub fn sector(&self, gain_dbi: f64, beamwidth_rad: f64) -> AntennaPattern {
+        AntennaPattern::Sector { gain_dbi, beamwidth_rad, sidelobe_dbi: self.sidelobe_dbi }
+    }
+}
+
+/// Is a communications link jammed? (rule 10)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CommsJamVerdict {
+    pub raw_js_db: f64,
+    /// After frequency-hopping gain, if the waveform hops.
+    pub effective_js_db: f64,
+    pub required_js_db: f64,
+    pub jammed: bool,
+}
+
+/// Compare J/S at a comms receiver against what defeats it; a hopping
+/// waveform (SINCGARS-like) needs that much more.
+pub fn comms_jammed(raw_js_db: f64, hopping: bool, p: &EwParams) -> CommsJamVerdict {
+    let eff = raw_js_db - if hopping { p.fhss_gain_db } else { 0.0 };
+    CommsJamVerdict { raw_js_db, effective_js_db: eff, required_js_db: p.comms_js_required_db, jammed: eff >= p.comms_js_required_db }
+}
+
+/// Detection margin of a radar under jamming: SNR + jamming loss − detection threshold, dB.
+pub fn radar_detection_margin_db(snr_db: f64, effect: &RadarJamEffect, p: &EwParams) -> f64 {
+    snr_db + effect.snr_loss_db - p.radar_detect_snr_db
+}
+
 impl Jammer {
+    /// A continuous jammer with the declared look-through.
+    pub fn new(power_w: f64, pattern: AntennaPattern, bands: Vec<JamBand>, p: &EwParams) -> Self {
+        Self { power_w, pattern, bands, duty_cycle: 1.0, look_through: p.look_through, on: true }
+    }
+
     /// Power split across bands: each band's share of the budget, dB (≤ 0).
     pub fn split_db(&self, band: usize) -> f64 {
         let total: f64 = self.bands.iter().map(|b| b.weight.max(0.0)).sum();
@@ -363,6 +419,11 @@ pub fn radar_jam_effect(p: &RadarEwParams, technique: RadarJamTechnique, mode: R
 
 /// How far an ESM receiver hears an emitter of `erp_dbw` (§8.3 signature),
 /// given a path-loss function of range and the receiver's sensitivity.
+/// ESM detection range with the declared ESM sensitivity.
+pub fn esm_range(erp_dbw: f64, path_loss_db: impl Fn(f64) -> f64, max_m: f64, p: &EwParams) -> f64 {
+    esm_detection_range(erp_dbw, p.esm_sensitivity_dbw, path_loss_db, max_m)
+}
+
 pub fn esm_detection_range(erp_dbw: f64, sensitivity_dbw: f64, path_loss_db: impl Fn(f64) -> f64, max_m: f64) -> f64 {
     bisect(1.0, max_m, |r| erp_dbw - path_loss_db(r) - sensitivity_dbw).unwrap_or(if erp_dbw - path_loss_db(max_m) > sensitivity_dbw { max_m } else { 0.0 })
 }
@@ -467,6 +528,21 @@ mod tests {
         assert!(e.false_targets > 1.0);
         let s = radar_jam_effect(&p, RadarJamTechnique::BarrageNoise, RadarMode::Search, 10.0, 15.0, &agile, true);
         assert!(s.effective_js_db < -20.0);
+    }
+
+    #[test]
+    fn params_drive_verdicts() {
+        let f = crate::default_figures();
+        let p = EwParams::from_figures(&f);
+        assert!(comms_jammed(5.0, false, &p).jammed);
+        assert!(!comms_jammed(5.0, true, &p).jammed);
+        let j = Jammer::new(100.0, p.sector(15.0, 0.5), vec![JamBand { centre_hz: 60e6, width_hz: 1e6, weight: 1.0 }], &p);
+        assert_relative_eq!(j.pattern.gain_dbi(3.0), p.sidelobe_dbi);
+        assert!(j.look_through > 0.0);
+        let rp = RadarEwParams::from_figures(&f);
+        let e = radar_jam_effect(&rp, RadarJamTechnique::SpotNoise, RadarMode::Search, 0.0, 20.0, &Eccm::default(), false);
+        assert!(radar_detection_margin_db(20.0, &e, &p) < 20.0 - p.radar_detect_snr_db);
+        assert!(esm_range(10.0, |d| free_space_loss_db(d, 60e6), 1e8, &p) > 1e5);
     }
 
     #[test]
