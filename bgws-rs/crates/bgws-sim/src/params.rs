@@ -39,6 +39,7 @@ pub fn figures() -> Vec<Figure> {
 /// Every figure the engine declares, across all crates.
 pub fn all_figures() -> Vec<Figure> {
     let mut v = figures();
+    v.extend(crate::domains::fires::figures());
     v.extend(bgws_catalogue::figures());
     v.extend(bgws_env::figures());
     v.extend(bgws_prop::figures());

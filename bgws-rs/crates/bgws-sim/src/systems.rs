@@ -516,7 +516,8 @@ pub fn direct_fire(s: &mut Sim) {
         let seen: Vec<(EntityId, Seen)> = s.world.get::<Aware>(e).expect("aware").seen.iter().filter(|(_, v)| v.last == now || (now - v.last).secs() < 3.0).map(|(k, v)| (*k, v.clone())).collect();
         // Pick a mount with rounds, ready.
         let arms = s.world.get::<Arms>(e).expect("arms").clone();
-        let Some(mount) = arms.mounts.iter().find(|m| m.rounds > 0 && m.ready_at <= now) else { continue };
+        // Indirect-fire mounts fire missions (domains::fires), not direct volleys.
+        let Some(mount) = arms.mounts.iter().find(|m| m.rounds > 0 && m.ready_at <= now && !crate::domains::fires::indirect_mount(&platform, m.index)) else { continue };
         let Some(mun) = s.ctx.catalogue.munition(&mount.munition).cloned() else { continue };
         let cat_mount = &platform.mounts[mount.index];
         // Target: the ordered one if seen, else the nearest seen in reach.

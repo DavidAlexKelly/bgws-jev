@@ -166,6 +166,12 @@ pub(crate) fn compass(b: f64) -> &'static str {
 
 /// Raise one question for a trigger. Returns whether anything was raised.
 pub(crate) fn ask(s: &mut Sim, t: &Trigger) -> bool {
+    ask_with_rule(s, t, RulesChoice::Fallback)
+}
+
+/// As [`ask`], with the engine's own rule choice for the rules decider (a
+/// world domain's `registerRules`); an option not offered falls back.
+pub(crate) fn ask_with_rule(s: &mut Sim, t: &Trigger, rule: RulesChoice) -> bool {
     let e = s.ctx.entity(t.entity);
     let (agent, side, template, archetype_default, kind) = {
         let i = s.world.get::<Ident>(e).expect("i");
@@ -198,7 +204,7 @@ pub(crate) fn ask(s: &mut Sim, t: &Trigger) -> bool {
         reaction,
         summaries: BTreeMap::new(),
         expansions: BTreeMap::new(),
-        rule: RulesChoice::Fallback,
+        rule,
     };
     let limits = QuestionLimits::from_figures(&s.ctx.figures);
     let Some(q) = build_question(&walk, &ctx, &s.ctx.vocab, limits) else { return false };
