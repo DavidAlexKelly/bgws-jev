@@ -1,0 +1,108 @@
+# BGWS in Rust
+
+The engine of `apps/bgws/docs/plan/RUST_ENGINE.md`: a local, physics-first,
+multi-domain simulation with Jev and Claude as decision makers, written in
+Rust. It sits beside the TypeScript build and does not replace it.
+
+```sh
+cd bgws-rs
+cargo build --release
+target/release/bgws scenarios                        # the shipped scenarios
+target/release/bgws play skirmish-advance-to-contact-v1 --record game.json --events events.jsonl
+target/release/bgws replay game.json                 # exact replay, no model calls
+target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
+target/release/bgws vignettes                        # benchmark vignettes against their bands
+target/release/bgws sensitivity shahed-raid          # Morris + Sobol, the research backlog
+target/release/bgws figures --markdown               # every figure, sourced or [default]
+target/release/bgws platform generic/mbt             # a resolved catalogue record
+target/release/bgws-server m4-drone-line --person blue   # then open http://127.0.0.1:8765/
+```
+
+Deciders: `--deciders rules|jev|claude|local` (or as the scenario says).
+Keys come from the environment only: `OPENROUTER_API_KEY` for Jev,
+`ANTHROPIC_API_KEY` for Claude. A local model is any OpenAI-compatible server
+(`--local-url`, `--local-model`). With no key or no network the template
+fallbacks decide and the log says why.
+
+## The workspace (plan §3.1)
+
+| Crate | What it holds |
+|---|---|
+| `bgws-core` | ids, µs time, units, WGS84/ECEF/ENU, the figures registry, keyed ChaCha8 streams, the event log and fingerprint, question and answer types |
+| `bgws-catalogue` | 105 platforms and 48 munitions built from parts (movers, bodies, signatures, sensors, mounts, radios, emitters, stores), class defaults, derivation, validation |
+| `bgws-env` | terrain grids and pyramids, synthetic theatres, land cover and micro-terrain, soil and trafficability, roads, the change layer, tiles and theatre packs, sea state and sound speed, weather fields, optics, sun and moon, thermal days |
+| `bgws-prop` | optical LOS with canopy, horizons, Deygout diffraction, ITM-style loss, HF ground wave and NVIS, satellite and microwave links, acoustic TL, link budgets |
+| `bgws-gpu` | LOS, viewsheds, candidate pairs, path-loss and J/S fields, flow fields, Monte Carlo hits: CPU twins always, WGSL kernels behind `--features gpu` |
+| `bgws-know` | Kalman tracks, GNN association, Bayesian classification with decoys, covariance-intersection COPs, DF fixes, `SideView` with truth kept behind an audit API |
+| `bgws-behaviour` | the TypeScript template walk ported exactly (22 golden scenes from the TS walker), hard gates, validation, patches, safeguards |
+| `bgws-scenario` | scope, the v3 loader, scenario v4, the v3 → v4 converter, game records; 14 presets in `data/scenarios/` |
+| `bgws-models` | land physics and people: ACQUIRE/TTP, thermal, radar, ESM, sonar, signatures, direct and indirect fire, engineers, suppression, morale, fatigue, casualties |
+| `bgws-domains` | munitions in flight (kinematic profiles, CEP), air (3-DoF, sorties), air defence (kill chains, WTA, magazines), naval (hulls, salvo, damage, mines), space (SGP4, passes, imagery, GNSS) |
+| `bgws-ops` | comms nets, drones and counter-drone, EW, PNT, logistics (min-cost flow), maintenance, medical, C2 and orders, cyber, aggregated combat |
+| `bgws-sim` | the ECS world, the multi-rate clock and event queue, the land loop, decisions, views, and one module per joint domain (`domains/`) |
+| `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
+| `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
+| `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
+| `apps/server` | `bgws-server`: the game on its own thread, the map viewer over a WebSocket |
+| `web/viewer` | the viewer page: MapLibre + deck.gl when online, a plain canvas offline |
+
+## Rules the code keeps (plan §2)
+
+- Deciders never read truth: they get a `SideView` or a question's words.
+- Every number is a declared figure with unit, range, source and confidence
+  (`bgws figures`); tests fail on undeclared or unused figures.
+- The core is sans-IO: `Sim::advance` stops at decision points and takes
+  answers; the host does the network.
+- Deterministic for a seed, build and machine: keyed streams, ordered
+  iteration, simultaneous fire within a tick; tests compare fingerprints across
+  seeds and across 1 and 4 threads. Game records replay exactly.
+
+## Where it stands against the roadmap (§18)
+
+| Phase | State |
+|---|---|
+| 0 Spike | Workspace, core, ECS, terrain, CPU/GPU LOS twins. The desktop shell is the browser server (see below). |
+| 1 Land tactical | Done: movement on trafficability with cost-raster routes, EO/IR sensing, tracks, direct fire, people, templates, rules decider, v3 converter, CLI. MBT Ph and attack-halt vignettes in band. |
+| 2 Deciders | Done: Jev, Claude, local and recorded deciders, batching, caching, timeouts, fallbacks, cost logging, exact replay. |
+| 3 Fires, engineers, sustainment | Done in the sim: calls for fire, adjust, Carleton lethality, counter-battery radar, displacement, minefields and breaching, digging in, stores. Breach time and counter-battery survival in band. |
+| 4 C2 and comms | Done: nets with link budgets, PACE, HQ COPs and staff queues, planning time, CCIRs, succession, orders over the nets. |
+| 5 Drones, EW, PNT | Done: drone flights and link dependence, the FPV strike chain, counter-drone, jammers, ESM/DF, GNSS and INS. FPV and precision-under-jamming in band; detect-to-strike just outside (backlog). |
+| 6 Air and air defence | Done: aircraft on tasks, sorties, munitions in flight, radar, kill chains and WTA, airspace. Shahed raid and sortie rates in band. |
+| 7 Logistics, medical, aggregation | Logistics, maintenance and medical done in the sim (culmination test, evacuation delays in band). Aggregation: see `domains/lod`. |
+| 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
+| 9 Space, cyber, kill web | Satellites and imagery, GNSS and satcom helpers, scripted space events, cyber access campaigns. |
+| 10 People and tools | HQ seats for a person (server), AAR data in the event log, inspectors via the viewer; the full React screens are not yet ported. |
+| 11 Calibration | The vignette suite, sensitivity and the research backlog run; the campaign itself is ongoing. |
+
+### Calibration backlog
+
+- **Detect-to-strike [P2]:** the median is about 5.3 minutes with every domain
+  in play, just outside the 2–5 minute band.
+- **Lethality:** meeting engagements in open ground end within a minute or two.
+  Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
+  fire are worth checking against playtests.
+- **Mostly unsourced figures:** most figures are `[default]`.
+  `bgws sensitivity <vignette>` ranks which ones matter.
+
+### Known gaps
+
+- **No Tauri desktop shell:** this environment has no WebKitGTK. The host runs
+  in-process in `bgws-server` and the viewer is a web page.
+- **TypeScript types for the UI** (`ts-rs`) are not generated yet.
+- **The React screens** from the TypeScript build are not wired to the Rust host
+  yet.
+- **Event logs** are JSONL; DuckDB is not used, because it needs a C++ build.
+- **Missile and air-defence models** work at the engagement level: kinematic
+  flights, per-shot kill probabilities and kill chains. They do not model
+  guidance laws or seekers.
+- **Drones:** drones in flight are records in the drones module, not ECS
+  entities, so the air-defence module does not engage them. Counter-drone
+  handles them instead.
+
+## Tests
+
+```sh
+cargo test --workspace          # unit, property, golden, determinism, vignette and integration tests
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p bgws-gpu --features gpu   # GPU twin tests (skip without an adapter)
+```
