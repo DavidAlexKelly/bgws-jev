@@ -8,8 +8,10 @@
 //! metres to kilometres over a theatre. The converter therefore recovers
 //! the authored metres by inverting that projection about the origin, and
 //! places them exactly on WGS84 through an ENU tangent frame at the origin
-//! (`bgws_core::EnuFrame`), at the stated height (0 on land and sea,
-//! `altM` for aircraft, negative for submarines). The origin is the TS
+//! (`bgws_core::EnuFrame`): east and north are kept exactly in that frame,
+//! and the up component is solved so the point sits at its stated height
+//! above the ellipsoid (0 on land and sea, `altM` for aircraft, negative for
+//! submarines). The origin is the TS
 //! `DEFAULT_ORIGIN` (54.2° N, 18.6° E), which every TS preset and force list
 //! used, unless the file's positions are clearly elsewhere — then their
 //! centroid — or the caller names one. `Placement::KeepLatLon` keeps the v3
@@ -100,8 +102,20 @@ impl Placer {
         match self.placement {
             Placement::KeepLatLon => Geodetic::new(p.lat, p.lng, h),
             Placement::AuthoredMetres => {
+                // Keep east/north exactly in the origin's frame and find the
+                // up component that puts the point at height `h` (Newton steps
+                // on h(u), whose slope is ~1 at these ranges).
                 let (e, n) = ts_offset_of(self.origin, p);
-                let mut g = self.frame.enu_to_geodetic(Enu::new(e, n, 0.0));
+                let mut u = h - (e * e + n * n) / (2.0 * bgws_core::geo::EARTH_RADIUS);
+                let mut g = self.frame.enu_to_geodetic(Enu::new(e, n, u));
+                for _ in 0..8 {
+                    let err = h - g.h;
+                    if err.abs() < 1e-6 {
+                        break;
+                    }
+                    u += err;
+                    g = self.frame.enu_to_geodetic(Enu::new(e, n, u));
+                }
                 g.h = h;
                 g
             }
@@ -201,7 +215,7 @@ pub fn convert_v3(v3: &ScenarioV3, catalogue: Option<&Catalogue>, opts: &Convert
             label: f.label.clone(),
             side: side_of(&f.side, &field)?,
             platform: f.platform.clone(),
-            count: f.platform_count.round().max(1.0) as u32,
+            count: f.platform_count.as_f64().unwrap_or(1.0).round().max(1.0) as u32,
             quality,
             position: placer.place(f.position, 0.0),
             heading_deg: None,
@@ -392,8 +406,9 @@ mod tests {
         for (e, n) in [(0.0, 3200.0), (-25_000.0, 90_000.0), (150_000.0, -10_000.0), (0.0, -220_000.0)] {
             let g = placer.place(ts_latlng_of(TS_DEFAULT_ORIGIN, e, n), 0.0);
             let back = frame.geodetic_to_enu(g);
-            // Horizontal metres preserved to well under a metre (the up component is the curvature drop).
-            assert!((back.e - e).abs() < 0.5 && (back.n - n).abs() < 0.5, "{e},{n}: {back:?}");
+            // Authored metres kept exactly in the origin's frame, at height 0.
+            assert!((back.e - e).abs() < 1e-3 && (back.n - n).abs() < 1e-3, "{e},{n}: {back:?}");
+            assert!(g.h.abs() < 1e-9);
         }
         // Small boards: the flat projection and the exact frame agree to a metre.
         let flat = ts_latlng_of(TS_DEFAULT_ORIGIN, 500.0, 3000.0);

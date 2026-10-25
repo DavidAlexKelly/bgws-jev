@@ -252,7 +252,7 @@ pub fn base64_encode(bytes: &[u8]) -> String {
 /// Decode standard base64 with padding; `None` if malformed.
 pub fn base64_decode(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
-    if b.len() % 4 != 0 {
+    if !b.len().is_multiple_of(4) {
         return None;
     }
     let val = |c: u8| -> Option<u32> { B64.iter().position(|&x| x == c).map(|p| p as u32) };

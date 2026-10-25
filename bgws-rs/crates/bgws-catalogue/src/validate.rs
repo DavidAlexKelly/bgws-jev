@@ -135,7 +135,7 @@ pub fn platform_problems(c: &Catalogue, r: &Platform) -> Vec<CatalogueError> {
     if a.ke.side > a.ke.front + 1e-9 || a.ke.rear > a.ke.front + 1e-9 {
         out.push(inconsistent(id, "side or rear KE armour thicker than the front"));
     }
-    if r.signatures.rcs.get("x").is_none() {
+    if !r.signatures.rcs.contains_key("x") {
         out.push(inconsistent(id, "signatures.rcs needs an X-band entry"));
     }
     for w in r.signatures.acoustic.water_db.windows(2).chain(r.signatures.acoustic.air_dba.windows(2)) {

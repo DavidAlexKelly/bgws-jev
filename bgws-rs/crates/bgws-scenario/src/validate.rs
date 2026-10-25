@@ -222,7 +222,7 @@ pub fn validate(s: &ScenarioV4, catalogue: &Catalogue) -> Vec<ScenarioError> {
         }
     }
     for (i, e) in s.events.iter().enumerate() {
-        if !(e.at >= 0.0) {
+        if e.at.is_nan() || e.at < 0.0 {
             out.push(invalid(format!("events[{i}].at"), "must be at or after the start"));
         }
     }

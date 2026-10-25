@@ -61,7 +61,8 @@ pub struct PlacedElement {
     pub label: String,
     pub side: String,
     pub platform: String,
-    pub platform_count: f64,
+    /// Kept as written (an integer stays an integer on a round trip).
+    pub platform_count: serde_json::Number,
     pub troop_quality: String,
     pub position: LatLng,
     #[serde(default, skip_serializing_if = "Option::is_none")]

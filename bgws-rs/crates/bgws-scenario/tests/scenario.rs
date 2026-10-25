@@ -129,7 +129,7 @@ fn validation_catches_broken_scenarios() {
     s.start_utc = "tomorrow".into();
     s.scope.set(ScopeDomain::Land, DomainMode::Off);
     let errs = validate(&s, &cat);
-    let has = |f: &dyn Fn(&ScenarioError) -> bool| errs.iter().any(|e| f(e));
+    let has = |f: &dyn Fn(&ScenarioError) -> bool| errs.iter().any(f);
     assert!(has(&|e| matches!(e, ScenarioError::DuplicateId { .. })));
     assert!(has(&|e| matches!(e, ScenarioError::UnknownPlatform { platform, .. } if platform == "generic/nothing")));
     assert!(has(&|e| matches!(e, ScenarioError::OutOfTheatre { .. })));
@@ -256,4 +256,12 @@ proptest! {
             let _ = s.to_json_pretty();
         }
     }
+}
+
+#[test]
+fn figures_register() {
+    // Formats only: no model figures of its own, and the catalogue's register cleanly beside them.
+    let mut all = bgws_scenario::figures();
+    all.extend(bgws_catalogue::figures());
+    assert!(bgws_core::Figures::from_list(all).is_ok());
 }

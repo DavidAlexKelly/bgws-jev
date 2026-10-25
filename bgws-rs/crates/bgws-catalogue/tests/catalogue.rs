@@ -179,7 +179,7 @@ fn validation_catches_broken_records() {
         "stores": {"ammo": {"nothing": 4}}}]}"#;
     let c = Catalogue::from_sources(&sources_plus(extra)).expect("loads; problems come from validate");
     let errs = c.validate();
-    let has = |f: &dyn Fn(&CatalogueError) -> bool| errs.iter().any(|e| f(e));
+    let has = |f: &dyn Fn(&CatalogueError) -> bool| errs.iter().any(f);
     assert!(has(&|e| matches!(e, CatalogueError::UnknownMunition { munition, .. } if munition == "noSuchRound")));
     assert!(has(&|e| matches!(e, CatalogueError::UnknownBand { band, .. } if band == "zz")));
     assert!(has(&|e| matches!(e, CatalogueError::OutOfRange { field, .. } if field == "mover.ceilingM")));
