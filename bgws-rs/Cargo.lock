@@ -336,24 +336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bgws-domains"
-version = "0.1.0"
-dependencies = [
- "approx",
- "bgws-core",
- "pathfinding",
- "petgraph",
- "proptest",
- "rand 0.8.8",
- "rand_chacha",
- "rand_distr",
- "serde",
- "serde_json",
- "sgp4",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "bgws-env"
 version = "0.1.0"
 dependencies = [
@@ -640,16 +622,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "rand_core 0.10.1",
-]
-
-[[package]]
-name = "chrono"
-version = "0.4.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
-dependencies = [
- "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -1835,6 +1807,8 @@ checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
  "fixedbitset 0.4.2",
  "indexmap",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -2352,17 +2326,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "sgp4"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9467b9a7be8485ed8be0f336d399c8f32c0fcd60686e7dd2ed3dab75c9a73eb3"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
 ]
 
 [[package]]
