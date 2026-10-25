@@ -13,8 +13,8 @@ import { hasRecord, recordFor } from "../catalogue";
 import type { CatalogueRecord } from "../catalogue/schema";
 import type { RtConfig, RtState } from "../engine/types";
 import { archetypeFor } from "../model/archetypes";
-import { DOMAINS, type Scope } from "../scope";
-import { DEFAULT_ENVIRONMENT } from "./environment";
+import { DOMAINS, changesEnvironment, type Scope } from "../scope";
+import { DEFAULT_ENVIRONMENT, scopeEnvironment } from "./environment";
 import type {
   ControlMeasure,
   CyberAccess,
@@ -103,6 +103,7 @@ export interface WorldSetup {
 export function needsWorld(scope: Scope | undefined, setup?: Partial<WorldSetup>): boolean {
   if (setup && ((setup.entities?.length ?? 0) > 0 || (setup.obstacles?.length ?? 0) > 0 || (setup.hqs?.length ?? 0) > 0 || (setup.victory?.length ?? 0) > 0 || (setup.events?.length ?? 0) > 0 || setup.environment)) return true;
   if (!scope) return false;
+  if (changesEnvironment(scope)) return true;
   return DOMAINS.some((d) => d !== "land" && scope.domains[d] !== "off");
 }
 
@@ -253,7 +254,8 @@ export function onCreateWorld(order: number, hook: CreateHook): void {
 
 /** The world for a game about to start. */
 export function createWorld(state: RtState, config: RtConfig, setup: WorldSetup): WorldState {
-  const world = emptyWorld(setup.environment);
+  // The scope's time dimension sets the light and weather; the scenario's own environment, if any, wins.
+  const world = emptyWorld({ ...scopeEnvironment(config.scope), ...setup.environment });
   for (const fe of Object.values(state.game.forceElements)) {
     const platform = setup.platforms[fe.id] ?? "";
     world.land[fe.id] = landComponents(archetypeFor(platform, { commandRating: fe.commandRating }));

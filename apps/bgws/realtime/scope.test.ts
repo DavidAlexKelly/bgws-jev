@@ -69,3 +69,30 @@ describe("scope in the engine's config", () => {
     expect(() => configFromSpec(spec({ scope: { ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } } }))).toThrow(/cannot be played yet/);
   });
 });
+
+describe("the time dimension (§5.1)", () => {
+  it("defaults to 10:00 and clear, and runs a game of days faster", async () => {
+    const { timeOf, scopeFor, changesEnvironment, scopeErrors } = await import("./scope");
+    expect(timeOf(scopeFor("skirmish"))).toMatchObject({ startHour: 10, weather: "clear", skipQuiet: false, maxCompression: 60 });
+    expect(timeOf(scopeFor("sustainedOffensive")).maxCompression).toBe(600);
+    expect(changesEnvironment(scopeFor("skirmish"))).toBe(false);
+    const night = { ...scopeFor("skirmish"), time: { startHour: 2, weather: "fog" as const, maxCompression: 60, skipQuiet: true } };
+    expect(changesEnvironment(night)).toBe(true);
+    expect(scopeErrors(night)).toEqual([]);
+    expect(scopeErrors({ ...night, time: { startHour: 30, weather: "hail", maxCompression: 0, skipQuiet: "yes" } })).toHaveLength(4);
+  });
+
+  it("sets the world's light and weather, so a land-only night game gets a world", async () => {
+    const { scopeFor, effectiveScope } = await import("./scope");
+    const { needsWorld, emptyWorld } = await import("./world/create");
+    const { scopeEnvironment } = await import("./world/environment");
+    const landOnly = { ...scopeFor("skirmish"), domains: Object.fromEntries(Object.keys(scopeFor("skirmish").domains).map((d) => [d, d === "land" ? "simulated" : "off"])) as ReturnType<typeof scopeFor>["domains"] };
+    const night = { ...landOnly, time: { startHour: 2, weather: "fog" as const, maxCompression: 60, skipQuiet: false } };
+    expect(needsWorld(night)).toBe(true);
+    expect(needsWorld(landOnly)).toBe(false);
+    const env = emptyWorld(scopeEnvironment(night)).env;
+    expect(env.startHour).toBe(2);
+    expect(env.visibilityKm).toBeLessThan(1);
+    expect(effectiveScope({ ...night, echelons: { lowest: "brigade", highest: "company" } }).errors.some((e) => /lowest command level/.test(e))).toBe(true);
+  });
+});

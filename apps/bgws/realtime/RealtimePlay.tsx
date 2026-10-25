@@ -141,6 +141,8 @@ import {
   type Scope,
   type ScenarioType,
 } from "./scope";
+import { DOMAIN_MODES, ECHELONS, timeOf, WEATHERS, type DomainMode, type Echelon, type ScopeTime, type Weather } from "./scope";
+import { clockSpeed, quietPeriod } from "./world/quiet";
 
 type Phase = "setup" | "ordered" | "running";
 type Viewpoint = Side | "both";
@@ -151,7 +153,7 @@ const ORDER_SOURCE = "rt-orders";
 const LAST_KNOWN_SOURCE = "rt-last-known";
 /** The selected unit's own picture: where it believes each enemy is, and how sure. */
 const PICTURE_SOURCE = "rt-picture";
-const SPEEDS = [1, 5, 10, 30, 60];
+const SPEEDS = [1, 5, 10, 30, 60, 300, 600];
 /** How long a decision's tag stays beside its counter, in simulated seconds. */
 const DECISION_TAG_S = 40;
 const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
@@ -682,6 +684,7 @@ export default function RealtimePlay() {
   const [timeLimitMin, setTimeLimitMin] = useState(90);
   /** What the game covers (scope.ts). Its duration is `timeLimitMin`, set on the victory step. */
   const [scope, setScope] = useState<Scope>(() => scopeFor("skirmish"));
+  const clockTime = useMemo(() => timeOf(scope), [scope]);
   /** The scenario's world (entities, HQs, obstacles, sea, events…), from a loaded file or preset. */
   const [scenarioWorld, setScenarioWorld] = useState<ScenarioWorld | undefined>(undefined);
   /** Which world layers the map draws (worldOverlays.ts), and whether the world panel is open. */
@@ -693,6 +696,9 @@ export default function RealtimePlay() {
   /** The decision line opened in the feed, to show its walked path (DFG §5.3). */
   const [openDecision, setOpenDecision] = useState<string | null>(null);
   const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
+  /** Adjust any part of the scope after choosing its type (§5.1); the type's victory conditions stay. */
+  const editScope = (patch: Partial<Scope>) => setScope((was) => ({ ...was, ...patch }));
+  const editTime = (patch: Partial<ScopeTime>) => setScope((was) => ({ ...was, time: { ...timeOf(was), ...patch } }));
   const chooseScenarioType = (type: ScenarioType) => {
     const next = scopeFor(type);
     setScope(next);
@@ -1209,7 +1215,8 @@ export default function RealtimePlay() {
     const loop = (now: number) => {
       const runner = runnerRef.current;
       if (!runner) return;
-      owed += ((now - last) / 1000) * speed;
+      // The scope's time dimension: no faster than it allows, and faster still while quiet if it skips quiet periods.
+      owed += ((now - last) / 1000) * clockSpeed(runner.state, speed, clockTime);
       last = now;
       if (!advancing && owed >= 1) {
         const step = Math.min(Math.floor(owed), 120);
@@ -1236,7 +1243,7 @@ export default function RealtimePlay() {
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed]);
+  }, [playing, speed, clockTime]);
 
   // ── The map ───────────────────────────────────────────────────────────────
 
@@ -1778,13 +1785,24 @@ export default function RealtimePlay() {
                   <div className="su-review-row">
                     <span className="su-review-label">Area</span>
                     <span className="su-review-value">
-                      {scopeCheck.scope.area.widthKm} × {scopeCheck.scope.area.depthKm} km
+                      <input type="number" min={1} max={1500} value={scope.area.widthKm} onChange={(e) => editScope({ area: { ...scope.area, widthKm: Math.max(1, Number(e.target.value) || 1) } })} style={{ width: 64 }} /> ×{" "}
+                      <input type="number" min={1} max={1500} value={scope.area.depthKm} onChange={(e) => editScope({ area: { ...scope.area, depthKm: Math.max(1, Number(e.target.value) || 1) } })} style={{ width: 64 }} /> km
                     </span>
                   </div>
                   <div className="su-review-row">
                     <span className="su-review-label">Command levels</span>
                     <span className="su-review-value">
-                      {scope.echelons.lowest} to {scope.echelons.highest}
+                      <select value={scope.echelons.lowest} onChange={(e) => editScope({ echelons: { ...scope.echelons, lowest: e.target.value as Echelon } })}>
+                        {ECHELONS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>{" "}
+                      to{" "}
+                      <select value={scope.echelons.highest} onChange={(e) => editScope({ echelons: { ...scope.echelons, highest: e.target.value as Echelon } })}>
+                        {ECHELONS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
                     </span>
                   </div>
                   <div className="su-review-row">
@@ -1794,9 +1812,43 @@ export default function RealtimePlay() {
                   {DOMAINS.map((domain) => (
                     <div className="su-review-row" key={domain}>
                       <span className="su-review-label">{DOMAIN_LABEL[domain]}</span>
-                      <span className="su-review-value">{scopeCheck.scope.domains[domain]}</span>
+                      <span className="su-review-value">
+                        <select value={scope.domains[domain]} onChange={(e) => editScope({ domains: { ...scope.domains, [domain]: e.target.value as DomainMode } })}>
+                          {DOMAIN_MODES.map((m) => (
+                            <option key={m}>{m}</option>
+                          ))}
+                        </select>
+                      </span>
                     </div>
                   ))}
+                  <div className="su-review-row">
+                    <span className="su-review-label">Starts at</span>
+                    <span className="su-review-value">
+                      <input type="number" min={0} max={23.99} step={0.5} value={clockTime.startHour} onChange={(e) => editTime({ startHour: Math.min(23.99, Math.max(0, Number(e.target.value) || 0)) })} style={{ width: 56 }} />
+                      :00,{" "}
+                      <select value={clockTime.weather} onChange={(e) => editTime({ weather: e.target.value as Weather })}>
+                        {WEATHERS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                    </span>
+                  </div>
+                  <div className="su-review-row">
+                    <span className="su-review-label">Clock</span>
+                    <span className="su-review-value">
+                      up to ×
+                      <select value={clockTime.maxCompression} onChange={(e) => editTime({ maxCompression: Number(e.target.value) })}>
+                        {SPEEDS.map((x) => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>{" "}
+                      <label>
+                        <input type="checkbox" checked={clockTime.skipQuiet} onChange={(e) => editTime({ skipQuiet: e.target.checked })} /> skip quiet periods
+                      </label>
+                    </span>
+                  </div>
                 </div>
                 {scopeCheck.notes.length > 0 && (
                   <Callout tone="info">
@@ -2285,14 +2337,15 @@ export default function RealtimePlay() {
                   </div>
                 )}
                 <div style={row}>
-                  {SPEEDS.map((x) => (
+                  {SPEEDS.filter((x) => x <= clockTime.maxCompression).map((x) => (
                     <button key={x} onClick={() => setSpeed(x)} style={{ ...chip, flex: 1, borderColor: speed === x ? "#e8c547" : "transparent", color: speed === x ? "#e8c547" : "#8a91a8" }}>
                       &times;{x}
                     </button>
                   ))}
                 </div>
                 <div style={{ ...subtle, lineHeight: 1.5 }}>
-                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
+                  {clock(state?.time ?? 0)} simulated
+                  {clockTime.skipQuiet && state && quietPeriod(state) ? ` · quiet: ×${clockTime.maxCompression}` : ""} &middot; {decisions.length} decisions ({byJev} by Jev
                   {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
                   {runner?.where === "worker" ? " · engine in a background thread" : ""}

@@ -8,6 +8,7 @@
 import type { SensorKind } from "../catalogue/schema";
 import { wfig } from "./figures";
 import type { Environment } from "./types";
+import { timeOf, type Scope, type Weather } from "../scope";
 
 export const DEFAULT_ENVIRONMENT: Environment = {
   startHour: 10,
@@ -18,6 +19,23 @@ export const DEFAULT_ENVIRONMENT: Environment = {
   windMs: 4,
   seaState: 2,
 };
+
+/** What each weather of the scope's time dimension (scope.ts) means for the world. Declared, not researched: in-band guesses. */
+export const WEATHER_ENVIRONMENT: Record<Weather, Partial<Environment>> = {
+  clear: {},
+  overcast: { visibilityKm: 12, cloudBaseM: 800, cloudCover: 0.9 },
+  rain: { visibilityKm: 5, cloudBaseM: 500, cloudCover: 1, precipitation: 0.6, windMs: 8, seaState: 3 },
+  fog: { visibilityKm: 0.4, cloudBaseM: 100, cloudCover: 1, windMs: 1 },
+  snow: { visibilityKm: 2, cloudBaseM: 600, cloudCover: 1, precipitation: 0.5, windMs: 6 },
+  storm: { visibilityKm: 3, cloudBaseM: 400, cloudCover: 1, precipitation: 0.9, windMs: 16, seaState: 6 },
+};
+
+/** The environment a scope's time dimension sets: its start hour and its weather. */
+export function scopeEnvironment(scope: Scope | undefined): Partial<Environment> {
+  if (!scope?.time) return {};
+  const t = timeOf(scope);
+  return { startHour: t.startHour, ...WEATHER_ENVIRONMENT[t.weather] };
+}
 
 /** Hour of the day (0–24) at sim time `time`. */
 export function hourAt(env: Environment, time: number): number {
