@@ -532,12 +532,16 @@ mod tests {
                 AdSystem::from_figures("gun5in", "5-inch", V3::ZERO, &f),
                 AdSystem::from_figures("gun", "CIWS", V3::ZERO, &f),
                 AdSystem::from_figures("fighter", "CAP1", V3::new(-15_000.0, 30_000.0, 6_000.0), &f),
-                AdSystem::from_figures("fighter", "CAP2", V3::new(15_000.0, 30_000.0, 6_000.0), &f),
                 AdSystem::from_figures("ewSoftKill", "EW", V3::ZERO, &f),
             ];
+            let cruise = Profile::from_figures(FlightClass::Cruise, &f);
             let raid: Vec<Threat> = (0..20)
-                .map(|i| Threat { id: i, class: ThreatClass::OneWayDrone, flight: Flight::new(owa.clone(), V3::new(-20_000.0 + 2_000.0 * i as f64, 150_000.0, 0.0), V3::ZERO, 45.0 * i as f64), cost: 2.0e4, value: 5.0e5 })
-                .collect();
+        .map(|i| {
+            // Drones and anti-ship cruise missiles, as in the Red Sea [R6.2].
+            let (class, prof, cost) = if i % 2 == 0 { (ThreatClass::OneWayDrone, owa.clone(), 2.0e4) } else { (ThreatClass::Cruise, cruise.clone(), 5.0e5) };
+            Threat { id: i, class, flight: Flight::new(prof, V3::new(-20_000.0 + 2_000.0 * i as f64, 150_000.0, 0.0), V3::ZERO, 45.0 * i as f64), cost, value: 5.0e5 }
+        })
+        .collect();
             let out = engage_raid(&mut sys, &raid, &chain, Assignment::Optimal, 1.0, &mut rng);
             missiles += out.shots_by_system["SM-2/6"] + out.shots_by_system["ESSM"];
             engaged += out.threats.iter().filter(|t| t.shots > 0).count();

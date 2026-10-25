@@ -534,12 +534,12 @@ pub fn figures() -> Vec<Figure> {
         ("mrsam", 1.0, 20.0, 1_500.0, 50_000.0, 1.0e6, 24.0, 2.0, 900.0, 1.0, &[("cruise", 0.8), ("aircraft", 0.8), ("seaSkimmer", 0.75), ("owa", 0.85), ("rocket", 0.5)], "ESSM/NASAMS class [P28]"),
         ("shorad", 2.0, 12.0, 500.0, 9_000.0, 1.5e5, 16.0, 2.0, 600.0, 1.0, &[("cruise", 0.7), ("aircraft", 0.6), ("seaSkimmer", 0.75), ("owa", 0.8), ("rocket", 0.4)], "RAM/Stinger-class launchers [P28]"),
         ("gun", 3.0, 10.0, 100.0, 2_000.0, 2.0e3, 60.0, 2.0, 1_000.0, 1.0, &[("owa", 0.35), ("cruise", 0.3), ("seaSkimmer", 0.35), ("rocket", 0.2)], "CIWS/AA gun burst [P28]"),
-        ("gun5in", 2.0, 20.0, 1_000.0, 15_000.0, 1.0e4, 600.0, 6.0, 800.0, 1.0, &[("owa", 0.3), ("cruise", 0.15), ("seaSkimmer", 0.1)], "5-inch naval gun against drones [R6.2: 160 rounds in the Red Sea]"),
+        ("gun5in", 2.0, 20.0, 1_000.0, 15_000.0, 1.0e4, 600.0, 6.0, 800.0, 1.0, &[("owa", 0.45), ("cruise", 0.15), ("seaSkimmer", 0.1)], "5-inch naval gun against drones [R6.2: 160 rounds in the Red Sea]"),
         ("mobileGun", 3.0, 3.0, 50.0, 1_500.0, 5.0e2, 40.0, 4.0, 1_000.0, 1.0, &[("owa", 0.3)], "truck-mounted gun team vs Shahed [P10]"),
         ("interceptorDrone", 2.0, 10.0, 300.0, 15_000.0, 5.0e3, 30.0, 8.0, 80.0, 1.0, &[("owa", 0.6)], "interceptor drone [P11: $1.4-16k]"),
         ("ewSoftKill", 4.0, 10.0, 0.0, 25_000.0, 0.0, 1000.0, 30.0, 0.0, 1.0, &[("owa", 0.2), ("cruise", 0.1)], "GNSS/datalink jamming of drones and cruise missiles"),
         ("fighter", 0.0, 8_000.0, 1_000.0, 80_000.0, 4.0e5, 6.0, 30.0, 1_000.0, 1.0, &[("owa", 0.85), ("cruise", 0.8), ("aircraft", 0.6)], "fighter with AAMs and gun on CAP [R6.2]"),
-        ("bmd", 0.0, 20.0, 5_000.0, 100_000.0, 4.2e6, 16.0, 3.0, 1_500.0, 2.0, &[("ballistic", 0.65)], "BMD battery, shoot-shoot-look-shoot [P20, P29]"),
+        ("bmd", 0.0, 20.0, 5_000.0, 100_000.0, 4.2e6, 16.0, 3.0, 1_500.0, 2.0, &[("ballistic", 0.6)], "BMD battery, shoot-shoot-look-shoot [P20, P29]"),
     ];
     for (k, layer, h, min, max, cost, rounds, cycle, speed, salvo, pks, note) in rows {
         let p = |n: &str| format!("ad.sys.{k}.{n}");

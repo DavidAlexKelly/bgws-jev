@@ -96,8 +96,9 @@ pub fn bmd(f: &Figures, seed: Seed) -> Value {
     let chain = KillChain::from_figures(f);
     let prof = Profile::from_figures(FlightClass::Ballistic, f);
     let mut sys = vec![AdSystem::from_figures("bmd", "bmd1", V3::ZERO, f), AdSystem::from_figures("bmd", "bmd2", V3::new(3_000.0, 0.0, 0.0), f)];
-    let raid: Vec<Threat> = (0..6)
-        .map(|i| Threat { id: i, class: ThreatClass::Ballistic, flight: Flight::new(prof.clone(), V3::new(300_000.0, 20_000.0 * i as f64, 0.0), V3::new(0.0, 500.0, 0.0), 30.0 * i as f64), cost: 3.0e6, value: 1.0e8 })
+    // A salvo of sixteen, 10 s apart: magazine depth and engagement time bind.
+    let raid: Vec<Threat> = (0..16)
+        .map(|i| Threat { id: i, class: ThreatClass::Ballistic, flight: Flight::new(prof.clone(), V3::new(300_000.0, 10_000.0 * i as f64, 0.0), V3::new(0.0, 500.0, 0.0), 10.0 * i as f64), cost: 3.0e6, value: 1.0e8 })
         .collect();
     let out = engage_raid(&mut sys, &raid, &chain, Assignment::Optimal, 1.0, &mut rng(seed, "v.bmd"));
     Some(out.threats.iter().filter(|t| t.killed_by.is_some()).count() as f64 / out.threats.len() as f64)
@@ -113,11 +114,15 @@ pub fn red_sea(f: &Figures, seed: Seed) -> Value {
         AdSystem::from_figures("gun5in", "5-inch", V3::ZERO, f),
         AdSystem::from_figures("gun", "CIWS", V3::ZERO, f),
         AdSystem::from_figures("fighter", "CAP1", V3::new(-15_000.0, 30_000.0, 6_000.0), f),
-        AdSystem::from_figures("fighter", "CAP2", V3::new(15_000.0, 30_000.0, 6_000.0), f),
         AdSystem::from_figures("ewSoftKill", "EW", V3::ZERO, f),
     ];
+    let cruise = Profile::from_figures(FlightClass::Cruise, f);
     let raid: Vec<Threat> = (0..20)
-        .map(|i| Threat { id: i, class: ThreatClass::OneWayDrone, flight: Flight::new(owa.clone(), V3::new(-20_000.0 + 2_000.0 * i as f64, 150_000.0, 0.0), V3::ZERO, 45.0 * i as f64), cost: 2.0e4, value: 5.0e5 })
+        .map(|i| {
+            // Drones and anti-ship cruise missiles, as in the Red Sea [R6.2].
+            let (class, prof, cost) = if i % 2 == 0 { (ThreatClass::OneWayDrone, owa.clone(), 2.0e4) } else { (ThreatClass::Cruise, cruise.clone(), 5.0e5) };
+            Threat { id: i, class, flight: Flight::new(prof, V3::new(-20_000.0 + 2_000.0 * i as f64, 150_000.0, 0.0), V3::ZERO, 45.0 * i as f64), cost, value: 5.0e5 }
+        })
         .collect();
     let out = engage_raid(&mut sys, &raid, &chain, Assignment::Optimal, 1.0, &mut rng(seed, "v.redsea"));
     let engaged = out.threats.iter().filter(|t| t.shots > 0).count();
