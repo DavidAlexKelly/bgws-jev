@@ -548,7 +548,7 @@ mod tests {
         // NEES must sit inside the chi-squared bounds at every checked step.
         let runs = 60;
         let steps = 25;
-        let dt = 2.0;
+        let dt: f64 = 2.0;
         let sigma = 10.0;
         let mut rng = ChaCha8Rng::seed_from_u64(1);
         let mut nees_sum = vec![0.0; steps];

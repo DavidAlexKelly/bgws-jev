@@ -215,7 +215,7 @@ impl AuditLog {
         }
         let mut best: Option<(Option<EntityId>, u32)> = None;
         for (k, n) in counts {
-            if best.map_or(true, |(_, b)| n > b) {
+            if best.is_none_or(|(_, b)| n > b) {
                 best = Some((k, n));
             }
         }

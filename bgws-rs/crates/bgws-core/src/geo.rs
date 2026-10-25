@@ -107,6 +107,7 @@ impl Ecef {
         ((self.x - o.x).powi(2) + (self.y - o.y).powi(2) + (self.z - o.z).powi(2)).sqrt()
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, d: [f64; 3]) -> Ecef {
         Ecef { x: self.x + d[0], y: self.y + d[1], z: self.z + d[2] }
     }
@@ -129,9 +130,11 @@ impl Enu {
     pub fn elevation(self) -> f64 {
         self.u.atan2(self.horizontal())
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, o: Enu) -> Enu {
         Enu::new(self.e - o.e, self.n - o.n, self.u - o.u)
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, o: Enu) -> Enu {
         Enu::new(self.e + o.e, self.n + o.n, self.u + o.u)
     }
