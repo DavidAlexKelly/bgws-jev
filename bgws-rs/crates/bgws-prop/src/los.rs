@@ -20,18 +20,30 @@ use rand::Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
-/// Terrain converted once for the kernel layer, with its land cover.
+/// Convert a terrain's elevation layer for the kernel layer (one copy).
+pub fn height_grid(terrain: &Terrain) -> HeightGrid {
+    let s = terrain.spec;
+    HeightGrid { width: s.width, height: s.height, cell: s.cell, origin_x: s.origin_e, origin_y: s.origin_n, heights: terrain.elevation.data.clone() }
+}
+
+/// Terrain for the kernel layer, with its land cover. The height grid is
+/// shared, so a caller can build it once and reuse it every tick.
 #[derive(Clone, Debug)]
 pub struct TerrainGrid<'a> {
     pub terrain: &'a Terrain,
-    pub heights: HeightGrid,
+    pub heights: Arc<HeightGrid>,
 }
 
 impl<'a> TerrainGrid<'a> {
+    /// Build the height grid from the terrain (copies the elevation once).
     pub fn new(terrain: &'a Terrain) -> Self {
-        let s = terrain.spec;
-        let heights = HeightGrid { width: s.width, height: s.height, cell: s.cell, origin_x: s.origin_e, origin_y: s.origin_n, heights: terrain.elevation.data.clone() };
+        Self { terrain, heights: Arc::new(height_grid(terrain)) }
+    }
+
+    /// Reuse an already-built height grid (it must match `terrain`).
+    pub fn with_heights(terrain: &'a Terrain, heights: Arc<HeightGrid>) -> Self {
         Self { terrain, heights }
     }
 }
@@ -165,6 +177,8 @@ mod tests {
         assert!(optical_los(&g, &edge, &p).p_visible > 0.9);
         // Batched through the CPU kernels matches the single query.
         let b = optical_los_batch(&CpuKernels, &g, &[low, high, edge], &p);
+        let shared = TerrainGrid::with_heights(&t, g.heights.clone());
+        assert_eq!(optical_los(&shared, &low, &p), r);
         assert_eq!(b[0], r);
         // The keyed draw is reproducible.
         let s = Seed(9);
