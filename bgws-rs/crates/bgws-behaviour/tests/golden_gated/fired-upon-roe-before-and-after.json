@@ -1,0 +1,52 @@
+{
+  "scene": {
+    "name": "fired-upon-roe-before-and-after",
+    "candidates": [
+      "core/default"
+    ],
+    "trigger": "D4",
+    "facts": {}
+  },
+  "template": "core/default",
+  "lineage": [
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D4",
+    "title": "Trigger met",
+    "question": "The moment it was waiting for has come. Fire now?",
+    "doctrine": [],
+    "options": [
+      {
+        "id": "letPass",
+        "action": "land.letPass",
+        "bias": 0
+      }
+    ],
+    "fallback": "letPass",
+    "dropped": [
+      {
+        "id": "fire",
+        "action": "land.fireNow",
+        "why": "gate:roe"
+      },
+      {
+        "id": "closer",
+        "action": "land.waitCloser",
+        "why": "gate:roe"
+      }
+    ],
+    "path": [
+      "D4"
+    ]
+  },
+  "gates": {
+    "roe": "ifFiredUpon",
+    "fired_upon": false,
+    "weapon_release": "free",
+    "target_identified": false,
+    "emcon": "unrestricted",
+    "cohesion": "steady"
+  }
+}

@@ -78,7 +78,9 @@ impl Interval {
 
 /// Standard normal quantile.
 pub fn z_quantile(p: f64) -> f64 {
-    Normal::new(0.0, 1.0).map(|n| n.inverse_cdf(p)).unwrap_or(f64::NAN)
+    Normal::new(0.0, 1.0)
+        .map(|n| n.inverse_cdf(p))
+        .unwrap_or(f64::NAN)
 }
 
 /// The t confidence interval of the mean: x̄ ± t(1−α/2, n−1)·s/√n.
@@ -90,9 +92,15 @@ pub fn mean_ci_t(values: &[f64], level: f64) -> Option<Interval> {
     }
     let m = mean(values);
     let s = std_dev(values);
-    let t = StudentsT::new(0.0, 1.0, (n - 1) as f64).ok()?.inverse_cdf(0.5 + level / 2.0);
+    let t = StudentsT::new(0.0, 1.0, (n - 1) as f64)
+        .ok()?
+        .inverse_cdf(0.5 + level / 2.0);
     let half = t * s / (n as f64).sqrt();
-    Some(Interval { lo: m - half, hi: m + half, level })
+    Some(Interval {
+        lo: m - half,
+        hi: m + half,
+        level,
+    })
 }
 
 /// The Wilson score interval for `successes` out of `n` trials. Well behaved
@@ -108,7 +116,18 @@ pub fn wilson(successes: u64, n: u64, level: f64) -> Option<Interval> {
     let denom = 1.0 + z2 / nf;
     let centre = (p + z2 / (2.0 * nf)) / denom;
     let half = z / denom * (p * (1.0 - p) / nf + z2 / (4.0 * nf * nf)).sqrt();
-    Some(Interval { lo: (centre - half).max(0.0), hi: (centre + half).min(1.0), level })
+    // At the edges the interval ends exactly at 0 or 1.
+    let lo = if successes == 0 {
+        0.0
+    } else {
+        (centre - half).max(0.0)
+    };
+    let hi = if successes >= n {
+        1.0
+    } else {
+        (centre + half).min(1.0)
+    };
+    Some(Interval { lo, hi, level })
 }
 
 /// A distribution-free confidence interval for the `p` quantile of a sorted
@@ -145,7 +164,16 @@ pub fn quantile_ci_sorted(sorted: &[f64], p: f64, level: f64) -> Option<Interval
             u += 1;
         }
     }
-    Some(Interval { lo: sorted[l - 1], hi: sorted[u - 1], level })
+    Some(Interval {
+        lo: sorted[l - 1],
+        hi: sorted[u - 1],
+        level,
+    })
+}
+
+/// Serde helper: read `null` (how JSON writes NaN) back as NaN.
+pub(crate) fn nan_from_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    Ok(Option::<f64>::deserialize(d)?.unwrap_or(f64::NAN))
 }
 
 /// The descriptive summary of one metric over a batch: the TypeScript
@@ -157,16 +185,27 @@ pub struct Summary {
     pub n: usize,
     /// Replicates that produced nothing to measure.
     pub missing: usize,
+    #[serde(deserialize_with = "nan_from_null")]
     pub mean: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub sd: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub min: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p05: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p10: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p25: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p50: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p75: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p90: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub p95: f64,
+    #[serde(deserialize_with = "nan_from_null")]
     pub max: f64,
     /// t interval of the mean, when n ≥ 2.
     pub mean_ci: Option<Interval>,
@@ -234,7 +273,11 @@ impl Histogram {
             let i = (((x - lo) / width).floor() as usize).min(bins - 1);
             counts[i] += 1;
         }
-        Histogram { edges, counts, outside }
+        Histogram {
+            edges,
+            counts,
+            outside,
+        }
     }
 
     pub fn total(&self) -> u64 {
@@ -287,10 +330,10 @@ mod tests {
 
     #[test]
     fn wilson_known_values() {
-        // 273/322 (P20): Wilson 95% ≈ [0.8048, 0.8840].
+        // 273/322 (P20): Wilson 95% = [0.80451, 0.88294].
         let w = wilson(273, 322, 0.95).unwrap();
-        assert_relative_eq!(w.lo, 0.8048, epsilon = 1e-3);
-        assert_relative_eq!(w.hi, 0.8840, epsilon = 1e-3);
+        assert_relative_eq!(w.lo, 0.80451, epsilon = 1e-5);
+        assert_relative_eq!(w.hi, 0.88294, epsilon = 1e-5);
         let z = wilson(0, 20, 0.95).unwrap();
         assert_eq!(z.lo, 0.0);
         assert!(z.hi > 0.1 && z.hi < 0.2);
@@ -320,5 +363,23 @@ mod tests {
         assert_eq!(h2.outside, 2);
         let e = ecdf(&[1.0, 1.0, 2.0]);
         assert_eq!(e, vec![(1.0, 2.0 / 3.0), (2.0, 1.0)]);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn quantiles_are_monotone_and_bounded(v in proptest::collection::vec(-1e6f64..1e6, 1..60), p in 0.0f64..1.0, q in 0.0f64..1.0) {
+            let s = sorted_finite(&v);
+            let (lo, hi) = if p <= q { (p, q) } else { (q, p) };
+            proptest::prop_assert!(quantile_sorted(&s, lo) <= quantile_sorted(&s, hi));
+            proptest::prop_assert!(quantile_sorted(&s, p) >= s[0] && quantile_sorted(&s, p) <= s[s.len() - 1]);
+        }
+
+        #[test]
+        fn wilson_contains_the_estimate(n in 1u64..500, k in 0u64..500) {
+            let k = k.min(n);
+            let w = wilson(k, n, 0.95).unwrap();
+            let p = k as f64 / n as f64;
+            proptest::prop_assert!(w.lo <= p + 1e-12 && p <= w.hi + 1e-12 && w.lo >= 0.0 && w.hi <= 1.0);
+        }
     }
 }

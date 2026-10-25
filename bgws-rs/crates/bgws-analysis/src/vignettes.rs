@@ -16,7 +16,9 @@
 //! width is marked in `band_note` and its confidence is the source's.
 
 use crate::batch::{run_batch, BatchConfig, Experiment, Metric, Sample};
-use crate::stats::{mean, mean_ci_t, quantile_ci_sorted, quantile_sorted, sorted_finite, wilson, Interval, Summary};
+use crate::stats::{
+    mean, mean_ci_t, quantile_ci_sorted, quantile_sorted, sorted_finite, wilson, Interval, Summary,
+};
 use bgws_core::rng::{fnv1a, mix64};
 use bgws_core::{Confidence, Figures, Seed};
 use serde::{Deserialize, Serialize};
@@ -61,7 +63,11 @@ impl Statistic {
                     let k = v.iter().filter(|&&x| x == 1.0).count() as u64;
                     wilson(k, v.len() as u64, level)
                 } else {
-                    mean_ci_t(&v, level).map(|i| Interval { lo: i.lo.max(0.0), hi: i.hi.min(1.0), level })
+                    mean_ci_t(&v, level).map(|i| Interval {
+                        lo: i.lo.max(0.0),
+                        hi: i.hi.min(1.0),
+                        level,
+                    })
                 };
                 (m, ci)
             }
@@ -148,7 +154,8 @@ pub struct VignetteResult {
     pub band: Band,
     pub unit: String,
     pub verdict: Verdict,
-    /// The band statistic's point estimate.
+    /// The band statistic's point estimate (NaN with no data).
+    #[serde(deserialize_with = "crate::stats::nan_from_null")]
     pub estimate: f64,
     /// Its confidence interval, when the sample allows one.
     pub interval: Option<Interval>,
@@ -179,7 +186,10 @@ pub struct CheckOptions {
 
 impl CheckOptions {
     pub fn from_figures(f: &Figures) -> Self {
-        CheckOptions { level: f.get("analysis.ci_level"), replicates: None }
+        CheckOptions {
+            level: f.get("analysis.ci_level"),
+            replicates: None,
+        }
     }
 }
 
@@ -204,9 +214,22 @@ impl Vignette {
         let inside = interval.is_some_and(|i| i.lo >= self.band.lo && i.hi <= self.band.hi);
         let overlaps = interval.is_some_and(|i| i.hi >= self.band.lo && i.lo <= self.band.hi);
         let stat = self.band.statistic.label();
-        let ci = interval.map(|i| format!(" ({:.0}% CI {} – {})", i.level * 100.0, fmt(i.lo), fmt(i.hi))).unwrap_or_default();
+        let ci = interval
+            .map(|i| {
+                format!(
+                    " ({:.0}% CI {} – {})",
+                    i.level * 100.0,
+                    fmt(i.lo),
+                    fmt(i.hi)
+                )
+            })
+            .unwrap_or_default();
         let explanation = match verdict {
-            Verdict::NoData => format!("No replicate of {} measured `{}`.", sample.values.len() + sample.missing, self.metric.name),
+            Verdict::NoData => format!(
+                "No replicate of {} measured `{}`.",
+                sample.values.len() + sample.missing,
+                self.metric.name
+            ),
             Verdict::InBand => format!(
                 "{stat} {}{ci} {} is inside the band {} – {} from [{}]{}.",
                 fmt(estimate),
@@ -214,17 +237,29 @@ impl Vignette {
                 fmt(self.band.lo),
                 fmt(self.band.hi),
                 self.source,
-                if inside { "" } else { "; the interval reaches outside it, so more replicates would firm this up" }
+                if inside {
+                    ""
+                } else {
+                    "; the interval reaches outside it, so more replicates would firm this up"
+                }
             ),
             Verdict::OutOfBand => format!(
                 "{stat} {}{ci} {} is {} the band {} – {} from [{}]{}.",
                 fmt(estimate),
                 self.metric.unit,
-                if estimate < self.band.lo { "below" } else { "above" },
+                if estimate < self.band.lo {
+                    "below"
+                } else {
+                    "above"
+                },
                 fmt(self.band.lo),
                 fmt(self.band.hi),
                 self.source,
-                if overlaps { "; the interval still touches the band" } else { "" }
+                if overlaps {
+                    "; the interval still touches the band"
+                } else {
+                    ""
+                }
             ),
         };
         VignetteResult {
@@ -254,7 +289,10 @@ impl Vignette {
         base_seed: Seed,
         options: &CheckOptions,
     ) -> VignetteResult {
-        let config = BatchConfig::new(options.replicates.unwrap_or(self.replicates), self.seed(base_seed));
+        let config = BatchConfig::new(
+            options.replicates.unwrap_or(self.replicates),
+            self.seed(base_seed),
+        );
         let batch = run_batch(experiment, figures, config);
         let mut sample = batch.sample(metric);
         sample.metric = self.metric.name.clone();
@@ -296,7 +334,11 @@ fn def(
         id: id.into(),
         title: title.into(),
         hypothesis: hypothesis.into(),
-        metric: MetricSpec { name: metric.0.into(), unit: metric.1.into(), description: metric.2.into() },
+        metric: MetricSpec {
+            name: metric.0.into(),
+            unit: metric.1.into(),
+            description: metric.2.into(),
+        },
         band,
         source: source.into(),
         band_confidence,
@@ -332,7 +374,7 @@ pub fn benchmark_vignettes() -> Vec<Vignette> {
             "A raid-level intercept rate near 85% emerges from 1.5–2 interceptors per threat at a per-shot Pk of 0.6–0.7.",
             ("bm_intercepted", "share", "share of ballistic missiles engaged that were intercepted"),
             Band::new(0.80, 0.90, Proportion), "P20, P29, R6.6", Medium,
-            "P20: 273/322 = 0.848 (Wilson 95% 0.805–0.884), widened to 0.80–0.90.", B, &[]),
+            "P20: 273/322 = 0.848 (Wilson 95% 0.805–0.883), widened to 0.80–0.90.", B, &[]),
         def("breach-time", "Minefield breach time",
             "Breaching one lane through a ~500 m mine belt takes about 1.5 h, longer when observed.",
             ("breach_time", "s", "time from the first breach action to an open lane"),
@@ -399,41 +441,160 @@ pub fn typescript_vignettes() -> Vec<Vignette> {
     use Statistic::Median;
     use VignetteOrigin::TypeScript as T;
     vec![
-        def("ts.breach", "Minefield breach", "About 1.5 h per lane.",
-            ("breach_s", "s", "time to breach the minefield (world.stats.breachS[0])"),
-            Band::new(0.5 * 5400.0, 1.5 * 5400.0, Median), "R4.5, P13", Medium, "TypeScript band 0.5–1.5 × 5400 s.", T,
-            &["world/domains/landExt.BREACH_S", "world/domains/landExt.UNDER_FIRE_SLOW"]),
-        def("ts.battalion", "Attacking battalion", "Halts near 20% casualties.",
-            ("share_lost", "share lost", "losses when the HQ decided to halt (CCIR), else at the end"),
-            Band::new(0.05, 0.6, Median), "P14", Medium, "TypeScript band 0.05–0.6.", T,
-            &["world/command/heuristicPlanner.CULMINATION_LOSS"]),
-        def("ts.fpv", "FPV effectiveness", "60–80% of strikes fail to destroy.",
-            ("share_failing", "share failing", "1 − kills / fired for FPV munitions"),
-            Band::new(0.5, 0.92, Median), "P8, P9", Medium, "TypeScript band 0.5–0.92.", T,
-            &["world/domains/drones.MOVING_HIT", "world/domains/drones.ACQUIRE_IN_COVER", "world/domains/drones.JAMMED_HIT"]),
-        def("ts.shahed", "Shahed raid", "About 85% intercepted.",
-            ("share_intercepted", "share intercepted", "destroyed one-way-attack drones / raid size"),
-            Band::new(0.65, 0.97, Median), "P10", Medium, "TypeScript band 0.65–0.97.", T,
-            &["world/domains/air.AD_ASK_S", "world/domains/air.LOW_FACTOR"]),
-        def("ts.pnt-clear", "Precision rounds, GNSS clear", "More than 50% effective.",
-            ("share_within_20m", "share within 20 m", "share of 100 guided rounds landing within 20 m"),
-            Band::new(0.5, 1.0, Median), "R3, P15", Low, "TypeScript band 0.5–1.", T, &["world/pnt.INERTIAL_CEP_M"]),
-        def("ts.pnt-jammed", "Precision rounds under GNSS jamming", "Down toward 10%.",
-            ("share_within_20m", "share within 20 m", "share of 100 guided rounds landing within 20 m"),
-            Band::new(0.0, 0.15, Median), "R3, P15", Low, "TypeScript band 0–0.15.", T,
-            &["world/pnt.JAM_DEPTH", "world/pnt.INERTIAL_CEP_M"]),
-        def("ts.redsea", "Red Sea exchange", "Interceptors used per threat downed.",
-            ("interceptors_per_kill", "interceptors per kill", "SAM rounds fired / threats destroyed"),
-            Band::new(1.0, 6.0, Median), "R6.2", Medium, "TypeScript band 1–6.", T,
-            &["world/domains/naval.VLS_PER_S", "world/domains/air.ENERGY_FALLOFF"]),
-        def("ts.killweb-datalink", "Kill chain, data link", "Minutes.",
-            ("detect_to_fire", "min", "fastest blue mission, found (or requested) to fired"),
-            Band::new(1.0, 20.0, Median), "R3, P2", Medium, "TypeScript band 1–20 min.", T,
-            &["world/domains/killweb.DATALINK_STAFF_S"]),
-        def("ts.killweb-voice", "Kill chain, voice nets", "Hours.",
-            ("detect_to_fire", "min", "fastest blue mission, found (or requested) to fired"),
-            Band::new(15.0, 240.0, Median), "R3, P2", Medium, "TypeScript band 15–240 min.", T,
-            &["world/domains/killweb.VOICE_STAFF_S"]),
+        def(
+            "ts.breach",
+            "Minefield breach",
+            "About 1.5 h per lane.",
+            (
+                "breach_s",
+                "s",
+                "time to breach the minefield (world.stats.breachS[0])",
+            ),
+            Band::new(0.5 * 5400.0, 1.5 * 5400.0, Median),
+            "R4.5, P13",
+            Medium,
+            "TypeScript band 0.5–1.5 × 5400 s.",
+            T,
+            &[
+                "world/domains/landExt.BREACH_S",
+                "world/domains/landExt.UNDER_FIRE_SLOW",
+            ],
+        ),
+        def(
+            "ts.battalion",
+            "Attacking battalion",
+            "Halts near 20% casualties.",
+            (
+                "share_lost",
+                "share lost",
+                "losses when the HQ decided to halt (CCIR), else at the end",
+            ),
+            Band::new(0.05, 0.6, Median),
+            "P14",
+            Medium,
+            "TypeScript band 0.05–0.6.",
+            T,
+            &["world/command/heuristicPlanner.CULMINATION_LOSS"],
+        ),
+        def(
+            "ts.fpv",
+            "FPV effectiveness",
+            "60–80% of strikes fail to destroy.",
+            (
+                "share_failing",
+                "share failing",
+                "1 − kills / fired for FPV munitions",
+            ),
+            Band::new(0.5, 0.92, Median),
+            "P8, P9",
+            Medium,
+            "TypeScript band 0.5–0.92.",
+            T,
+            &[
+                "world/domains/drones.MOVING_HIT",
+                "world/domains/drones.ACQUIRE_IN_COVER",
+                "world/domains/drones.JAMMED_HIT",
+            ],
+        ),
+        def(
+            "ts.shahed",
+            "Shahed raid",
+            "About 85% intercepted.",
+            (
+                "share_intercepted",
+                "share intercepted",
+                "destroyed one-way-attack drones / raid size",
+            ),
+            Band::new(0.65, 0.97, Median),
+            "P10",
+            Medium,
+            "TypeScript band 0.65–0.97.",
+            T,
+            &["world/domains/air.AD_ASK_S", "world/domains/air.LOW_FACTOR"],
+        ),
+        def(
+            "ts.pnt-clear",
+            "Precision rounds, GNSS clear",
+            "More than 50% effective.",
+            (
+                "share_within_20m",
+                "share within 20 m",
+                "share of 100 guided rounds landing within 20 m",
+            ),
+            Band::new(0.5, 1.0, Median),
+            "R3, P15",
+            Low,
+            "TypeScript band 0.5–1.",
+            T,
+            &["world/pnt.INERTIAL_CEP_M"],
+        ),
+        def(
+            "ts.pnt-jammed",
+            "Precision rounds under GNSS jamming",
+            "Down toward 10%.",
+            (
+                "share_within_20m",
+                "share within 20 m",
+                "share of 100 guided rounds landing within 20 m",
+            ),
+            Band::new(0.0, 0.15, Median),
+            "R3, P15",
+            Low,
+            "TypeScript band 0–0.15.",
+            T,
+            &["world/pnt.JAM_DEPTH", "world/pnt.INERTIAL_CEP_M"],
+        ),
+        def(
+            "ts.redsea",
+            "Red Sea exchange",
+            "Interceptors used per threat downed.",
+            (
+                "interceptors_per_kill",
+                "interceptors per kill",
+                "SAM rounds fired / threats destroyed",
+            ),
+            Band::new(1.0, 6.0, Median),
+            "R6.2",
+            Medium,
+            "TypeScript band 1–6.",
+            T,
+            &[
+                "world/domains/naval.VLS_PER_S",
+                "world/domains/air.ENERGY_FALLOFF",
+            ],
+        ),
+        def(
+            "ts.killweb-datalink",
+            "Kill chain, data link",
+            "Minutes.",
+            (
+                "detect_to_fire",
+                "min",
+                "fastest blue mission, found (or requested) to fired",
+            ),
+            Band::new(1.0, 20.0, Median),
+            "R3, P2",
+            Medium,
+            "TypeScript band 1–20 min.",
+            T,
+            &["world/domains/killweb.DATALINK_STAFF_S"],
+        ),
+        def(
+            "ts.killweb-voice",
+            "Kill chain, voice nets",
+            "Hours.",
+            (
+                "detect_to_fire",
+                "min",
+                "fastest blue mission, found (or requested) to fired",
+            ),
+            Band::new(15.0, 240.0, Median),
+            "R3, P2",
+            Medium,
+            "TypeScript band 15–240 min.",
+            T,
+            &["world/domains/killweb.VOICE_STAFF_S"],
+        ),
     ]
 }
 
@@ -465,9 +626,13 @@ mod tests {
         let all = catalogue();
         let ids: BTreeSet<_> = all.iter().map(|v| v.id.clone()).collect();
         assert_eq!(ids.len(), all.len(), "duplicate vignette ids");
-        for refs in ["P27", "P9", "P10", "P20", "P13", "P14", "P15", "P2", "P23", "P30", "R7", "R6.2"] {
+        for refs in [
+            "P27", "P9", "P10", "P20", "P13", "P14", "P15", "P2", "P23", "P30", "R7", "R6.2",
+        ] {
             assert!(
-                benchmark_vignettes().iter().any(|v| v.source.split(", ").any(|s| s == refs)),
+                benchmark_vignettes()
+                    .iter()
+                    .any(|v| v.source.split(", ").any(|s| s == refs)),
                 "no benchmark vignette cites {refs}"
             );
         }
@@ -489,11 +654,20 @@ mod tests {
     fn bernoulli_experiment_in_and_out_of_band() {
         let f = figs();
         let v = find("ballistic-missile-defence").unwrap();
-        let shot = |p: f64| move |_: &Figures, seed: Seed| {
-            let x: f64 = seed.stream(StreamKey::new("test.bmd", 0, 0, 0)).gen();
-            if x < p { 1.0 } else { 0.0 }
+        let shot = |p: f64| {
+            move |_: &Figures, seed: Seed| {
+                let x: f64 = seed.stream(StreamKey::new("test.bmd", 0, 0, 0)).gen();
+                if x < p {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
         };
-        let opts = CheckOptions { level: 0.95, replicates: Some(2000) };
+        let opts = CheckOptions {
+            level: 0.95,
+            replicates: Some(2000),
+        };
         let good = v.check(&shot(0.85), &crate::batch::Scalar, &f, Seed(1), &opts);
         assert_eq!(good.verdict, Verdict::InBand, "{}", good.explanation);
         assert!(good.interval.unwrap().contains(0.85));
@@ -507,7 +681,11 @@ mod tests {
     #[test]
     fn median_and_no_data() {
         let v = find("breach-time").unwrap();
-        let s = Sample::new("breach_time", "s", (0..101).map(|i| 4000.0 + i as f64 * 20.0).collect());
+        let s = Sample::new(
+            "breach_time",
+            "s",
+            (0..101).map(|i| 4000.0 + i as f64 * 20.0).collect(),
+        );
         let r = v.evaluate(&s, 0.95);
         assert_eq!(r.verdict, Verdict::InBand);
         assert_eq!(r.estimate, 5000.0);

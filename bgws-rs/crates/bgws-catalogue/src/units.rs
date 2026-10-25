@@ -68,7 +68,7 @@ const SPECIFIC: &[(&str, FieldUnit)] = &[
 
 /// Suffix rules, longest first.
 const SUFFIX: &[(&str, FieldUnit)] = &[
-    ("CycPerMrad", fu("cyc/mrad", 0.0, 100.0)),
+    ("CycPerMrad", fu("cyc/mrad", 0.0, 2_000.0)),
     ("HpT", fu("hp/t", 0.0, 200.0)),
     ("Kmh", fu("km/h", 0.0, 30_000.0)),
     ("Lph", fu("L/h", 0.0, 50_000.0)),

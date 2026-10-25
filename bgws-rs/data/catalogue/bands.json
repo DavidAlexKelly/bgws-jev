@@ -1,0 +1,27 @@
+{
+  "$comment": "The bands table (RUST_ENGINE.md §7.5, §14.1): every band id a sensor, radio, emitter, jammer or RCS entry may name. Radio/radar edges are the IEEE/ITU letter bands; optical edges are the usual atmospheric windows; 'none' is for wire, fibre-as-courier and couriers.",
+  "bands": [
+    { "id": "hf", "name": "HF", "kind": "radio", "fMinHz": 3e6, "fMaxHz": 3e7, "source": "ITU" },
+    { "id": "vhf", "name": "VHF", "kind": "radio", "fMinHz": 3e7, "fMaxHz": 3e8, "source": "ITU; SINCGARS 30–88 MHz [P4]" },
+    { "id": "uhf", "name": "UHF", "kind": "radio", "fMinHz": 3e8, "fMaxHz": 1e9, "source": "ITU" },
+    { "id": "l", "name": "L band", "kind": "radar", "fMinHz": 1e9, "fMaxHz": 2e9, "source": "IEEE 521; Link 16 960–1215 MHz [P6] sits at its lower edge" },
+    { "id": "s", "name": "S band", "kind": "radar", "fMinHz": 2e9, "fMaxHz": 4e9, "source": "IEEE 521" },
+    { "id": "c", "name": "C band", "kind": "radar", "fMinHz": 4e9, "fMaxHz": 8e9, "source": "IEEE 521" },
+    { "id": "x", "name": "X band", "kind": "radar", "fMinHz": 8e9, "fMaxHz": 1.2e10, "source": "IEEE 521" },
+    { "id": "ku", "name": "Ku band", "kind": "radar", "fMinHz": 1.2e10, "fMaxHz": 1.8e10, "source": "IEEE 521" },
+    { "id": "k", "name": "K band", "kind": "radar", "fMinHz": 1.8e10, "fMaxHz": 2.7e10, "source": "IEEE 521" },
+    { "id": "ka", "name": "Ka band", "kind": "radar", "fMinHz": 2.7e10, "fMaxHz": 4e10, "source": "IEEE 521" },
+    { "id": "gnss", "name": "GNSS L1/L2/L5", "kind": "radio", "fMinHz": 1.164e9, "fMaxHz": 1.61e9, "source": "GPS/Galileo/GLONASS allocations" },
+    { "id": "ism24", "name": "2.4 GHz ISM (drone links)", "kind": "radio", "fMinHz": 2.4e9, "fMaxHz": 2.4835e9, "source": "ITU ISM" },
+    { "id": "ism58", "name": "5.8 GHz ISM (FPV video)", "kind": "radio", "fMinHz": 5.725e9, "fMaxHz": 5.875e9, "source": "ITU ISM" },
+    { "id": "visible", "name": "Visible", "kind": "optical", "fMinHz": 4.0e14, "fMaxHz": 7.9e14, "source": "0.38–0.75 µm" },
+    { "id": "nir", "name": "Near IR (image intensifiers)", "kind": "optical", "fMinHz": 2.0e14, "fMaxHz": 4.0e14, "source": "0.75–1.5 µm" },
+    { "id": "swir", "name": "Short-wave IR", "kind": "optical", "fMinHz": 1.0e14, "fMaxHz": 2.0e14, "source": "1.5–3 µm" },
+    { "id": "mwir", "name": "Mid-wave IR", "kind": "optical", "fMinHz": 6.0e13, "fMaxHz": 1.0e14, "source": "3–5 µm window" },
+    { "id": "lwir", "name": "Long-wave IR", "kind": "optical", "fMinHz": 2.5e13, "fMaxHz": 3.75e13, "source": "8–12 µm window" },
+    { "id": "optical", "name": "Optical fibre", "kind": "optical", "fMinHz": 1.8e14, "fMaxHz": 2.4e14, "source": "1.25–1.65 µm telecom windows" },
+    { "id": "acoustic", "name": "Acoustic (air and water)", "kind": "acoustic", "fMinHz": 10, "fMaxHz": 1e5, "source": "sonar and aural bands" },
+    { "id": "wire", "name": "Wire (baseband)", "kind": "none", "fMinHz": 0, "fMaxHz": 1e6, "source": "field telephone and LAN" },
+    { "id": "none", "name": "No radiated band (courier)", "kind": "none", "fMinHz": 0, "fMaxHz": 0, "source": "" }
+  ]
+}

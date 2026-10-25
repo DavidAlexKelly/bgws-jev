@@ -19,7 +19,9 @@ use crate::stats::{mean, sorted_finite, Interval};
 use bgws_core::Figures;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use statrs::distribution::{ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, Gamma, LogNormal, Poisson};
+use statrs::distribution::{
+    ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, Gamma, LogNormal, Poisson,
+};
 use statrs::function::gamma::digamma;
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -79,7 +81,9 @@ impl FittedDistribution {
     pub fn variance(&self) -> f64 {
         match *self {
             Self::Exponential { rate } => 1.0 / (rate * rate),
-            Self::Lognormal { mu, sigma } => ((sigma * sigma).exp() - 1.0) * (2.0 * mu + sigma * sigma).exp(),
+            Self::Lognormal { mu, sigma } => {
+                ((sigma * sigma).exp() - 1.0) * (2.0 * mu + sigma * sigma).exp()
+            }
             Self::Gamma { shape, scale } => shape * scale * scale,
             Self::Poisson { lambda } => lambda,
         }
@@ -93,21 +97,27 @@ impl FittedDistribution {
                 if x <= 0.0 {
                     0.0
                 } else {
-                    LogNormal::new(mu, sigma).map(|d| d.cdf(x)).unwrap_or(f64::NAN)
+                    LogNormal::new(mu, sigma)
+                        .map(|d| d.cdf(x))
+                        .unwrap_or(f64::NAN)
                 }
             }
             Self::Gamma { shape, scale } => {
                 if x <= 0.0 {
                     0.0
                 } else {
-                    Gamma::new(shape, 1.0 / scale).map(|d| d.cdf(x)).unwrap_or(f64::NAN)
+                    Gamma::new(shape, 1.0 / scale)
+                        .map(|d| d.cdf(x))
+                        .unwrap_or(f64::NAN)
                 }
             }
             Self::Poisson { lambda } => {
                 if x < 0.0 {
                     0.0
                 } else {
-                    Poisson::new(lambda).map(|d| d.cdf(x.floor() as u64)).unwrap_or(f64::NAN)
+                    Poisson::new(lambda)
+                        .map(|d| d.cdf(x.floor() as u64))
+                        .unwrap_or(f64::NAN)
                 }
             }
         }
@@ -117,10 +127,18 @@ impl FittedDistribution {
     pub fn log_likelihood(&self, samples: &[f64]) -> f64 {
         let ll = |f: &dyn Fn(f64) -> f64| samples.iter().map(|&x| f(x)).sum::<f64>();
         match *self {
-            Self::Exponential { rate } => Exp::new(rate).map(|d| ll(&|x| d.ln_pdf(x))).unwrap_or(f64::NAN),
-            Self::Lognormal { mu, sigma } => LogNormal::new(mu, sigma).map(|d| ll(&|x| d.ln_pdf(x))).unwrap_or(f64::NAN),
-            Self::Gamma { shape, scale } => Gamma::new(shape, 1.0 / scale).map(|d| ll(&|x| d.ln_pdf(x))).unwrap_or(f64::NAN),
-            Self::Poisson { lambda } => Poisson::new(lambda).map(|d| ll(&|x| d.ln_pmf(x.round().max(0.0) as u64))).unwrap_or(f64::NAN),
+            Self::Exponential { rate } => Exp::new(rate)
+                .map(|d| ll(&|x| d.ln_pdf(x)))
+                .unwrap_or(f64::NAN),
+            Self::Lognormal { mu, sigma } => LogNormal::new(mu, sigma)
+                .map(|d| ll(&|x| d.ln_pdf(x)))
+                .unwrap_or(f64::NAN),
+            Self::Gamma { shape, scale } => Gamma::new(shape, 1.0 / scale)
+                .map(|d| ll(&|x| d.ln_pdf(x)))
+                .unwrap_or(f64::NAN),
+            Self::Poisson { lambda } => Poisson::new(lambda)
+                .map(|d| ll(&|x| d.ln_pmf(x.round().max(0.0) as u64)))
+                .unwrap_or(f64::NAN),
         }
     }
 
@@ -129,9 +147,15 @@ impl FittedDistribution {
         use rand::distributions::Distribution;
         match *self {
             Self::Exponential { rate } => Exp::new(rate).map(|d| d.sample(rng)).unwrap_or(f64::NAN),
-            Self::Lognormal { mu, sigma } => LogNormal::new(mu, sigma).map(|d| d.sample(rng)).unwrap_or(f64::NAN),
-            Self::Gamma { shape, scale } => Gamma::new(shape, 1.0 / scale).map(|d| d.sample(rng)).unwrap_or(f64::NAN),
-            Self::Poisson { lambda } => Poisson::new(lambda).map(|d| d.sample(rng)).unwrap_or(f64::NAN),
+            Self::Lognormal { mu, sigma } => LogNormal::new(mu, sigma)
+                .map(|d| d.sample(rng))
+                .unwrap_or(f64::NAN),
+            Self::Gamma { shape, scale } => Gamma::new(shape, 1.0 / scale)
+                .map(|d| d.sample(rng))
+                .unwrap_or(f64::NAN),
+            Self::Poisson { lambda } => Poisson::new(lambda)
+                .map(|d| d.sample(rng))
+                .unwrap_or(f64::NAN),
         }
     }
 }
@@ -159,19 +183,25 @@ impl Fit {
             n: samples.len(),
             log_likelihood: ll,
             aic: 2.0 * distribution.parameters() as f64 - 2.0 * ll,
-            ks: if continuous { ks_one_sample(samples, |x| distribution.cdf(x)) } else { None },
+            ks: if continuous {
+                ks_one_sample(samples, |x| distribution.cdf(x))
+            } else {
+                None
+            },
             chi_squared: None,
         }
     }
 
     /// The goodness-of-fit p-value (KS or chi-squared), when there is one.
     pub fn gof_p_value(&self) -> Option<f64> {
-        self.ks.map(|k| k.p_value).or(self.chi_squared.as_ref().map(|c| c.p_value))
+        self.ks
+            .map(|k| k.p_value)
+            .or(self.chi_squared.as_ref().map(|c| c.p_value))
     }
 
     /// The fit is not rejected at level `alpha`.
     pub fn acceptable(&self, alpha: f64) -> bool {
-        self.gof_p_value().map_or(true, |p| p >= alpha)
+        self.gof_p_value().is_none_or(|p| p >= alpha)
     }
 }
 
@@ -186,10 +216,36 @@ fn positive(samples: &[f64], family: &'static str, need: usize) -> Result<Vec<f6
     Ok(v)
 }
 
+/// Settings for fits and their goodness-of-fit checks.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FitOptions {
+    /// A fit is acceptable when its goodness-of-fit p-value is at least this.
+    pub alpha: f64,
+    /// Chi-squared cells are merged to at least this expected count.
+    pub min_expected: f64,
+    /// Confidence level of rate intervals.
+    pub level: f64,
+}
+
+impl FitOptions {
+    pub fn from_figures(f: &Figures) -> Self {
+        FitOptions {
+            alpha: f.get("analysis.gof.alpha"),
+            min_expected: f.get("analysis.gof.min_expected"),
+            level: f.get("analysis.ci_level"),
+        }
+    }
+}
+
 /// Exponential MLE: λ = 1 / mean.
 pub fn fit_exponential(samples: &[f64]) -> Result<Fit, FitError> {
     let v = positive(samples, "exponential", 1)?;
-    Ok(Fit::new(FittedDistribution::Exponential { rate: 1.0 / mean(&v) }, &v))
+    Ok(Fit::new(
+        FittedDistribution::Exponential {
+            rate: 1.0 / mean(&v),
+        },
+        &v,
+    ))
 }
 
 /// Lognormal MLE: μ, σ of ln x (σ with 1/n).
@@ -199,7 +255,9 @@ pub fn fit_lognormal(samples: &[f64]) -> Result<Fit, FitError> {
     let mu = mean(&logs);
     let sigma = (logs.iter().map(|l| (l - mu).powi(2)).sum::<f64>() / logs.len() as f64).sqrt();
     if sigma <= 0.0 {
-        return Err(FitError::Degenerate { family: "lognormal" });
+        return Err(FitError::Degenerate {
+            family: "lognormal",
+        });
     }
     Ok(Fit::new(FittedDistribution::Lognormal { mu, sigma }, &v))
 }
@@ -207,12 +265,14 @@ pub fn fit_lognormal(samples: &[f64]) -> Result<Fit, FitError> {
 /// Trigamma ψ₁(x) for x > 0 (recurrence then asymptotic series).
 pub fn trigamma(mut x: f64) -> f64 {
     let mut acc = 0.0;
-    while x < 6.0 {
+    while x < 10.0 {
         acc += 1.0 / (x * x);
         x += 1.0;
     }
     let x2 = 1.0 / (x * x);
-    acc + 1.0 / x + x2 / 2.0 + (1.0 / x) * x2 * (1.0 / 6.0 - x2 * (1.0 / 30.0 - x2 * (1.0 / 42.0 - x2 / 30.0)))
+    acc + 1.0 / x
+        + x2 / 2.0
+        + (1.0 / x) * x2 * (1.0 / 6.0 - x2 * (1.0 / 30.0 - x2 * (1.0 / 42.0 - x2 / 30.0)))
 }
 
 /// Gamma MLE: solve ln k − ψ(k) = ln x̄ − mean(ln x) by Newton from the
@@ -236,7 +296,13 @@ pub fn fit_gamma(samples: &[f64]) -> Result<Fit, FitError> {
         }
         k = next;
     }
-    Ok(Fit::new(FittedDistribution::Gamma { shape: k, scale: m / k }, &v))
+    Ok(Fit::new(
+        FittedDistribution::Gamma {
+            shape: k,
+            scale: m / k,
+        },
+        &v,
+    ))
 }
 
 /// Poisson MLE for counts in equal windows: λ = mean, with a chi-squared
@@ -259,7 +325,11 @@ pub fn fit_poisson(counts: &[u64], min_expected: f64) -> Result<Fit, FitError> {
         let p = Poisson::new(lambda).map_err(|_| FitError::Degenerate { family: "poisson" })?;
         let mut expected: Vec<f64> = (0..=max).map(|k| n * p.pmf(k as u64)).collect();
         // The last class is "max or more".
-        expected[max] = if max == 0 { n } else { n * (1.0 - p.cdf(max as u64 - 1)) };
+        expected[max] = if max == 0 {
+            n
+        } else {
+            n * (1.0 - p.cdf(max as u64 - 1))
+        };
         fit.chi_squared = chi_squared_gof(&observed, &expected, 1, min_expected);
     }
     Ok(fit)
@@ -268,7 +338,14 @@ pub fn fit_poisson(counts: &[u64], min_expected: f64) -> Result<Fit, FitError> {
 /// Fit every continuous family and rank by AIC (best first). Families that
 /// cannot fit the data are left out.
 pub fn fit_best(samples: &[f64]) -> Vec<Fit> {
-    let mut fits: Vec<Fit> = [fit_exponential(samples), fit_lognormal(samples), fit_gamma(samples)].into_iter().flatten().collect();
+    let mut fits: Vec<Fit> = [
+        fit_exponential(samples),
+        fit_lognormal(samples),
+        fit_gamma(samples),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     fits.sort_by(|a, b| a.aic.total_cmp(&b.aic));
     fits
 }
@@ -291,8 +368,17 @@ pub struct RateFit {
 
 /// Fit a Poisson rate from counts over exposures (e.g. losses over
 /// shooter-hours). Zero-exposure observations are ignored.
-pub fn fit_poisson_rate(counts: &[u64], exposures: &[f64], level: f64) -> Result<RateFit, FitError> {
-    let obs: Vec<(u64, f64)> = counts.iter().zip(exposures).filter(|(_, &t)| t > 0.0 && t.is_finite()).map(|(&k, &t)| (k, t)).collect();
+pub fn fit_poisson_rate(
+    counts: &[u64],
+    exposures: &[f64],
+    level: f64,
+) -> Result<RateFit, FitError> {
+    let obs: Vec<(u64, f64)> = counts
+        .iter()
+        .zip(exposures)
+        .filter(|(_, &t)| t > 0.0 && t.is_finite())
+        .map(|(&k, &t)| (k, t))
+        .collect();
     if obs.is_empty() {
         return Err(FitError::NoExposure);
     }
@@ -300,17 +386,39 @@ pub fn fit_poisson_rate(counts: &[u64], exposures: &[f64], level: f64) -> Result
     let exposure: f64 = obs.iter().map(|o| o.1).sum();
     let rate = events as f64 / exposure;
     let a = 1.0 - level;
-    let chi = |q: f64, dof: f64| ChiSquared::new(dof).map(|c| c.inverse_cdf(q)).unwrap_or(f64::NAN);
-    let lo = if events == 0 { 0.0 } else { chi(a / 2.0, 2.0 * events as f64) / 2.0 / exposure };
+    let chi = |q: f64, dof: f64| {
+        ChiSquared::new(dof)
+            .map(|c| c.inverse_cdf(q))
+            .unwrap_or(f64::NAN)
+    };
+    let lo = if events == 0 {
+        0.0
+    } else {
+        chi(a / 2.0, 2.0 * events as f64) / 2.0 / exposure
+    };
     let hi = chi(1.0 - a / 2.0, 2.0 * events as f64 + 2.0) / 2.0 / exposure;
     let (dispersion, dispersion_p) = if obs.len() > 1 && rate > 0.0 {
-        let x2: f64 = obs.iter().map(|&(k, t)| (k as f64 - rate * t).powi(2) / (rate * t)).sum();
+        let x2: f64 = obs
+            .iter()
+            .map(|&(k, t)| (k as f64 - rate * t).powi(2) / (rate * t))
+            .sum();
         let dof = (obs.len() - 1) as f64;
-        (x2 / dof, ChiSquared::new(dof).map(|c| c.sf(x2)).unwrap_or(f64::NAN))
+        (
+            x2 / dof,
+            ChiSquared::new(dof).map(|c| c.sf(x2)).unwrap_or(f64::NAN),
+        )
     } else {
         (f64::NAN, f64::NAN)
     };
-    Ok(RateFit { rate, interval: Interval { lo, hi, level }, events, exposure, n: obs.len(), dispersion, dispersion_p })
+    Ok(RateFit {
+        rate,
+        interval: Interval { lo, hi, level },
+        events,
+        exposure,
+        n: obs.len(),
+        dispersion,
+        dispersion_p,
+    })
 }
 
 // ───────────────────────── Stochastic Lanchester ─────────────────────────
@@ -366,7 +474,13 @@ impl AttritionFit {
     }
 
     /// Draw losses for one aggregate step (capped at the targets present).
-    pub fn sample_losses(&self, shooters: f64, targets: f64, duration: f64, rng: &mut impl Rng) -> u64 {
+    pub fn sample_losses(
+        &self,
+        shooters: f64,
+        targets: f64,
+        duration: f64,
+        rng: &mut impl Rng,
+    ) -> u64 {
         use rand::distributions::Distribution;
         let lambda = self.expected_losses(shooters, targets, duration);
         if lambda <= 0.0 || !lambda.is_finite() {
@@ -378,9 +492,16 @@ impl AttritionFit {
 }
 
 /// Fit an attrition coefficient under one law by Poisson MLE.
-pub fn fit_attrition(obs: &[EngagementObservation], law: AttritionLaw, level: f64) -> Result<AttritionFit, FitError> {
+pub fn fit_attrition(
+    obs: &[EngagementObservation],
+    law: AttritionLaw,
+    level: f64,
+) -> Result<AttritionFit, FitError> {
     let counts: Vec<u64> = obs.iter().map(|o| o.losses).collect();
-    let exposures: Vec<f64> = obs.iter().map(|o| law.exposure(o.shooters, o.targets, o.duration)).collect();
+    let exposures: Vec<f64> = obs
+        .iter()
+        .map(|o| law.exposure(o.shooters, o.targets, o.duration))
+        .collect();
     let rate = fit_poisson_rate(&counts, &exposures, level)?;
     let ll = counts
         .iter()
@@ -397,16 +518,28 @@ pub fn fit_attrition(obs: &[EngagementObservation], law: AttritionLaw, level: f6
             }
         })
         .sum();
-    Ok(AttritionFit { law, rate, log_likelihood: ll })
+    Ok(AttritionFit {
+        law,
+        rate,
+        log_likelihood: ll,
+    })
 }
 
 /// Fit every law and return them best first (by log-likelihood; all have one parameter).
 pub fn fit_attrition_best(obs: &[EngagementObservation], level: f64) -> Vec<AttritionFit> {
-    let mut fits: Vec<AttritionFit> = [AttritionLaw::Square, AttritionLaw::Linear, AttritionLaw::Logarithmic]
-        .into_iter()
-        .filter_map(|law| fit_attrition(obs, law, level).ok())
-        .collect();
-    fits.sort_by(|a, b| b.log_likelihood.total_cmp(&a.log_likelihood).then(a.law.cmp(&b.law)));
+    let mut fits: Vec<AttritionFit> = [
+        AttritionLaw::Square,
+        AttritionLaw::Linear,
+        AttritionLaw::Logarithmic,
+    ]
+    .into_iter()
+    .filter_map(|law| fit_attrition(obs, law, level).ok())
+    .collect();
+    fits.sort_by(|a, b| {
+        b.log_likelihood
+            .total_cmp(&a.log_likelihood)
+            .then(a.law.cmp(&b.law))
+    });
     fits
 }
 
@@ -427,7 +560,12 @@ pub struct CoefficientKey {
 
 impl CoefficientKey {
     pub fn new(own: &str, opponent: &str, posture: &str, terrain: &str) -> Self {
-        Self { own: own.into(), opponent: opponent.into(), posture: posture.into(), terrain: terrain.into() }
+        Self {
+            own: own.into(),
+            opponent: opponent.into(),
+            posture: posture.into(),
+            terrain: terrain.into(),
+        }
     }
 }
 
@@ -473,11 +611,17 @@ impl CoefficientTable {
     }
 
     pub fn get(&self, key: &CoefficientKey) -> Option<&CoefficientSet> {
-        self.entries.binary_search_by(|e| e.key.cmp(key)).ok().map(|i| &self.entries[i].set)
+        self.entries
+            .binary_search_by(|e| e.key.cmp(key))
+            .ok()
+            .map(|i| &self.entries[i].set)
     }
 
     pub fn get_mut(&mut self, key: &CoefficientKey) -> Option<&mut CoefficientSet> {
-        self.entries.binary_search_by(|e| e.key.cmp(key)).ok().map(|i| &mut self.entries[i].set)
+        self.entries
+            .binary_search_by(|e| e.key.cmp(key))
+            .ok()
+            .map(|i| &mut self.entries[i].set)
     }
 
     pub fn len(&self) -> usize {
@@ -516,7 +660,10 @@ pub struct AgreementOptions {
 
 impl AgreementOptions {
     pub fn from_figures(f: &Figures) -> Self {
-        AgreementOptions { alpha: f.get("analysis.agreement.alpha"), rel_tol: f.get("analysis.agreement.rel_tol") }
+        AgreementOptions {
+            alpha: f.get("analysis.agreement.alpha"),
+            rel_tol: f.get("analysis.agreement.rel_tol"),
+        }
     }
 }
 
@@ -542,7 +689,12 @@ fn rel_err(pred: f64, obs: f64) -> f64 {
 }
 
 /// Check a fitted distribution against new entity-level samples (KS).
-pub fn distribution_agreement(quantity: &str, fit: &FittedDistribution, samples: &[f64], options: &AgreementOptions) -> Agreement {
+pub fn distribution_agreement(
+    quantity: &str,
+    fit: &FittedDistribution,
+    samples: &[f64],
+    options: &AgreementOptions,
+) -> Agreement {
     let v = sorted_finite(samples);
     let ks = ks_one_sample(&v, |x| fit.cdf(x));
     let (pm, om) = (fit.mean(), mean(&v));
@@ -574,13 +726,25 @@ pub fn distribution_agreement(quantity: &str, fit: &FittedDistribution, samples:
 
 /// Check a fitted attrition coefficient against new engagements: is the
 /// observed total of losses plausible under Poisson(Σ α·exposure)? (two-sided).
-pub fn attrition_agreement(quantity: &str, fit: &AttritionFit, obs: &[EngagementObservation], options: &AgreementOptions) -> Agreement {
-    let predicted: f64 = obs.iter().map(|o| fit.expected_losses(o.shooters, o.targets, o.duration)).sum();
+pub fn attrition_agreement(
+    quantity: &str,
+    fit: &AttritionFit,
+    obs: &[EngagementObservation],
+    options: &AgreementOptions,
+) -> Agreement {
+    let predicted: f64 = obs
+        .iter()
+        .map(|o| fit.expected_losses(o.shooters, o.targets, o.duration))
+        .sum();
     let observed: u64 = obs.iter().map(|o| o.losses).sum();
     let p = match Poisson::new(predicted.max(1e-12)) {
         Ok(d) => {
             let lower = d.cdf(observed);
-            let upper = if observed == 0 { 1.0 } else { 1.0 - d.cdf(observed - 1) };
+            let upper = if observed == 0 {
+                1.0
+            } else {
+                1.0 - d.cdf(observed - 1)
+            };
             (2.0 * lower.min(upper)).min(1.0)
         }
         Err(_) => f64::NAN,
@@ -624,18 +788,45 @@ mod tests {
 
     #[test]
     fn recovers_continuous_parameters() {
-        let e = fit_exponential(&draws(&FittedDistribution::Exponential { rate: 0.25 }, 4000, 1)).unwrap();
-        let FittedDistribution::Exponential { rate } = e.distribution else { panic!() };
+        let e = fit_exponential(&draws(
+            &FittedDistribution::Exponential { rate: 0.25 },
+            4000,
+            1,
+        ))
+        .unwrap();
+        let FittedDistribution::Exponential { rate } = e.distribution else {
+            panic!()
+        };
         assert_relative_eq!(rate, 0.25, max_relative = 0.05);
         assert!(e.acceptable(0.01));
 
-        let l = fit_lognormal(&draws(&FittedDistribution::Lognormal { mu: 1.0, sigma: 0.5 }, 4000, 2)).unwrap();
-        let FittedDistribution::Lognormal { mu, sigma } = l.distribution else { panic!() };
+        let l = fit_lognormal(&draws(
+            &FittedDistribution::Lognormal {
+                mu: 1.0,
+                sigma: 0.5,
+            },
+            4000,
+            2,
+        ))
+        .unwrap();
+        let FittedDistribution::Lognormal { mu, sigma } = l.distribution else {
+            panic!()
+        };
         assert_relative_eq!(mu, 1.0, epsilon = 0.03);
         assert_relative_eq!(sigma, 0.5, epsilon = 0.03);
 
-        let g = fit_gamma(&draws(&FittedDistribution::Gamma { shape: 3.0, scale: 2.0 }, 4000, 3)).unwrap();
-        let FittedDistribution::Gamma { shape, scale } = g.distribution else { panic!() };
+        let g = fit_gamma(&draws(
+            &FittedDistribution::Gamma {
+                shape: 3.0,
+                scale: 2.0,
+            },
+            4000,
+            3,
+        ))
+        .unwrap();
+        let FittedDistribution::Gamma { shape, scale } = g.distribution else {
+            panic!()
+        };
         assert_relative_eq!(shape, 3.0, max_relative = 0.08);
         assert_relative_eq!(scale, 2.0, max_relative = 0.08);
         assert!(g.acceptable(0.01));
@@ -643,20 +834,44 @@ mod tests {
 
     #[test]
     fn trigamma_known_values() {
-        assert_relative_eq!(trigamma(1.0), std::f64::consts::PI.powi(2) / 6.0, epsilon = 1e-10);
-        assert_relative_eq!(trigamma(0.5), std::f64::consts::PI.powi(2) / 2.0, epsilon = 1e-10);
+        assert_relative_eq!(
+            trigamma(1.0),
+            std::f64::consts::PI.powi(2) / 6.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            trigamma(0.5),
+            std::f64::consts::PI.powi(2) / 2.0,
+            epsilon = 1e-10
+        );
     }
 
     #[test]
     fn aic_prefers_the_true_family_and_ks_rejects_the_wrong_one() {
-        let x = draws(&FittedDistribution::Lognormal { mu: 0.0, sigma: 1.0 }, 3000, 4);
+        let x = draws(
+            &FittedDistribution::Lognormal {
+                mu: 0.0,
+                sigma: 1.0,
+            },
+            3000,
+            4,
+        );
         let best = fit_best(&x);
         assert_eq!(best.len(), 3);
         assert_eq!(best[0].distribution.family(), "lognormal");
-        let exp = best.iter().find(|f| f.distribution.family() == "exponential").unwrap();
+        let exp = best
+            .iter()
+            .find(|f| f.distribution.family() == "exponential")
+            .unwrap();
         assert!(!exp.acceptable(0.01));
-        assert!(matches!(fit_lognormal(&[1.0, -1.0]), Err(FitError::NonPositive { .. })));
-        assert!(matches!(fit_gamma(&[2.0, 2.0, 2.0]), Err(FitError::Degenerate { .. })));
+        assert!(matches!(
+            fit_lognormal(&[1.0, -1.0]),
+            Err(FitError::NonPositive { .. })
+        ));
+        assert!(matches!(
+            fit_gamma(&[2.0, 2.0, 2.0]),
+            Err(FitError::Degenerate { .. })
+        ));
     }
 
     #[test]
@@ -673,7 +888,10 @@ mod tests {
         assert_relative_eq!(r.rate, 3.0);
         assert_relative_eq!(r.interval.lo, 2.024, epsilon = 2e-3);
         assert_relative_eq!(r.interval.hi, 4.283, epsilon = 2e-3);
-        assert!(matches!(fit_poisson_rate(&[1], &[0.0], 0.95), Err(FitError::NoExposure)));
+        assert!(matches!(
+            fit_poisson_rate(&[1], &[0.0], 0.95),
+            Err(FitError::NoExposure)
+        ));
     }
 
     /// Synthetic "entity-level" engagements generated under the square law.
@@ -686,7 +904,12 @@ mod tests {
                 let duration = 0.5 + (i % 4) as f64 * 0.5;
                 let lambda = alpha * shooters * duration;
                 let losses = Poisson::new(lambda).unwrap().sample(&mut rng) as u64;
-                EngagementObservation { shooters, targets, duration, losses }
+                EngagementObservation {
+                    shooters,
+                    targets,
+                    duration,
+                    losses,
+                }
             })
             .collect()
     }
@@ -702,29 +925,75 @@ mod tests {
 
         let mut table = CoefficientTable::new();
         let key = CoefficientKey::new("armour-coy", "mech-inf-coy", "attack", "open");
-        let mut set = CoefficientSet { provenance: "synthetic test".into(), ..Default::default() };
+        let mut set = CoefficientSet {
+            provenance: "synthetic test".into(),
+            ..Default::default()
+        };
         set.attrition.insert("opponent_losses".into(), sq.clone());
         set.distributions.insert(
             "advance_km_per_h".into(),
-            fit_gamma(&draws(&FittedDistribution::Gamma { shape: 4.0, scale: 0.5 }, 500, 7)).unwrap(),
+            fit_gamma(&draws(
+                &FittedDistribution::Gamma {
+                    shape: 4.0,
+                    scale: 0.5,
+                },
+                500,
+                7,
+            ))
+            .unwrap(),
         );
         table.insert(key.clone(), set);
-        table.insert(CoefficientKey::new("armour-coy", "mech-inf-coy", "attack", "forest"), CoefficientSet::default());
+        table.insert(
+            CoefficientKey::new("armour-coy", "mech-inf-coy", "attack", "forest"),
+            CoefficientSet::default(),
+        );
         assert_eq!(table.entries[0].key.terrain, "forest");
         let back = CoefficientTable::from_json(&table.to_json().unwrap()).unwrap();
         assert_eq!(back, table);
 
-        let opts = AgreementOptions { alpha: 0.01, rel_tol: 0.15 };
+        let opts = AgreementOptions {
+            alpha: 0.01,
+            rel_tol: 0.15,
+        };
         let fit = &back.get(&key).unwrap().attrition["opponent_losses"];
         let same = attrition_agreement("opponent_losses", fit, &engagements(0.15, 300, 8), &opts);
         assert!(same.agrees, "{}", same.explanation);
-        let changed = attrition_agreement("opponent_losses", fit, &engagements(0.25, 300, 9), &opts);
-        assert!(!changed.agrees && !changed.practically_close, "{}", changed.explanation);
+        let changed =
+            attrition_agreement("opponent_losses", fit, &engagements(0.25, 300, 9), &opts);
+        assert!(
+            !changed.agrees && !changed.practically_close,
+            "{}",
+            changed.explanation
+        );
 
         let adv = back.get(&key).unwrap().distributions["advance_km_per_h"].distribution;
-        let ok = distribution_agreement("advance", &adv, &draws(&FittedDistribution::Gamma { shape: 4.0, scale: 0.5 }, 400, 10), &opts);
+        let ok = distribution_agreement(
+            "advance",
+            &adv,
+            &draws(
+                &FittedDistribution::Gamma {
+                    shape: 4.0,
+                    scale: 0.5,
+                },
+                400,
+                10,
+            ),
+            &opts,
+        );
         assert!(ok.agrees, "{}", ok.explanation);
-        let bad = distribution_agreement("advance", &adv, &draws(&FittedDistribution::Gamma { shape: 4.0, scale: 0.8 }, 400, 11), &opts);
+        let bad = distribution_agreement(
+            "advance",
+            &adv,
+            &draws(
+                &FittedDistribution::Gamma {
+                    shape: 4.0,
+                    scale: 0.8,
+                },
+                400,
+                11,
+            ),
+            &opts,
+        );
         assert!(!bad.agrees);
 
         let mut rng = Seed(1).stream(StreamKey::new("t", 0, 0, 0));

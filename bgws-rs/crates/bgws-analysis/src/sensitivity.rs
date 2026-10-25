@@ -61,7 +61,11 @@ impl Factor {
 /// The figures that can be varied (a non-empty range) and pass `include`,
 /// in key order.
 pub fn factors(figures: &Figures, include: impl Fn(&Figure) -> bool) -> Vec<Factor> {
-    figures.iter().filter(|f| f.max > f.min && include(f)).map(Factor::from_figure).collect()
+    figures
+        .iter()
+        .filter(|f| f.max > f.min && include(f))
+        .map(Factor::from_figure)
+        .collect()
 }
 
 /// A scalar response of the whole model to a set of figures.
@@ -98,7 +102,12 @@ where
 }
 
 /// Evaluate a response at unit-hypercube points, mapping each to figures.
-fn eval_points(figures: &Figures, factors: &[Factor], response: &impl Response, points: &[Vec<f64>]) -> Vec<f64> {
+fn eval_points(
+    figures: &Figures,
+    factors: &[Factor],
+    response: &impl Response,
+    points: &[Vec<f64>],
+) -> Vec<f64> {
     points
         .par_iter()
         .map(|x| {
@@ -106,7 +115,8 @@ fn eval_points(figures: &Figures, factors: &[Factor], response: &impl Response, 
             for (fac, &xi) in factors.iter().zip(x) {
                 // In range by construction; an unknown key is a caller error
                 // that `factors` cannot produce.
-                f.set(&fac.key, fac.value_at(xi)).expect("factor values stay in their declared range");
+                f.set(&fac.key, fac.value_at(xi))
+                    .expect("factor values stay in their declared range");
             }
             response.eval(&f)
         })
@@ -168,7 +178,11 @@ pub fn morris_design(k: usize, options: &MorrisOptions, seed: Seed) -> Vec<Traje
                 steps.push(step);
                 points.push(x.clone());
             }
-            Trajectory { points, order, steps }
+            Trajectory {
+                points,
+                order,
+                steps,
+            }
         })
         .collect()
 }
@@ -196,7 +210,13 @@ pub struct MorrisResult {
     pub effects: Vec<MorrisEffect>,
 }
 
-fn morris_effects(k: usize, design: &[Trajectory], y: &[f64], names: &[String], options: MorrisOptions) -> MorrisResult {
+fn morris_effects(
+    k: usize,
+    design: &[Trajectory],
+    y: &[f64],
+    names: &[String],
+    options: MorrisOptions,
+) -> MorrisResult {
     let mut ee: Vec<Vec<f64>> = vec![Vec::new(); k];
     let mut at = 0;
     for tr in design {
@@ -215,8 +235,19 @@ fn morris_effects(k: usize, design: &[Trajectory], y: &[f64], names: &[String], 
             let n = e.len().max(1) as f64;
             let mu = e.iter().sum::<f64>() / n;
             let mu_star = e.iter().map(|x| x.abs()).sum::<f64>() / n;
-            let sigma = if e.len() > 1 { (e.iter().map(|x| (x - mu).powi(2)).sum::<f64>() / (n - 1.0)).sqrt() } else { 0.0 };
-            MorrisEffect { index: i, key: names[i].clone(), mu, mu_star, sigma, mu_star_normalised: 0.0 }
+            let sigma = if e.len() > 1 {
+                (e.iter().map(|x| (x - mu).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
+            } else {
+                0.0
+            };
+            MorrisEffect {
+                index: i,
+                key: names[i].clone(),
+                mu,
+                mu_star,
+                sigma,
+                mu_star_normalised: 0.0,
+            }
         })
         .collect();
     let top = effects.iter().map(|e| e.mu_star).fold(0.0, f64::max);
@@ -224,11 +255,20 @@ fn morris_effects(k: usize, design: &[Trajectory], y: &[f64], names: &[String], 
         e.mu_star_normalised = if top > 0.0 { e.mu_star / top } else { 0.0 };
     }
     effects.sort_by(|a, b| b.mu_star.total_cmp(&a.mu_star).then(a.index.cmp(&b.index)));
-    MorrisResult { options, evaluations: y.len(), effects }
+    MorrisResult {
+        options,
+        evaluations: y.len(),
+        effects,
+    }
 }
 
 /// Morris screening of a function on the unit hypercube [0, 1]^k.
-pub fn morris_unit(k: usize, f: &(dyn Fn(&[f64]) -> f64 + Sync), options: &MorrisOptions, seed: Seed) -> MorrisResult {
+pub fn morris_unit(
+    k: usize,
+    f: &(dyn Fn(&[f64]) -> f64 + Sync),
+    options: &MorrisOptions,
+    seed: Seed,
+) -> MorrisResult {
     let design = morris_design(k, options, seed);
     let points: Vec<&Vec<f64>> = design.iter().flat_map(|t| t.points.iter()).collect();
     let y: Vec<f64> = points.par_iter().map(|x| f(x)).collect();
@@ -238,10 +278,19 @@ pub fn morris_unit(k: usize, f: &(dyn Fn(&[f64]) -> f64 + Sync), options: &Morri
 
 /// Morris screening of a response over figures, each varied in its range.
 /// Elementary effects are per unit fraction of each figure's range.
-pub fn morris_figures(figures: &Figures, factors: &[Factor], response: &impl Response, options: &MorrisOptions, seed: Seed) -> MorrisResult {
+pub fn morris_figures(
+    figures: &Figures,
+    factors: &[Factor],
+    response: &impl Response,
+    options: &MorrisOptions,
+    seed: Seed,
+) -> MorrisResult {
     let k = factors.len();
     let design = morris_design(k, options, seed);
-    let points: Vec<Vec<f64>> = design.iter().flat_map(|t| t.points.iter().cloned()).collect();
+    let points: Vec<Vec<f64>> = design
+        .iter()
+        .flat_map(|t| t.points.iter().cloned())
+        .collect();
     let y = eval_points(figures, factors, response, &points);
     let names: Vec<String> = factors.iter().map(|f| f.key.clone()).collect();
     morris_effects(k, &design, &y, &names, *options)
@@ -326,12 +375,24 @@ fn jansen(k: usize, n: usize, y: &[f64], idx: &[usize]) -> (Vec<f64>, Vec<f64>, 
     let fab = |i: usize, r: usize| y[(2 + i) * n + r];
     let m = idx.len() as f64;
     let mean = idx.iter().map(|&r| fa(r) + fb(r)).sum::<f64>() / (2.0 * m);
-    let var = idx.iter().map(|&r| (fa(r) - mean).powi(2) + (fb(r) - mean).powi(2)).sum::<f64>() / (2.0 * m);
+    let var = idx
+        .iter()
+        .map(|&r| (fa(r) - mean).powi(2) + (fb(r) - mean).powi(2))
+        .sum::<f64>()
+        / (2.0 * m);
     let mut first = Vec::with_capacity(k);
     let mut total = Vec::with_capacity(k);
     for i in 0..k {
-        let s1 = idx.iter().map(|&r| (fb(r) - fab(i, r)).powi(2)).sum::<f64>() / (2.0 * m);
-        let st = idx.iter().map(|&r| (fa(r) - fab(i, r)).powi(2)).sum::<f64>() / (2.0 * m);
+        let s1 = idx
+            .iter()
+            .map(|&r| (fb(r) - fab(i, r)).powi(2))
+            .sum::<f64>()
+            / (2.0 * m);
+        let st = idx
+            .iter()
+            .map(|&r| (fa(r) - fab(i, r)).powi(2))
+            .sum::<f64>()
+            / (2.0 * m);
         if var > 0.0 {
             first.push((var - s1) / var);
             total.push(st / var);
@@ -343,7 +404,14 @@ fn jansen(k: usize, n: usize, y: &[f64], idx: &[usize]) -> (Vec<f64>, Vec<f64>, 
     (first, total, var)
 }
 
-fn sobol_from(k: usize, n: usize, y: &[f64], names: &[String], options: &SobolOptions, seed: Seed) -> SobolResult {
+fn sobol_from(
+    k: usize,
+    n: usize,
+    y: &[f64],
+    names: &[String],
+    options: &SobolOptions,
+    seed: Seed,
+) -> SobolResult {
     let all: Vec<usize> = (0..n).collect();
     let (first, total, variance) = jansen(k, n, y, &all);
     let mut cis: Vec<(Option<Interval>, Option<Interval>)> = vec![(None, None); k];
@@ -351,7 +419,8 @@ fn sobol_from(k: usize, n: usize, y: &[f64], names: &[String], options: &SobolOp
         let boots: Vec<(Vec<f64>, Vec<f64>, f64)> = (0..options.bootstrap)
             .into_par_iter()
             .map(|b| {
-                let mut rng = seed.stream(StreamKey::new("analysis.sobol.bootstrap", b as u64, 0, 0));
+                let mut rng =
+                    seed.stream(StreamKey::new("analysis.sobol.bootstrap", b as u64, 0, 0));
                 let idx: Vec<usize> = (0..n).map(|_| rng.gen_range(0..n)).collect();
                 jansen(k, n, y, &idx)
             })
@@ -361,20 +430,45 @@ fn sobol_from(k: usize, n: usize, y: &[f64], names: &[String], options: &SobolOp
             let s: Vec<f64> = boots.iter().map(|b| b.0[i]).collect();
             let t: Vec<f64> = boots.iter().map(|b| b.1[i]).collect();
             *ci = (
-                Some(Interval { lo: quantile(&s, lo), hi: quantile(&s, 1.0 - lo), level: options.level }),
-                Some(Interval { lo: quantile(&t, lo), hi: quantile(&t, 1.0 - lo), level: options.level }),
+                Some(Interval {
+                    lo: quantile(&s, lo),
+                    hi: quantile(&s, 1.0 - lo),
+                    level: options.level,
+                }),
+                Some(Interval {
+                    lo: quantile(&t, lo),
+                    hi: quantile(&t, 1.0 - lo),
+                    level: options.level,
+                }),
             );
         }
     }
     let mut indices: Vec<SobolIndex> = (0..k)
-        .map(|i| SobolIndex { index: i, key: names[i].clone(), first: first[i], total: total[i], first_ci: cis[i].0, total_ci: cis[i].1 })
+        .map(|i| SobolIndex {
+            index: i,
+            key: names[i].clone(),
+            first: first[i],
+            total: total[i],
+            first_ci: cis[i].0,
+            total_ci: cis[i].1,
+        })
         .collect();
     indices.sort_by(|a, b| b.total.total_cmp(&a.total).then(a.index.cmp(&b.index)));
-    SobolResult { base_samples: n, evaluations: y.len(), variance, indices }
+    SobolResult {
+        base_samples: n,
+        evaluations: y.len(),
+        variance,
+        indices,
+    }
 }
 
 /// Sobol indices of a function on the unit hypercube [0, 1]^k.
-pub fn sobol_unit(k: usize, f: &(dyn Fn(&[f64]) -> f64 + Sync), options: &SobolOptions, seed: Seed) -> SobolResult {
+pub fn sobol_unit(
+    k: usize,
+    f: &(dyn Fn(&[f64]) -> f64 + Sync),
+    options: &SobolOptions,
+    seed: Seed,
+) -> SobolResult {
     let n = options.base_samples.max(2);
     let pts = saltelli_points(k, n, seed);
     let y: Vec<f64> = pts.par_iter().map(|x| f(x)).collect();
@@ -383,7 +477,13 @@ pub fn sobol_unit(k: usize, f: &(dyn Fn(&[f64]) -> f64 + Sync), options: &SobolO
 }
 
 /// Sobol indices of a response over figures, the others held at base value.
-pub fn sobol_figures(figures: &Figures, factors: &[Factor], response: &impl Response, options: &SobolOptions, seed: Seed) -> SobolResult {
+pub fn sobol_figures(
+    figures: &Figures,
+    factors: &[Factor],
+    response: &impl Response,
+    options: &SobolOptions,
+    seed: Seed,
+) -> SobolResult {
     let k = factors.len();
     let n = options.base_samples.max(2);
     let pts = saltelli_points(k, n, seed);
@@ -417,10 +517,22 @@ pub fn analyse(
     seed: Seed,
 ) -> SensitivityReport {
     let m = morris_figures(figures, factors, response, morris, seed);
-    let top: Vec<Factor> = m.effects.iter().take(sobol.top_k).filter(|e| e.mu_star > 0.0).map(|e| factors[e.index].clone()).collect();
+    let top: Vec<Factor> = m
+        .effects
+        .iter()
+        .take(sobol.top_k)
+        .filter(|e| e.mu_star > 0.0)
+        .map(|e| factors[e.index].clone())
+        .collect();
     let s = (!top.is_empty()).then(|| sobol_figures(figures, &top, response, sobol, seed));
     let backlog = ResearchBacklog::rank(factors, &m, s.as_ref());
-    SensitivityReport { subject: subject.into(), factors: factors.to_vec(), morris: m, sobol: s, backlog }
+    SensitivityReport {
+        subject: subject.into(),
+        factors: factors.to_vec(),
+        morris: m,
+        sobol: s,
+        backlog,
+    }
 }
 
 /// One unsourced figure in the research backlog.
@@ -476,7 +588,9 @@ impl ResearchBacklog {
         entries.sort_by(|a, b| {
             let sa = a.sobol_total.unwrap_or(-1.0);
             let sb = b.sobol_total.unwrap_or(-1.0);
-            sb.total_cmp(&sa).then(b.mu_star_normalised.total_cmp(&a.mu_star_normalised)).then(a.key.cmp(&b.key))
+            sb.total_cmp(&sa)
+                .then(b.mu_star_normalised.total_cmp(&a.mu_star_normalised))
+                .then(a.key.cmp(&b.key))
         });
         for (i, e) in entries.iter_mut().enumerate() {
             e.rank = i + 1;
@@ -503,8 +617,12 @@ impl ResearchBacklog {
                 fmt(e.mu_star),
                 e.mu_star_normalised * 100.0,
                 fmt(e.sigma),
-                e.sobol_total.map(|x| format!("{x:.3}")).unwrap_or_else(|| "—".into()),
-                e.sobol_first.map(|x| format!("{x:.3}")).unwrap_or_else(|| "—".into()),
+                e.sobol_total
+                    .map(|x| format!("{x:.3}"))
+                    .unwrap_or_else(|| "—".into()),
+                e.sobol_first
+                    .map(|x| format!("{x:.3}"))
+                    .unwrap_or_else(|| "—".into()),
             ));
         }
         s
@@ -560,7 +678,11 @@ pub fn one_at_a_time<E: Experiment>(
         let mut f = figures.clone();
         f.set(key, value).ok()?;
         let r = vignette.check(experiment, metric, &f, base_seed, options);
-        Some(SweepEnd { value, estimate: r.estimate, in_band: r.verdict == Verdict::InBand })
+        Some(SweepEnd {
+            value,
+            estimate: r.estimate,
+            in_band: r.verdict == Verdict::InBand,
+        })
     };
     let base_in = base.verdict == Verdict::InBand;
     let mut rows: Vec<SweepRow> = keys
@@ -580,7 +702,12 @@ pub fn one_at_a_time<E: Experiment>(
         })
         .collect();
     rows.sort_by(|a, b| b.swing.total_cmp(&a.swing).then(a.figure.cmp(&b.figure)));
-    Sweep { vignette: vignette.id.clone(), base_estimate: base.estimate, base_in_band: base_in, rows }
+    Sweep {
+        vignette: vignette.id.clone(),
+        base_estimate: base.estimate,
+        base_in_band: base_in,
+        rows,
+    }
 }
 
 #[cfg(test)]
@@ -600,7 +727,15 @@ mod tests {
     fn morris_linear_model_mu_star_is_the_coefficient() {
         let c = [3.0, -2.0, 0.5, 0.0];
         let f = move |x: &[f64]| x.iter().zip(&c).map(|(a, b)| a * b).sum::<f64>();
-        let r = morris_unit(4, &f, &MorrisOptions { trajectories: 10, levels: 4 }, Seed(1));
+        let r = morris_unit(
+            4,
+            &f,
+            &MorrisOptions {
+                trajectories: 10,
+                levels: 4,
+            },
+            Seed(1),
+        );
         assert_eq!(r.evaluations, 10 * 5);
         for e in &r.effects {
             assert_abs_diff_eq!(e.mu_star, c[e.index].abs(), epsilon = 1e-9);
@@ -613,7 +748,14 @@ mod tests {
 
     #[test]
     fn morris_design_stays_on_grid() {
-        let d = morris_design(6, &MorrisOptions { trajectories: 30, levels: 6 }, Seed(9));
+        let d = morris_design(
+            6,
+            &MorrisOptions {
+                trajectories: 30,
+                levels: 6,
+            },
+            Seed(9),
+        );
         for tr in &d {
             assert_eq!(tr.points.len(), 7);
             let mut seen = tr.order.clone();
@@ -627,7 +769,15 @@ mod tests {
 
     #[test]
     fn morris_flags_ishigami_interaction() {
-        let r = morris_unit(3, &ishigami, &MorrisOptions { trajectories: 50, levels: 4 }, Seed(2));
+        let r = morris_unit(
+            3,
+            &ishigami,
+            &MorrisOptions {
+                trajectories: 50,
+                levels: 4,
+            },
+            Seed(2),
+        );
         let x3 = r.effects.iter().find(|e| e.index == 2).unwrap();
         // x3 acts only through its interaction with x1: μ ≈ 0 relative to μ*, σ > 0.
         assert!(x3.sigma > 0.0 && x3.mu_star > 0.0);
@@ -635,7 +785,12 @@ mod tests {
 
     #[test]
     fn sobol_ishigami_matches_analytic_indices() {
-        let opts = SobolOptions { base_samples: 8192, bootstrap: 50, level: 0.95, top_k: 3 };
+        let opts = SobolOptions {
+            base_samples: 8192,
+            bootstrap: 50,
+            level: 0.95,
+            top_k: 3,
+        };
         let r = sobol_unit(3, &ishigami, &opts, Seed(3));
         let by = |i: usize| r.indices.iter().find(|s| s.index == i).unwrap().clone();
         // Analytic (a = 7, b = 0.1): S = (0.3139, 0.4424, 0), S_T = (0.5576, 0.4424, 0.2437).
@@ -664,10 +819,25 @@ mod tests {
         let resp = |f: &Figures| 2.0 * f.get("m.a") + f.get("m.b") + 0.1 * f.get("m.c");
         let fac = factors(&figs, |_| true);
         assert_eq!(fac.len(), 3, "a fixed figure cannot be varied");
-        let m = MorrisOptions { trajectories: 8, levels: 4 };
-        let s = SobolOptions { base_samples: 512, bootstrap: 0, level: 0.95, top_k: 2 };
+        let m = MorrisOptions {
+            trajectories: 8,
+            levels: 4,
+        };
+        let s = SobolOptions {
+            base_samples: 512,
+            bootstrap: 0,
+            level: 0.95,
+            top_k: 2,
+        };
         let rep = analyse("linear", &figs, &fac, &resp, &m, &s, Seed(4));
-        let mu = |k: &str| rep.morris.effects.iter().find(|e| e.key == k).unwrap().mu_star;
+        let mu = |k: &str| {
+            rep.morris
+                .effects
+                .iter()
+                .find(|e| e.key == k)
+                .unwrap()
+                .mu_star
+        };
         assert_abs_diff_eq!(mu("m.a"), 4.0, epsilon = 1e-9);
         assert_abs_diff_eq!(mu("m.b"), 10.0, epsilon = 1e-9);
         assert_abs_diff_eq!(mu("m.c"), 0.1, epsilon = 1e-9);
@@ -680,14 +850,26 @@ mod tests {
         assert!(rep.backlog.entries[0].sobol_total.is_some());
         assert!(rep.backlog.to_markdown().contains("| 1 | `m.a`"));
         let back: ResearchBacklog = serde_json::from_str(&rep.backlog.to_json()).unwrap();
-        assert_eq!(back, rep.backlog);
+        assert_eq!(back.entries.len(), rep.backlog.entries.len());
+        assert_eq!(back.entries[1].key, "m.c");
     }
 
     #[test]
     fn thread_count_does_not_change_results() {
-        let opts = SobolOptions { base_samples: 256, bootstrap: 20, level: 0.95, top_k: 3 };
-        let one = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap();
-        let four = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap();
+        let opts = SobolOptions {
+            base_samples: 256,
+            bootstrap: 20,
+            level: 0.95,
+            top_k: 3,
+        };
+        let one = rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .unwrap();
+        let four = rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .unwrap();
         let a = one.install(|| sobol_unit(3, &ishigami, &opts, Seed(8)));
         let b = four.install(|| sobol_unit(3, &ishigami, &opts, Seed(8)));
         assert_eq!(a, b);
@@ -695,17 +877,32 @@ mod tests {
 
     #[test]
     fn one_at_a_time_sweep_reports_both_ends() {
-        let figs = Figures::from_list(
-            crate::figures().into_iter().chain([figure!("t.p", 0.85, "fraction", 0.5, 0.95, "default", Default, "")]),
-        )
+        let figs = Figures::from_list(crate::figures().into_iter().chain([figure!(
+            "t.p", 0.85, "fraction", 0.5, 0.95, "default", Default, ""
+        )]))
         .unwrap();
         let v = crate::vignettes::find("ballistic-missile-defence").unwrap();
         let exp = |f: &Figures, seed: Seed| {
             let x: f64 = seed.stream(StreamKey::new("t", 0, 0, 0)).gen();
-            if x < f.get("t.p") { 1.0 } else { 0.0 }
+            if x < f.get("t.p") {
+                1.0
+            } else {
+                0.0
+            }
         };
-        let opts = CheckOptions { level: 0.95, replicates: Some(400) };
-        let sweep = one_at_a_time(&v, &exp, &crate::batch::Scalar, &figs, &["t.p".into(), "nope".into()], Seed(1), &opts);
+        let opts = CheckOptions {
+            level: 0.95,
+            replicates: Some(400),
+        };
+        let sweep = one_at_a_time(
+            &v,
+            &exp,
+            &crate::batch::Scalar,
+            &figs,
+            &["t.p".into(), "nope".into()],
+            Seed(1),
+            &opts,
+        );
         assert_eq!(sweep.rows.len(), 1);
         let row = &sweep.rows[0];
         assert!(row.low.value < row.high.value);

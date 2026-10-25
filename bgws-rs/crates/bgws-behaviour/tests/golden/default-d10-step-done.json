@@ -1,0 +1,53 @@
+{
+  "scene": {
+    "name": "default-d10-step-done",
+    "candidates": [
+      "core/default"
+    ],
+    "trigger": "D10",
+    "facts": {}
+  },
+  "template": "core/default",
+  "lineage": [
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D10",
+    "title": "Order step done or blocked",
+    "question": "Its current step is done or it cannot go on. What next?",
+    "doctrine": [],
+    "options": [
+      {
+        "id": "resume",
+        "action": "land.resumeOrders",
+        "bias": 0
+      },
+      {
+        "id": "nextPhase",
+        "action": "land.skipToNextPhase",
+        "bias": 0
+      },
+      {
+        "id": "hold",
+        "action": "land.holdHere",
+        "bias": 0
+      },
+      {
+        "id": "overwatch",
+        "action": "land.overwatchHere",
+        "bias": 0
+      },
+      {
+        "id": "keep",
+        "action": "land.keepHoldingHere",
+        "bias": 0
+      }
+    ],
+    "fallback": "overwatch",
+    "dropped": [],
+    "path": [
+      "D10"
+    ]
+  }
+}

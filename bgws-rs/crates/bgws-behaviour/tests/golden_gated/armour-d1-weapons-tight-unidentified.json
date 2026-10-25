@@ -1,0 +1,70 @@
+{
+  "scene": {
+    "name": "armour-d1-weapons-tight-unidentified",
+    "candidates": [
+      "core/armour"
+    ],
+    "trigger": "D1",
+    "facts": {}
+  },
+  "template": "core/armour",
+  "lineage": [
+    "core/armour",
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D1",
+    "title": "New contact",
+    "question": "It has found an enemy it did not know about. What now?",
+    "doctrine": [
+      "Armour fights from hull-down positions and at long range, where its gun and protection count most. It avoids being drawn close to infantry it cannot see, and moves between firing positions out of the enemy's sight."
+    ],
+    "options": [
+      {
+        "id": "keep",
+        "action": "land.carryOn",
+        "bias": 0
+      },
+      {
+        "id": "observe",
+        "action": "land.observe",
+        "bias": 0
+      },
+      {
+        "id": "pullBack",
+        "action": "land.pullBackToFriends",
+        "bias": 0
+      }
+    ],
+    "fallback": "keep",
+    "dropped": [
+      {
+        "id": "engage",
+        "action": "land.engageNow",
+        "why": "gate:weaponRelease"
+      },
+      {
+        "id": "wait",
+        "action": "land.waitFor",
+        "why": "gate:weaponRelease"
+      },
+      {
+        "id": "better",
+        "action": "land.betterPosition",
+        "why": "gate:weaponRelease"
+      }
+    ],
+    "path": [
+      "D1"
+    ]
+  },
+  "gates": {
+    "roe": "always",
+    "fired_upon": false,
+    "weapon_release": "tight",
+    "target_identified": false,
+    "emcon": "unrestricted",
+    "cohesion": "steady"
+  }
+}

@@ -21,12 +21,35 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+/// Bit-exact f64 lists through JSON: Rust's `Display` writes the shortest
+/// string that round-trips, and `str::parse` is correctly rounded.
+mod exact_f64s {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &[f64], s: S) -> Result<S::Ok, S::Error> {
+        s.collect_seq(v.iter().map(|x| x.to_string()))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<f64>, D::Error> {
+        let raw = Vec::<String>::deserialize(d)?;
+        raw.iter()
+            .map(|s| s.parse::<f64>().map_err(serde::de::Error::custom))
+            .collect()
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RegressionError {
     #[error("i/o error on {path}: {source}")]
-    Io { path: PathBuf, source: std::io::Error },
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     #[error("bad JSON in {path}: {source}")]
-    Json { path: PathBuf, source: serde_json::Error },
+    Json {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
     #[error("vignette id `{0}` is not a safe file name")]
     BadId(String),
     #[error("an acceptance needs an explanation")]
@@ -55,7 +78,10 @@ pub struct StoredDistribution {
     pub band: Band,
     pub estimate: f64,
     pub summary: Summary,
-    /// The measured values, in replicate order.
+    /// The measured values, in replicate order. Stored as decimal strings
+    /// that parse back bit-exactly (JSON numbers may not, depending on the
+    /// serde_json build features).
+    #[serde(with = "exact_f64s")]
     pub values: Vec<f64>,
     pub missing: usize,
     pub fingerprint: String,
@@ -99,7 +125,10 @@ pub enum RegressionStatus {
 
 impl RegressionStatus {
     pub fn fails(&self) -> bool {
-        matches!(self, RegressionStatus::OutOfBand | RegressionStatus::Shifted)
+        matches!(
+            self,
+            RegressionStatus::OutOfBand | RegressionStatus::Shifted
+        )
     }
 }
 
@@ -126,7 +155,9 @@ pub struct RegressionOptions {
 
 impl RegressionOptions {
     pub fn from_figures(f: &Figures) -> Self {
-        RegressionOptions { ks_alpha: f.get("analysis.regression.ks_alpha") }
+        RegressionOptions {
+            ks_alpha: f.get("analysis.regression.ks_alpha"),
+        }
     }
 }
 
@@ -137,7 +168,10 @@ pub struct RegressionStore {
 }
 
 fn io(path: &Path) -> impl FnOnce(std::io::Error) -> RegressionError + '_ {
-    move |source| RegressionError::Io { path: path.to_path_buf(), source }
+    move |source| RegressionError::Io {
+        path: path.to_path_buf(),
+        source,
+    }
 }
 
 impl RegressionStore {
@@ -153,7 +187,11 @@ impl RegressionStore {
     }
 
     fn path(&self, id: &str) -> Result<PathBuf, RegressionError> {
-        let ok = !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) && !id.starts_with('.');
+        let ok = !id.is_empty()
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            && !id.starts_with('.');
         if !ok {
             return Err(RegressionError::BadId(id.into()));
         }
@@ -167,13 +205,19 @@ impl RegressionStore {
             return Ok(None);
         }
         let text = std::fs::read_to_string(&path).map_err(io(&path))?;
-        serde_json::from_str(&text).map(Some).map_err(|source| RegressionError::Json { path, source })
+        serde_json::from_str(&text)
+            .map(Some)
+            .map_err(|source| RegressionError::Json { path, source })
     }
 
     /// Write a baseline (overwriting).
     pub fn save(&self, stored: &StoredDistribution) -> Result<PathBuf, RegressionError> {
         let path = self.path(&stored.id)?;
-        let text = serde_json::to_string_pretty(stored).map_err(|source| RegressionError::Json { path: path.clone(), source })?;
+        let text =
+            serde_json::to_string_pretty(stored).map_err(|source| RegressionError::Json {
+                path: path.clone(),
+                source,
+            })?;
         std::fs::write(&path, text).map_err(io(&path))?;
         Ok(path)
     }
@@ -193,14 +237,22 @@ impl RegressionStore {
     }
 
     /// Compare a new run with its baseline. Does not write anything.
-    pub fn compare(&self, result: &VignetteResult, options: &RegressionOptions) -> Result<RegressionVerdict, RegressionError> {
+    pub fn compare(
+        &self,
+        result: &VignetteResult,
+        options: &RegressionOptions,
+    ) -> Result<RegressionVerdict, RegressionError> {
         let stored = self.load(&result.id)?;
         Ok(compare_with(stored.as_ref(), result, options))
     }
 
     /// Store the run as the baseline when it is new or passes; leave the
     /// baseline alone when it fails. Returns the verdict.
-    pub fn check_and_record(&self, result: &VignetteResult, options: &RegressionOptions) -> Result<RegressionVerdict, RegressionError> {
+    pub fn check_and_record(
+        &self,
+        result: &VignetteResult,
+        options: &RegressionOptions,
+    ) -> Result<RegressionVerdict, RegressionError> {
         let stored = self.load(&result.id)?;
         let verdict = compare_with(stored.as_ref(), result, options);
         if verdict.status == RegressionStatus::New {
@@ -210,7 +262,12 @@ impl RegressionStore {
     }
 
     /// Accept a run as the new baseline, with an explanation (§15.8).
-    pub fn accept(&self, result: &VignetteResult, explanation: &str, options: &RegressionOptions) -> Result<StoredDistribution, RegressionError> {
+    pub fn accept(
+        &self,
+        result: &VignetteResult,
+        explanation: &str,
+        options: &RegressionOptions,
+    ) -> Result<StoredDistribution, RegressionError> {
         if explanation.trim().is_empty() {
             return Err(RegressionError::NoExplanation);
         }
@@ -230,18 +287,38 @@ impl RegressionStore {
 }
 
 /// Compare a run with an optional baseline (pure; the store's logic).
-pub fn compare_with(stored: Option<&StoredDistribution>, result: &VignetteResult, options: &RegressionOptions) -> RegressionVerdict {
+pub fn compare_with(
+    stored: Option<&StoredDistribution>,
+    result: &VignetteResult,
+    options: &RegressionOptions,
+) -> RegressionVerdict {
     let ks = stored.and_then(|s| ks_two_sample(&s.values, &result.sample.values));
     let mw = stored.and_then(|s| mann_whitney(&s.values, &result.sample.values));
     let fingerprint = result.sample.fingerprint();
-    let accepted = stored.and_then(|s| s.history.iter().rev().find(|a| a.fingerprint == fingerprint));
+    let accepted = stored.and_then(|s| {
+        s.history
+            .iter()
+            .rev()
+            .find(|a| a.fingerprint == fingerprint)
+    });
     let shifted = ks.is_some_and(|k| k.rejects(options.ks_alpha));
     let (status, explanation) = if result.verdict != Verdict::InBand {
-        (RegressionStatus::OutOfBand, format!("Out of band: {}", result.explanation))
-    } else if let Some(a) = accepted.filter(|_| stored.is_some_and(|s| s.fingerprint == fingerprint)) {
-        (RegressionStatus::Accepted, format!("Matches the accepted baseline: {}", a.explanation))
+        (
+            RegressionStatus::OutOfBand,
+            format!("Out of band: {}", result.explanation),
+        )
+    } else if let Some(a) =
+        accepted.filter(|_| stored.is_some_and(|s| s.fingerprint == fingerprint))
+    {
+        (
+            RegressionStatus::Accepted,
+            format!("Matches the accepted baseline: {}", a.explanation),
+        )
     } else if stored.is_none() {
-        (RegressionStatus::New, "No baseline yet; this run becomes it.".to_string())
+        (
+            RegressionStatus::New,
+            "No baseline yet; this run becomes it.".to_string(),
+        )
     } else if shifted {
         let k = ks.expect("shifted implies a KS result");
         (
@@ -256,8 +333,13 @@ pub fn compare_with(stored: Option<&StoredDistribution>, result: &VignetteResult
             ),
         )
     } else {
-        let p = ks.map(|k| format!("KS p = {:.3}", k.p_value)).unwrap_or_else(|| "no KS (empty sample)".into());
-        (RegressionStatus::Pass, format!("In band and consistent with the baseline ({p})."))
+        let p = ks
+            .map(|k| format!("KS p = {:.3}", k.p_value))
+            .unwrap_or_else(|| "no KS (empty sample)".into());
+        (
+            RegressionStatus::Pass,
+            format!("In band and consistent with the baseline ({p})."),
+        )
     };
     RegressionVerdict {
         id: result.id.clone(),
@@ -280,7 +362,9 @@ mod tests {
     fn result(shift: f64) -> VignetteResult {
         let v = find("attack-halt").unwrap();
         // A deterministic spread of 200 values around 0.2 + shift.
-        let values = (0..200).map(|i| 0.2 + shift + 0.05 * (((i * 37) % 200) as f64 / 200.0 - 0.5)).collect();
+        let values = (0..200)
+            .map(|i| 0.2 + shift + 0.05 * (((i * 37) % 200) as f64 / 200.0 - 0.5))
+            .collect();
         v.evaluate(&Sample::new("losses_at_halt", "fraction", values), 0.95)
     }
 
@@ -290,10 +374,16 @@ mod tests {
         let store = RegressionStore::open(dir.path()).unwrap();
         let opts = RegressionOptions { ks_alpha: 0.01 };
         let base = result(0.0);
-        assert_eq!(store.check_and_record(&base, &opts).unwrap().status, RegressionStatus::New);
+        assert_eq!(
+            store.check_and_record(&base, &opts).unwrap().status,
+            RegressionStatus::New
+        );
         assert_eq!(store.ids().unwrap(), vec!["attack-halt".to_string()]);
         // Same distribution: passes.
-        assert_eq!(store.compare(&base, &opts).unwrap().status, RegressionStatus::Pass);
+        assert_eq!(
+            store.compare(&base, &opts).unwrap().status,
+            RegressionStatus::Pass
+        );
         // A shift that stays in band but is significant.
         let moved = result(0.04);
         let v = store.compare(&moved, &opts).unwrap();
@@ -301,29 +391,51 @@ mod tests {
         assert!(v.status.fails());
         // Out of band.
         let out = result(0.2);
-        assert_eq!(store.compare(&out, &opts).unwrap().status, RegressionStatus::OutOfBand);
+        assert_eq!(
+            store.compare(&out, &opts).unwrap().status,
+            RegressionStatus::OutOfBand
+        );
         // Accept the shift with an explanation.
-        assert!(matches!(store.accept(&moved, "  ", &opts), Err(RegressionError::NoExplanation)));
-        let stored = store.accept(&moved, "Suppression model now includes fatigue.", &opts).unwrap();
+        assert!(matches!(
+            store.accept(&moved, "  ", &opts),
+            Err(RegressionError::NoExplanation)
+        ));
+        let stored = store
+            .accept(&moved, "Suppression model now includes fatigue.", &opts)
+            .unwrap();
         assert_eq!(stored.history.len(), 1);
         assert_eq!(stored.history[0].verdict, Some(RegressionStatus::Shifted));
         let again = store.compare(&moved, &opts).unwrap();
         assert_eq!(again.status, RegressionStatus::Accepted);
         assert!(again.explanation.contains("fatigue"));
         // The old distribution is now the shifted one.
-        assert_eq!(store.compare(&base, &opts).unwrap().status, RegressionStatus::Shifted);
+        assert_eq!(
+            store.compare(&base, &opts).unwrap().status,
+            RegressionStatus::Shifted
+        );
         // Round trip through disk.
         let loaded = store.load("attack-halt").unwrap().unwrap();
-        assert_eq!(loaded, stored);
+        assert_eq!(
+            loaded.values, stored.values,
+            "values round-trip bit-exactly"
+        );
+        assert_eq!(loaded.history, stored.history);
+        assert_eq!(loaded.fingerprint, moved.sample.fingerprint());
     }
 
     #[test]
     fn rejects_unsafe_ids_and_bad_json() {
         let dir = tempfile::tempdir().unwrap();
         let store = RegressionStore::open(dir.path()).unwrap();
-        assert!(matches!(store.load("../etc/passwd"), Err(RegressionError::BadId(_))));
+        assert!(matches!(
+            store.load("../etc/passwd"),
+            Err(RegressionError::BadId(_))
+        ));
         std::fs::write(dir.path().join("broken.json"), "{not json").unwrap();
-        assert!(matches!(store.load("broken"), Err(RegressionError::Json { .. })));
+        assert!(matches!(
+            store.load("broken"),
+            Err(RegressionError::Json { .. })
+        ));
         assert!(store.load("absent").unwrap().is_none());
     }
 }

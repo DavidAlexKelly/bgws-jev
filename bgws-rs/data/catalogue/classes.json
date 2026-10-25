@@ -1,0 +1,382 @@
+{
+  "$comment": "Class defaults (RUST_ENGINE.md §14.1: 'defaults per class, so a new platform can be added with a few numbers') and per-kind defaults for sensors, emitters, radios and mounts. A record names its class; the class's values sit under the record's own. Every number a class sets is a declared figure, catalogue.class.<class>.<path>. Values are synthetic and open-source-anchored; $source names a research ref where one fits, else the value is [default].",
+  "classes": {
+    "base": {
+      "$comment": "Every record starts here.",
+      "template": "core/default",
+      "provenance": "synthetic",
+      "source": "synthetic",
+      "crew": { "quality": 4, "reactionS": 30, "nightTrained": false },
+      "body": { "stayingPower": 1 },
+      "signatures": {
+        "visual": { "criticalDimM": 2.0, "contrast": { "moving": 0.5, "halted": 0.35, "hullDown": 0.2, "dugIn": 0.1, "camouflaged": 0.08 } },
+        "ir": { "deltaK": { "cold": 1, "engineOn": 6, "moved": 10, "fired": 15 } },
+        "rcs": { "x": { "front": 10 } },
+        "decoy": false,
+        "index": { "visual": 1, "ir": 1 }
+      },
+      "sensors": [],
+      "mounts": [],
+      "radios": [],
+      "emitters": [],
+      "stores": {},
+      "carried": {}
+    },
+    "ground": {
+      "$extends": "base",
+      "$comment": "A land platform: VHF combat-net radio, eyes, engine noise.",
+      "domain": "land",
+      "echelon": "platoon",
+      "mover": { "kind": "wheeled", "maxKmh": 80, "cruiseKmh": 40, "maxSlopeDeg": 30, "fordingM": 0.75, "turnRateDps": 30 },
+      "body": { "vulnerability": "soft", "count": 1, "crew": 3 },
+      "signatures": { "acoustic": { "airDba": [ { "kmh": 0, "db": 80 }, { "kmh": 40, "db": 98 }, { "kmh": 80, "db": 105 } ] } },
+      "crew": { "reactionS": 20 },
+      "sensors": [ { "kind": "eye" } ],
+      "radios": [ { "bearer": "vhf" } ],
+      "emitters": [ { "kind": "radio" } ]
+    },
+    "armoured": {
+      "$extends": "ground",
+      "$comment": "Tracked armour: stabilised sights, thermal imagers, loud and hot when moving.",
+      "mover": { "kind": "tracked", "maxKmh": 65, "cruiseKmh": 25, "maxSlopeDeg": 31, "fordingM": 1.2, "powerToWeightHpT": 22, "groundPressureKpa": 90 },
+      "body": { "vulnerability": "armoured", "count": 4, "crew": 4, "massT": 45, "lengthM": 7.0, "widthM": 3.5, "heightM": 2.6 },
+      "signatures": {
+        "visual": { "criticalDimM": 3.0, "contrast": { "moving": 0.6, "halted": 0.4, "hullDown": 0.2, "dugIn": 0.1, "camouflaged": 0.1 } },
+        "ir": { "deltaK": { "cold": 0.5, "engineOn": 9, "moved": 16, "fired": 25 } },
+        "rcs": { "x": { "front": 15 } },
+        "acoustic": { "airDba": [ { "kmh": 0, "db": 85 }, { "kmh": 30, "db": 105 }, { "kmh": 60, "db": 112 } ] }
+      },
+      "crew": { "reactionS": 15, "nightTrained": true },
+      "sensors": [ { "kind": "eye", "heightM": 2.5 }, { "kind": "thermal", "rangeMaxM": 4000 } ]
+    },
+    "mbt": {
+      "$extends": "armoured",
+      "$source": "P17, P27",
+      "$confidence": "low",
+      "$comment": "A main battle tank: Abrams-class burn [P17]; 2–3 km engagements [P27].",
+      "template": "core/armour",
+      "mover": { "maxKmh": 65, "cruiseKmh": 25, "roadKmh": 60, "fuelCapacityL": 1900, "burnMovingLph": 227, "burnIdleLph": 38, "powerToWeightHpT": 24, "groundPressureKpa": 100 },
+      "body": { "count": 4, "crew": 4, "massT": 62, "lengthM": 7.9, "widthM": 3.7, "heightM": 2.4, "armour": { "ke": { "front": 650 } } },
+      "signatures": { "visual": { "criticalDimM": 3.0 }, "ir": { "deltaK": { "cold": 0.5, "engineOn": 10, "moved": 18, "fired": 30 } }, "rcs": { "x": { "front": 20 } } }
+    },
+    "ifv": {
+      "$extends": "armoured",
+      "$comment": "An infantry fighting vehicle: lighter armour, a cannon and missiles, carries a section.",
+      "template": "core/ifv",
+      "mover": { "maxKmh": 65, "cruiseKmh": 25, "roadKmh": 60, "fuelCapacityL": 860, "burnMovingLph": 110, "burnIdleLph": 20, "powerToWeightHpT": 20, "groundPressureKpa": 80 },
+      "body": { "vulnerability": "light", "count": 3, "crew": 3, "massT": 30, "lengthM": 6.8, "widthM": 3.2, "heightM": 3.0, "armour": { "ke": { "front": 200 } } },
+      "signatures": { "visual": { "criticalDimM": 3.1 }, "rcs": { "x": { "front": 15 } } }
+    },
+    "lightArmoured": {
+      "$extends": "ground",
+      "$comment": "Light armour on wheels or tracks: recce, engineers, ambulances, self-propelled guns, SHORAD.",
+      "mover": { "kind": "wheeled", "maxKmh": 90, "cruiseKmh": 40, "fuelCapacityL": 400, "burnMovingLph": 45, "burnIdleLph": 8, "powerToWeightHpT": 20, "groundPressureKpa": 250 },
+      "body": { "vulnerability": "light", "count": 2, "crew": 4, "massT": 20, "lengthM": 6.5, "widthM": 2.8, "heightM": 2.6, "armour": { "ke": { "front": 30 } } },
+      "signatures": { "visual": { "criticalDimM": 2.7 }, "ir": { "deltaK": { "cold": 0.5, "engineOn": 8, "moved": 14, "fired": 25 } }, "rcs": { "x": { "front": 10 } } },
+      "crew": { "reactionS": 20, "nightTrained": true },
+      "sensors": [ { "kind": "eye", "heightM": 2.5 }, { "kind": "thermal", "rangeMaxM": 3000 } ]
+    },
+    "softVehicle": {
+      "$extends": "ground",
+      "$comment": "Unarmoured trucks and vans: launchers, radars, EW, command posts, convoys.",
+      "mover": { "kind": "wheeled", "maxKmh": 80, "cruiseKmh": 40, "fuelCapacityL": 300, "burnMovingLph": 35, "burnIdleLph": 6, "powerToWeightHpT": 18, "groundPressureKpa": 400, "maxSlopeDeg": 28 },
+      "body": { "vulnerability": "soft", "count": 1, "crew": 3, "massT": 15, "lengthM": 8.0, "widthM": 2.5, "heightM": 3.0 },
+      "signatures": { "visual": { "criticalDimM": 2.7 }, "ir": { "deltaK": { "cold": 0.8, "engineOn": 7, "moved": 12, "fired": 20 } }, "rcs": { "x": { "front": 10 } } },
+      "crew": { "reactionS": 30 }
+    },
+    "dismounted": {
+      "$extends": "ground",
+      "$source": "P26",
+      "$confidence": "low",
+      "$comment": "People on foot: 4 km/h on road, 2–3 across country [P26]; small, cool, quiet.",
+      "mover": { "kind": "foot", "maxKmh": 6, "cruiseKmh": 4, "roadKmh": 4, "crossCountryKmh": 2.5, "maxSlopeDeg": 45, "fordingM": 1.0, "turnRateDps": 90 },
+      "body": { "vulnerability": "personnel", "count": 1, "crew": 8, "massT": 0.8, "lengthM": 0.5, "widthM": 0.5, "heightM": 1.7 },
+      "signatures": {
+        "visual": { "criticalDimM": 0.75, "contrast": { "moving": 0.4, "halted": 0.25, "hullDown": 0.12, "dugIn": 0.05, "camouflaged": 0.05 } },
+        "ir": { "deltaK": { "cold": 4, "engineOn": 4, "moved": 6, "fired": 10 } },
+        "rcs": { "x": { "front": 1 } },
+        "acoustic": { "airDba": [ { "kmh": 0, "db": 30 }, { "kmh": 4, "db": 50 } ] }
+      },
+      "crew": { "reactionS": 10 },
+      "sensors": [ { "kind": "eye", "heightM": 1.7, "rangeMaxM": 2000 } ],
+      "stores": { "waterL": 24, "foodRations": 24 }
+    },
+    "ugv": {
+      "$extends": "ground",
+      "$source": "P19",
+      "$confidence": "low",
+      "$comment": "A tracked ground robot on a radio link: slow, small, battery-powered.",
+      "mover": { "kind": "tracked", "maxKmh": 15, "cruiseKmh": 8, "batteryWh": 20000, "batteryDrawW": 2500, "maxSlopeDeg": 30, "fordingM": 0.3 },
+      "body": { "vulnerability": "light", "count": 1, "crew": 0, "massT": 1.2, "lengthM": 2.0, "widthM": 1.2, "heightM": 0.9 },
+      "signatures": { "visual": { "criticalDimM": 1.0 }, "ir": { "deltaK": { "cold": 0.5, "engineOn": 2, "moved": 4, "fired": 4 } }, "rcs": { "x": { "front": 1 } }, "acoustic": { "airDba": [ { "kmh": 0, "db": 40 }, { "kmh": 10, "db": 60 } ] } },
+      "crew": { "reactionS": 5 },
+      "radios": [],
+      "emitters": [ { "kind": "droneLink" } ]
+    },
+    "air": {
+      "$extends": "base",
+      "$comment": "An aircraft: UHF/VHF radios, hot engines.",
+      "domain": "air",
+      "mover": { "kind": "fixedWing", "maxKmh": 900, "cruiseKmh": 750, "ceilingM": 12000, "climbMs": 15, "turnRateDps": 3 },
+      "body": { "vulnerability": "aircraft", "count": 1, "crew": 2 },
+      "signatures": { "visual": { "criticalDimM": 4.0, "contrast": { "moving": 0.6, "halted": 0.5, "hullDown": 0.5, "dugIn": 0.3, "camouflaged": 0.3 } }, "ir": { "deltaK": { "cold": 2, "engineOn": 60, "moved": 120, "fired": 150 } }, "rcs": { "x": { "front": 5 } } },
+      "crew": { "reactionS": 10, "nightTrained": true },
+      "radios": [ { "bearer": "uhf" }, { "bearer": "vhf" } ],
+      "emitters": [ { "kind": "radio", "band": "uhf" } ]
+    },
+    "smallDrone": {
+      "$extends": "air",
+      "$source": "P9",
+      "$confidence": "low",
+      "$comment": "Multirotor drones on a radio or fibre link: tiny, cool, buzzing.",
+      "echelon": "team",
+      "mover": { "kind": "multirotor", "maxKmh": 60, "cruiseKmh": 40, "ceilingM": 1000, "climbMs": 5, "turnRateDps": 90, "batteryWh": 100, "batteryDrawW": 170 },
+      "body": { "count": 1, "crew": 0, "massT": 0.002, "lengthM": 0.35, "widthM": 0.35, "heightM": 0.15 },
+      "signatures": { "visual": { "criticalDimM": 0.3 }, "ir": { "deltaK": { "cold": 1, "engineOn": 5, "moved": 6, "fired": 6 } }, "rcs": { "x": { "front": 0.01 } }, "acoustic": { "airDba": [ { "kmh": 0, "db": 75 }, { "kmh": 60, "db": 82 } ] } },
+      "crew": { "reactionS": 3 },
+      "radios": [],
+      "emitters": [ { "kind": "droneLink" } ]
+    },
+    "fixedWingDrone": {
+      "$extends": "air",
+      "$comment": "Fixed-wing drones: loitering munitions, small ISR and MALE aircraft.",
+      "mover": { "kind": "fixedWing", "maxKmh": 150, "cruiseKmh": 100, "ceilingM": 4000, "climbMs": 4, "turnRateDps": 15 },
+      "body": { "count": 1, "crew": 0, "massT": 0.015, "lengthM": 1.5, "widthM": 2.5, "heightM": 0.3 },
+      "signatures": { "visual": { "criticalDimM": 0.9 }, "ir": { "deltaK": { "cold": 1, "engineOn": 10, "moved": 15, "fired": 15 } }, "rcs": { "x": { "front": 0.05 } }, "acoustic": { "airDba": [ { "kmh": 0, "db": 70 }, { "kmh": 100, "db": 85 } ] } },
+      "crew": { "reactionS": 5 },
+      "radios": [],
+      "emitters": [ { "kind": "droneLink" } ]
+    },
+    "owaDrone": {
+      "$extends": "air",
+      "$source": "P10, P11",
+      "$confidence": "low",
+      "$comment": "Shahed-like one-way attack drones and their decoys: a piston engine, a planned route, no link.",
+      "mover": { "kind": "missile", "maxKmh": 185, "cruiseKmh": 180, "ceilingM": 4000, "climbMs": 3, "turnRateDps": 5, "fuelCapacityL": 30, "burnMovingLph": 3 },
+      "body": { "vulnerability": "missile", "count": 1, "crew": 0, "massT": 0.2, "lengthM": 3.5, "widthM": 2.5, "heightM": 0.5 },
+      "signatures": { "visual": { "criticalDimM": 1.1 }, "ir": { "deltaK": { "cold": 2, "engineOn": 20, "moved": 30, "fired": 30 } }, "rcs": { "x": { "front": 0.1 } }, "acoustic": { "airDba": [ { "kmh": 0, "db": 90 }, { "kmh": 180, "db": 100 } ] } },
+      "crew": { "reactionS": 1 },
+      "radios": [],
+      "emitters": []
+    },
+    "fighter": {
+      "$extends": "air",
+      "$source": "P30",
+      "$confidence": "low",
+      "$comment": "Fighters: fast, agile, a multimode radar and a data link.",
+      "template": "core/aircraft",
+      "echelon": "platoon",
+      "mover": { "kind": "fixedWing", "maxKmh": 2100, "cruiseKmh": 900, "ceilingM": 15000, "climbMs": 250, "turnRateDps": 18, "fuelCapacityL": 7000, "burnMovingLph": 3000 },
+      "body": { "count": 2, "crew": 1, "massT": 20, "lengthM": 15, "widthM": 10, "heightM": 5 },
+      "signatures": { "visual": { "criticalDimM": 5.0 }, "ir": { "deltaK": { "cold": 2, "engineOn": 80, "moved": 150, "fired": 180 } }, "rcs": { "x": { "front": 5 } } },
+      "radios": [ { "bearer": "uhf" }, { "bearer": "vhf" }, { "bearer": "tdl" } ]
+    },
+    "bomber": {
+      "$extends": "air",
+      "$comment": "Heavy bombers and strike aircraft: big, long-ranged, carry stand-off weapons.",
+      "template": "core/aircraft",
+      "mover": { "kind": "fixedWing", "maxKmh": 1000, "cruiseKmh": 850, "ceilingM": 15000, "climbMs": 30, "turnRateDps": 3, "fuelCapacityL": 150000, "burnMovingLph": 10000 },
+      "body": { "count": 1, "crew": 4, "massT": 180, "lengthM": 45, "widthM": 40, "heightM": 10 },
+      "signatures": { "visual": { "criticalDimM": 15 }, "ir": { "deltaK": { "cold": 3, "engineOn": 100, "moved": 160, "fired": 160 } }, "rcs": { "x": { "front": 10 } } },
+      "radios": [ { "bearer": "uhf" }, { "bearer": "hf" }, { "bearer": "tdl" }, { "bearer": "satcomMil" } ]
+    },
+    "helicopter": {
+      "$extends": "air",
+      "$comment": "Helicopters: low, slow, loud and hot; MANPADS meat.",
+      "template": "core/aircraft",
+      "mover": { "kind": "rotary", "maxKmh": 290, "cruiseKmh": 230, "ceilingM": 4000, "climbMs": 10, "turnRateDps": 15, "fuelCapacityL": 1400, "burnMovingLph": 500 },
+      "body": { "count": 2, "crew": 2, "massT": 8, "lengthM": 17, "widthM": 3, "heightM": 4 },
+      "signatures": { "visual": { "criticalDimM": 3.5 }, "ir": { "deltaK": { "cold": 2, "engineOn": 70, "moved": 100, "fired": 110 } }, "rcs": { "x": { "front": 3 } }, "acoustic": { "airDba": [ { "kmh": 0, "db": 105 }, { "kmh": 250, "db": 110 } ] } }
+    },
+    "largeAircraft": {
+      "$extends": "air",
+      "$comment": "Tankers, AEW and maritime patrol: airliner-sized, high-value, kept back.",
+      "template": "core/aircraft",
+      "mover": { "kind": "fixedWing", "maxKmh": 900, "cruiseKmh": 800, "ceilingM": 12000, "climbMs": 12, "turnRateDps": 2, "fuelCapacityL": 60000, "burnMovingLph": 5000 },
+      "body": { "count": 1, "crew": 6, "massT": 120, "lengthM": 45, "widthM": 40, "heightM": 12 },
+      "signatures": { "visual": { "criticalDimM": 20 }, "rcs": { "x": { "front": 80 } } },
+      "radios": [ { "bearer": "uhf" }, { "bearer": "hf" }, { "bearer": "tdl" }, { "bearer": "satcomMil" } ]
+    },
+    "ship": {
+      "$extends": "base",
+      "$comment": "A surface vessel.",
+      "domain": "surface",
+      "mover": { "kind": "surface", "maxKmh": 52, "cruiseKmh": 28, "turnRateDps": 2 },
+      "body": { "vulnerability": "ship", "count": 1, "crew": 100, "stayingPower": 2 },
+      "signatures": {
+        "visual": { "criticalDimM": 20, "contrast": { "moving": 0.7, "halted": 0.6, "hullDown": 0.6, "dugIn": 0.6, "camouflaged": 0.5 } },
+        "ir": { "deltaK": { "cold": 2, "engineOn": 15, "moved": 25, "fired": 40 } },
+        "rcs": { "x": { "front": 3000 } },
+        "acoustic": { "waterDb": [ { "kmh": 0, "db": 130 }, { "kmh": 20, "db": 145 }, { "kmh": 50, "db": 165 } ] }
+      },
+      "crew": { "reactionS": 30, "nightTrained": true },
+      "radios": [ { "bearer": "hf" }, { "bearer": "uhf" } ],
+      "emitters": [ { "kind": "radio" } ]
+    },
+    "warship": {
+      "$extends": "ship",
+      "$source": "P28",
+      "$confidence": "low",
+      "$comment": "Warships: layered defences [P28], a data link, a hull or towed sonar.",
+      "template": "core/warship",
+      "body": { "crew": 200, "stayingPower": 3, "massT": 6000, "lengthM": 140, "widthM": 17, "heightM": 30 },
+      "radios": [ { "bearer": "hf" }, { "bearer": "uhf" }, { "bearer": "tdl" }, { "bearer": "satcomMil" } ]
+    },
+    "smallCraft": {
+      "$extends": "ship",
+      "$comment": "Small and uncrewed craft: low, fast, little to see.",
+      "mover": { "kind": "surface", "maxKmh": 80, "cruiseKmh": 44, "turnRateDps": 15, "fuelCapacityL": 600, "burnMovingLph": 60, "burnIdleLph": 5 },
+      "body": { "crew": 0, "stayingPower": 0.3, "massT": 1.0, "lengthM": 5.5, "widthM": 1.5, "heightM": 0.6 },
+      "signatures": { "visual": { "criticalDimM": 0.95 }, "ir": { "deltaK": { "cold": 1, "engineOn": 10, "moved": 15, "fired": 15 } }, "rcs": { "x": { "front": 2 } }, "acoustic": { "waterDb": [ { "kmh": 0, "db": 110 }, { "kmh": 40, "db": 135 }, { "kmh": 80, "db": 145 } ] } },
+      "crew": { "reactionS": 5 },
+      "radios": [],
+      "emitters": []
+    },
+    "merchantShip": {
+      "$extends": "ship",
+      "$comment": "Neutral shipping: big, slow, loud, radar always on.",
+      "template": "core/neutral",
+      "body": { "crew": 20, "stayingPower": 2, "massT": 50000, "lengthM": 190, "widthM": 32, "heightM": 40 },
+      "signatures": { "rcs": { "x": { "front": 10000 } }, "acoustic": { "waterDb": [ { "kmh": 0, "db": 140 }, { "kmh": 28, "db": 172 } ] } }
+    },
+    "submarine": {
+      "$extends": "base",
+      "$comment": "Submarines: quiet below a few knots, louder fast; nothing on radar submerged but the mast.",
+      "domain": "subsurface",
+      "template": "core/submarine",
+      "mover": { "kind": "sub", "maxKmh": 37, "cruiseKmh": 9, "maxDepthM": 300, "turnRateDps": 1 },
+      "body": { "vulnerability": "ship", "count": 1, "crew": 50, "massT": 2000, "lengthM": 70, "widthM": 7, "heightM": 10 },
+      "signatures": {
+        "visual": { "criticalDimM": 0.5, "contrast": { "moving": 0.1, "halted": 0.05, "hullDown": 0.05, "dugIn": 0.05, "camouflaged": 0.05 } },
+        "ir": { "deltaK": { "cold": 0.1, "engineOn": 0.5, "moved": 0.5, "fired": 1 } },
+        "rcs": { "x": { "front": 1 } },
+        "acoustic": { "waterDb": [ { "kmh": 0, "db": 100 }, { "kmh": 9, "db": 110 }, { "kmh": 37, "db": 140 } ] }
+      },
+      "crew": { "reactionS": 60, "nightTrained": true },
+      "radios": [ { "bearer": "hf" }, { "bearer": "satcomMil" } ],
+      "emitters": []
+    },
+    "satellite": {
+      "$extends": "base",
+      "$comment": "Satellites on orbits; the orbit sets when they can see or relay.",
+      "domain": "space",
+      "template": "core/satellite",
+      "mover": { "kind": "orbit", "maxKmh": 27000, "cruiseKmh": 27000, "orbitAltKm": 500, "inclinationDeg": 97 },
+      "body": { "vulnerability": "satellite", "count": 1, "crew": 0, "massT": 1.0, "lengthM": 3, "widthM": 2, "heightM": 2 },
+      "signatures": { "visual": { "criticalDimM": 2.4, "contrast": { "moving": 0, "halted": 0, "hullDown": 0, "dugIn": 0, "camouflaged": 0 } }, "ir": { "deltaK": { "cold": 0, "engineOn": 0, "moved": 0, "fired": 0 } }, "rcs": { "x": { "front": 2 } }, "index": { "visual": 0, "ir": 0 } },
+      "crew": { "reactionS": 60 }
+    },
+    "installation": {
+      "$extends": "base",
+      "$comment": "Fixed installations: depots, railheads, ports, airbases.",
+      "domain": "node",
+      "template": "core/node",
+      "mover": { "kind": "static", "maxKmh": 0, "cruiseKmh": 0 },
+      "body": { "vulnerability": "structure", "count": 1, "crew": 50, "stayingPower": 6, "lengthM": 500, "widthM": 300, "heightM": 10 },
+      "signatures": { "visual": { "criticalDimM": 50, "contrast": { "moving": 0.6, "halted": 0.6, "hullDown": 0.6, "dugIn": 0.4, "camouflaged": 0.3 } }, "ir": { "deltaK": { "cold": 3, "engineOn": 5, "moved": 5, "fired": 10 } }, "rcs": { "x": { "front": 1000 } } },
+      "crew": { "reactionS": 60 },
+      "sensors": [ { "kind": "eye", "rangeMaxM": 1000, "heightM": 5 } ],
+      "radios": [ { "bearer": "vhf" }, { "bearer": "hf" }, { "bearer": "wire" } ],
+      "emitters": [ { "kind": "radio" } ]
+    },
+    "cyberUnit": {
+      "$extends": "installation",
+      "$source": "R5.5, P21",
+      "$confidence": "low",
+      "$comment": "A cyber cell: an office somewhere, on fibre; its effects are in the world model.",
+      "template": "core/cyber",
+      "body": { "crew": 30, "stayingPower": 2, "lengthM": 40, "widthM": 20, "heightM": 8 },
+      "signatures": { "visual": { "criticalDimM": 12.6 }, "rcs": { "x": { "front": 100 } }, "index": { "visual": 0.5, "ir": 0.5 } },
+      "sensors": [],
+      "radios": [ { "bearer": "fibre" } ],
+      "emitters": []
+    },
+    "sensorNode": {
+      "$extends": "base",
+      "$comment": "An unattended ground sensor: acoustic and seismic, on a mesh radio.",
+      "domain": "land",
+      "template": "core/sensor",
+      "mover": { "kind": "static", "maxKmh": 0, "cruiseKmh": 0 },
+      "body": { "vulnerability": "structure", "count": 1, "crew": 0, "stayingPower": 0.05, "lengthM": 0.3, "widthM": 0.3, "heightM": 0.3 },
+      "signatures": { "visual": { "criticalDimM": 0.3, "contrast": { "moving": 0.1, "halted": 0.05, "hullDown": 0.05, "dugIn": 0.02, "camouflaged": 0.02 } }, "ir": { "deltaK": { "cold": 0.1, "engineOn": 0.5, "moved": 0.5, "fired": 0.5 } }, "rcs": { "x": { "front": 0.01 } }, "index": { "visual": 0.05, "ir": 0.05 } },
+      "crew": { "reactionS": 1 },
+      "radios": [ { "bearer": "mesh" } ],
+      "emitters": [ { "kind": "radio", "band": "uhf", "erpW": 1, "dutyCycle": 0.01 } ]
+    }
+  },
+  "kindDefaults": {
+    "$comment": "Each sensor, emitter, radio and mount sits on its kind's defaults. N50 cycles are Johnson's (detect 0.75, recognise 3, identify 6), used with the ACQUIRE curve [P22]; resolutions are synthetic.",
+    "sensors": {
+      "eye": { "band": "visible", "rangeMaxM": 3000, "forDeg": 360, "scanS": 2, "classifies": "type", "seesAir": true, "heightM": 2, "optics": { "resolutionCycPerMrad": 1.7, "apertureMm": 5, "fovDeg": 120, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "optic": { "band": "visible", "rangeMaxM": 6000, "forDeg": 120, "scanS": 2, "classifies": "type", "seesAir": true, "heightM": 2.5, "optics": { "resolutionCycPerMrad": 8, "apertureMm": 50, "fovDeg": 6, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "imageIntensifier": { "band": "nir", "rangeMaxM": 1500, "forDeg": 40, "scanS": 2, "classifies": "class", "seesAir": true, "heightM": 2, "optics": { "resolutionCycPerMrad": 2.5, "apertureMm": 25, "fovDeg": 40, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "thermal": { "band": "lwir", "rangeMaxM": 4000, "forDeg": 120, "scanS": 1, "classifies": "type", "seesAir": true, "heightM": 2.5, "optics": { "resolutionCycPerMrad": 5, "apertureMm": 100, "fovDeg": 3, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "eo": { "band": "visible", "rangeMaxM": 3000, "forDeg": 360, "scanS": 2, "classifies": "type", "seesAir": false, "heightM": 0, "optics": { "resolutionCycPerMrad": 10, "apertureMm": 30, "fovDeg": 4, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "eoSat": { "band": "visible", "rangeMaxM": 300000, "forDeg": 30, "scanS": 0, "classifies": "class", "seesAir": false, "heightM": 500000, "optics": { "resolutionCycPerMrad": 500, "apertureMm": 700, "fovDeg": 1.5, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } }, "imaging": { "gsdM": 0.5, "swathKm": 15 } },
+      "irst": { "band": "mwir", "rangeMaxM": 50000, "forDeg": 120, "scanS": 2, "classifies": "class", "seesAir": true, "heightM": 0, "optics": { "resolutionCycPerMrad": 6, "apertureMm": 120, "fovDeg": 2, "n50": { "detect": 0.75, "recognise": 3, "identify": 6 } } },
+      "radar": { "band": "x", "rangeMaxM": 25000, "forDeg": 360, "scanS": 4, "classifies": "class", "seesAir": true, "heightM": 5, "radar": { "gainDb": 32, "bandwidthHz": 1e6, "noiseFigureDb": 4, "lossesDb": 6, "snrRequiredDb": 13, "pulsesIntegrated": 10, "beamwidthDeg": 2, "mti": true } },
+      "cbr": { "band": "s", "rangeMaxM": 40000, "forDeg": 90, "scanS": 1, "classifies": "class", "seesAir": true, "heightM": 6, "radar": { "gainDb": 38, "bandwidthHz": 2e6, "noiseFigureDb": 3, "lossesDb": 6, "snrRequiredDb": 13, "pulsesIntegrated": 20, "beamwidthDeg": 1.5, "mti": true } },
+      "sar": { "band": "x", "rangeMaxM": 300000, "forDeg": 30, "scanS": 0, "classifies": "class", "seesAir": false, "heightM": 550000, "radar": { "gainDb": 44, "bandwidthHz": 3e8, "noiseFigureDb": 3, "lossesDb": 5, "snrRequiredDb": 10, "pulsesIntegrated": 1000, "beamwidthDeg": 0.3, "mti": false }, "imaging": { "gsdM": 1, "swathKm": 30 } },
+      "esm": { "band": "vhf", "rangeMaxM": 30000, "forDeg": 360, "scanS": 5, "classifies": "class", "seesAir": true, "heightM": 5, "esm": { "sensitivityDbm": -100, "freqMinHz": 2e7, "freqMaxHz": 6e9, "dfRmsDeg": 3, "gainDbi": 0 } },
+      "rwr": { "band": "x", "rangeMaxM": 300000, "forDeg": 360, "scanS": 1, "classifies": "class", "seesAir": true, "heightM": 0, "esm": { "sensitivityDbm": -60, "freqMinHz": 2e9, "freqMaxHz": 1.8e10, "dfRmsDeg": 15, "gainDbi": 0 } },
+      "sonarPassive": { "band": "acoustic", "rangeMaxM": 20000, "forDeg": 360, "scanS": 10, "classifies": "class", "seesAir": false, "heightM": 0, "sonar": { "diDb": 20, "dtDb": 0, "freqHz": 1000, "selfNoiseDb": 60, "towed": false } },
+      "sonarActive": { "band": "acoustic", "rangeMaxM": 20000, "forDeg": 360, "scanS": 10, "classifies": "class", "seesAir": false, "heightM": 0, "sonar": { "diDb": 25, "dtDb": 10, "freqHz": 3500, "sourceLevelDb": 230, "selfNoiseDb": 60, "towed": false } },
+      "acoustic": { "band": "acoustic", "rangeMaxM": 2000, "forDeg": 360, "scanS": 2, "classifies": "class", "seesAir": true, "heightM": 1 },
+      "missileWarning": { "band": "mwir", "rangeMaxM": 10000000, "forDeg": 360, "scanS": 5, "classifies": "class", "seesAir": true, "heightM": 35786000 }
+    },
+    "emitters": {
+      "radio": { "band": "vhf", "bandwidthHz": 25000, "erpW": 50, "dutyCycle": 0.1, "pattern": { "kind": "omni", "beamwidthDeg": 360 } },
+      "datalink": { "band": "l", "bandwidthHz": 3e6, "erpW": 200, "dutyCycle": 0.3, "pattern": { "kind": "omni", "beamwidthDeg": 360 } },
+      "radar": { "band": "x", "bandwidthHz": 1e6, "erpW": 1000, "dutyCycle": 1, "pattern": { "kind": "rotating", "beamwidthDeg": 2, "sidelobeDb": 25, "scanS": 4 } },
+      "jammer": { "band": "uhf", "bandwidthHz": 2e8, "erpW": 1000, "dutyCycle": 1, "pattern": { "kind": "omni", "beamwidthDeg": 360 } },
+      "beacon": { "band": "uhf", "bandwidthHz": 25000, "erpW": 5, "dutyCycle": 0.05, "pattern": { "kind": "omni", "beamwidthDeg": 360 } },
+      "droneLink": { "band": "l", "bandwidthHz": 2e7, "erpW": 1, "dutyCycle": 1, "pattern": { "kind": "omni", "beamwidthDeg": 360 } },
+      "satcom": { "band": "ku", "bandwidthHz": 3.6e7, "erpW": 50, "dutyCycle": 0.2, "pattern": { "kind": "pencil", "beamwidthDeg": 3, "sidelobeDb": 20 } },
+      "gnss": { "band": "gnss", "bandwidthHz": 2e6, "erpW": 50, "dutyCycle": 1, "pattern": { "kind": "omni", "beamwidthDeg": 360 } }
+    },
+    "radios": {
+      "$comment": "Bearers [P4 SINCGARS, P5 HF NVIS, P6 Link 16, P7 Starlink].",
+      "vhf": { "band": "vhf", "powerW": 50, "antennaHeightM": 3, "antennaGainDbi": 2, "dataRateBps": 16000, "cryptoDelayS": 0.5, "latencyS": 0 },
+      "uhf": { "band": "uhf", "powerW": 20, "antennaHeightM": 3, "antennaGainDbi": 2, "dataRateBps": 64000, "cryptoDelayS": 0.5, "latencyS": 0 },
+      "hf": { "band": "hf", "powerW": 100, "antennaHeightM": 6, "antennaGainDbi": 0, "dataRateBps": 2400, "cryptoDelayS": 2, "latencyS": 1 },
+      "tdl": { "band": "l", "powerW": 200, "antennaHeightM": 3, "antennaGainDbi": 0, "dataRateBps": 115200, "cryptoDelayS": 0.01, "latencyS": 0.5 },
+      "satcomMil": { "band": "ku", "powerW": 50, "antennaHeightM": 2, "antennaGainDbi": 30, "dataRateBps": 2e6, "cryptoDelayS": 1, "latencyS": 0.27 },
+      "satcomLeo": { "band": "ku", "powerW": 50, "antennaHeightM": 2, "antennaGainDbi": 30, "dataRateBps": 1e7, "cryptoDelayS": 0.2, "latencyS": 0.05 },
+      "mesh": { "band": "uhf", "powerW": 5, "antennaHeightM": 2, "antennaGainDbi": 2, "dataRateBps": 2e6, "cryptoDelayS": 0.1, "latencyS": 0.05 },
+      "wire": { "band": "wire", "powerW": 0, "antennaHeightM": 0, "antennaGainDbi": 0, "dataRateBps": 1e6, "cryptoDelayS": 0, "latencyS": 0.01 },
+      "fibre": { "band": "optical", "powerW": 0, "antennaHeightM": 0, "antennaGainDbi": 0, "dataRateBps": 1e9, "cryptoDelayS": 0, "latencyS": 0.005 },
+      "courier": { "band": "none", "powerW": 0, "antennaHeightM": 0, "antennaGainDbi": 0, "dataRateBps": 1, "cryptoDelayS": 0, "latencyS": 1800 }
+    },
+    "mounts": {
+      "directFire": { "fireControl": { "quality": 0.85, "stabilised": true, "rangefinder": true, "layS": 6 }, "arcDeg": 360, "rofRpm": 6, "readyS": 0 },
+      "cannon": { "fireControl": { "quality": 0.75, "stabilised": true, "rangefinder": true, "layS": 4 }, "arcDeg": 360, "rofRpm": 200, "readyS": 0 },
+      "smallArms": { "fireControl": { "quality": 0.3, "stabilised": false, "rangefinder": false, "layS": 2 }, "arcDeg": 360, "rofRpm": 60, "readyS": 0 },
+      "lightAt": { "fireControl": { "quality": 0.3, "stabilised": false, "rangefinder": false, "layS": 10 }, "arcDeg": 120, "rofRpm": 2, "readyS": 5 },
+      "atgm": { "fireControl": { "quality": 0.8, "stabilised": true, "rangefinder": true, "layS": 15 }, "arcDeg": 360, "rofRpm": 2, "readyS": 20 },
+      "mortar": { "fireControl": { "quality": 0.6, "stabilised": false, "rangefinder": false, "layS": 60 }, "arcDeg": 360, "rofRpm": 8, "readyS": 120 },
+      "howitzer": { "fireControl": { "quality": 0.7, "stabilised": false, "rangefinder": false, "layS": 60 }, "arcDeg": 360, "rofRpm": 4, "readyS": 120 },
+      "rocket": { "fireControl": { "quality": 0.8, "stabilised": false, "rangefinder": false, "layS": 60 }, "arcDeg": 360, "rofRpm": 6, "readyS": 180 },
+      "samLong": { "fireControl": { "quality": 0.9, "stabilised": false, "rangefinder": true, "layS": 8 }, "arcDeg": 120, "rofRpm": 20, "readyS": 10 },
+      "samMedium": { "fireControl": { "quality": 0.85, "stabilised": false, "rangefinder": true, "layS": 6 }, "arcDeg": 360, "rofRpm": 20, "readyS": 8 },
+      "samShort": { "fireControl": { "quality": 0.8, "stabilised": true, "rangefinder": true, "layS": 4 }, "arcDeg": 360, "rofRpm": 10, "readyS": 5 },
+      "gunAd": { "fireControl": { "quality": 0.8, "stabilised": true, "rangefinder": true, "layS": 2 }, "arcDeg": 360, "rofRpm": 550, "readyS": 2 },
+      "ciws": { "fireControl": { "quality": 0.85, "stabilised": true, "rangefinder": true, "layS": 1 }, "arcDeg": 360, "rofRpm": 4500, "readyS": 1 },
+      "vls": { "fireControl": { "quality": 0.9, "stabilised": true, "rangefinder": true, "layS": 2 }, "arcDeg": 360, "rofRpm": 30, "readyS": 2 },
+      "aam": { "fireControl": { "quality": 0.85, "stabilised": true, "rangefinder": true, "layS": 3 }, "arcDeg": 120, "rofRpm": 20, "readyS": 1 },
+      "agm": { "fireControl": { "quality": 0.8, "stabilised": true, "rangefinder": true, "layS": 10 }, "arcDeg": 120, "rofRpm": 6, "readyS": 2 },
+      "glideBomb": { "fireControl": { "quality": 0.7, "stabilised": true, "rangefinder": false, "layS": 10 }, "arcDeg": 60, "rofRpm": 2, "readyS": 5 },
+      "bomb": { "fireControl": { "quality": 0.7, "stabilised": true, "rangefinder": false, "layS": 10 }, "arcDeg": 60, "rofRpm": 10, "readyS": 5 },
+      "arm": { "fireControl": { "quality": 0.8, "stabilised": true, "rangefinder": false, "layS": 5 }, "arcDeg": 120, "rofRpm": 6, "readyS": 2 },
+      "ascm": { "fireControl": { "quality": 0.8, "stabilised": false, "rangefinder": false, "layS": 30 }, "arcDeg": 360, "rofRpm": 4, "readyS": 60 },
+      "cruise": { "fireControl": { "quality": 0.8, "stabilised": false, "rangefinder": false, "layS": 120 }, "arcDeg": 360, "rofRpm": 2, "readyS": 300 },
+      "ballistic": { "fireControl": { "quality": 0.8, "stabilised": false, "rangefinder": false, "layS": 300 }, "arcDeg": 360, "rofRpm": 1, "readyS": 900 },
+      "torpedo": { "fireControl": { "quality": 0.8, "stabilised": false, "rangefinder": false, "layS": 30 }, "arcDeg": 360, "rofRpm": 2, "readyS": 30 },
+      "fpv": { "fireControl": { "quality": 0.5, "stabilised": false, "rangefinder": false, "layS": 60 }, "arcDeg": 360, "rofRpm": 0.5, "readyS": 120 },
+      "loitering": { "fireControl": { "quality": 0.6, "stabilised": false, "rangefinder": false, "layS": 60 }, "arcDeg": 360, "rofRpm": 0.2, "readyS": 300 },
+      "owa": { "fireControl": { "quality": 0.5, "stabilised": false, "rangefinder": false, "layS": 600 }, "arcDeg": 360, "rofRpm": 0.1, "readyS": 600 },
+      "interceptorDrone": { "fireControl": { "quality": 0.6, "stabilised": false, "rangefinder": false, "layS": 30 }, "arcDeg": 360, "rofRpm": 1, "readyS": 60 },
+      "shotgun": { "fireControl": { "quality": 0.2, "stabilised": false, "rangefinder": false, "layS": 1 }, "arcDeg": 360, "rofRpm": 30, "readyS": 0 },
+      "droneDrop": { "fireControl": { "quality": 0.4, "stabilised": false, "rangefinder": false, "layS": 20 }, "arcDeg": 360, "rofRpm": 2, "readyS": 5 }
+    }
+  }
+}

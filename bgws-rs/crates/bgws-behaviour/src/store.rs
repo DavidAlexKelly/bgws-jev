@@ -73,7 +73,7 @@ pub struct UnitRef {
 }
 
 /// What a game should run, fixed at its start (`behaviourSnapshot`).
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct BehaviourSnapshot {
     /// Unit id → template, where it is not its kind's default.
     pub behaviours: BTreeMap<String, String>,
@@ -89,21 +89,18 @@ pub fn is_built_in(id: &str) -> bool {
 
 /// "Stand Fast!" → "stand-fast".
 pub fn slugify(name: &str) -> String {
-    let mut out = String::new();
-    let mut dash = false;
+    let mut s = String::new();
+    let mut in_run = false;
     for ch in name.to_lowercase().chars() {
         if ch.is_ascii_lowercase() || ch.is_ascii_digit() {
-            if dash && !out.is_empty() {
-                out.push('-');
-            }
-            dash = false;
-            out.push(ch);
-        } else {
-            dash = true;
+            s.push(ch);
+            in_run = false;
+        } else if !in_run {
+            s.push('-');
+            in_run = true;
         }
     }
-    out.truncate(48);
-    let out = out.trim_end_matches('-').to_owned();
+    let out: String = s.trim_matches('-').chars().take(48).collect();
     if out.is_empty() {
         "behaviour".into()
     } else {

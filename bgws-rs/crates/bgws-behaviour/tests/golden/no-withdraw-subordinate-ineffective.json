@@ -1,0 +1,53 @@
+{
+  "scene": {
+    "name": "no-withdraw-subordinate-ineffective",
+    "candidates": [
+      "custom/no-withdraw"
+    ],
+    "trigger": "subordinateIneffective",
+    "facts": {}
+  },
+  "template": "custom/no-withdraw",
+  "lineage": [
+    "custom/no-withdraw",
+    "core/default",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.subordinateIneffective",
+    "title": "Subordinate ineffective",
+    "question": "One of its units can no longer fight as it should. What now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent."
+    ],
+    "options": [
+      {
+        "id": "reinforce",
+        "action": "c2.reinforce",
+        "bias": 2
+      },
+      {
+        "id": "swap",
+        "action": "c2.swapWithReserve",
+        "bias": 0
+      },
+      {
+        "id": "carryOn",
+        "action": "c2.carryOn",
+        "bias": 0
+      }
+    ],
+    "fallback": "reinforce",
+    "dropped": [
+      {
+        "id": "withdraw",
+        "action": "c2.withdrawIt",
+        "why": "removed"
+      }
+    ],
+    "path": [
+      "w.subordinateIneffective"
+    ]
+  }
+}

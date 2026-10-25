@@ -1,0 +1,37 @@
+{
+  "scene": {
+    "name": "branchy-broken-drill-ok",
+    "candidates": [
+      "custom/branchy"
+    ],
+    "trigger": "D2",
+    "facts": {
+      "self.cohesion": "broken",
+      "self.strength": 0.4
+    }
+  },
+  "template": "custom/branchy",
+  "lineage": [
+    "custom/branchy"
+  ],
+  "walk": {
+    "kind": "do",
+    "nodeId": "recover",
+    "action": "land.holdAndRecover",
+    "params": {
+      "minutes": 5
+    },
+    "path": [
+      "fired",
+      "recover"
+    ]
+  },
+  "gates": {
+    "roe": "always",
+    "fired_upon": false,
+    "weapon_release": "free",
+    "target_identified": false,
+    "emcon": "unrestricted",
+    "cohesion": "broken"
+  }
+}

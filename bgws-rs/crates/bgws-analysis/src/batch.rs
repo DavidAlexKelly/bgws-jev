@@ -59,7 +59,11 @@ pub struct MetricFn<F> {
 
 impl<F> MetricFn<F> {
     pub fn new(name: impl Into<String>, unit: impl Into<String>, f: F) -> Self {
-        Self { name: name.into(), unit: unit.into(), f }
+        Self {
+            name: name.into(),
+            unit: unit.into(),
+            f,
+        }
     }
 }
 
@@ -105,7 +109,10 @@ pub struct BatchConfig {
 
 impl BatchConfig {
     pub fn new(replicates: usize, base_seed: Seed) -> Self {
-        Self { replicates, base_seed }
+        Self {
+            replicates,
+            base_seed,
+        }
     }
 
     /// The seed of replicate `i`: `base_seed.derive(i)`. Stable across builds.
@@ -139,7 +146,10 @@ pub struct Batch<O> {
 impl<O> Batch<O> {
     /// The metric for every replicate, in order (`None` = nothing measured).
     pub fn metric(&self, metric: &impl Metric<O>) -> Vec<Option<f64>> {
-        self.replicates.iter().map(|r| metric.extract(&r.output).filter(|x| x.is_finite())).collect()
+        self.replicates
+            .iter()
+            .map(|r| metric.extract(&r.output).filter(|x| x.is_finite()))
+            .collect()
     }
 
     /// The metric as a [`Sample`].
@@ -150,7 +160,11 @@ impl<O> Batch<O> {
 
 /// Run a batch with no progress reporting. Uses the current rayon pool
 /// (wrap in `ThreadPool::install` to choose the thread count).
-pub fn run_batch<E: Experiment>(exp: &E, figures: &Figures, config: BatchConfig) -> Batch<E::Output> {
+pub fn run_batch<E: Experiment>(
+    exp: &E,
+    figures: &Figures,
+    config: BatchConfig,
+) -> Batch<E::Output> {
     run_batch_with_progress(exp, figures, config, &|_| {})
 }
 
@@ -172,7 +186,11 @@ pub fn run_batch_with_progress<E: Experiment>(
             let output = exp.run(figures, seed);
             let d = done.fetch_add(1, Ordering::Relaxed) + 1;
             progress(BatchProgress { done: d, total });
-            Replicate { index, seed, output }
+            Replicate {
+                index,
+                seed,
+                output,
+            }
         })
         .collect();
     Batch { config, replicates }
@@ -193,12 +211,22 @@ impl Sample {
     pub fn new(metric: impl Into<String>, unit: impl Into<String>, values: Vec<f64>) -> Self {
         let finite: Vec<f64> = values.iter().copied().filter(|x| x.is_finite()).collect();
         let missing = values.len() - finite.len();
-        Sample { metric: metric.into(), unit: unit.into(), values: finite, missing }
+        Sample {
+            metric: metric.into(),
+            unit: unit.into(),
+            values: finite,
+            missing,
+        }
     }
 
     pub fn from_options(metric: &str, unit: &str, values: &[Option<f64>]) -> Self {
         let measured: Vec<f64> = values.iter().flatten().copied().collect();
-        Sample { metric: metric.into(), unit: unit.into(), missing: values.len() - measured.len(), values: measured }
+        Sample {
+            metric: metric.into(),
+            unit: unit.into(),
+            missing: values.len() - measured.len(),
+            values: measured,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -242,7 +270,13 @@ pub struct BatchSummary {
 }
 
 impl BatchSummary {
-    pub fn new(label: impl Into<String>, config: BatchConfig, sample: &Sample, level: f64, bins: usize) -> Self {
+    pub fn new(
+        label: impl Into<String>,
+        config: BatchConfig,
+        sample: &Sample,
+        level: f64,
+        bins: usize,
+    ) -> Self {
         BatchSummary {
             label: label.into(),
             metric: sample.metric.clone(),
@@ -252,6 +286,23 @@ impl BatchSummary {
             summary: sample.summary(level),
             histogram: Histogram::of(&sample.values, bins),
         }
+    }
+
+    /// With the confidence level and bin count from the figures.
+    pub fn from_figures(
+        label: impl Into<String>,
+        config: BatchConfig,
+        sample: &Sample,
+        figures: &Figures,
+    ) -> Self {
+        let bins = figures.get("analysis.histogram.bins").round() as usize;
+        Self::new(
+            label,
+            config,
+            sample,
+            figures.get("analysis.ci_level"),
+            bins,
+        )
     }
 }
 
@@ -263,7 +314,10 @@ mod tests {
     use std::sync::Mutex;
 
     fn figs() -> Figures {
-        Figures::from_list([figure!("test.p", 0.3, "fraction", 0.0, 1.0, "default", Default, "")]).unwrap()
+        Figures::from_list([figure!(
+            "test.p", 0.3, "fraction", 0.0, 1.0, "default", Default, ""
+        )])
+        .unwrap()
     }
 
     /// A cheap stochastic experiment: 50 Bernoulli trials and a sum of draws.
@@ -279,8 +333,14 @@ mod tests {
     fn thousand_replicates_are_fast_and_thread_count_independent() {
         let f = figs();
         let cfg = BatchConfig::new(1000, Seed(7));
-        let one = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap();
-        let four = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap();
+        let one = rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .unwrap();
+        let four = rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .unwrap();
         let t0 = std::time::Instant::now();
         let a = one.install(|| run_batch(&cheap, &f, cfg));
         let b = four.install(|| run_batch(&cheap, &f, cfg));
@@ -305,8 +365,16 @@ mod tests {
     fn progress_reaches_total_and_missing_values_are_counted() {
         let f = figs();
         let seen = Mutex::new(Vec::new());
-        let exp = |_: &Figures, seed: Seed| if seed.0 % 3 == 0 { None } else { Some((seed.0 % 100) as f64) };
-        let batch = run_batch_with_progress(&exp, &f, BatchConfig::new(60, Seed(1)), &|p| seen.lock().unwrap().push(p.done));
+        let exp = |_: &Figures, seed: Seed| {
+            if seed.0.is_multiple_of(3) {
+                None
+            } else {
+                Some((seed.0 % 100) as f64)
+            }
+        };
+        let batch = run_batch_with_progress(&exp, &f, BatchConfig::new(60, Seed(1)), &|p| {
+            seen.lock().unwrap().push(p.done)
+        });
         let mut seen = seen.into_inner().unwrap();
         seen.sort();
         assert_eq!(seen, (1..=60).collect::<Vec<_>>());

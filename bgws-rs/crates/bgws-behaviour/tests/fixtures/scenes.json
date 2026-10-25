@@ -1,0 +1,196 @@
+[
+ {
+  "name": "armour-d1-contact",
+  "candidates": [
+   "core/armour"
+  ],
+  "trigger": "D1",
+  "facts": {}
+ },
+ {
+  "name": "default-d10-step-done",
+  "candidates": [
+   "core/default"
+  ],
+  "trigger": "D10",
+  "facts": {}
+ },
+ {
+  "name": "infantry-d2-fired-on",
+  "candidates": [
+   "core/infantry"
+  ],
+  "trigger": "D2",
+  "facts": {}
+ },
+ {
+  "name": "hq-emitting-too-long",
+  "candidates": [
+   "core/hq"
+  ],
+  "trigger": "emittingTooLong",
+  "facts": {}
+ },
+ {
+  "name": "aircraft-missile-warning",
+  "candidates": [
+   "core/aircraft"
+  ],
+  "trigger": "missileWarning",
+  "facts": {}
+ },
+ {
+  "name": "warship-vampire-inbound",
+  "candidates": [
+   "core/warship"
+  ],
+  "trigger": "vampireInbound",
+  "facts": {}
+ },
+ {
+  "name": "engineer-obstacle",
+  "candidates": [
+   "core/engineer"
+  ],
+  "trigger": "obstacleEncountered",
+  "facts": {}
+ },
+ {
+  "name": "ifv-dismount-point",
+  "candidates": [
+   "core/ifv"
+  ],
+  "trigger": "dismountPoint",
+  "facts": {}
+ },
+ {
+  "name": "stand-fast-d1",
+  "candidates": [
+   "custom/stand-fast"
+  ],
+  "trigger": "D1",
+  "facts": {}
+ },
+ {
+  "name": "stand-fast-d2",
+  "candidates": [
+   "custom/stand-fast"
+  ],
+  "trigger": "D2",
+  "facts": {}
+ },
+ {
+  "name": "point-blank-far",
+  "candidates": [
+   "custom/point-blank"
+  ],
+  "trigger": "D1",
+  "facts": {
+   "enemy.rangeM": 1500,
+   "self.class": "armoured_vehicle"
+  }
+ },
+ {
+  "name": "point-blank-near",
+  "candidates": [
+   "custom/point-blank"
+  ],
+  "trigger": "D1",
+  "facts": {
+   "enemy.rangeM": 600,
+   "self.class": "armoured_vehicle"
+  }
+ },
+ {
+  "name": "point-blank-unknown-range",
+  "candidates": [
+   "custom/point-blank"
+  ],
+  "trigger": "D1",
+  "facts": {
+   "enemy.rangeM": null,
+   "self.class": "armoured_vehicle"
+  }
+ },
+ {
+  "name": "no-withdraw-subordinate-ineffective",
+  "candidates": [
+   "custom/no-withdraw"
+  ],
+  "trigger": "subordinateIneffective",
+  "facts": {}
+ },
+ {
+  "name": "no-withdraw-d1",
+  "candidates": [
+   "custom/no-withdraw"
+  ],
+  "trigger": "D1",
+  "facts": {}
+ },
+ {
+  "name": "branchy-broken",
+  "candidates": [
+   "custom/branchy"
+  ],
+  "trigger": "D2",
+  "facts": {
+   "self.cohesion": "broken",
+   "self.strength": 0.4
+  }
+ },
+ {
+  "name": "branchy-steady-strong",
+  "candidates": [
+   "custom/branchy"
+  ],
+  "trigger": "D2",
+  "facts": {
+   "self.cohesion": "steady",
+   "self.strength": 0.9
+  }
+ },
+ {
+  "name": "branchy-steady-weak",
+  "candidates": [
+   "custom/branchy"
+  ],
+  "trigger": "D2",
+  "facts": {
+   "self.cohesion": "steady",
+   "self.strength": 0.3
+  }
+ },
+ {
+  "name": "unknown-trigger",
+  "candidates": [
+   "core/armour"
+  ],
+  "trigger": "lostComms",
+  "facts": {}
+ },
+ {
+  "name": "missing-template-uses-world",
+  "candidates": [
+   "custom/missing"
+  ],
+  "trigger": "bingoFuel",
+  "facts": {}
+ },
+ {
+  "name": "drone-link-degraded",
+  "candidates": [
+   "core/drone"
+  ],
+  "trigger": "linkDegraded",
+  "facts": {}
+ },
+ {
+  "name": "drill-fire-d4",
+  "candidates": [
+   "custom/drill-fire"
+  ],
+  "trigger": "D4",
+  "facts": {}
+ }
+]

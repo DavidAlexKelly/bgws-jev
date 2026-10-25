@@ -1,0 +1,57 @@
+{
+  "scene": {
+    "name": "warship-vampire-inbound",
+    "candidates": [
+      "core/warship"
+    ],
+    "trigger": "vampireInbound",
+    "facts": {}
+  },
+  "template": "core/warship",
+  "lineage": [
+    "core/warship",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.vampireInbound",
+    "title": "Missiles inbound",
+    "question": "Anti-ship missiles are inbound. How does the ship defend?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "A warship's magazine cannot be reloaded at sea: it engages with the cheapest layer that will do, and leaves station to reload before it is empty."
+    ],
+    "options": [
+      {
+        "id": "long",
+        "action": "sea.engageLong",
+        "bias": 0
+      },
+      {
+        "id": "medium",
+        "action": "sea.engageMedium",
+        "bias": 1
+      },
+      {
+        "id": "short",
+        "action": "sea.engageShort",
+        "bias": 0
+      },
+      {
+        "id": "decoy",
+        "action": "sea.decoyManoeuvre",
+        "bias": 0
+      },
+      {
+        "id": "unmask",
+        "action": "sea.unmask",
+        "bias": 0
+      }
+    ],
+    "fallback": "medium",
+    "dropped": [],
+    "path": [
+      "w.vampireInbound"
+    ]
+  }
+}

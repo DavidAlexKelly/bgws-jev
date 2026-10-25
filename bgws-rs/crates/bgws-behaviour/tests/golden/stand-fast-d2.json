@@ -1,0 +1,64 @@
+{
+  "scene": {
+    "name": "stand-fast-d2",
+    "candidates": [
+      "custom/stand-fast"
+    ],
+    "trigger": "D2",
+    "facts": {}
+  },
+  "template": "custom/stand-fast",
+  "lineage": [
+    "custom/stand-fast",
+    "core/armour",
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D2",
+    "title": "Fired on, shooter located",
+    "question": "It is under fire and can see who is firing. How does it answer?",
+    "doctrine": [
+      "Armour fights from hull-down positions and at long range, where its gun and protection count most. It avoids being drawn close to infantry it cannot see, and moves between firing positions out of the enemy's sight.",
+      "This crew does not give up ground."
+    ],
+    "options": [
+      {
+        "id": "returnFire",
+        "action": "land.returnFire",
+        "bias": 0
+      },
+      {
+        "id": "hullDown",
+        "action": "land.hullDownThenFire",
+        "bias": 0
+      },
+      {
+        "id": "askFriend",
+        "action": "land.askFriendForHelp",
+        "bias": 0
+      },
+      {
+        "id": "assault",
+        "action": "land.assault",
+        "bias": 0
+      },
+      {
+        "id": "quiet",
+        "action": "land.goQuietInCover",
+        "bias": 0
+      }
+    ],
+    "fallback": "returnFire",
+    "dropped": [
+      {
+        "id": "pullBack",
+        "action": "land.outOfSight",
+        "why": "removed"
+      }
+    ],
+    "path": [
+      "D2"
+    ]
+  }
+}

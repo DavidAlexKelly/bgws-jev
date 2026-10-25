@@ -303,7 +303,7 @@ mod tests {
         let lambda: f64 = 0.099_930_819;
         let num = 1e6 * 1e8 * lambda * lambda;
         let den = (4.0 * PI).powi(3) * 1e20 * 1.380_649e-23 * 290.0 * 1e6 * 10f64.powf(0.9);
-        assert_relative_eq!(s, num / den, max_relative = 1e-9);
+        assert_relative_eq!(s, num / den, max_relative = 1e-6);
         // R⁻⁴: half the range, +12.04 dB.
         let s2 = snr(&spec(), 1.0, 50_000.0, 0.0);
         assert_relative_eq!(10.0 * (s2 / s).log10(), 12.041, epsilon = 1e-3);

@@ -1,0 +1,48 @@
+{
+  "scene": {
+    "name": "ifv-dismount-point",
+    "candidates": [
+      "core/ifv"
+    ],
+    "trigger": "dismountPoint",
+    "facts": {}
+  },
+  "template": "core/ifv",
+  "lineage": [
+    "core/ifv",
+    "core/default",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.dismountPoint",
+    "title": "Dismount?",
+    "question": "It is close to the enemy with infantry on board. Dismount?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "An IFV carries its infantry to where they fight and supports them with its cannon. It dismounts them in cover short of the enemy, never on top of it."
+    ],
+    "options": [
+      {
+        "id": "dismountHere",
+        "action": "land.dismountHere",
+        "bias": 0
+      },
+      {
+        "id": "dismountInCover",
+        "action": "land.dismountInCover",
+        "bias": 1
+      },
+      {
+        "id": "stayMounted",
+        "action": "land.stayMounted",
+        "bias": 0
+      }
+    ],
+    "fallback": "dismountInCover",
+    "dropped": [],
+    "path": [
+      "w.dismountPoint"
+    ]
+  }
+}

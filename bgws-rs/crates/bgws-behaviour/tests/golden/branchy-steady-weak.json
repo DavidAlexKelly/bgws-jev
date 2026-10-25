@@ -1,0 +1,44 @@
+{
+  "scene": {
+    "name": "branchy-steady-weak",
+    "candidates": [
+      "custom/branchy"
+    ],
+    "trigger": "D2",
+    "facts": {
+      "self.cohesion": "steady",
+      "self.strength": 0.3
+    }
+  },
+  "template": "custom/branchy",
+  "lineage": [
+    "custom/branchy"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "weak",
+    "title": "Weak and fired on",
+    "question": "Too weak to fight it out. What now?",
+    "doctrine": [
+      "Hold on or hold out."
+    ],
+    "options": [
+      {
+        "id": "quiet",
+        "action": "land.goQuietInCover",
+        "bias": 0
+      },
+      {
+        "id": "pullBack",
+        "action": "land.outOfSight",
+        "bias": 1
+      }
+    ],
+    "fallback": "pullBack",
+    "dropped": [],
+    "path": [
+      "fired",
+      "weak"
+    ]
+  }
+}

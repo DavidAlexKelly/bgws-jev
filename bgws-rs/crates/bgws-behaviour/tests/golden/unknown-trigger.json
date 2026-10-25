@@ -1,0 +1,16 @@
+{
+  "scene": {
+    "name": "unknown-trigger",
+    "candidates": [
+      "core/armour"
+    ],
+    "trigger": "lostComms",
+    "facts": {}
+  },
+  "template": null,
+  "lineage": [],
+  "walk": {
+    "kind": "none",
+    "path": []
+  }
+}

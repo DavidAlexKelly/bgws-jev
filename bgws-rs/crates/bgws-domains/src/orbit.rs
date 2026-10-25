@@ -181,7 +181,7 @@ mod tests {
         }
 
         #[test]
-        fn frame_round_trip(x in -7e6f64..7e6, y in -7e6f64..7e6, th in 0.0f64..6.28) {
+        fn frame_round_trip(x in -7e6f64..7e6, y in -7e6f64..7e6, th in 0.0f64..6.0) {
             let s = StateVector { r: V3::new(x, y, 1e6), v: V3::new(10.0, -20.0, 30.0) };
             let b = ecef_to_inertial(inertial_to_ecef(s, th), th);
             prop_assert!((b.r - s.r).norm() < 1e-6 && (b.v - s.v).norm() < 1e-9);

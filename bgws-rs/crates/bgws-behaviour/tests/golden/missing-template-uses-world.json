@@ -1,0 +1,45 @@
+{
+  "scene": {
+    "name": "missing-template-uses-world",
+    "candidates": [
+      "custom/missing"
+    ],
+    "trigger": "bingoFuel",
+    "facts": {}
+  },
+  "template": "core/world",
+  "lineage": [
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.bingoFuel",
+    "title": "Bingo fuel",
+    "question": "It is at bingo fuel or out of weapons. What now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent."
+    ],
+    "options": [
+      {
+        "id": "rtb",
+        "action": "air.rtb",
+        "bias": 0
+      },
+      {
+        "id": "tanker",
+        "action": "air.tanker",
+        "bias": 0
+      },
+      {
+        "id": "onePass",
+        "action": "air.onePass",
+        "bias": 0
+      }
+    ],
+    "fallback": "rtb",
+    "dropped": [],
+    "path": [
+      "w.bingoFuel"
+    ]
+  }
+}

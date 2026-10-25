@@ -1,0 +1,146 @@
+[
+ {
+  "id": "custom/stand-fast",
+  "version": 1,
+  "name": "Stand fast",
+  "parent": "core/armour",
+  "remove": [
+   "pullBack"
+  ],
+  "bias": {
+   "observe": -2,
+   "engage": 1
+  },
+  "doctrine": "This crew does not give up ground."
+ },
+ {
+  "id": "custom/point-blank",
+  "version": 1,
+  "parent": "core/default",
+  "when": {
+   "engage": {
+    "all": [
+     {
+      "fact": "enemy.rangeM",
+      "op": "<=",
+      "value": 1000
+     },
+     {
+      "fact": "self.class",
+      "op": "==",
+      "value": "armoured_vehicle"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "custom/no-withdraw",
+  "version": 1,
+  "parent": "core/default",
+  "remove": [
+   "withdraw",
+   "pullBack"
+  ],
+  "bias": {
+   "reinforce": 2
+  }
+ },
+ {
+  "id": "custom/branchy",
+  "version": 2,
+  "doctrine": "Hold on or hold out.",
+  "triggers": {
+   "D2": "fired"
+  },
+  "nodes": {
+   "fired": {
+    "kind": "branch",
+    "cases": [
+     {
+      "when": {
+       "fact": "self.cohesion",
+       "op": "==",
+       "value": "broken"
+      },
+      "next": "recover"
+     },
+     {
+      "when": {
+       "not": {
+        "fact": "self.strength",
+        "op": ">=",
+        "value": 0.5
+       }
+      },
+      "next": "weak"
+     }
+    ],
+    "else": "fight"
+   },
+   "recover": {
+    "kind": "do",
+    "action": "land.holdAndRecover",
+    "params": {
+     "minutes": 5
+    }
+   },
+   "weak": {
+    "kind": "choose",
+    "title": "Weak and fired on",
+    "question": "Too weak to fight it out. What now?",
+    "options": [
+     {
+      "id": "quiet",
+      "action": "land.goQuietInCover"
+     },
+     {
+      "id": "pullBack",
+      "action": "land.outOfSight",
+      "bias": 1
+     }
+    ],
+    "fallback": "pullBack"
+   },
+   "fight": {
+    "kind": "choose",
+    "title": "Fired on",
+    "question": "Answer the fire?",
+    "options": [
+     {
+      "id": "returnFire",
+      "action": "land.returnFire",
+      "bias": 1
+     },
+     {
+      "id": "assault",
+      "action": "land.assault",
+      "when": {
+       "fact": "self.strength",
+       "op": ">",
+       "value": 0.8
+      }
+     },
+     {
+      "id": "pullBack",
+      "action": "land.outOfSight"
+     }
+    ],
+    "fallback": "returnFire"
+   }
+  }
+ },
+ {
+  "id": "custom/drill-fire",
+  "version": 1,
+  "triggers": {
+   "D4": "fire"
+  },
+  "nodes": {
+   "fire": {
+    "kind": "do",
+    "action": "land.fireNow"
+   }
+  }
+ }
+]

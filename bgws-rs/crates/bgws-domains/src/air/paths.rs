@@ -22,6 +22,9 @@ pub struct PathParams {
     pub tf_samples: usize,
     /// Fraction of the maximum climb rate the TF planner may rely on.
     pub tf_climb_margin: f64,
+    /// The autopilot's altitude-capture time constant, s: the planner leads
+    /// its command by this much so a first-order autopilot tracks the ramp.
+    pub autopilot_alt_tau: f64,
 }
 
 impl PathParams {
@@ -32,6 +35,7 @@ impl PathParams {
             tf_lookahead: f.get("air.path.tf_lookahead"),
             tf_samples: f.get("air.path.tf_samples") as usize,
             tf_climb_margin: f.get("air.path.tf_climb_margin"),
+            autopilot_alt_tau: f.get("air.autopilot.alt_tau"),
         }
     }
 }
@@ -210,10 +214,14 @@ pub fn intercept(own: V3, own_speed: f64, target: V3, target_vel: V3) -> Interce
     }
 }
 
-/// The altitude to command for terrain following: the highest of
-/// (terrain + clearance) at each look-ahead sample, less the height the
-/// aircraft can gain by then at a margin of its climb rate. `terrain(x, y)`
-/// returns the terrain height (m) at a local position.
+/// The altitude to command for terrain following. The planner first finds
+/// the lowest altitude the aircraft should be at *now* so that climbing at a
+/// margin of its climb rate it clears (terrain + clearance) at every
+/// look-ahead sample (the "ski-toe" profile). Because the autopilot captures
+/// altitude with a first-order lag, the command leads that profile by the
+/// autopilot time constant times the profile's rate of rise, so the aircraft
+/// actually flies the ramp instead of lagging into the slope.
+/// `terrain(x, y)` returns the terrain height (m) at a local position.
 pub fn terrain_following_altitude(
     p: &PathParams,
     s: &AirState,
@@ -225,14 +233,21 @@ pub fn terrain_following_altitude(
     let v = s.speed.max(1.0);
     let n = p.tf_samples.max(1);
     let climb = climb_rate.max(0.0) * p.tf_climb_margin;
-    let mut cmd = terrain(s.pos.x, s.pos.y) + clearance;
-    for i in 1..=n {
-        let t = p.tf_lookahead * i as f64 / n as f64;
-        let q = s.pos + dir * (v * t);
-        let need = terrain(q.x, q.y) + clearance - climb * t;
-        cmd = cmd.max(need);
-    }
-    cmd
+    // Required altitude now for the profile starting `lead` seconds ahead.
+    let profile = |lead: f64| {
+        let o = s.pos + dir * (v * lead);
+        let mut a = terrain(o.x, o.y) + clearance;
+        for i in 1..=n {
+            let t = p.tf_lookahead * i as f64 / n as f64;
+            let q = o + dir * (v * t);
+            a = a.max(terrain(q.x, q.y) + clearance - climb * t);
+        }
+        a
+    };
+    let now = profile(0.0);
+    let dt = 1.0;
+    let rise = ((profile(dt) - now) / dt).max(0.0);
+    now + p.autopilot_alt_tau * rise
 }
 
 /// Heading error helper (for tests and behaviour templates).

@@ -359,10 +359,10 @@ pub fn formation_slots(formation: Formation, class: VehicleClass, n: usize, marc
                     } else {
                         let rank = ((k + 1.0) / 2.0).floor();
                         let side = if (k as usize) % 2 == 1 { 1.0 } else { -1.0 };
-                        (side * rank * s * 0.7, -rank * s * 0.7)
+                        (side * rank * s * std::f64::consts::FRAC_1_SQRT_2, -rank * s * std::f64::consts::FRAC_1_SQRT_2)
                     }
                 }
-                Formation::Echelon => (k * s * 0.7, -k * s * 0.7),
+                Formation::Echelon => (k * s * std::f64::consts::FRAC_1_SQRT_2, -k * s * std::f64::consts::FRAC_1_SQRT_2),
             }
         })
         .collect()

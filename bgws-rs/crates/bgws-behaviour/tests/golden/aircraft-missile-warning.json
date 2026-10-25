@@ -1,0 +1,47 @@
+{
+  "scene": {
+    "name": "aircraft-missile-warning",
+    "candidates": [
+      "core/aircraft"
+    ],
+    "trigger": "missileWarning",
+    "facts": {}
+  },
+  "template": "core/aircraft",
+  "lineage": [
+    "core/aircraft",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.missileWarning",
+    "title": "Missile warning",
+    "question": "A missile is coming for the aircraft. What now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "Aircraft are scarce. They do not fly into an air-defence ring without suppression, and they come home with enough fuel to land."
+    ],
+    "options": [
+      {
+        "id": "defend",
+        "action": "air.defend",
+        "bias": 0
+      },
+      {
+        "id": "press",
+        "action": "air.pressAttack",
+        "bias": 0
+      },
+      {
+        "id": "abort",
+        "action": "air.abort",
+        "bias": 0
+      }
+    ],
+    "fallback": "defend",
+    "dropped": [],
+    "path": [
+      "w.missileWarning"
+    ]
+  }
+}
