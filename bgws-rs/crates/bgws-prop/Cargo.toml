@@ -14,7 +14,10 @@ thiserror.workspace = true
 bgws-env.workspace = true
 bgws-gpu.workspace = true
 rayon.workspace = true
+rand.workspace = true
+libm.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+rand_chacha.workspace = true

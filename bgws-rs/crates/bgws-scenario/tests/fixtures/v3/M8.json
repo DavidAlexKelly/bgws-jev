@@ -1,0 +1,381 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "M8 — Joint strike",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "m8-joint",
+ "ground": {
+  "choice": "generated",
+  "seed": "m8-joint-ground"
+ },
+ "scope": {
+  "type": "strike",
+  "durationMin": 1440,
+  "area": {
+   "widthKm": 400,
+   "depthKm": 400
+  },
+  "echelons": {
+   "highest": "joint",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "simulated",
+   "fires": "off",
+   "ew": "simulated",
+   "air": "simulated",
+   "airDefence": "simulated",
+   "naval": "simulated",
+   "space": "simulated",
+   "cyber": "simulated",
+   "logistics": "abstracted",
+   "medical": "off"
+  },
+  "planners": [
+   "overall",
+   "air",
+   "maritime",
+   "spaceCyber"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": true,
+   "jev": "nearContact"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "b-jfc",
+   "label": "Joint force HQ",
+   "side": "blue",
+   "platform": "generic/cp-division",
+   "platformCount": 8,
+   "troopQuality": "veteran",
+   "position": {
+    "lat": 53.12202659001078,
+    "lng": 18.6
+   },
+   "commandRating": 5
+  },
+  {
+   "id": "b-loiter-1",
+   "label": "Staged drone team west",
+   "side": "blue",
+   "platform": "generic/loiterTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.66712181099533,
+    "lng": 18.477145138747257
+   }
+  },
+  {
+   "id": "b-loiter-2",
+   "label": "Staged drone team east",
+   "side": "blue",
+   "platform": "generic/loiterTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.63118936399569,
+    "lng": 18.738211718909337
+   }
+  },
+  {
+   "id": "b-esm-1",
+   "label": "SIGINT west",
+   "side": "blue",
+   "platform": "generic/esmTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.37966223499821,
+    "lng": 18.21607855858518
+   }
+  },
+  {
+   "id": "b-esm-2",
+   "label": "SIGINT east",
+   "side": "blue",
+   "platform": "generic/esmTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.37966223499821,
+    "lng": 18.98392144141482
+   }
+  },
+  {
+   "id": "r-ad-hq",
+   "label": "Red air-defence command",
+   "side": "red",
+   "platform": "generic/cp-brigade",
+   "platformCount": 5,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 55.18814229249012,
+    "lng": 18.6
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "r-sam-long",
+   "label": "Red long-range SAM",
+   "side": "red",
+   "platform": "generic/samLong",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 55.008480057491916,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-sam-1",
+   "label": "Red SAM west",
+   "side": "red",
+   "platform": "generic/samMedium",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.738986704994616,
+    "lng": 18.446431423434074
+   }
+  },
+  {
+   "id": "r-sam-2",
+   "label": "Red SAM east",
+   "side": "red",
+   "platform": "generic/samMedium",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.694071146245065,
+    "lng": 18.784282291879116
+   }
+  },
+  {
+   "id": "r-shorad",
+   "label": "Red point defence",
+   "side": "red",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 55.14322673374057,
+    "lng": 18.6
+   }
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "world": {
+  "hqs": [
+   {
+    "id": "blue-jfc",
+    "side": "blue",
+    "echelon": "joint",
+    "postId": "b-jfc",
+    "subordinates": [
+     "b-loiter-1",
+     "b-loiter-2",
+     "b-esm-1",
+     "b-esm-2"
+    ],
+    "planner": "overall",
+    "seat": "heuristic"
+   },
+   {
+    "id": "red-ad",
+    "side": "red",
+    "echelon": "brigade",
+    "postId": "r-ad-hq",
+    "subordinates": [
+     "r-sam-long",
+     "r-sam-1",
+     "r-sam-2",
+     "r-shorad"
+    ],
+    "planner": "air",
+    "seat": "heuristic"
+   }
+  ],
+  "entities": [
+   {
+    "id": "b-base",
+    "owner": "blue",
+    "archetype": "generic/airbase",
+    "at": {
+     "lat": 52.85253323751348,
+     "lng": 18.6
+    },
+    "label": "Blue airbase"
+   },
+   {
+    "id": "b-ssn",
+    "owner": "blue",
+    "archetype": "generic/ssn",
+    "at": {
+     "lat": 52.22371541501977,
+     "lng": 18.6
+    },
+    "altM": -100,
+    "label": "Blue submarine"
+   },
+   {
+    "id": "b-sar",
+    "owner": "blue",
+    "archetype": "generic/satSar",
+    "at": {
+     "lat": 54.2,
+     "lng": 18.6
+    },
+    "label": "Blue radar satellite"
+   },
+   {
+    "id": "b-eo",
+    "owner": "blue",
+    "archetype": "generic/satEo",
+    "at": {
+     "lat": 54.2,
+     "lng": 18.6
+    },
+    "label": "Commercial imaging satellite",
+    "provider": "commercial"
+   },
+   {
+    "id": "b-mw",
+    "owner": "blue",
+    "archetype": "generic/missileWarning",
+    "at": {
+     "lat": 54.2,
+     "lng": 18.6
+    },
+    "label": "Blue missile warning"
+   },
+   {
+    "id": "b-cyber",
+    "owner": "blue",
+    "archetype": "generic/cyberCell",
+    "at": {
+     "lat": 52.40337765001797,
+     "lng": 18.6
+    },
+    "label": "Blue cyber cell"
+   },
+   {
+    "id": "r-depot",
+    "owner": "red",
+    "archetype": "generic/depot",
+    "at": {
+     "lat": 55.45763564498743,
+     "lng": 18.90713715313186
+    },
+    "label": "Red missile depot"
+   },
+   {
+    "id": "r-base",
+    "owner": "red",
+    "archetype": "generic/airbase",
+    "at": {
+     "lat": 55.816960114983836,
+     "lng": 18.139294270302216
+    },
+    "label": "Red airbase"
+   }
+  ],
+  "sea": {
+   "waters": [
+    [
+     {
+      "lat": 51.50506647502695,
+      "lng": 13.992942703022148
+     },
+     {
+      "lat": 51.50506647502695,
+      "lng": 23.207057296977855
+     },
+     {
+      "lat": 52.58303988501617,
+      "lng": 23.207057296977855
+     },
+     {
+      "lat": 52.58303988501617,
+      "lng": 13.992942703022148
+     }
+    ]
+   ]
+  },
+  "cyber": [
+   {
+    "id": "access-ad",
+    "side": "blue",
+    "target": "airDefence",
+    "system": "red air-defence network",
+    "readiness": 0,
+    "pEffect": 0.7,
+    "durationS": 21600,
+    "detectionRisk": 0.3,
+    "window": {
+     "from": 0,
+     "until": 7200
+    }
+   }
+  ],
+  "nais": [
+   {
+    "side": "blue",
+    "label": "NAI 1: the air-defence command",
+    "at": {
+     "lat": 55.1701760689903,
+     "lng": 18.6
+    },
+    "priority": 5
+   },
+   {
+    "side": "blue",
+    "label": "NAI 2: the missile depot",
+    "at": {
+     "lat": 55.45763564498743,
+     "lng": 18.876423437818673
+    },
+    "priority": 4
+   }
+  ],
+  "network": {
+   "blue": "datalink",
+   "red": "voice"
+  },
+  "environment": {
+   "startHour": 2,
+   "cloudCover": 0.3
+  },
+  "victory": [
+   {
+    "kind": "targetSet",
+    "side": "blue",
+    "targets": [
+     "r-sam-long",
+     "r-sam-1",
+     "r-sam-2",
+     "r-ad-hq"
+    ],
+    "share": 0.75,
+    "label": "The air defences and their command down"
+   }
+  ]
+ }
+}

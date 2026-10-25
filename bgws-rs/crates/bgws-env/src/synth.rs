@@ -122,21 +122,36 @@ pub fn generate(p: &SynthParams, f: &Figures) -> SynthWorld {
         (p.base_elevation + p.relief * fbm(s1, x, y, p.octaves, p.persistence)) as f32
     });
 
-    // Rivers: from well-separated high points, steepest descent to the edge,
-    // carving a monotone bed and a valley.
+    // Rivers enter at well-separated high points of the map edge and flow
+    // across it to another edge (with a bias away from their entry side),
+    // carving a monotone bed and then a valley.
     let river_depth = f.get("env.synth.river_depth_m");
     let valley_m = f.get("env.synth.valley_halfwidth_m");
+    let (w, hgt) = (p.width, p.height);
+    let side = |i: usize, j: usize| -> Option<u8> {
+        if i == 0 {
+            Some(0)
+        } else if i + 1 == w {
+            Some(1)
+        } else if j == 0 {
+            Some(2)
+        } else if j + 1 == hgt {
+            Some(3)
+        } else {
+            None
+        }
+    };
     let mut order: Vec<usize> = (0..spec.len()).collect();
     order.sort_by(|&a, &b| elev.data[b].total_cmp(&elev.data[a]).then(a.cmp(&b)));
     let mut sources: Vec<usize> = Vec::new();
-    let min_sep = (p.width.min(p.height) as f64 * 0.3).max(3.0);
+    let min_sep = (w.min(hgt) as f64 * 0.3).max(3.0);
     for &k in &order {
         if sources.len() >= p.rivers {
             break;
         }
         let (i, j) = spec.ij(k);
-        let margin = 3;
-        if i < margin || j < margin || i + margin >= p.width || j + margin >= p.height {
+        let corner = (i < 3 || i + 3 >= w) && (j < 3 || j + 3 >= hgt);
+        if side(i, j).is_none() || corner {
             continue;
         }
         if sources.iter().all(|&s| {
@@ -146,9 +161,20 @@ pub fn generate(p: &SynthParams, f: &Figures) -> SynthWorld {
             sources.push(k);
         }
     }
+    let bias = 2.0 * p.relief / w.min(hgt).max(1) as f64;
     let mut water = vec![false; spec.len()];
     let mut rivers = Vec::new();
     for (ri, &src) in sources.iter().enumerate() {
+        let (si, sj) = spec.ij(src);
+        let s0 = side(si, sj).unwrap_or(0);
+        let progress = |i: usize, j: usize| -> f64 {
+            (match s0 {
+                0 => i,
+                1 => w - 1 - i,
+                2 => j,
+                _ => hgt - 1 - j,
+            }) as f64
+        };
         let mut path = vec![src];
         let mut visited = vec![false; spec.len()];
         visited[src] = true;
@@ -156,29 +182,35 @@ pub fn generate(p: &SynthParams, f: &Figures) -> SynthWorld {
         let mut k = src;
         loop {
             let (i, j) = spec.ij(k);
-            if i == 0 || j == 0 || i + 1 == p.width || j + 1 == p.height || water[k] && k != src {
+            if path.len() > 1 && side(i, j).is_some_and(|s| s != s0) {
                 break;
             }
-            let mut best: Option<(f32, usize)> = None;
-            for (di, dj) in [(0i64, 1i64), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, -1), (-1, 1)] {
-                let nk = spec.idx((i as i64 + di) as usize, (j as i64 + dj) as usize);
+            let mut best: Option<(f64, usize)> = None;
+            // 4-connected, so an 8-connected road cannot slip diagonally across.
+            for (di, dj) in [(0i64, 1i64), (1, 0), (0, -1), (-1, 0)] {
+                let (ni, nj) = (i as i64 + di, j as i64 + dj);
+                if ni < 0 || nj < 0 || ni >= w as i64 || nj >= hgt as i64 {
+                    continue;
+                }
+                let nk = spec.idx(ni as usize, nj as usize);
                 if visited[nk] {
                     continue;
                 }
-                let h = elev.data[nk];
-                if best.is_none_or(|(bh, bk)| h < bh || (h == bh && nk < bk)) {
-                    best = Some((h, nk));
+                let score = elev.data[nk] as f64 - bias * progress(ni as usize, nj as usize);
+                if best.is_none_or(|(bs, bk)| score < bs || (score == bs && nk < bk)) {
+                    best = Some((score, nk));
                 }
             }
             let Some((_, nk)) = best else { break };
+            if water[nk] {
+                // Joined an earlier river: end here, leaving its bed untouched.
+                break;
+            }
             visited[nk] = true;
             bed = (elev.data[nk] as f64).min(bed - 0.05);
             elev.data[nk] = bed as f32;
             path.push(nk);
             k = nk;
-            if path.len() > spec.len() {
-                break;
-            }
         }
         for &c in &path {
             water[c] = true;
@@ -299,11 +331,11 @@ pub fn generate(p: &SynthParams, f: &Figures) -> SynthWorld {
         }
     }
     for t in &towns {
-        for k in 0..spec.len() {
+        for (k, &wet) in water.iter().enumerate() {
             let (i, j) = spec.ij(k);
             let (x, y) = spec.pos(i, j);
             let d = (x - t.e).hypot(y - t.n);
-            if water[k] {
+            if wet {
                 continue;
             }
             if d < t.radius_m * 0.45 {
@@ -435,8 +467,9 @@ pub fn generate(p: &SynthParams, f: &Figures) -> SynthWorld {
     }
 
     let mut power_lines = Vec::new();
+    let pl_height = f.get("env.synth.power_line_height_m");
     if towns.len() >= 2 {
-        power_lines.push(PowerLine { line: vec![(towns[0].e, towns[0].n), (towns[1].e, towns[1].n)], height_m: f.get("env.synth.power_line_height_m") });
+        power_lines.push(PowerLine { line: vec![(towns[0].e, towns[0].n), (towns[1].e, towns[1].n)], height_m: pl_height });
     }
 
     SynthWorld { terrain, roads, rivers, towns, power_lines }
@@ -477,10 +510,10 @@ mod tests {
 
     #[test]
     fn deterministic_and_complete() {
-        let a = world(11);
-        let b = world(11);
+        let a = world(2);
+        let b = world(2);
         assert_eq!(a.terrain, b.terrain);
-        assert_ne!(a.terrain.elevation, world(12).terrain.elevation);
+        assert_ne!(a.terrain.elevation, world(3).terrain.elevation);
         let lc = &a.terrain.land_cover.data;
         for c in [LandCover::Water, LandCover::ForestLight, LandCover::ForestDense, LandCover::UrbanDense, LandCover::Crops] {
             assert!(lc.contains(&c), "missing {c:?}");

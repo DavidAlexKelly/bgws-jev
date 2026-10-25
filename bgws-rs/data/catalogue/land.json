@@ -1,0 +1,2689 @@
+{
+ "$comment": "Land platforms (generic.ts LAND, ported and extended). Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/atgmTeam",
+   "name": "Anti-tank guided missile team",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Ambushes armour from cover at long range.",
+   "sidc": "SFGPUCAA",
+   "template": "core/atgmTeam",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "personnel",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2500,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 1.7
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 4000,
+     "forDeg": 120,
+     "scanS": 1,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 1.5
+    }
+   ],
+   "mounts": [
+    {
+     "id": "atgm",
+     "kind": "atgm",
+     "munitions": [
+      "atgmTandem"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 30
+    },
+    {
+     "id": "rifles",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 10,
+     "magazine": 600,
+     "reloadS": 5
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "atgmTandem": 8,
+     "ball556": 600
+    },
+    "medical": 2,
+    "spares": 0,
+    "batteryWh": 400,
+    "waterL": 24,
+    "foodRations": 6
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1500000,
+   "rationale": "Two firing posts; eight missiles between them.",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "team"
+  },
+  {
+   "id": "generic/bomberDroneTeam",
+   "name": "Bomber drone team",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Flies heavy bomber drones at night.",
+   "sidc": "SFGPUCVU",
+   "template": "core/droneTeam",
+   "echelon": "team",
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 4
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "emitters": [
+    {
+     "kind": "radio"
+    },
+    {
+     "kind": "droneLink",
+     "erpW": 10
+    }
+   ],
+   "stores": {
+    "batteryWh": 20000,
+    "ammo": {
+     "droneGrenade": 60
+    }
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/bomberDrone",
+     "count": 3
+    }
+   },
+   "costUsd": 120000,
+   "rationale": "Three airframes and a truckload of batteries.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/cbRadar",
+   "name": "Counter-battery radar",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Tracks incoming rounds back to the guns that fired them.",
+   "sidc": "SFGPUCFTR",
+   "template": "core/sensor",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 200,
+    "burnMovingLph": 20,
+    "burnIdleLph": 6
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "soft",
+    "crew": 4,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.8,
+     "ir": 0.8
+    },
+    "rcs": {
+     "x": {
+      "front": 10
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "cbr",
+     "rangeMaxM": 40000,
+     "forDeg": 90,
+     "scanS": 1,
+     "heightM": 6,
+     "band": "s"
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio"
+    },
+    {
+     "kind": "radar",
+     "band": "s",
+     "erpW": 5000
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 16,
+    "foodRations": 4
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 10000000,
+   "rationale": "About 40 km detection, from the Zoopark-1M claim.",
+   "source": "R4.3",
+   "provenance": "synthetic",
+   "sources": {
+    "sensors.0.rangeM": {
+     "kind": "reference",
+     "ref": "R4.3"
+    }
+   }
+  },
+  {
+   "id": "generic/coastalAsm",
+   "name": "Coastal anti-ship battery",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Denies the sea from the shore.",
+   "sidc": "SFGPUCMS",
+   "template": "core/coastal",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 35,
+    "fuelCapacityL": 500,
+    "burnMovingLph": 60,
+    "burnIdleLph": 10
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "soft",
+    "crew": 4,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 15
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "rangeMaxM": 150000,
+     "scanS": 6,
+     "heightM": 20,
+     "band": "x",
+     "seesAir": false,
+     "radar": {
+      "gainDb": 38,
+      "pulsesIntegrated": 30
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "ascm",
+     "kind": "ascm",
+     "munitions": [
+      "ascm"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 20
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "x",
+     "erpW": 20000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "ascm": 8
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 32,
+    "foodRations": 8
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 200000000,
+   "rationale": "The battery that sank Moskva fired two missiles.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/convoyTruck",
+   "name": "Supply convoy (4 trucks)",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Moves fuel and ammunition forward.",
+   "sidc": "SFGPEVUL",
+   "template": "core/convoy",
+   "plannedBy": "sustainment",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 1600,
+    "burnMovingLph": 35,
+    "burnIdleLph": 5
+   },
+   "body": {
+    "count": 4,
+    "vulnerability": "soft",
+    "crew": 2,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.1,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 15
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 32,
+    "foodRations": 8
+   },
+   "carried": {
+    "cargoT": 40
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 600000,
+   "rationale": "Ten tonnes a truck.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/counterDrone",
+   "name": "Counter-drone vehicle",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Detects drones by radar and RF, jams their links, and shoots them down.",
+   "sidc": "SFGPUCDS",
+   "template": "core/gbad",
+   "plannedBy": "air",
+   "echelon": "section",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 90,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 300,
+    "burnMovingLph": 40,
+    "burnIdleLph": 10
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 3,
+    "armour": {
+     "ke": {
+      "front": 20
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.8,
+     "ir": 0.9
+    },
+    "rcs": {
+     "x": {
+      "front": 10
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "x",
+     "rangeMaxM": 5000,
+     "scanS": 1,
+     "heightM": 4,
+     "radar": {
+      "gainDb": 25
+     }
+    },
+    {
+     "kind": "esm",
+     "band": "uhf",
+     "rangeMaxM": 5000,
+     "heightM": 4,
+     "esm": {
+      "freqMinHz": 400000000,
+      "freqMaxHz": 6000000000,
+      "dfRmsDeg": 5
+     }
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "heightM": 3
+    },
+    {
+     "kind": "acoustic",
+     "rangeMaxM": 1500
+    }
+   ],
+   "mounts": [
+    {
+     "id": "gunAd",
+     "kind": "gunAd",
+     "munitions": [
+      "adShell30"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 3
+    },
+    {
+     "id": "shotgun",
+     "kind": "shotgun",
+     "munitions": [
+      "shot12g"
+     ],
+     "salvo": 1,
+     "magazine": 50,
+     "reloadS": 2
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio"
+    },
+    {
+     "kind": "radar",
+     "band": "x",
+     "erpW": 200
+    },
+    {
+     "kind": "jammer",
+     "band": "l",
+     "erpW": 100,
+     "jams": [
+      "l",
+      "gnss",
+      "uhf"
+     ],
+     "jamRadiusM": 2000,
+     "jamRadiiM": {
+      "l": 2000,
+      "gnss": 3000,
+      "uhf": 1500
+     }
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "adShell30": 400,
+     "shot12g": 200
+    }
+   },
+   "costUsd": 3000000,
+   "rationale": "Layered counter-UAS on one vehicle: find with radar and RF, jam, then guns.",
+   "source": "synthetic; R5.1",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/droneIsrTeam",
+   "name": "ISR quadcopter team",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Finds targets and adjusts fire from the air.",
+   "sidc": "SFGPUCVU",
+   "template": "core/droneTeam",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 5,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 3000,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/quadIsr",
+     "count": 4
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 60000,
+   "rationale": "Operators in a dugout with four quadcopters and spare batteries.",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "team"
+  },
+  {
+   "id": "generic/engineerSection",
+   "name": "Combat engineer section",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Breaches and lays obstacles; digs in.",
+   "sidc": "SFGPUCE",
+   "template": "core/engineer",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 60,
+    "cruiseKmh": 25,
+    "fuelCapacityL": 800,
+    "burnMovingLph": 100,
+    "burnIdleLph": 18
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 8,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 150
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.9,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 15
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [
+    {
+     "id": "mg",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 20,
+     "magazine": 500,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "ball762": 3000
+    },
+    "medical": 0,
+    "spares": 4,
+    "batteryWh": 0,
+    "waterL": 64,
+    "foodRations": 16
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 3000000,
+   "rationale": "A lane 6 m wide in about 1.5 h, from the research on breaching.",
+   "source": "R4.5, P13",
+   "provenance": "synthetic",
+   "sources": {
+    "role": {
+     "kind": "reference",
+     "ref": "R4.5, P13"
+    }
+   }
+  },
+  {
+   "id": "generic/esmTeam",
+   "name": "Electronic support (SIGINT) team",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Finds emitters and fixes them by bearings.",
+   "sidc": "SFGPUUMSEI",
+   "template": "core/ewEsm",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 250,
+    "burnMovingLph": 25,
+    "burnIdleLph": 6
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "soft",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.6,
+     "ir": 0.6
+    },
+    "rcs": {
+     "x": {
+      "front": 5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "esm",
+     "rangeMaxM": 40000,
+     "heightM": 10,
+     "esm": {
+      "dfRmsDeg": 2
+     }
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 3000000,
+   "rationale": "Direction finding to about 40 km on a mast.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/ewJammer",
+   "name": "Electronic attack team",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Jams radios, drone links and GNSS over an area.",
+   "sidc": "SFGPUUMSE",
+   "template": "core/ewJammer",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 300,
+    "burnMovingLph": 30,
+    "burnIdleLph": 10
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "soft",
+    "crew": 4,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.8,
+     "ir": 0.8
+    },
+    "rcs": {
+     "x": {
+      "front": 8
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "esm",
+     "rangeMaxM": 30000,
+     "heightM": 8
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "jammer",
+     "band": "uhf",
+     "erpW": 1000,
+     "dutyCycle": 1,
+     "jams": [
+      "vhf",
+      "uhf",
+      "l",
+      "gnss"
+     ],
+     "jamRadiusM": 8000,
+     "jamRadiiM": {
+      "gnss": 25000,
+      "l": 6000,
+      "vhf": 8000,
+      "uhf": 8000
+     }
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 16,
+    "foodRations": 4
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 5000000,
+   "rationale": "A Pole-21-like module denies GNSS out to about 25 km.",
+   "source": "R5.3, P16",
+   "provenance": "synthetic",
+   "sources": {
+    "emitters.1.jamRadiiM.gnss": {
+     "kind": "reference",
+     "ref": "R5.3, P16"
+    }
+   }
+  },
+  {
+   "id": "generic/fixedWingIsrTeam",
+   "name": "Fixed-wing ISR drone team",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Launches and flies small fixed-wing ISR drones from a catapult.",
+   "sidc": "SFGPUCVU",
+   "template": "core/droneTeam",
+   "echelon": "team",
+   "body": {
+    "count": 1,
+    "vulnerability": "soft",
+    "crew": 4
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.6,
+     "ir": 0.6
+    },
+    "rcs": {
+     "x": {
+      "front": 4
+     }
+    }
+   },
+   "emitters": [
+    {
+     "kind": "radio"
+    },
+    {
+     "kind": "droneLink",
+     "erpW": 20
+    }
+   ],
+   "mover": {
+    "fuelCapacityL": 200,
+    "burnMovingLph": 20,
+    "burnIdleLph": 4
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/fixedWingIsr",
+     "count": 3
+    }
+   },
+   "costUsd": 500000,
+   "rationale": "A van, a catapult and three airframes.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/fpvTeamFibre",
+   "name": "FPV strike team (fibre)",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "FPV strikes that jamming cannot stop, within the spool's reach.",
+   "sidc": "SFGPUCVUF",
+   "template": "core/droneTeam",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "fpvFibre": 12
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 3000,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/fpvFibre",
+     "count": 12
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 60000,
+   "rationale": "Fibre spools are commonly 20 km at most (41 km is the record).",
+   "source": "R4, P8",
+   "provenance": "synthetic",
+   "sources": {
+    "carried.drones": {
+     "kind": "reference",
+     "ref": "R4, P8"
+    }
+   },
+   "echelon": "team"
+  },
+  {
+   "id": "generic/fpvTeamRf",
+   "name": "FPV strike team (radio)",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Strikes vehicles and people with cheap FPV drones.",
+   "sidc": "SFGPUCVUF",
+   "template": "core/droneTeam",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 5,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "fpvHeat": 20
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 3000,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/fpvRf",
+     "count": 20
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 40000,
+   "rationale": "Hit rate 30–50% for skilled pilots; the radio link can be jammed and gives the operator away.",
+   "source": "R5.1, P9",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons.fpv.pk": {
+     "kind": "reference",
+     "ref": "R5.1, P9"
+    }
+   },
+   "echelon": "team"
+  },
+  {
+   "id": "generic/ifv",
+   "name": "Infantry fighting vehicle platoon",
+   "class": "ifv",
+   "domain": "land",
+   "role": "Carries and supports a rifle platoon; 30 mm cannon and ATGM.",
+   "sidc": "SFGPUCIZ",
+   "template": "core/ifv",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 65,
+    "cruiseKmh": 25,
+    "fuelCapacityL": 860,
+    "burnMovingLph": 110,
+    "burnIdleLph": 20
+   },
+   "body": {
+    "count": 3,
+    "vulnerability": "light",
+    "crew": 3,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 200
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.9,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 15
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2.5
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 3500,
+     "forDeg": 120,
+     "scanS": 1,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2.5
+    }
+   ],
+   "mounts": [
+    {
+     "id": "cannon30",
+     "kind": "cannon",
+     "munitions": [
+      "apfsds30",
+      "he30"
+     ],
+     "salvo": 3,
+     "magazine": 200,
+     "reloadS": 2
+    },
+    {
+     "id": "atgm",
+     "kind": "atgm",
+     "munitions": [
+      "atgmTandem"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds30": 500,
+     "he30": 700,
+     "atgmTandem": 6,
+     "ball762": 2000,
+     "ball556": 4000
+    },
+    "medical": 0,
+    "spares": 3,
+    "batteryWh": 2000,
+    "waterL": 36,
+    "foodRations": 9
+   },
+   "carried": {
+    "dismounts": {
+     "archetype": "generic/infantrySection",
+     "sections": 3
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 4000000,
+   "rationale": "Burn scaled from the tank by mass (about half); one rifle section per vehicle.",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "platoon"
+  },
+  {
+   "id": "generic/infantrySection",
+   "name": "Rifle section",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Holds and clears ground; carries an anti-armour weapon.",
+   "sidc": "SFGPUCI",
+   "template": "core/infantry",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 8,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.4,
+     "ir": 0.5
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000,
+     "heightM": 1.7
+    },
+    {
+     "kind": "imageIntensifier",
+     "rangeMaxM": 800,
+     "heightM": 1.7
+    }
+   ],
+   "mounts": [
+    {
+     "id": "rifles",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    },
+    {
+     "id": "lmg",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 50,
+     "magazine": 800,
+     "reloadS": 10
+    },
+    {
+     "id": "lightAt",
+     "kind": "lightAt",
+     "munitions": [
+      "heatRpg"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 20
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "ball556": 2000,
+     "ball762": 800,
+     "heatRpg": 2
+    },
+    "medical": 4,
+    "spares": 0,
+    "batteryWh": 300,
+    "waterL": 32,
+    "foodRations": 8
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 200000,
+   "rationale": "Dismounted movement 4 km/h on a road, slower across country.",
+   "source": "P26 (default)",
+   "provenance": "synthetic",
+   "sources": {
+    "mover.speedKmh": {
+     "kind": "reference",
+     "ref": "P26 (default)"
+    }
+   },
+   "echelon": "section"
+  },
+  {
+   "id": "generic/interceptorTeam",
+   "name": "Interceptor drone team",
+   "class": "dismounted",
+   "domain": "land",
+   "role": "Hunts enemy drones with drones.",
+   "sidc": "SFGPUCDSI",
+   "template": "core/gbad",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "personnel",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.5
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "rangeMaxM": 8000,
+     "scanS": 2,
+     "heightM": 3,
+     "band": "x",
+     "radar": {
+      "gainDb": 25
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000
+    },
+    {
+     "kind": "acoustic",
+     "rangeMaxM": 1500
+    }
+   ],
+   "mounts": [
+    {
+     "id": "interceptorDrone",
+     "kind": "interceptorDrone",
+     "munitions": [
+      "interceptorDrone"
+     ],
+     "salvo": 1,
+     "magazine": 6,
+     "reloadS": 60
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 5,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "interceptorDrone": 12
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 2000,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 80000,
+   "rationale": "Interceptor drones cost $1.4–16k each.",
+   "source": "R4.4, P11",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons.interceptorDrone.costUsd": {
+     "kind": "reference",
+     "ref": "R4.4, P11"
+    }
+   },
+   "echelon": "team"
+  },
+  {
+   "id": "generic/loiterTeam",
+   "name": "Loitering munition team",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Hunts high-value targets well behind the line.",
+   "sidc": "SFGPUCVUL",
+   "template": "core/droneTeam",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 200,
+    "burnMovingLph": 20,
+    "burnIdleLph": 4
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "soft",
+    "crew": 3,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.6,
+     "ir": 0.6
+    },
+    "rcs": {
+     "x": {
+      "front": 4
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 20,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "loiterHeat": 4
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 12,
+    "foodRations": 3
+   },
+   "carried": {
+    "drones": {
+     "archetype": "generic/loiter",
+     "count": 4
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 400000,
+   "rationale": "Lancet-like: 40 km, an hour aloft, a shaped charge.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/mbt",
+   "name": "Main battle tank troop",
+   "class": "mbt",
+   "domain": "land",
+   "role": "Direct-fire manoeuvre: kill armour, take ground.",
+   "sidc": "SFGPUCA",
+   "template": "core/armour",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 65,
+    "cruiseKmh": 25,
+    "fuelCapacityL": 1900,
+    "burnMovingLph": 227,
+    "burnIdleLph": 38
+   },
+   "body": {
+    "count": 4,
+    "vulnerability": "armoured",
+    "crew": 4,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 650
+     },
+     "zones": {
+      "turret": {
+       "ke": {
+        "front": 750,
+        "side": 250,
+        "rear": 80,
+        "top": 40
+       },
+       "ce": {
+        "front": 1100,
+        "side": 300,
+        "rear": 80,
+        "top": 40
+       },
+       "hitShare": 0.4
+      }
+     }
+    },
+    "era": false
+   },
+   "signatures": {
+    "index": {
+     "visual": 1,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "heightM": 2.5
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 4000,
+     "forDeg": 360
+    },
+    {
+     "kind": "optic",
+     "rangeMaxM": 5000,
+     "heightM": 2.5
+    }
+   ],
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsds120",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds120": 100,
+     "heat120": 60,
+     "ball762": 4000
+    },
+    "medical": 0,
+    "spares": 4,
+    "batteryWh": 2000,
+    "waterL": 64,
+    "foodRations": 16
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 9000000,
+   "rationale": "Fuel burn from the Abrams figures (about 60 gal/h across country, 10 gal/h idle); armour and gun as the land engine's tank.",
+   "source": "R7, P17",
+   "provenance": "synthetic",
+   "sources": {
+    "stores.burnLph": {
+     "kind": "reference",
+     "ref": "R7, P17"
+    }
+   },
+   "echelon": "platoon"
+  },
+  {
+   "id": "generic/medevac",
+   "name": "Ambulance section",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Evacuates casualties from the collection point.",
+   "sidc": "SFGPUSM",
+   "template": "core/convoy",
+   "plannedBy": "sustainment",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 60,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 600,
+    "burnMovingLph": 60,
+    "burnIdleLph": 10
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 3,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 30
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.9,
+     "ir": 0.9
+    },
+    "rcs": {
+     "x": {
+      "front": 12
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 20,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 24,
+    "foodRations": 6
+   },
+   "carried": {
+    "cargoT": 1
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 3000000,
+   "rationale": "Four stretchers a vehicle.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/mlrs",
+   "name": "Rocket launcher section",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Long-range precision rockets at high-payoff targets.",
+   "sidc": "SFGPUCFRMR",
+   "template": "core/artillery",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 85,
+    "cruiseKmh": 50,
+    "fuelCapacityL": 500,
+    "burnMovingLph": 60,
+    "burnIdleLph": 10
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 3,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 20
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 1,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 18
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "heightM": 3
+    }
+   ],
+   "mounts": [
+    {
+     "id": "rocketGmlrs",
+     "kind": "rocket",
+     "munitions": [
+      "gmlrs"
+     ],
+     "salvo": 2,
+     "magazine": 12,
+     "reloadS": 30
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "gmlrs": 12
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 1500,
+    "waterL": 24,
+    "foodRations": 6
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 5000000,
+   "rationale": "Six rockets a pod; GNSS-guided, so jamming matters.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/mortar120",
+   "name": "120 mm mortar section",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Indirect fire on call for the company.",
+   "sidc": "SFGPUCFM",
+   "template": "core/mortar",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 35,
+    "fuelCapacityL": 300,
+    "burnMovingLph": 30,
+    "burnIdleLph": 6
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 5,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 20
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.7,
+     "ir": 0.8
+    },
+    "rcs": {
+     "x": {
+      "front": 8
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [
+    {
+     "id": "mortar120",
+     "kind": "mortar",
+     "munitions": [
+      "he120Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 60,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he120Mortar": 120
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 800,
+    "waterL": 40,
+    "foodRations": 10
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1000000,
+   "rationale": "Range 7 km; a basic load of 60 bombs a tube.",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "section"
+  },
+  {
+   "id": "generic/recce",
+   "name": "Reconnaissance patrol",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Finds the enemy and reports without being found.",
+   "sidc": "SFGPUCR",
+   "template": "core/recce",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 90,
+    "cruiseKmh": 40,
+    "fuelCapacityL": 400,
+    "burnMovingLph": 40,
+    "burnIdleLph": 8
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 4,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 40
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.5,
+     "ir": 0.6
+    },
+    "rcs": {
+     "x": {
+      "front": 6
+     }
+    },
+    "visual": {
+     "criticalDimM": 2.4
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 4000,
+     "heightM": 3
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 6000,
+     "heightM": 3,
+     "forDeg": 360
+    },
+    {
+     "kind": "optic",
+     "rangeMaxM": 8000,
+     "heightM": 3
+    }
+   ],
+   "mounts": [
+    {
+     "id": "mg",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 20,
+     "magazine": 500,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "ball762": 2000
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 1500,
+    "waterL": 32,
+    "foodRations": 8
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 2000000,
+   "rationale": "Long-range optics on a mast; light, quiet vehicles.",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "section"
+  },
+  {
+   "id": "generic/samLong",
+   "name": "Long-range SAM battery",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Theatre air and missile defence.",
+   "sidc": "SFGPUCDH",
+   "template": "core/gbad",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 65,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 800,
+    "burnMovingLph": 90,
+    "burnIdleLph": 20
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "soft",
+    "crew": 5,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.2,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 25
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "rangeMaxM": 180000,
+     "scanS": 10,
+     "heightM": 15,
+     "band": "c",
+     "forDeg": 120,
+     "radar": {
+      "gainDb": 40,
+      "pulsesIntegrated": 30,
+      "beamwidthDeg": 1
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "samLong",
+     "kind": "samLong",
+     "munitions": [
+      "samLong"
+     ],
+     "salvo": 2,
+     "magazine": 16,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "c",
+     "erpW": 100000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samLong": 16
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 40,
+    "foodRations": 10
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1000000000,
+   "rationale": "Interceptor cost from the PAC-3 figure.",
+   "source": "R4.4, P11",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons.samLong.costUsd": {
+     "kind": "reference",
+     "ref": "R4.4, P11"
+    }
+   }
+  },
+  {
+   "id": "generic/samMedium",
+   "name": "Medium-range SAM battery",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Area air defence against aircraft and cruise missiles.",
+   "sidc": "SFGPUCDM",
+   "template": "core/gbad",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 35,
+    "fuelCapacityL": 600,
+    "burnMovingLph": 70,
+    "burnIdleLph": 15
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "soft",
+    "crew": 4,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 15
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "rangeMaxM": 80000,
+     "scanS": 5,
+     "heightM": 10,
+     "band": "c",
+     "radar": {
+      "gainDb": 36,
+      "pulsesIntegrated": 20
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "samMedium",
+     "kind": "samMedium",
+     "munitions": [
+      "samMedium"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 8
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "c",
+     "erpW": 20000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samMedium": 16
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 32,
+    "foodRations": 8
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 80000000,
+   "rationale": "Radar 80 km against a fighter; launchers reloaded from stores.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/sensorNode",
+   "name": "Unattended ground sensor",
+   "class": "sensorNode",
+   "domain": "land",
+   "role": "Hears and feels movement on a track and reports it over a mesh.",
+   "sidc": "SFGPUUS",
+   "template": "core/sensor",
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 0
+   },
+   "sensors": [
+    {
+     "kind": "acoustic",
+     "rangeMaxM": 500
+    }
+   ],
+   "mover": {
+    "batteryWh": 200,
+    "batteryDrawW": 0.5
+   },
+   "costUsd": 5000,
+   "rationale": "A buried seismic and acoustic sensor: weeks on a battery.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/shorad",
+   "name": "Short-range air defence section",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "Protects the force against drones, helicopters and low aircraft.",
+   "sidc": "SFGPUCDS",
+   "template": "core/gbad",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 60,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 700,
+    "burnMovingLph": 90,
+    "burnIdleLph": 15
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "light",
+    "crew": 3,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 30
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.9,
+     "ir": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 12
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "rangeMaxM": 25000,
+     "scanS": 2,
+     "heightM": 6,
+     "band": "x"
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 3000
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 8000,
+     "forDeg": 360,
+     "heightM": 4
+    }
+   ],
+   "mounts": [
+    {
+     "id": "samShort",
+     "kind": "samShort",
+     "munitions": [
+      "samShort"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 6
+    },
+    {
+     "id": "gunAd",
+     "kind": "gunAd",
+     "munitions": [
+      "adShell30"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 3
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "x",
+     "erpW": 2000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samShort": 16,
+     "adShell30": 800
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0,
+    "waterL": 24,
+    "foodRations": 6
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 15000000,
+   "rationale": "Radar 25 km; cheap guns before missiles.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/sph155",
+   "name": "155 mm self-propelled battery (platoon)",
+   "class": "lightArmoured",
+   "domain": "land",
+   "role": "General-support artillery; shoots and scoots.",
+   "sidc": "SFGPUCFHE",
+   "template": "core/artillery",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 60,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 900,
+    "burnMovingLph": 120,
+    "burnIdleLph": 20
+   },
+   "body": {
+    "count": 3,
+    "vulnerability": "light",
+    "crew": 5,
+    "stayingPower": 1,
+    "armour": {
+     "ke": {
+      "front": 40
+     }
+    }
+   },
+   "signatures": {
+    "index": {
+     "visual": 1,
+     "ir": 1.3
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "heightM": 3
+    }
+   ],
+   "mounts": [
+    {
+     "id": "howitzer155",
+     "kind": "howitzer",
+     "munitions": [
+      "he155"
+     ],
+     "salvo": 4,
+     "magazine": 40,
+     "reloadS": 12
+    },
+    {
+     "id": "precision155",
+     "kind": "howitzer",
+     "munitions": [
+      "pgm155"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 20
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he155": 120
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 1500,
+    "waterL": 60,
+    "foodRations": 15
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 12000000,
+   "rationale": "Burst of four rounds a gun; precision rounds a small share of the load.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/srbmBattery",
+   "name": "Short-range ballistic missile battery",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Strikes high-value targets hundreds of kilometres deep.",
+   "sidc": "SFGPUCMS",
+   "template": "core/artillery",
+   "plannedBy": "land",
+   "echelon": "battalion",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 35,
+    "fuelCapacityL": 600,
+    "burnMovingLph": 80,
+    "burnIdleLph": 12
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "soft",
+    "crew": 3,
+    "massT": 40,
+    "lengthM": 13,
+    "widthM": 3,
+    "heightM": 3.5
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.2,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "ballistic",
+     "kind": "ballistic",
+     "munitions": [
+      "srbm"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 1800
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "srbm": 4
+    }
+   },
+   "costUsd": 50000000,
+   "rationale": "Iskander-like: two missiles a launcher; interceptors take about 85% [P20].",
+   "source": "P20, P29",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/ugv",
+   "name": "Ground robot",
+   "class": "ugv",
+   "domain": "land",
+   "role": "Carries supplies and wounded the last few kilometres.",
+   "sidc": "SFGPEVUL",
+   "template": "core/convoy",
+   "mover": {
+    "kind": "tracked",
+    "maxKmh": 15,
+    "cruiseKmh": 8,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "batteryWh": 20000
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "light",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.3,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 500,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 1
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 5,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0
+   },
+   "carried": {
+    "cargoT": 0.3
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 50000,
+   "rationale": "Some brigades move 50–80% of kill-zone supply by drone and robot.",
+   "source": "R7, P19",
+   "provenance": "synthetic",
+   "sources": {
+    "role": {
+     "kind": "reference",
+     "ref": "R7, P19"
+    }
+   }
+  }
+ ]
+}

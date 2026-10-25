@@ -1,0 +1,433 @@
+{
+ "$comment": "Command posts, one per echelon: every HQ is an entity that can be found, jammed and destroyed (§4.4.1). Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/cp-battalion",
+   "name": "Battalion command post",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Commands a battalion: its staff cells plan, fuse reports and pass orders.",
+   "sidc": "SFGPUH",
+   "template": "core/hq",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 900,
+    "burnMovingLph": 40,
+    "burnIdleLph": 12
+   },
+   "body": {
+    "count": 3,
+    "vulnerability": "soft",
+    "crew": 40,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.3,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    },
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    },
+    {
+     "bearer": "satcomLeo"
+    },
+    {
+     "bearer": "wire"
+    },
+    {
+     "bearer": "courier"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 100,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "datalink",
+     "band": "uhf",
+     "erpW": 50,
+     "dutyCycle": 0.3
+    },
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 50,
+     "dutyCycle": 0.2
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 15000,
+    "waterL": 480,
+    "foodRations": 120
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 6000000,
+   "rationale": "Size grows with echelon; its emissions are what ESM finds (15 km is a typical intercept range).",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "battalion"
+  },
+  {
+   "id": "generic/cp-brigade",
+   "name": "Brigade command post",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Commands a brigade: its staff cells plan, fuse reports and pass orders.",
+   "sidc": "SFGPUH",
+   "template": "core/hq",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 1500,
+    "burnMovingLph": 40,
+    "burnIdleLph": 12
+   },
+   "body": {
+    "count": 5,
+    "vulnerability": "soft",
+    "crew": 120,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.5,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    },
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    },
+    {
+     "bearer": "satcomLeo"
+    },
+    {
+     "bearer": "wire"
+    },
+    {
+     "bearer": "courier"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 100,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "datalink",
+     "band": "uhf",
+     "erpW": 50,
+     "dutyCycle": 0.3
+    },
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 50,
+     "dutyCycle": 0.2
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 25000,
+    "waterL": 2400,
+    "foodRations": 600
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 10000000,
+   "rationale": "Size grows with echelon; its emissions are what ESM finds (30 km is a typical intercept range).",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "brigade"
+  },
+  {
+   "id": "generic/cp-company",
+   "name": "Company command post",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Commands a company: its staff cells plan, fuse reports and pass orders.",
+   "sidc": "SFGPUH",
+   "template": "core/hq",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 600,
+    "burnMovingLph": 40,
+    "burnIdleLph": 12
+   },
+   "body": {
+    "count": 2,
+    "vulnerability": "soft",
+    "crew": 20,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.2,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    },
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    },
+    {
+     "bearer": "satcomLeo"
+    },
+    {
+     "bearer": "wire"
+    },
+    {
+     "bearer": "courier"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 100,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "datalink",
+     "band": "uhf",
+     "erpW": 50,
+     "dutyCycle": 0.3
+    },
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 50,
+     "dutyCycle": 0.2
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 10000,
+    "waterL": 160,
+    "foodRations": 40
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 4000000,
+   "rationale": "Size grows with echelon; its emissions are what ESM finds (10 km is a typical intercept range).",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "company"
+  },
+  {
+   "id": "generic/cp-division",
+   "name": "Division main command post",
+   "class": "softVehicle",
+   "domain": "land",
+   "role": "Commands a division: its staff cells plan, fuse reports and pass orders.",
+   "sidc": "SFGPUH",
+   "template": "core/hq",
+   "plannedBy": "land",
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 70,
+    "cruiseKmh": 30,
+    "fuelCapacityL": 2400,
+    "burnMovingLph": 40,
+    "burnIdleLph": 12
+   },
+   "body": {
+    "count": 8,
+    "vulnerability": "soft",
+    "crew": 300,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.8,
+     "ir": 1.2
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 2000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    },
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    },
+    {
+     "bearer": "satcomLeo"
+    },
+    {
+     "bearer": "wire"
+    },
+    {
+     "bearer": "courier"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 100,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "datalink",
+     "band": "uhf",
+     "erpW": 50,
+     "dutyCycle": 0.3
+    },
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 50,
+     "dutyCycle": 0.2
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 40000,
+    "waterL": 9600,
+    "foodRations": 2400
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 16000000,
+   "rationale": "Size grows with echelon; its emissions are what ESM finds (50 km is a typical intercept range).",
+   "source": "synthetic",
+   "provenance": "synthetic",
+   "echelon": "division"
+  }
+ ]
+}

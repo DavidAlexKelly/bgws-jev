@@ -1,0 +1,1591 @@
+{
+ "$comment": "Every platform key a TS force list can field (rules/forceList.ts PLATFORM_SNAPSHOT), as a child of its generic archetype. Figures the snapshot gives (armour by aspect, penetration, speed) override; the rest is inherited.",
+ "platforms": [
+  {
+   "id": "tankmodels/cn_m1a2t",
+   "parent": "generic/mbt",
+   "name": "Cn M1a2t",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/cn_m1a2t; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 800
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/cn_ztz_96",
+   "parent": "generic/mbt",
+   "name": "Cn Ztz 96",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/cn_ztz_96; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 530
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/fr_leopard_2a5nl",
+   "parent": "generic/mbt",
+   "name": "Fr Leopard 2a5nl",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/fr_leopard_2a5nl; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/fr_leopard_2a6nl",
+   "parent": "generic/mbt",
+   "name": "Fr Leopard 2a6nl",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/fr_leopard_2a6nl; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/germ_leopard_2a5",
+   "parent": "generic/mbt",
+   "name": "Germ Leopard 2a5",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/germ_leopard_2a5; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/germ_leopard_2a5_pso",
+   "parent": "generic/mbt",
+   "name": "Germ Leopard 2a5 Pso",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/germ_leopard_2a5_pso; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/il_merkava_mk_3_raam_segol",
+   "parent": "generic/mbt",
+   "name": "Il Merkava Mk 3 Raam Segol",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/il_merkava_mk_3_raam_segol; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 900
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/il_merkava_mk_3b",
+   "parent": "generic/mbt",
+   "name": "Il Merkava Mk 3b",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/il_merkava_mk_3b; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 900
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/it_leopard_2a4",
+   "parent": "generic/mbt",
+   "name": "It Leopard 2a4",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/it_leopard_2a4; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 585
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/it_leopard_2a7_hungary",
+   "parent": "generic/mbt",
+   "name": "It Leopard 2a7 Hungary",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/it_leopard_2a7_hungary; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/jp_leopard_2ri",
+   "parent": "generic/mbt",
+   "name": "Jp Leopard 2ri",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/jp_leopard_2ri; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 585
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/jp_tkx_prot",
+   "parent": "generic/mbt",
+   "name": "Jp Tkx Prot",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/jp_tkx_prot; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 605
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/sw_leopard_2a6nl",
+   "parent": "generic/mbt",
+   "name": "Sw Leopard 2a6nl",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/sw_leopard_2a6nl; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/sw_pvrbv_551",
+   "parent": "generic/mbt",
+   "name": "Sw Pvrbv 551",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/sw_pvrbv_551; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 500
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "atgm",
+     "kind": "atgm",
+     "munitions": [
+      "atgmTow"
+     ],
+     "salvo": 1,
+     "magazine": 6,
+     "reloadS": 30
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "atgmTow": 12
+    }
+   },
+   "role": "Missile carrier: no main gun, kills tanks at 2 km."
+  },
+  {
+   "id": "tankmodels/uk_m1a1_aim_abrams",
+   "parent": "generic/mbt",
+   "name": "Uk M1a1 Aim Abrams",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/uk_m1a1_aim_abrams; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 800
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "tankmodels/us_m1a1_abrams",
+   "parent": "generic/mbt",
+   "name": "Us M1a1 Abrams",
+   "provenance": "sourced",
+   "source": "[SIM] L6 bgws_platform_profile, read 2026-09-13",
+   "rationale": "From the TS force-list snapshot tankmodels/us_m1a1_abrams; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 800
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsdsSrc480",
+      "heat120"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsdsSrc480": 100,
+     "heat120": 60,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "infantry/rifle_infantry",
+   "parent": "generic/infantrySection",
+   "name": "Rifle Infantry",
+   "provenance": "synthetic",
+   "source": "declared (forceList valuesDeclared)",
+   "rationale": "the source names 76 foot platforms and models none of them — null capabilities, cs_index 0, no ranges, completeness 0.3-0.4 — so the id and display name are the source's and every figure is ours",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "atgm",
+     "munitions": [
+      "nlaw"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "nlaw": 2,
+     "ball556": 2400
+    }
+   }
+  },
+  {
+   "id": "declared/mortar_section",
+   "parent": "generic/mortar120",
+   "name": "Mortar Section",
+   "provenance": "synthetic",
+   "source": "declared (forceList valuesDeclared)",
+   "rationale": "the catalogue contains no mortar, no artillery piece and no attack helicopter — a search for 'mortar' returns zero rows — so the id, the name and every figure are ours",
+   "mounts": [
+    {
+     "id": "mortar",
+     "kind": "mortar",
+     "munitions": [
+      "he81Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 60,
+     "reloadS": 10
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he81Mortar": 120,
+     "ball556": 2400
+    }
+   },
+   "mover": {
+    "kind": "wheeled",
+    "maxKmh": 80,
+    "cruiseKmh": 35
+   }
+  },
+  {
+   "id": "var_11_default",
+   "parent": "generic/mbt",
+   "name": "Challenger 2",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_11_default)",
+   "rationale": "From the TS force-list snapshot var_11_default; parts its data does not give come from generic/mbt.",
+   "mover": {
+    "maxKmh": 59,
+    "roadKmh": 59,
+    "cruiseKmh": 25
+   },
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 700,
+      "side": 140,
+      "rear": 40,
+      "top": 30
+     },
+     "ce": {
+      "front": 1000,
+      "side": 400,
+      "rear": 60,
+      "top": 30
+     },
+     "zones": {
+      "turret": {
+       "ke": {
+        "front": 950,
+        "side": 140,
+        "rear": 40,
+        "top": 30
+       },
+       "ce": {
+        "front": 1300,
+        "side": 400,
+        "rear": 60,
+        "top": 30
+       },
+       "hitShare": 0.4
+      }
+     }
+    },
+    "era": true
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "charm3"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "charm3": 100,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "var_27_default",
+   "parent": "generic/ifv",
+   "name": "FV510 Warrior",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_27_default)",
+   "rationale": "From the TS force-list snapshot var_27_default; parts its data does not give come from generic/ifv.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 40,
+      "side": 20,
+      "rear": 15,
+      "top": 12
+     },
+     "ce": {
+      "front": 40,
+      "side": 20,
+      "rear": 15,
+      "top": 12
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "cannon30",
+     "kind": "cannon",
+     "munitions": [
+      "apds30Rarden"
+     ],
+     "salvo": 3,
+     "magazine": 200,
+     "reloadS": 2
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apds30Rarden": 600,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "var_1_default",
+   "parent": "generic/mbt",
+   "name": "M1 Abrams",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_1_default, M1A2 SEPv3 estimates)",
+   "rationale": "From the TS force-list snapshot var_1_default; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 600,
+      "side": 100,
+      "rear": 40,
+      "top": 25
+     },
+     "ce": {
+      "front": 900,
+      "side": 300,
+      "rear": 60,
+      "top": 25
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "m829"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "m829": 100,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "var_20_default",
+   "parent": "generic/mbt",
+   "name": "T-55",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_20_default)",
+   "rationale": "From the TS force-list snapshot var_20_default; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 200,
+      "side": 80,
+      "rear": 45,
+      "top": 15
+     },
+     "ce": {
+      "front": 200,
+      "side": 80,
+      "rear": 45,
+      "top": 15
+     }
+    }
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsds100"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds100": 100,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "var_22_1",
+   "parent": "generic/mbt",
+   "name": "T-72B3 obr.2016",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_22_1)",
+   "rationale": "From the TS force-list snapshot var_22_1; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 600,
+      "side": 80,
+      "rear": 40,
+      "top": 20
+     },
+     "ce": {
+      "front": 850,
+      "side": 300,
+      "rear": 60,
+      "top": 20
+     }
+    },
+    "era": true
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsds125"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds125": 100,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "var_23_1",
+   "parent": "generic/mbt",
+   "name": "T-80BVM",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_platform_profile (var_23_1)",
+   "rationale": "From the TS force-list snapshot var_23_1; parts its data does not give come from generic/mbt.",
+   "body": {
+    "armour": {
+     "ke": {
+      "front": 650,
+      "side": 100,
+      "rear": 40,
+      "top": 20
+     },
+     "ce": {
+      "front": 900,
+      "side": 350,
+      "rear": 60,
+      "top": 20
+     }
+    },
+    "era": true
+   },
+   "mounts": [
+    {
+     "id": "tankGun",
+     "kind": "directFire",
+     "munitions": [
+      "apfsds125"
+     ],
+     "salvo": 1,
+     "magazine": 40,
+     "reloadS": 8
+    },
+    {
+     "id": "coax",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 1,
+     "magazine": 250,
+     "reloadS": 10
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds125": 100,
+     "ball762": 4000
+    }
+   }
+  },
+  {
+   "id": "sec_uk_armd_inf",
+   "parent": "generic/infantrySection",
+   "name": "UK Armoured Infantry Section",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_uk_armd_inf; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "atgm",
+     "munitions": [
+      "nlaw"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "nlaw": 2,
+     "ball762": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_uk_javelin",
+   "parent": "generic/atgmTeam",
+   "name": "UK Javelin Detachment",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_uk_javelin; parts its data does not give come from generic/atgmTeam.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "atgm",
+     "munitions": [
+      "javelin"
+     ],
+     "salvo": 1,
+     "magazine": 4,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "javelin": 4,
+     "ball556": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_uk_gpmg_sf",
+   "parent": "generic/infantrySection",
+   "name": "UK GPMG Sustained-Fire Team",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_uk_gpmg_sf; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "ball762": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_uk_mortar",
+   "parent": "generic/mortar120",
+   "name": "UK 81mm Mortar Section",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_uk_mortar; parts its data does not give come from generic/mortar120.",
+   "mounts": [
+    {
+     "id": "mortar",
+     "kind": "mortar",
+     "munitions": [
+      "he81Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 60,
+     "reloadS": 10
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he81Mortar": 120,
+     "ball556": 2400
+    }
+   },
+   "class": "dismounted",
+   "template": "core/mortar",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "roadKmh": 4,
+    "crossCountryKmh": 2.5,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "enduranceH": 0
+   },
+   "body": {
+    "vulnerability": "personnel",
+    "count": 1,
+    "crew": 6,
+    "armour": null,
+    "massT": 0.6,
+    "lengthM": 0.5,
+    "widthM": 0.5,
+    "heightM": 1.7
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.4,
+     "ir": 0.5
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "sec_ru_mr_bmp",
+   "parent": "generic/infantrySection",
+   "name": "RU Motor-Rifle Squad (BMP)",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_ru_mr_bmp; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "lightAt",
+     "munitions": [
+      "heatRpg"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "heatRpg": 2,
+     "ball762": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_ru_mr_btr",
+   "parent": "generic/infantrySection",
+   "name": "RU Motor-Rifle Squad (BTR)",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_ru_mr_btr; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "lightAt",
+     "munitions": [
+      "heatRpg"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "heatRpg": 2,
+     "ball762": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_ru_at",
+   "parent": "generic/atgmTeam",
+   "name": "RU Anti-Tank Section (Kornet)",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_ru_at; parts its data does not give come from generic/atgmTeam.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "atgm",
+     "munitions": [
+      "kornet"
+     ],
+     "salvo": 1,
+     "magazine": 4,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "kornet": 4,
+     "ball556": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_ru_mortar",
+   "parent": "generic/mortar120",
+   "name": "RU 82mm Mortar Section",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_ru_mortar; parts its data does not give come from generic/mortar120.",
+   "mounts": [
+    {
+     "id": "mortar",
+     "kind": "mortar",
+     "munitions": [
+      "he82Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 60,
+     "reloadS": 10
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he82Mortar": 120,
+     "ball556": 2400
+    }
+   },
+   "class": "dismounted",
+   "template": "core/mortar",
+   "mover": {
+    "kind": "foot",
+    "maxKmh": 6,
+    "cruiseKmh": 4,
+    "roadKmh": 4,
+    "crossCountryKmh": 2.5,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "enduranceH": 0
+   },
+   "body": {
+    "vulnerability": "personnel",
+    "count": 1,
+    "crew": 6,
+    "armour": null,
+    "massT": 0.6,
+    "lengthM": 0.5,
+    "widthM": 0.5,
+    "heightM": 1.7
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.4,
+     "ir": 0.5
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "sec_us_mech_sqd",
+   "parent": "generic/infantrySection",
+   "name": "US Mechanised Infantry Squad",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_us_mech_sqd; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "lightAt",
+     "munitions": [
+      "heat84"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "heat84": 2,
+     "ball556": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_us_stryker_sqd",
+   "parent": "generic/infantrySection",
+   "name": "US Stryker Rifle Squad",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_us_stryker_sqd; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "atgm",
+     "munitions": [
+      "javelin"
+     ],
+     "salvo": 1,
+     "magazine": 4,
+     "reloadS": 30
+    },
+    {
+     "id": "at2",
+     "kind": "lightAt",
+     "munitions": [
+      "heat84"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball556"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "javelin": 4,
+     "heat84": 2,
+     "ball556": 2400
+    }
+   }
+  },
+  {
+   "id": "sec_generic_light",
+   "parent": "generic/infantrySection",
+   "name": "Territorial / Light Infantry Section",
+   "provenance": "sourced",
+   "source": "[SIM] L7 bgws_section_profile (curated equipment tables, published TO&E)",
+   "rationale": "From the TS force-list snapshot sec_generic_light; parts its data does not give come from generic/infantrySection.",
+   "mounts": [
+    {
+     "id": "at",
+     "kind": "lightAt",
+     "munitions": [
+      "heatRpg"
+     ],
+     "salvo": 1,
+     "magazine": 2,
+     "reloadS": 30
+    },
+    {
+     "id": "smallArms",
+     "kind": "smallArms",
+     "munitions": [
+      "ball762"
+     ],
+     "salvo": 30,
+     "magazine": 2400,
+     "reloadS": 5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "heatRpg": 2,
+     "ball762": 2400
+    }
+   }
+  }
+ ]
+}

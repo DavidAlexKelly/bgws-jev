@@ -1,0 +1,136 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "Probe — equipment generation only",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "generation-probe-v1",
+ "ground": {
+  "choice": "generated",
+  "seed": "generation-probe-v1-ground"
+ },
+ "scope": {
+  "type": "skirmish",
+  "durationMin": 90,
+  "area": {
+   "widthKm": 10,
+   "depthKm": 10
+  },
+  "echelons": {
+   "highest": "company",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "abstracted",
+   "fires": "abstracted",
+   "ew": "off",
+   "air": "off",
+   "airDefence": "off",
+   "naval": "off",
+   "space": "off",
+   "cyber": "off",
+   "logistics": "off",
+   "medical": "off"
+  },
+  "planners": [
+   "tactical"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": false,
+   "jev": "all"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "blue-1",
+   "label": "Blue 1 Troop",
+   "side": "blue",
+   "platform": "var_1_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.2,
+    "lng": 18.592321571171706
+   }
+  },
+  {
+   "id": "blue-2",
+   "label": "Blue 2 Troop",
+   "side": "blue",
+   "platform": "var_1_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.2,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "blue-3",
+   "label": "Blue 3 Troop",
+   "side": "blue",
+   "platform": "var_1_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.2,
+    "lng": 18.607678428828297
+   }
+  },
+  {
+   "id": "red-1",
+   "label": "Red 1 Troop",
+   "side": "red",
+   "platform": "var_20_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.21437297879986,
+    "lng": 18.592321571171706
+   }
+  },
+  {
+   "id": "red-2",
+   "label": "Red 2 Troop",
+   "side": "red",
+   "platform": "var_20_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.21437297879986,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "red-3",
+   "label": "Red 3 Troop",
+   "side": "red",
+   "platform": "var_20_default",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.21437297879986,
+    "lng": 18.607678428828297
+   }
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "caveats": [
+  "An instrument, not a scenario. Identical crews and counts; only the equipment differs.",
+  "A near-even result here means Combat Strength is not discriminating equipment, NOT that a Type 59 is a match for an M1A2."
+ ]
+}

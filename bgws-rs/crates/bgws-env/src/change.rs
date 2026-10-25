@@ -24,7 +24,7 @@ pub enum ObstacleKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChangeKind {
     /// A shell or bomb crater at the change position.
     Crater { radius_m: f64, depth_m: f64 },

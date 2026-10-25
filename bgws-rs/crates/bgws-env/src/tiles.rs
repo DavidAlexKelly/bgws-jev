@@ -136,7 +136,7 @@ pub fn read_tile(bytes: &[u8]) -> Result<Terrain, TileError> {
         return Err(TileError::Version(header.version));
     }
     let spec = header.spec;
-    if spec.width == 0 || spec.height == 0 || !(spec.cell > 0.0) || spec.width.checked_mul(spec.height).is_none() {
+    if spec.width == 0 || spec.height == 0 || spec.cell.is_nan() || spec.cell <= 0.0 || spec.width.checked_mul(spec.height).is_none() {
         return Err(TileError::Header("bad grid spec".into()));
     }
     let payload = &bytes[body..];
@@ -283,10 +283,10 @@ impl TheatrePack {
         Ok(Self { dir: dir.to_path_buf(), meta, cache: BTreeMap::new() })
     }
 
-    /// Tiles touching an area, sorted by (iy, ix).
+    /// Tiles touching an area, sorted by (ix, iy).
     pub fn tiles_in(&self, aoi: &Aoi) -> Vec<(u32, u32)> {
         let mut v: Vec<(u32, u32)> = self.meta.tiles.iter().filter(|t| aoi.intersects(&t.spec)).map(|t| (t.ix, t.iy)).collect();
-        v.sort_by_key(|&(x, y)| (y, x));
+        v.sort_unstable();
         v
     }
 

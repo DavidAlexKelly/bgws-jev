@@ -1,0 +1,406 @@
+{
+  "format": "bgws.scenario",
+  "version": 4,
+  "name": "M4 — Drone line",
+  "description": "",
+  "savedAt": "2026-10-24T00:00:00.000Z",
+  "seed": 2455291955566116,
+  "seedText": "m4-drone-line",
+  "theatre": {
+    "origin": {
+      "lat": 54.2,
+      "lon": 18.6,
+      "h": 0.0
+    },
+    "bounds": {
+      "south": 54.10836255036539,
+      "west": 18.34675861628689,
+      "north": 54.34553932258612,
+      "east": 18.853241383713108
+    },
+    "ground": "generated",
+    "groundSeed": "m4-drone-line-ground"
+  },
+  "scope": {
+    "type": "droneLine",
+    "durationMin": 360.0,
+    "area": {
+      "widthKm": 30.0,
+      "depthKm": 15.0
+    },
+    "echelons": {
+      "highest": "company",
+      "lowest": "platoon"
+    },
+    "domains": {
+      "land": "simulated",
+      "drones": "simulated",
+      "fires": "simulated",
+      "ew": "simulated",
+      "air": "abstracted",
+      "airDefence": "off",
+      "naval": "off",
+      "space": "abstracted",
+      "cyber": "off",
+      "logistics": "abstracted",
+      "medical": "off"
+    },
+    "planners": [
+      "tactical"
+    ],
+    "detail": {
+      "aggregateAwayFromContact": false,
+      "jev": "all"
+    }
+  },
+  "startUtc": "2026-06-01T03:45:36Z",
+  "weather": {
+    "source": "preset",
+    "weather": "clear"
+  },
+  "environment": {
+    "windMs": 5.0
+  },
+  "comms": "radio",
+  "forces": [
+    {
+      "id": "b-hq",
+      "label": "Blue company HQ",
+      "side": "blue",
+      "platform": "generic/cp-company",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.15507973245618,
+        "lon": 18.599999999999998,
+        "h": 0.0
+      },
+      "layer": "unit",
+      "commandRating": 2.0
+    },
+    {
+      "id": "b-tanks",
+      "label": "Blue tanks",
+      "side": "blue",
+      "platform": "generic/mbt",
+      "count": 4,
+      "quality": "regular",
+      "position": {
+        "lat": 54.19101534830822,
+        "lon": 18.587744197199417,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-ifv",
+      "label": "Blue mech",
+      "side": "blue",
+      "platform": "generic/ifv",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.19101534830822,
+        "lon": 18.612255802800583,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-isr",
+      "label": "Blue ISR team",
+      "side": "blue",
+      "platform": "generic/droneIsrTeam",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.168555844833875,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-fpv",
+      "label": "Blue FPV team",
+      "side": "blue",
+      "platform": "generic/fpvTeamRf",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.173045686247384,
+        "lon": 18.577030333141845,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-fibre",
+      "label": "Blue fibre FPV team",
+      "side": "blue",
+      "platform": "generic/fpvTeamFibre",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.173045686247384,
+        "lon": 18.622969666858154,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-int",
+      "label": "Blue interceptor team",
+      "side": "blue",
+      "platform": "generic/interceptorTeam",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.177539904918405,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-jam",
+      "label": "Blue EW",
+      "side": "blue",
+      "platform": "generic/ewJammer",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.18203193034535,
+        "lon": 18.599999999999998,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-esm",
+      "label": "Blue SIGINT",
+      "side": "blue",
+      "platform": "generic/esmTeam",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.16405505257059,
+        "lon": 18.645929370303843,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-guns",
+      "label": "Blue artillery",
+      "side": "blue",
+      "platform": "generic/sph155",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.11914331273906,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-hq",
+      "label": "Red company HQ",
+      "side": "red",
+      "platform": "generic/cp-company",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.29882332470601,
+        "lon": 18.599999999999998,
+        "h": 0.0
+      },
+      "layer": "unit",
+      "commandRating": 2.0
+    },
+    {
+      "id": "r-inf-1",
+      "label": "Red 1 Platoon",
+      "side": "red",
+      "platform": "generic/infantrySection",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.253901674678055,
+        "lon": 18.576985433682154,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-inf-2",
+      "label": "Red 2 Platoon",
+      "side": "red",
+      "platform": "generic/infantrySection",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.253901674678055,
+        "lon": 18.62301456631785,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-isr",
+      "label": "Red ISR team",
+      "side": "red",
+      "platform": "generic/droneIsrTeam",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.28085168626699,
+        "lon": 18.569293905503372,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-fpv-1",
+      "label": "Red FPV team 1",
+      "side": "red",
+      "platform": "generic/fpvTeamRf",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.285347534286814,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-fpv-2",
+      "label": "Red FPV team 2",
+      "side": "red",
+      "platform": "generic/fpvTeamRf",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.280849487469325,
+        "lon": 18.63838261605379,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-loiter",
+      "label": "Red loitering munitions",
+      "side": "red",
+      "platform": "generic/loiterTeam",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.31679098087037,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-jam",
+      "label": "Red EW",
+      "side": "red",
+      "platform": "generic/ewJammer",
+      "count": 1,
+      "quality": "regular",
+      "position": {
+        "lat": 54.27187170412213,
+        "lon": 18.599999999999998,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-shorad",
+      "label": "Red SHORAD",
+      "side": "red",
+      "platform": "generic/shorad",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.27636267475155,
+        "lon": 18.615351380164853,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-guns",
+      "label": "Red artillery",
+      "side": "red",
+      "platform": "generic/sph155",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.33475856021245,
+        "lon": 18.600000000000005,
+        "h": 0.0
+      },
+      "layer": "unit"
+    }
+  ],
+  "world": {
+    "obstacles": [
+      {
+        "owner": "red",
+        "kind": "minefield",
+        "at": {
+          "lat": 54.24042795418566,
+          "lon": 18.6,
+          "h": 0.0
+        },
+        "widthM": 5000.0,
+        "depthM": 300.0,
+        "bearingDeg": 0.0,
+        "density": 0.4
+      }
+    ]
+  },
+  "command": {
+    "sides": {
+      "blue": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      },
+      "red": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      }
+    },
+    "model": "claude-sonnet-5-5"
+  },
+  "behaviours": {
+    "assign": {}
+  },
+  "emitters": {
+    "default": {
+      "blue": "free",
+      "red": "free"
+    }
+  },
+  "victory": [
+    {
+      "kind": "breakpoint",
+      "pct": 50.0
+    }
+  ],
+  "convertedFrom": {
+    "fromFormat": "bgws.realtime.scenario",
+    "fromVersion": 3,
+    "notes": [
+      "origin is the TS DEFAULT_ORIGIN (54.2 N, 18.6 E), which the positions sit round",
+      "positions: the TS flat projection inverted to authored east/north metres, then placed exactly through an ENU frame at the origin",
+      "start: 5 h local mean solar time at the origin on 2026-06-01 (v3 has no date)",
+      "theatre bounds enlarged beyond the scope's area to hold every placed position"
+    ]
+  }
+}

@@ -1,0 +1,836 @@
+{
+ "$comment": "Drones: the aircraft themselves (generic.ts DRONES, plus bomber, fixed-wing ISR and interceptor drones). Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/bomberDrone",
+   "name": "Heavy bomber drone (Baba Yaga class)",
+   "class": "smallDrone",
+   "domain": "air",
+   "role": "Drops grenades and mines at night on dug-in positions and vehicles.",
+   "sidc": "SFAPMFQ",
+   "template": "core/drone",
+   "mover": {
+    "kind": "multirotor",
+    "maxKmh": 70,
+    "cruiseKmh": 50,
+    "ceilingM": 1000,
+    "batteryWh": 1500,
+    "batteryDrawW": 2000
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "massT": 0.04,
+    "lengthM": 1.5,
+    "widthM": 1.5,
+    "heightM": 0.5
+   },
+   "signatures": {
+    "visual": {
+     "criticalDimM": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 0.1
+     }
+    },
+    "ir": {
+     "deltaK": {
+      "engineOn": 8,
+      "moved": 10
+     }
+    },
+    "index": {
+     "visual": 0.3,
+     "ir": 0.3
+    },
+    "acoustic": {
+     "airDba": [
+      {
+       "kmh": 0,
+       "db": 85
+      },
+      {
+       "kmh": 50,
+       "db": 90
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "thermal",
+     "rangeMaxM": 2000,
+     "forDeg": 360,
+     "heightM": 0,
+     "optics": {
+      "resolutionCycPerMrad": 3,
+      "fovDeg": 20
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "drop",
+     "kind": "droneDrop",
+     "munitions": [
+      "droneGrenade"
+     ],
+     "salvo": 1,
+     "magazine": 6,
+     "reloadS": 10
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink"
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "droneGrenade": 6
+    }
+   },
+   "costUsd": 25000,
+   "rationale": "Heavy agricultural-hexacopter conversions: night bombing at 5–10 km, several kilograms a sortie.",
+   "source": "synthetic; R5.1 for drone volume",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/fixedWingIsr",
+   "name": "Small fixed-wing ISR drone (Orlan class)",
+   "class": "fixedWingDrone",
+   "domain": "air",
+   "role": "Spots for artillery 20–100 km deep.",
+   "sidc": "SFAPMFQ",
+   "template": "core/drone",
+   "mover": {
+    "kind": "fixedWing",
+    "maxKmh": 150,
+    "cruiseKmh": 100,
+    "ceilingM": 5000,
+    "fuelCapacityL": 8,
+    "burnMovingLph": 0.8
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "massT": 0.018,
+    "lengthM": 2,
+    "widthM": 3,
+    "heightM": 0.5
+   },
+   "signatures": {
+    "visual": {
+     "criticalDimM": 1
+    },
+    "rcs": {
+     "x": {
+      "front": 0.1
+     }
+    },
+    "index": {
+     "visual": 0.3,
+     "ir": 0.3
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 8000,
+     "forDeg": 360,
+     "heightM": 0
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 4000,
+     "forDeg": 360,
+     "heightM": 0
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink",
+     "erpW": 10
+    }
+   ],
+   "costUsd": 100000,
+   "rationale": "Petrol engine, 10 h aloft, a gimballed camera; the artillery's eyes.",
+   "source": "synthetic; R4.3 (artillery is sensor-limited)",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/fpvFibre",
+   "name": "FPV drone (fibre)",
+   "class": "smallDrone",
+   "domain": "air",
+   "role": "One-way strike on a fibre-optic spool: no radio to jam.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "multirotor",
+    "maxKmh": 90,
+    "cruiseKmh": 70,
+    "ceilingM": 300,
+    "enduranceH": 0.3,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "batteryWh": 80,
+    "batteryDrawW": 270
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.12,
+     "ir": 0.1
+    },
+    "rcs": {
+     "x": {
+      "front": 0.01
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 1500,
+     "forDeg": 90,
+     "scanS": 1,
+     "classifies": "class",
+     "seesAir": false,
+     "heightM": 0
+    }
+   ],
+   "mounts": [
+    {
+     "id": "fpvFibre",
+     "kind": "fpv",
+     "munitions": [
+      "fpvFibre"
+     ],
+     "salvo": 1,
+     "magazine": 12,
+     "reloadS": 120
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1500,
+   "rationale": "Spool length caps it at 20 km.",
+   "source": "R4, P8",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons.fpvFibre.maxRangeM": {
+     "kind": "reference",
+     "ref": "R4, P8"
+    }
+   }
+  },
+  {
+   "id": "generic/fpvRf",
+   "name": "FPV drone (radio)",
+   "class": "smallDrone",
+   "domain": "air",
+   "role": "One-way strike, flown by an operator over a radio link.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "multirotor",
+    "maxKmh": 120,
+    "cruiseKmh": 100,
+    "ceilingM": 500,
+    "enduranceH": 0.2,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "batteryWh": 60,
+    "batteryDrawW": 300
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.1,
+     "ir": 0.1
+    },
+    "rcs": {
+     "x": {
+      "front": 0.01
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 1500,
+     "forDeg": 90,
+     "scanS": 1,
+     "classifies": "class",
+     "seesAir": false,
+     "heightM": 0
+    }
+   ],
+   "mounts": [
+    {
+     "id": "fpv",
+     "kind": "fpv",
+     "munitions": [
+      "fpvHeat"
+     ],
+     "salvo": 1,
+     "magazine": 12,
+     "reloadS": 120
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 1,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 500,
+   "rationale": "About 15 km reach on a relay; 60–80% of strikes fail to destroy.",
+   "source": "R5.1, P9",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons.fpv.pk": {
+     "kind": "reference",
+     "ref": "R5.1, P9"
+    }
+   }
+  },
+  {
+   "id": "generic/interceptorDrone",
+   "name": "Interceptor drone",
+   "class": "smallDrone",
+   "domain": "air",
+   "role": "Rams or detonates on enemy drones.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "multirotor",
+    "maxKmh": 300,
+    "cruiseKmh": 200,
+    "ceilingM": 5000,
+    "climbMs": 30,
+    "batteryWh": 60,
+    "batteryDrawW": 600
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0
+   },
+   "signatures": {
+    "rcs": {
+     "x": {
+      "front": 0.01
+     }
+    },
+    "index": {
+     "visual": 0.1,
+     "ir": 0.1
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 1000,
+     "forDeg": 90,
+     "seesAir": true,
+     "heightM": 0
+    }
+   ],
+   "mounts": [
+    {
+     "id": "interceptorDrone",
+     "kind": "interceptorDrone",
+     "munitions": [
+      "interceptorDrone"
+     ],
+     "salvo": 1,
+     "magazine": 1,
+     "reloadS": 0
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink"
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "interceptorDrone": 1
+    }
+   },
+   "costUsd": 6000,
+   "rationale": "Interceptor drones cost $1.4–16k each [P11]; fast enough to catch a Shahed.",
+   "source": "P11",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/loiter",
+   "name": "Loitering munition",
+   "class": "fixedWingDrone",
+   "domain": "air",
+   "role": "Searches an area and dives on what it finds.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "fixedWing",
+    "maxKmh": 110,
+    "cruiseKmh": 90,
+    "ceilingM": 3000,
+    "enduranceH": 1,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "batteryWh": 500,
+    "batteryDrawW": 500
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.2,
+     "ir": 0.2
+    },
+    "rcs": {
+     "x": {
+      "front": 0.05
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 4000,
+     "forDeg": 120,
+     "scanS": 1,
+     "classifies": "type",
+     "seesAir": false,
+     "heightM": 0
+    }
+   ],
+   "mounts": [
+    {
+     "id": "loitering",
+     "kind": "loitering",
+     "munitions": [
+      "loiterHeat"
+     ],
+     "salvo": 1,
+     "magazine": 4,
+     "reloadS": 300
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 5,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 35000,
+   "rationale": "Lancet-like.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/male",
+   "name": "MALE ISR/strike drone",
+   "class": "fixedWingDrone",
+   "domain": "air",
+   "role": "Long-endurance surveillance and precision strike.",
+   "sidc": "SFAPMFQ",
+   "template": "core/aircraft",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "fixedWing",
+    "maxKmh": 300,
+    "cruiseKmh": 200,
+    "ceilingM": 8000,
+    "enduranceH": 24,
+    "fuelCapacityL": 300,
+    "burnMovingLph": 12,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "stayingPower": 1,
+    "massT": 1.5,
+    "lengthM": 8,
+    "widthM": 15,
+    "heightM": 2
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.5,
+     "ir": 0.6
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    },
+    "visual": {
+     "criticalDimM": 2.5
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 15000,
+     "forDeg": 360,
+     "scanS": 3,
+     "classifies": "type",
+     "seesAir": false,
+     "heightM": 0
+    },
+    {
+     "kind": "radar",
+     "band": "ku",
+     "rangeMaxM": 40000,
+     "forDeg": 120,
+     "seesAir": false,
+     "heightM": 0,
+     "radar": {
+      "gainDb": 30,
+      "pulsesIntegrated": 500
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "agm",
+     "kind": "agm",
+     "munitions": [
+      "agm"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 10
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "satcomMil"
+    },
+    {
+     "bearer": "uhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 50,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "agm": 4
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 5000000,
+   "rationale": "TB2/Reaper-like; slow, and easy prey for air defence.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/owaDecoy",
+   "name": "Decoy drone",
+   "class": "owaDrone",
+   "domain": "air",
+   "role": "Looks like a one-way attack drone; draws interceptors.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "missile",
+    "maxKmh": 185,
+    "cruiseKmh": 180,
+    "ceilingM": 4000,
+    "enduranceH": 10,
+    "fuelCapacityL": 30,
+    "burnMovingLph": 3,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "missile",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.4,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.1
+     }
+    },
+    "decoy": true
+   },
+   "sensors": [],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 10000,
+   "rationale": "Gerbera-like: cheap foam, no warhead.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/owaDrone",
+   "name": "One-way attack drone",
+   "class": "owaDrone",
+   "domain": "air",
+   "role": "Flies a planned route hundreds of kilometres to a fixed target.",
+   "sidc": "SFAPWMU",
+   "template": "core/drone",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "missile",
+    "maxKmh": 185,
+    "cruiseKmh": 180,
+    "ceilingM": 4000,
+    "enduranceH": 10,
+    "fuelCapacityL": 30,
+    "burnMovingLph": 3,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "missile",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.4,
+     "ir": 0.4
+    },
+    "rcs": {
+     "x": {
+      "front": 0.1
+     }
+    }
+   },
+   "sensors": [],
+   "mounts": [
+    {
+     "id": "owa",
+     "kind": "owa",
+     "munitions": [
+      "owaWarhead"
+     ],
+     "salvo": 1,
+     "magazine": 1,
+     "reloadS": 120
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 40000,
+   "rationale": "Shahed-like: $30–50k; raids mix about 60% armed with 40% decoys, and about 85% are intercepted.",
+   "source": "R4.4, P11; R5.2, P10",
+   "provenance": "synthetic",
+   "sources": {
+    "costUsd": {
+     "kind": "reference",
+     "ref": "R4.4, P11"
+    },
+    "role": {
+     "kind": "reference",
+     "ref": "R5.2, P10"
+    }
+   }
+  },
+  {
+   "id": "generic/quadIsr",
+   "name": "ISR quadcopter",
+   "class": "smallDrone",
+   "domain": "air",
+   "role": "Watches and reports; adjusts fire.",
+   "sidc": "SFAPMFQ",
+   "template": "core/drone",
+   "mover": {
+    "kind": "multirotor",
+    "maxKmh": 60,
+    "cruiseKmh": 40,
+    "ceilingM": 1000,
+    "enduranceH": 0.6,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "batteryWh": 100,
+    "batteryDrawW": 150
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "aircraft",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.15,
+     "ir": 0.1
+    },
+    "rcs": {
+     "x": {
+      "front": 0.01
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 3000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": false,
+     "heightM": 0
+    },
+    {
+     "kind": "thermal",
+     "rangeMaxM": 1500,
+     "forDeg": 360,
+     "heightM": 0,
+     "optics": {
+      "resolutionCycPerMrad": 3,
+      "fovDeg": 20
+     }
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "droneLink",
+     "band": "l",
+     "erpW": 1,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 3000,
+   "rationale": "Mavic-class: 40 minutes aloft.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  }
+ ]
+}
