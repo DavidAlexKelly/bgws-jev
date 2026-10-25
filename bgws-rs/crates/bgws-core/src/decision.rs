@@ -7,10 +7,12 @@ use crate::time::{SimDuration, SimTime};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct QuestionId(pub u64);
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum QuestionKind {
@@ -23,6 +25,7 @@ pub enum QuestionKind {
 }
 
 /// One option on offer, already masked by capability, gates and the template.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DecisionOption {
     pub id: String,
@@ -36,6 +39,7 @@ pub struct DecisionOption {
     pub params: BTreeMap<String, serde_json::Value>,
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Question {
     pub id: QuestionId,
@@ -85,6 +89,7 @@ impl Question {
     }
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum AnswerSource {
@@ -100,6 +105,7 @@ pub enum AnswerSource {
     Fallback { reason: String },
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Answer {
     pub question: QuestionId,

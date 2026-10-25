@@ -8,6 +8,7 @@ use crate::rng::{fnv1a, mix64};
 use crate::time::SimTime;
 use serde::{Deserialize, Serialize};
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogEvent {
     pub t: SimTime,
@@ -27,6 +28,7 @@ pub struct LogEvent {
     pub data: serde_json::Value,
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct Fingerprint(pub u64);

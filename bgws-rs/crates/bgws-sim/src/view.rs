@@ -7,6 +7,7 @@ use bgws_core::{EntityId, HqId, Side};
 use bgws_know::{Cop, OwnForceView, SideView};
 use serde::{Deserialize, Serialize};
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Viewer {
@@ -25,6 +26,7 @@ impl Viewer {
     }
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FrameEntity {
     pub id: u32,
@@ -47,6 +49,7 @@ pub struct FrameEntity {
     pub suppression: f64,
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FrameTrack {
     pub id: u32,
@@ -63,6 +66,7 @@ pub struct FrameTrack {
     pub quality: u8,
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FrameView {
     pub t: f64,

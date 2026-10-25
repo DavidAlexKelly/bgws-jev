@@ -23,6 +23,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 /// What `advance` returns.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Step {
@@ -34,6 +35,7 @@ pub enum Step {
     Over(Outcome),
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Outcome {

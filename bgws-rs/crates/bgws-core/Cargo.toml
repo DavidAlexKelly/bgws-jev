@@ -14,6 +14,11 @@ rand.workspace = true
 rand_chacha.workspace = true
 libm.workspace = true
 
+ts-rs = { version = "9", optional = true, features = ["serde-json-impl"] }
+
+[features]
+ts = ["dep:ts-rs"]
+
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true

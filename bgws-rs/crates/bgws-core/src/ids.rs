@@ -7,6 +7,7 @@ use std::fmt;
 macro_rules! id_type {
     ($(#[$m:meta])* $name:ident, $prefix:literal) => {
         $(#[$m])*
+        #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
         #[serde(transparent)]
         pub struct $name(pub u32);
@@ -36,6 +37,7 @@ id_type!(/// A seat at an HQ: who decides for it.
     SeatId, "seat");
 
 /// The two sides. Neutral covers civilians and third parties.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
