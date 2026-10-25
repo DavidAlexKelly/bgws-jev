@@ -1,6 +1,6 @@
 # BGWS in Rust: a local, GPU-assisted, physics-first simulation
 
-**Status:** plan, October 2026. **Scope:** a new, separate engine and desktop app, written in Rust. It runs locally, uses the GPU where that helps, and keeps Jev and Claude as decision makers. The TypeScript engine is not replaced in place, and exact replay parity with it is not a goal.
+**Status:** plan, October 2026. **Scope:** a new, separate engine and desktop app, written in Rust. The simulation runs locally and uses the GPU where that helps. Jev and Claude stay decision makers, **called remotely at first** (Jev through OpenRouter, Claude through the Anthropic API); running a model locally is a later option behind the same interface (§10.5). The TypeScript engine is not replaced in place, and exact replay parity with it is not a goal.
 
 **How to read this:**
 
@@ -149,7 +149,7 @@ The clock does not wait in wall time. It stops in simulated time until the answe
   UI ◄────► │ wall clock × speed ─► sim.advance(until)                        │
  (Tauri     │                         │                                       │
   events)   │       Advanced ◄────────┤                                       │
-            │       NeedsAnswers ─────┼─► batch by side ─► Jev / local model  │
+            │       NeedsAnswers ─────┼─► batch by side ─► Jev (OpenRouter)   │
             │                         │                  ─► Claude planners   │
             │                         │                  ─► a person's seat   │
             │       sim.answer() ◄────┘◄── answers (or fallback on timeout)   │
@@ -187,7 +187,8 @@ The clock does not wait in wall time. It stops in simulated time until the answe
 | Storage | SQLite (`rusqlite`) for catalogue, templates, saves; DuckDB for event logs and AAR queries | Local, file-based, fast analytics | Foundry (not local); Postgres (server) |
 | Desktop | Tauri 2 | Small, native, Rust in-process; hosts the React UI | Electron (size, Node in-process) |
 | UI | React + MapLibre + deck.gl | The existing screens; deck.gl draws 100k+ entities on the GPU | Bevy/egui UI (rebuild every screen) |
-| Local models | llama.cpp server or vLLM, OpenAI-compatible API, grammar- or schema-constrained output | Separate process: memory isolation, crash isolation, swap models freely | In-process inference first (later option: `mistral.rs`, `candle`) |
+| Model calls (now) | Remote: Jev through OpenRouter's Decisions API, Claude through the Anthropic Messages API, both with `reqwest` from the Rust host | No GPU memory or model serving to manage; Jev's typed answers (choice, probabilities, confidence) as today; keys stay in the host, never in the UI bundle | Local models from day one (more to build and tune before anything plays) |
+| Model calls (later) | Optionally local: llama.cpp server or vLLM, OpenAI-compatible, grammar- or schema-constrained output (§10.5) | Offline play, no per-call cost, lower latency | In-process inference first (later still: `mistral.rs`, `candle`) |
 | Profiling | `tracing` + `tracy-client`; `criterion`; `cargo flamegraph` | Per-system timing in real games; micro-benchmarks | — |
 | Testing | `proptest`, `insta`, `approx`, `cargo-fuzz` | Properties, snapshots, float comparisons, loader fuzzing | — |
 
@@ -554,21 +555,34 @@ Decoys, emitter decoys, false transmissions and spoofed tracks inject plausible 
 ### 10.2 Jev
 
 - **Prompts carry beliefs in words:** the agent's situation, its doctrine, its orders and the options with their doctrine bias, as the current `jevRealtimeDecider` and `jevWorldDecider` do.
-- **Local inference:** an OpenAI-compatible server (llama.cpp or vLLM). Output is constrained to the option keys by a grammar or JSON schema, and probabilities and confidence come from the token logprobs.
-  - If Jev's own weights can be run locally, use them. Otherwise a local open model is used, or Jev stays a remote call. The `Decider` trait doesn't care.
-- **Batching:** all of one side's questions at one moment go in one request, answered in parallel. vLLM's continuous batching suits this well.
-- **Fallbacks:** below a confidence threshold, on a timeout or on an error, the template's fallback decides, and the log says why.
+- **Called remotely,** as the TypeScript build does: OpenRouter's Decisions API with `typesafe/jev-1.13`, one `choice` question per agent, answered with a choice, probabilities and a confidence. The Rust client is a port of `data/jevClient.ts`, and the request and response types are the same.
+- **Batching:** all of one side's questions at one moment go in one request, answered in parallel. Requests for both sides, and for several moments when the clock is far ahead, go concurrently.
+- **Latency doesn't change the game:** the clock waits in simulated time (§3.2). It only changes how fast the game can play. At high compression, model latency is the limit, so the host shows "waiting for Jev" as today, and a cache (as `data/jevCache.ts` does) answers repeated identical questions.
+- **Fallbacks:** below a confidence threshold, on a timeout, on an error or when offline, the template's fallback decides, and the log says why. A game with no network still plays, on the rules.
+- **Cost:** each call's reported cost is logged per side and per game, and the batch runner uses the rules decider by default so overnight runs cost nothing.
+- **Keys** are kept by the host (the OS keychain, or an environment variable for the CLI), not compiled into the UI. This is safer than the current `VITE_OPENROUTER_API_KEY`, which ships in the bundle.
 
 ### 10.3 Claude planners
 
-- **The planner hierarchy** of MULTI_DOMAIN_PLAN §4.4 (overall, land, air, maritime, space and cyber, sustainment) plans from the HQ's fused picture, through the Claude API, into structured orders that are validated before they're sent.
+- **The planner hierarchy** of MULTI_DOMAIN_PLAN §4.4 (overall, land, air, maritime, space and cyber, sustainment) plans from the HQ's fused picture, through the Anthropic Messages API called directly from the host (the TypeScript build goes through a Foundry AIP function), into structured orders that are validated before they're sent.
+- **Structured output:** plans are requested as JSON matching the orders schema (generated from the Rust types), so parsing is a validation step, not guesswork.
+- **Rate limits and cost:** planning requests are few (on CCIR triggers and the battle rhythm), queued per HQ, retried with backoff, and logged with their cost.
 - **The heuristic planner** is the fallback, and the default for batch runs.
 
 ### 10.4 People
 
 A person can take any HQ's seat. They see the HQ console (the inbox, the COP with uncertainty, comms state, sent orders). Their orders travel the nets like anyone else's. Staff drafts come from the planners, as W15 built.
 
-### 10.5 Safeguards
+### 10.5 Later: local models
+
+Once the engine plays well with remote models, local inference can be added as another implementation of the same `Decider` and planner traits:
+
+- **Serving:** an OpenAI-compatible server (llama.cpp or vLLM). Output is constrained to the option keys by a grammar or JSON schema, and probabilities and confidence come from the token logprobs. vLLM's continuous batching suits per-side batches.
+- **Which model:** Jev's own weights if they can be run locally; otherwise an open model, checked against remote Jev on the decision vignettes (same scenes, compare choice distributions) before it's trusted.
+- **Memory:** a local model wants most of a GPU's memory (§11.3).
+- **Choice per side and per run:** remote, local or rules, in the scenario's settings, so the same game can compare them.
+
+### 10.6 Safeguards
 
 The research's warnings apply **[ref R8]**:
 - bounded option lists;
@@ -603,7 +617,7 @@ Agent logic, decisions, messages, tracks, logistics flows and anything branchy s
 - **Terrain:** DEM and land-cover tiles stay resident in GPU memory as texture arrays, paged by area of interest.
 - **Asynchrony:** kernels for tick t+1's candidates run while the CPU does tick t's decisions, so latency is hidden.
 - **CPU twins:** every kernel has a CPU implementation. Tests compare them on random inputs. The engine runs without a GPU, slower, and batch runs on a GPU-less machine still work.
-- **Shared memory:** the local language model will want most of a single card's memory. Planned layouts: one card shared (the sim's kernels need only a few hundred MB, so cap the model's allocation); or two cards (model on one, sim on the other); or the model on another machine.
+- **Memory:** with remote models, the GPU belongs to the simulation, whose kernels need a few hundred MB to a few GB. If local models are added later (§10.5), they want most of a card: cap the model's allocation on a shared card, or use two cards, or put the model on another machine.
 
 ---
 
@@ -631,7 +645,7 @@ Reference machine: 8–16 CPU cores, 32–64 GB RAM, one recent mid-to-high-end 
 | Division with aggregation | 10,000 entities (most aggregated) at ×10 |
 | Theatre campaign | 50,000 entities and formations at ×100 with quiet skipping |
 | Batch | 1,000 runs of a 1-hour battalion vignette in under 10 minutes, rules deciders |
-| Memory | Under 4 GB for the division case, excluding the local model |
+| Memory | Under 4 GB for the division case |
 | UI channel | Under 1 MB/s of frame data at 2,000 entities |
 
 **The tick budget** at the brigade target: 100 ms per simulated second at ×10. Roughly 35 ms sensing (with the GPU), 15 movement, 15 tracks and fusion, 10 comms, 10 fires and effects, 15 everything else. These are measured with `tracy` from the first spike (§18, phase 0), and every phase has a benchmark that fails if it regresses.
@@ -722,7 +736,7 @@ Sizes are rough, for one experienced Rust developer working full time. Several p
 |---|---|---|---|
 | **0. Spike** | Workspace; `core` (geodesy, figures, keyed RNG); `bevy_ecs` world; terrain tile loading; CPU and GPU line of sight with twin tests; Tauri shell drawing 10,000 Rust-moved entities on deck.gl | 3–4 weeks | 10k movers at 60 fps in the UI; GPU LOS matches CPU; `tracy` shows the tick |
 | **1. Land tactical** | Ground movement with trafficability; EO/IR/thermal sensing (ACQUIRE/TTP); tracks with Kalman filters; direct fire with error budgets and penetration; suppression, stress, cohesion; the template walker and rules decider; scenario loader with a v3 converter; headless CLI | 10–14 weeks | Tank and mech company vignettes in band (MBT Ph, halt threshold); the TS Skirmish presets load and play |
-| **2. Deciders** | Jev local (grammar-constrained, logprobs); Claude orders; recorded answers in game records; the host loop with batching and timeouts | 3–4 weeks | A Skirmish with Jev and Claude plays at ×10 and replays exactly from its record |
+| **2. Deciders** | Remote Jev client (OpenRouter Decisions API, a port of `jevClient.ts`) with batching, caching and timeouts; Claude planners through the Anthropic API with structured output; keys in the host; recorded answers in game records; cost logging | 3–4 weeks | A Skirmish with Jev and Claude plays at ×10, falls back to the rules when offline, and replays exactly from its record without calling them |
 | **3. Fires, engineers, sustainment at unit level** | Indirect fire with trajectories, meteorology and lethal areas; counter-battery radar; obstacles, minefields, breaching, digging; unit stores and consumption | 6–8 weeks | Breach time and counter-battery survival vignettes in band |
 | **4. C2 and comms** | Propagation (diffraction, ITM-style, HF); bearers with budgets; nets with queues, TDMA and mesh; PACE; HQs with staff queues, fusion by covariance intersection; planners in seats; structured orders | 8–10 weeks | Out-of-comms units act on intent; HQ loss slows reporting; detect-to-strike times emerge in band |
 | **5. Drones, EW, PNT** | Drone types and link dependence; FPV strike chain; counter-drone; jammers as emitters with J/S; GNSS C/N₀ and INS drift; spectrum view | 8–10 weeks | FPV effectiveness, precision-under-jamming and kill-zone depth vignettes in band |
@@ -732,7 +746,7 @@ Sizes are rough, for one experienced Rust developer working full time. Several p
 | **9. Space, cyber, kill web, theatre scale** | SGP4 satellites and imagery queues; satcom; cyber access campaigns; the joint kill web; theatre packs and ECEF everywhere; quiet skipping to next detectable event | 8–10 weeks | A joint operation runs at ×100; the full kill-chain AAR works |
 | **10. People and tools** | HQ console and seats; AAR, timeline scrubbing, "what if" branches; detection and link-budget inspectors; scenario editor; analysis workbench | 6–8 weeks | A person plays a brigade HQ through a combined-arms battle and wins or loses through orders alone |
 | **11. Calibration campaign** | Full sensitivity analysis; research backlog worked through; historical vignettes; playtests | 6+ weeks, then ongoing | Every benchmark vignette in band; the top-20 sensitive figures sourced or bounded |
-| **Later** | Multiplayer server (authoritative host over WebSocket, one seat per player); 3D view; in-process inference | — | — |
+| **Later** | Local models (§10.5), checked against remote Jev on the decision vignettes; multiplayer server (authoritative host over WebSocket, one seat per player); 3D view; in-process inference | — | — |
 
 Total: about 90–110 weeks for one person; about 9–12 months for a team of three or four.
 
@@ -768,15 +782,17 @@ Total: about 90–110 weeks for one person; about 9–12 months for a team of th
 | Scope is very large | Phases each ship a playable scenario; aggregation and abstracted domains let early phases play big scenarios with only some domains modelled in detail |
 | Performance targets missed | Profile from phase 0; GPU for the bulk numeric parts; aggregation by scope; benchmarks in CI |
 | GPU differences across machines | GPU narrows, CPU decides; quantised outputs; records name the machine; CPU twins |
-| Local model quality is worse than hosted Jev | The decider is a trait: run Jev remotely if needed; framing-sensitivity and quality vignettes compare deciders |
-| One GPU shared by the model and the sim | Cap allocations; two-card or two-machine layouts (§11.3) |
+| Remote model latency limits how fast a game with Jev can play | The clock waits in simulated time, so results don't change; batching per side, concurrent requests, a cache, and the rules decider for batch runs |
+| Remote services are down, rate-limited or change their API | Fallback to the template's choice, logged; retries with backoff; the client behind a trait, so another provider or a local model can replace it |
+| Per-call cost adds up on long games | Cost logged per game; decision points only (not every tick); aggregated and far units use the rules decider; the cache |
+| Later local models are worse than remote Jev | Compared on the decision vignettes before use; remote stays available |
 | Aggregate models drift from entity models | Refit automatically when entity models change; agreement checks in CI |
 | Open data quality (OSM gaps, coarse soil) | Defaults per class; tools to edit a theatre pack; sensitivity tells whether it matters |
 | Behaviour templates written for the TS engine need actions the Rust engine lacks | Loader reports unknown actions; an action compatibility table; templates degrade to their fallbacks |
 
 **Open questions:**
 
-- Can Jev's own weights run locally, or is it remote-only? This decides whether the local build can use Jev itself.
+- For later: can Jev's own weights run locally, or is it remote-only? This decides whether local play can use Jev itself or needs a substitute model.
 - How many of the research reference's unsourced areas can be closed with open sources: DF-to-strike, Western F2T2EA timings, sortie and tanker rates, ASW detection probabilities, radar and anti-ship missile detection ranges, jamming radius by power, readiness and repair rates?
 - Multiplayer: is it needed early enough to shape phase 4's host design? The sans-IO core supports it either way.
 - Should the browser build (the sim compiled to WASM with WebGPU) be maintained alongside the desktop one, or only the desktop?
