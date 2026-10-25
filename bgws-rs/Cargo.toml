@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+bgws-core = { path = "crates/bgws-core" }
+bgws-catalogue = { path = "crates/bgws-catalogue" }
+bgws-env = { path = "crates/bgws-env" }
+bgws-prop = { path = "crates/bgws-prop" }
+bgws-gpu = { path = "crates/bgws-gpu" }
+bgws-know = { path = "crates/bgws-know" }
+bgws-behaviour = { path = "crates/bgws-behaviour" }
+bgws-scenario = { path = "crates/bgws-scenario" }
+bgws-sim = { path = "crates/bgws-sim" }
+bgws-decide = { path = "crates/bgws-decide" }
+bgws-analysis = { path = "crates/bgws-analysis" }
+bgws-host = { path = "crates/bgws-host" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1", features = ["alloc"] }
+rand = "0.8.5"
+rand_chacha = "0.3"
+rand_distr = "0.4"
+glam = { version = "0.29", features = ["serde"] }
+nalgebra = "0.33"
+libm = "0.2"
+rayon = "1"
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+bevy_ecs = { version = "0.15", default-features = false, features = ["multi_threaded"] }
+wgpu = "23"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+sgp4 = "2"
+petgraph = "0.6"
+pathfinding = "4"
+statrs = "0.17"
+tiff = "0.9"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.6", features = ["fs"] }
+futures = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+proptest = "1"
+approx = "0.5"
+clap = { version = "4", features = ["derive"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+debug = 1
