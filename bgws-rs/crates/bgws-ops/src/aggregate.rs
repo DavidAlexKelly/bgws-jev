@@ -558,7 +558,8 @@ mod tests {
 
     #[test]
     fn stochastic_mean_follows_square_law() {
-        let f = figs();
+        let mut fx = figs();
+        fx.set("agg.fatigue_per_combat_h", 0.0).unwrap();
         let env = EngagementEnv { terrain: TerrainClass::Open, supply: (1.0, 1.0) };
         let k = AttritionCoeffs { k_a_on_b: 0.05, k_b_on_a: 0.03 };
         let runs = 300;
@@ -570,14 +571,11 @@ mod tests {
             b.fatigue = Spread::default();
             let mut rng = Seed(r).stream(StreamKey::new("lanchester", r, 0, 0));
             for _ in 0..50 {
-                let mut fx = Figures::from_list(figures()).unwrap();
-                fx.set("agg.fatigue_per_combat_h", 0.0).unwrap();
                 attrition_step(&mut a, &mut b, &k, &env, 0.1, &fx, &mut rng);
             }
             sa += a.strength as f64;
             sb += b.strength as f64;
         }
-        let _ = f;
         let (ea, eb) = square_law(400.0, 300.0, 0.05, 0.03, 5.0);
         assert!((sa / runs as f64 - ea).abs() / ea < 0.02, "{} vs {ea}", sa / runs as f64);
         assert!((sb / runs as f64 - eb).abs() / eb < 0.02, "{} vs {eb}", sb / runs as f64);
@@ -629,8 +627,7 @@ mod tests {
 
     #[test]
     fn attrition_fit_from_simulated_engagements() {
-        let f = figs();
-        let mut fx = Figures::from_list(figures()).unwrap();
+        let mut fx = figs();
         fx.set("agg.fatigue_per_combat_h", 0.0).unwrap();
         let env = EngagementEnv { terrain: TerrainClass::Open, supply: (1.0, 1.0) };
         let k = AttritionCoeffs { k_a_on_b: 0.04, k_b_on_a: 0.02 };
@@ -649,7 +646,6 @@ mod tests {
         assert!((fit.coeffs().k_a_on_b - 0.04).abs() < 3.0 * fit.a_on_b.se);
         assert!((fit.coeffs().k_b_on_a - 0.02).abs() < 3.0 * fit.b_on_a.se);
         assert!(fit.a_on_b.p_value > 0.001 && fit.b_on_a.p_value > 0.001);
-        let _ = f;
     }
 
     #[test]
