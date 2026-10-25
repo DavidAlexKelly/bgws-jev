@@ -81,6 +81,10 @@ import { OVERLAY_SOURCES, overlayLayerSpecs, SOURCE } from "./overlayLayers";
 import { PRESET_SCENARIOS } from "./presets";
 import type { RtLogEntry } from "./engine/runner";
 import WorldPanel from "./WorldPanel";
+import HqConsole from "./HqConsole";
+import { jevWorldDecider } from "./world/jevWorldDecider";
+import { claudePlanners } from "./world/command/claudePlanner";
+import type { PlanAnswer } from "./world/types";
 import { withWorld } from "./world/create";
 import { WORLD_LAYERS, WORLD_SOURCE, worldLayerSpecs, worldOverlay, type WorldLayer } from "./worldOverlays";
 import {
@@ -685,6 +689,7 @@ export default function RealtimePlay() {
   const worldLayersRef = useRef(worldLayers);
   worldLayersRef.current = worldLayers;
   const [worldPanelOpen, setWorldPanelOpen] = useState(false);
+  const [hqConsoleOpen, setHqConsoleOpen] = useState(false);
   /** The decision line opened in the feed, to show its walked path (DFG §5.3). */
   const [openDecision, setOpenDecision] = useState<string | null>(null);
   const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
@@ -1048,6 +1053,20 @@ export default function RealtimePlay() {
     setPlaying(true);
   }, [draft]);
 
+  /** A person's orders from an HQ seat (W15): over the nets, and into the record for replay. */
+  const commandFromHq = useCallback((hq: string, answer: PlanAnswer) => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    recordRef.current?.issued.push({ time: runner.state.time, orders: {}, command: { hq, answer } });
+    runner.command(hq, answer).catch((thrown: unknown) => setError(thrown instanceof Error ? thrown.message : String(thrown)));
+  }, []);
+  const seatHq = useCallback((hq: string, seat: "human" | "claude" | "heuristic") => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    recordRef.current?.issued.push({ time: runner.state.time, orders: {}, seat: { hq, seat } });
+    runner.setSeat(hq, seat).catch((thrown: unknown) => setError(thrown instanceof Error ? thrown.message : String(thrown)));
+  }, []);
+
   /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
   const runsRef = useRef(0);
   /** This run as a game record (headless.ts), and its event stream's fingerprint. */
@@ -1116,20 +1135,33 @@ export default function RealtimePlay() {
           red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }),
         }
       : undefined;
+    // World questions (W2) go to Jev too; Claude-seated HQs plan with Claude (W4, W15).
+    const worldDeciders = useJev && initial.world
+      ? {
+          blue: jevWorldDecider({ side: "blue", call: jevCall, directive: blueDirective }),
+          red: jevWorldDecider({ side: "red", call: jevCall, directive: redDirective }),
+        }
+      : undefined;
+    const planners = useCommander && initial.world
+      ? {
+          blue: claudePlanners(foundryModelCall(model, blueDirective, "realtime"), config),
+          red: claudePlanners(foundryModelCall(model, redDirective, "realtime"), config),
+        }
+      : undefined;
     runnerRef.current?.dispose();
     const runner: RunnerHandle = useWorker
       ? spawnWorkerRunner(
           { spec, raster: rasterUsable && raster ? raster.exportGrid() : null, initial, config },
-          { deciders, onEntry },
+          { deciders, worldDeciders, planners, onEntry },
         )
-      : new InThreadRunner(initial, config, { deciders, onEntry });
+      : new InThreadRunner(initial, config, { deciders, worldDeciders, planners, onEntry });
     wrecksRef.current = { list: [], after: -1 };
     runnerRef.current = runner;
     setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
-  }, [makeSpec, rasterUsable, raster, useWorker, useJev, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
+  }, [makeSpec, rasterUsable, raster, useWorker, useJev, useCommander, model, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
 
   const reset = useCallback(() => {
     stopStream();
@@ -2311,6 +2343,9 @@ export default function RealtimePlay() {
                   <button onClick={() => setWorldPanelOpen((o) => !o)} style={{ ...chip, color: worldPanelOpen ? "#e8c547" : "#8a91a8" }} title="Feed, kill chains, HQs, logistics, network, figures">
                     {worldPanelOpen ? "hide" : "show"} the world panel
                   </button>
+                  <button onClick={() => setHqConsoleOpen((o) => !o)} style={{ ...chip, color: hqConsoleOpen ? "#e8c547" : "#8a91a8" }} title="Take an HQ's seat and command from what reaches it">
+                    {hqConsoleOpen ? "hide" : "show"} the HQ console
+                  </button>
                 </div>
               </>
             )}
@@ -2399,6 +2434,11 @@ export default function RealtimePlay() {
           {worldPanelOpen && state?.world && (
             <div style={{ flex: "0 0 auto", maxHeight: "45%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
               <WorldPanel state={state} onClose={() => setWorldPanelOpen(false)} />
+            </div>
+          )}
+          {hqConsoleOpen && state?.world && runner && (
+            <div style={{ flex: "0 0 auto", maxHeight: "45%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
+              <HqConsole state={state} config={runner.config} side={viewpoint === "red" ? "red" : "blue"} onCommand={commandFromHq} onSeat={seatHq} />
             </div>
           )}
           <div style={{ flex: "0 0 auto", maxHeight: "48%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>

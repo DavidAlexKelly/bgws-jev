@@ -51,7 +51,7 @@ import { seatAt, type PlannerSeat } from "../world/command/seat";
 import { heuristicPlan } from "../world/command/heuristicPlanner";
 import { issuePlan } from "../world/domains/c2";
 import { withWorldCtx } from "../world/standalone";
-import type { PlanAnswer } from "../world/types";
+import type { PlanAnswer, PlanRequest } from "../world/types";
 
 /** Something the player should know about, while the clock runs. */
 export interface RtFlag {
@@ -177,6 +177,31 @@ export class RealtimeRunner {
    * of contact, a unit takes them at once; in a fight, it is asked how to
    * comply (D0). Units not named keep what they have.
    */
+  /**
+   * A commander at an HQ sends orders (W15): they leave as FRAGOs and
+   * guidance over the HQ's nets, as any plan does — delayed, lost or jammed
+   * on the way. Nothing reaches a unit until its message does.
+   */
+  command(hqId: string, answer: PlanAnswer): void {
+    const hq = this.state.world?.hqs[hqId];
+    if (!hq) throw new Error(`no HQ "${hqId}"`);
+    const applied = withWorldCtx(this.state, this.config, (c) => {
+      const request: PlanRequest = { id: c.newNumber(), hq: hqId, side: hq.side, planner: hq.planner ?? "tactical", seat: hq.seat, raisedAt: c.time, readyAt: c.time, why: "the commander's orders" };
+      issuePlan(c, request, answer);
+    });
+    this.state = applied.state;
+    for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
+  }
+
+  /** Take an HQ's seat, or hand it back (W15): "human", "claude" or "heuristic". */
+  setSeat(hqId: string, seat: "human" | "claude" | "heuristic"): void {
+    const world = this.state.world;
+    const hq = world?.hqs[hqId];
+    if (!world || !hq || hq.seat === seat) return;
+    this.state = { ...this.state, world: { ...world, hqs: { ...world.hqs, [hqId]: { ...hq, seat } }, plans: world.plans.map((p) => (p.hq === hqId && !p.asked ? { ...p, seat } : p)) } };
+    this.push({ type: "world", time: this.state.time, side: hq.side, item: { time: this.state.time, side: hq.side, domain: "c2", kind: "seat", text: `${hqId}'s seat is now ${seat === "human" ? "a person's" : seat}`, ids: [hqId] } });
+  }
+
   issueOrders(orders: Record<string, UnitOrders>, plan?: { side: Side; text: string }): void {
     for (const [unitId, next] of Object.entries(orders)) {
       const fe = this.state.game.forceElements[unitId];
@@ -284,7 +309,8 @@ export class RealtimeRunner {
     const world = this.state.world;
     if (!world?.plans.length) return;
     for (const request of world.plans) {
-      if (request.asked || request.seat === "heuristic") continue;
+      // A person's seat plans when the person chooses (command()); the heuristic answers inside the world.
+      if (request.asked || request.seat === "heuristic" || request.seat === "human") continue;
       const planner = this.options.planners?.[request.side];
       const seat = seatAt(this.state, request.hq);
       const hq = world.hqs[request.hq];
@@ -312,7 +338,10 @@ export class RealtimeRunner {
     for (const request of world.plans.filter((p) => p.seat !== "heuristic" && p.readyAt <= this.state.time)) {
       let answer: PlanAnswer | undefined;
       const batch = this.planInflight.get(request.id);
-      if (batch) {
+      if (request.seat === "human") {
+        // The battle rhythm or a CCIR has come round: the commander is told, and no orders go until they send some.
+        answer = { by: "human", plan: `${request.why}: over to the commander`, orders: {} };
+      } else if (batch) {
         if (!batch.result) {
           this.waits += 1;
           batch.result = await batch.promise;

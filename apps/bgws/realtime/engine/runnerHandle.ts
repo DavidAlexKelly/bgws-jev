@@ -22,8 +22,10 @@ import { DEFAULT_LOG_LIMIT, RealtimeRunner, recentShots, type RtFlag, type RtLog
 import { applyPatch } from "./statePatch";
 import type { RtConfig, RtState, UnitOrders } from "./types";
 import type { FromWorker, MessageEndpoint, RunnerSnapshot, ToWorker } from "./workerHost";
-import type { WorldDecider } from "../world/deciders";
-import type { PlannerSeat } from "../world/command/seat";
+import { ruleWorldDecider, type WorldDecider } from "../world/deciders";
+import { seatAt, type PlannerSeat } from "../world/command/seat";
+import { heuristicPlan } from "../world/command/heuristicPlanner";
+import type { PlanAnswer } from "../world/types";
 
 export interface RunnerHandle {
   /** Where the game runs, for the status line. */
@@ -44,6 +46,10 @@ export interface RunnerHandle {
   advance(seconds: number): Promise<void>;
   /** Resolves once the orders are with the runner (at once, on the main thread). */
   issueOrders(orders: Record<string, UnitOrders>, plan?: { side: Side; text: string }): Promise<void>;
+  /** A commander's orders from an HQ, sent over its nets (W15). */
+  command(hqId: string, answer: PlanAnswer): Promise<void>;
+  /** Take an HQ's seat or hand it back (W15). */
+  setSeat(hqId: string, seat: "human" | "claude" | "heuristic"): Promise<void>;
   /** Stop: a worker is terminated. */
   dispose(): void;
 }
@@ -107,6 +113,14 @@ export class InThreadRunner implements RunnerHandle {
     this.runner.issueOrders(orders, plan);
     return Promise.resolve();
   }
+  command(hqId: string, answer: PlanAnswer) {
+    this.runner.command(hqId, answer);
+    return Promise.resolve();
+  }
+  setSeat(hqId: string, seat: "human" | "claude" | "heuristic") {
+    this.runner.setSeat(hqId, seat);
+    return Promise.resolve();
+  }
   dispose() {}
 }
 
@@ -151,6 +165,8 @@ export class WorkerRunner implements RunnerHandle {
       raster: init.raster,
       state: init.initial,
       proxied: (Object.keys(options.deciders ?? {}) as Side[]).filter((side) => options.deciders?.[side] != null),
+      proxiedWorld: (Object.keys(options.worldDeciders ?? {}) as Side[]).filter((side) => options.worldDeciders?.[side] != null),
+      proxiedPlanners: (Object.keys(options.planners ?? {}) as Side[]).filter((side) => options.planners?.[side] != null),
       logLimit: options.logLimit,
     };
     endpoint.postMessage(message, init.raster ? [init.raster.data.buffer as ArrayBuffer] : []);
@@ -170,6 +186,14 @@ export class WorkerRunner implements RunnerHandle {
 
   issueOrders(orders: Record<string, UnitOrders>, plan?: { side: Side; text: string }): Promise<void> {
     return this.call((id) => ({ type: "issueOrders", id, orders, ...(plan ? { plan } : {}) }));
+  }
+
+  command(hqId: string, answer: PlanAnswer): Promise<void> {
+    return this.call((id) => ({ type: "command", id, hq: hqId, answer }));
+  }
+
+  setSeat(hqId: string, seat: "human" | "claude" | "heuristic"): Promise<void> {
+    return this.call((id) => ({ type: "setSeat", id, hq: hqId, seat }));
   }
 
   /** The worker died or could not load: every call from now on fails with this. */
@@ -205,6 +229,38 @@ export class WorkerRunner implements RunnerHandle {
       case "error": {
         this.calls.get(message.id)?.reject(new Error(message.message));
         this.calls.delete(message.id);
+        break;
+      }
+      case "decideWorld": {
+        const { id, side, questions } = message;
+        this.state = applyPatch(this.state, message.patch);
+        const state = this.state;
+        const decider = this.options.worldDeciders?.[side] ?? ruleWorldDecider;
+        this.asking += 1;
+        void decider
+          .decide(state, side, questions, this.config)
+          .catch(() => ruleWorldDecider.decide(state, side, questions, this.config))
+          .then((answers) => {
+            this.asking -= 1;
+            const reply: ToWorker = { type: "worldAnswers", id, answers };
+            this.endpoint.postMessage(reply);
+          });
+        break;
+      }
+      case "plan": {
+        const { id, side, request } = message;
+        this.state = applyPatch(this.state, message.patch);
+        const state = this.state;
+        const planner = this.options.planners?.[side];
+        const seat = seatAt(state, request.hq);
+        const hq = state.world?.hqs[request.hq];
+        this.asking += 1;
+        const fallback = (): PlanAnswer => (hq ? heuristicPlan(state, hq) : { by: "heuristic", plan: "no HQ", orders: {} });
+        void (planner && seat ? planner.plan(state, request, seat).catch(fallback) : Promise.resolve(fallback())).then((answer) => {
+          this.asking -= 1;
+          const reply: ToWorker = { type: "planAnswer", id, answer };
+          this.endpoint.postMessage(reply);
+        });
         break;
       }
       case "decide": {

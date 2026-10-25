@@ -256,7 +256,7 @@ export interface UnitOrders {
   roe: Roe;
   onContact: OnContact;
   boundaries: Boundary[];
-  by: "claude" | "heuristic" | "rules";
+  by: "claude" | "heuristic" | "rules" | "commander";
   issuedAt: number;
   /**
    * A phase it found it cannot carry out (the ground, or a line it may not
