@@ -32,6 +32,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.comms.report_delay_s", 30.0, "s", 0.0, 300.0, "default", Default, "contact report delay to the side picture when no nets are modelled"),
         figure!("sim.morale.isolation_m", 1_500.0, "m", 300.0, 5_000.0, "default", Default, "no friend within this range counts as isolated"),
         figure!("sim.lod.aggregate_m", 15_000.0, "m", 3_000.0, 60_000.0, "default", Default, "a formation this far from any enemy track is aggregated"),
+        figure!("sim.ad.engaged_reach_m", 150_000.0, "m", 20_000.0, 400_000.0, "default", Default, "an AD unit with a hostile air track this close is engaged, not asked to go quiet"),
         figure!("sim.quiet.max_jump_s", 300.0, "s", 10.0, 3_600.0, "default", Default, "longest quiet skip in one jump"),
     ]
 }
@@ -94,6 +95,7 @@ pub struct Params {
     pub isolation_m: f64,
     pub aggregate_m: f64,
     pub quiet_max_jump_s: f64,
+    pub ad_quiet_reach_m: f64,
 }
 
 impl Params {
@@ -128,6 +130,7 @@ impl Params {
             isolation_m: f.get("sim.morale.isolation_m"),
             aggregate_m: f.get("sim.lod.aggregate_m"),
             quiet_max_jump_s: f.get("sim.quiet.max_jump_s"),
+            ad_quiet_reach_m: f.get("sim.ad.engaged_reach_m"),
         }
     }
 }

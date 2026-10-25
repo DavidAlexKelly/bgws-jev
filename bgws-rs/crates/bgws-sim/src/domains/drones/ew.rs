@@ -400,6 +400,11 @@ fn exposure(s: &mut Sim, c4: &mut C4) {
         if t < limit || c4.emcon_of(id) == Emcon::Silent {
             continue;
         }
+        // An air-defence unit with hostile air tracks inbound is fighting, not
+        // loitering on the air: it is not asked to relocate mid-raid.
+        if air_threat_near(s, id) {
+            continue;
+        }
         if c4.ew.exposed_asked.get(&id).map(|x| (now - *x).secs() < 900.0).unwrap_or(false) {
             continue;
         }
@@ -409,6 +414,17 @@ fn exposure(s: &mut Sim, c4: &mut C4) {
         s.ctx.log.push(now, "ew.exposed").side(sd).entity(id).text(text).data(serde_json::json!({ "onAirS": t, "trigger": point }));
         push_trigger(s, c4, id, point, None, QCtx::default());
     }
+}
+
+/// Does the side's picture hold an air track within the unit's AD reach?
+fn air_threat_near(s: &Sim, id: EntityId) -> bool {
+    let e = s.ctx.entity(id);
+    if s.world.get::<crate::domains::air::defence::AdUnit>(e).is_none() {
+        return false;
+    }
+    let (Some(side), Some(k)) = (side_of(s, id), s.world.get::<crate::components::Kin>(e)) else { return false };
+    let reach = s.ctx.p.ad_quiet_reach_m;
+    s.ctx.tracks.get(&side).map(|st| st.views(&s.ctx.p.know).iter().any(|t| t.domain == bgws_know::Domain::Air && t.position.sub(k.pos).horizontal() <= reach)).unwrap_or(false)
 }
 
 fn jamming_orders(s: &mut Sim, c4: &mut C4) {
