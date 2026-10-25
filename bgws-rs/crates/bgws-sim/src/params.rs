@@ -40,6 +40,7 @@ pub fn figures() -> Vec<Figure> {
 pub fn all_figures() -> Vec<Figure> {
     let mut v = figures();
     v.extend(crate::domains::fires::figures());
+    v.extend(crate::domains::air::figures());
     v.extend(bgws_catalogue::figures());
     v.extend(bgws_env::figures());
     v.extend(bgws_prop::figures());

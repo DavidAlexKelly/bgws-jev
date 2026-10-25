@@ -506,7 +506,7 @@ impl Sim {
         let mut fit: BTreeMap<Side, (f64, f64)> = BTreeMap::new();
         for &e in &self.ctx.order {
             let (Some(i), Some(h)) = (self.world.get::<Ident>(e), self.world.get::<Health>(e)) else { continue };
-            if i.dummy || i.side == Side::Neutral {
+            if i.dummy || i.side == Side::Neutral || !crate::domains::air::counts_for_strength(&i.platform) {
                 continue;
             }
             let s = fit.entry(i.side).or_insert((0.0, 0.0));
@@ -587,7 +587,7 @@ pub struct Snapshot {
 }
 
 /// Spawn one scenario force.
-fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bgws_scenario::v4::Force, platform: Arc<Platform>) -> Entity {
+pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bgws_scenario::v4::Force, platform: Arc<Platform>) -> Entity {
     let pos = ctx.frame.geodetic_to_enu(f.position);
     let ground_h = ctx.ground.height(pos.e, pos.n);
     let domain = platform.domain;

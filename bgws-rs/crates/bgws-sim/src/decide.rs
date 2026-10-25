@@ -84,7 +84,7 @@ fn facts(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> BTre
     m
 }
 
-fn gates(s: &Sim, e: bevy_ecs::prelude::Entity) -> Gates {
+fn gates(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> Gates {
     let h = s.world.get::<Health>(e).expect("h");
     let c = s.world.get::<Crew>(e).expect("c");
     let a = s.world.get::<Act>(e).expect("a");
@@ -98,7 +98,7 @@ fn gates(s: &Sim, e: bevy_ecs::prelude::Entity) -> Gates {
     }
     caps.insert(Capability::Radio);
     crate::world::capabilities(s, e, &mut caps);
-    Gates {
+    let mut g = Gates {
         roe: match a.roe {
             RoeS::Never => Roe::Never,
             RoeS::IfFiredUpon => Roe::IfFiredUpon,
@@ -115,7 +115,9 @@ fn gates(s: &Sim, e: bevy_ecs::prelude::Entity) -> Gates {
             MoraleState::Shaken | MoraleState::Pinned => Cohesion::Shaken,
             _ => Cohesion::Broken,
         },
-    }
+    };
+    crate::domains::air::gates(s, e, about, &mut g);
+    g
 }
 
 /// The unit's situation in words: only what it has seen, heard and been told.
@@ -179,7 +181,7 @@ pub(crate) fn ask_with_rule(s: &mut Sim, t: &Trigger, rule: RulesChoice) -> bool
         (i.name.clone(), i.side, i.template.clone(), i.platform.template.clone(), kind)
     };
     let f = facts(s, e, t.about);
-    let g = gates(s, e);
+    let g = gates(s, e, t.about);
     let candidates = [template.as_str(), archetype_default.as_str()];
     let walked = match s.ctx.registry.decide(&candidates, t.point, &f, &g) {
         Ok(Some(w)) => w,

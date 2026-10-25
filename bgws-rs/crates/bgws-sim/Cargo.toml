@@ -25,6 +25,7 @@ bevy_ecs.workspace = true
 rayon.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
+rand_distr.workspace = true
 nalgebra.workspace = true
 
 [dev-dependencies]
