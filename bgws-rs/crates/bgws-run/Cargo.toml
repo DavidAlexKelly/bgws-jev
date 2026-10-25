@@ -1,0 +1,23 @@
+[package]
+name = "bgws-run"
+description = "CLI: play, replay, batch, vignettes, sensitivity, bench, export."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "bgws"
+path = "src/main.rs"
+
+[dependencies]
+bgws-core.workspace = true
+bgws-scenario.workspace = true
+bgws-sim.workspace = true
+bgws-decide.workspace = true
+bgws-analysis.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
