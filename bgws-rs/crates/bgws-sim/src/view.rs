@@ -123,6 +123,34 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
             suppression: c.map(|c| c.suppression.level).unwrap_or(0.0),
         });
     }
+    // Drones in flight are records of the drones domain, not entities: show them too.
+    for (fid, team, side, kind, pos, agl, heading) in crate::domains::drones::drones::airborne(s) {
+        if viewer.side().map(|v| v != side).unwrap_or(false) {
+            continue;
+        }
+        let g = s.ctx.frame.enu_to_geodetic(pos);
+        let team_name = s.world.get::<Ident>(s.ctx.entity(team)).map(|i| i.name.clone()).unwrap_or_default();
+        entities.push(FrameEntity {
+            id: 1_000_000 + fid as u32,
+            name: format!("{team_name} drone {fid}"),
+            label: format!("{kind:?}"),
+            side,
+            domain: "drone".into(),
+            platform: format!("{kind:?}"),
+            sidc: String::new(),
+            lat: g.lat,
+            lon: g.lon,
+            alt: pos.u + agl,
+            heading_deg: heading.to_degrees(),
+            speed: 0.0,
+            strength: 1.0,
+            fit: 1,
+            total: 1,
+            status: "ok".into(),
+            activity: "flying".into(),
+            suppression: 0.0,
+        });
+    }
     let mut tracks = Vec::new();
     for (side, store) in &s.ctx.tracks {
         if let Some(v) = viewer.side() {

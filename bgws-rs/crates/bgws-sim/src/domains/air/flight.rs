@@ -638,6 +638,14 @@ fn impact(s: &mut Sim, aw: &mut AirWorld, id: EntityId, f: &InFlight) {
     }
     let mut flight = f.flight.clone();
     flight.profile.cep *= cep_mult;
+    // GNSS-guided munitions (cruise missiles, glide bombs, one-way drones)
+    // lose accuracy where their GNSS is jammed (§8.7) [P15].
+    if s.ctx.catalogue.munition(&f.munition).map(|m| m.guidance == bgws_catalogue::Guidance::Gnss).unwrap_or(false) {
+        let from = Enu::new(flight.from.x, flight.from.y, flight.from.z);
+        let to = Enu::new(flight.to.x, flight.to.y, flight.to.z);
+        let acc = crate::domains::drones::pnt::precision_accuracy(s, from, to, flight.time_of_flight(), Some(f.side));
+        flight.profile.cep = flight.profile.cep.max(acc.cep_m);
+    }
     // An ARM homes on the radar while it radiates.
     if f.kind == MunitionKind::Arm && cep_mult == 1.0 {
         if let Some(p) = f

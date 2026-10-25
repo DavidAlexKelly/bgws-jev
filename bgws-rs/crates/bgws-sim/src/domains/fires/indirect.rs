@@ -563,7 +563,10 @@ fn fire(s: &mut Sim, st: &mut FiresWorld) {
             continue;
         };
         let range = m.aim.sub(shooter.pos).horizontal();
-        let want_guided = m.priority >= 4;
+        // A gun told its GNSS is denied (pntDegraded) keeps to its answer.
+        let pnt = crate::domains::drones::pnt::policy(s, e);
+        let gnss_ok = !matches!(pnt, Some(crate::domains::drones::pnt::PntPolicy::SwitchMunition | crate::domains::drones::pnt::PntPolicy::Wait));
+        let want_guided = m.priority >= 4 && gnss_ok;
         let mut usable: Vec<&(usize, Munition, u32)> = shooter.mounts.iter().filter(|(_, mu, r)| *r > 0 && range >= mu.min_range_m && range <= mu.max_range_m).collect();
         usable.sort_by_key(|(k, mu, _)| (guided(mu) != want_guided, *k));
         let Some(&(mount_i, ref mun, mount_rounds)) = usable.first().copied() else {
@@ -587,7 +590,14 @@ fn fire(s: &mut Sim, st: &mut FiresWorld) {
         let mut rng = s.ctx.rng("fires.salvo", mid, m.fired as u64);
         // Errors: fixed per mission, then per round.
         let errs = ifm::delivery_errors(range, met_age_h(s, st), st.p.gun_pnt_sigma_m, &st.p.ip);
-        let (disp_r, disp_d) = if guided(&mun) { (mun.cep_m / 1.1774, mun.cep_m / 1.1774) } else { (errs.disp_range_m, errs.disp_defl_m) };
+        // A GNSS-guided round's accuracy follows its navigation through the
+        // jamming along its flight (§8.7) [P15].
+        let guided_cep = if guided(&mun) && mun.guidance == bgws_catalogue::Guidance::Gnss {
+            crate::domains::drones::pnt::precision_accuracy(s, shooter.pos, m.aim, tr.tof_s, Some(m.side)).cep_m.max(mun.cep_m)
+        } else {
+            mun.cep_m
+        };
+        let (disp_r, disp_d) = if guided(&mun) { (guided_cep / 1.1774, guided_cep / 1.1774) } else { (errs.disp_range_m, errs.disp_defl_m) };
         let bias = match m.bias {
             Some(b) => b,
             None if guided(&mun) => (0.0, 0.0),

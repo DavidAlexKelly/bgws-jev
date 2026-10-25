@@ -1397,6 +1397,14 @@ pub fn records(s: &Sim) -> Vec<StrikeRecord> {
     s.world.get_resource::<C4>().map(|c| c.drones.records.clone()).unwrap_or_default()
 }
 
+/// Drones in the air now: (flight id, team, side, kind, position, height above ground, heading).
+pub fn airborne(s: &Sim) -> Vec<(u64, EntityId, Side, DroneType, Enu, f64, f64)> {
+    s.world
+        .get_resource::<C4>()
+        .map(|c| c.drones.flights.values().filter(|f| !f.done).map(|f| (f.id, f.team, f.side, f.kind, f.pos, f.agl, f.heading)).collect())
+        .unwrap_or_default()
+}
+
 /// Sorties launched.
 pub fn sorties(s: &Sim) -> u32 {
     s.world.get_resource::<C4>().map(|c| c.drones.sorties).unwrap_or(0)
