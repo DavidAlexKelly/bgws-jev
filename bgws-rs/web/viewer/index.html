@@ -27,6 +27,7 @@
 </head>
 <body>
 <div id="map"></div>
+<canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;display:none"></canvas>
 <div id="controls" class="panel">
   <span id="clock">--:--:--</span>
   <button id="play">Play</button>
@@ -40,13 +41,20 @@
 <script>
 const SIDE = { blue: [47, 111, 214], red: [200, 64, 47], neutral: [120, 120, 110] };
 let frame = null, playing = false, first = true;
-const map = new maplibregl.Map({
-  container: "map",
-  style: { version: 8, sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } }, layers: [{ id: "osm", type: "raster", source: "osm" }] },
-  center: [18.6, 54.2], zoom: 11,
-});
-const overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
-map.addControl(overlay);
+// MapLibre + deck.gl when they load; a plain canvas when offline.
+const online = typeof maplibregl !== "undefined" && typeof deck !== "undefined";
+let map = null, overlay = null;
+if (online) {
+  map = new maplibregl.Map({
+    container: "map",
+    style: { version: 8, sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } }, layers: [{ id: "osm", type: "raster", source: "osm" }] },
+    center: [18.6, 54.2], zoom: 11,
+  });
+  overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
+  map.addControl(overlay);
+} else {
+  document.getElementById("canvas").style.display = "block";
+}
 const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
 const send = (msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 ws.onopen = () => { document.getElementById("status").textContent = "connected"; send({ kind: "viewer", viewer: document.getElementById("viewer").value }); };
@@ -75,6 +83,7 @@ function ellipse(t) {
 function render(f) {
   frame = f;
   document.getElementById("clock").textContent = f.clock;
+  if (!online) return drawCanvas(f);
   if (first && f.entities.length) { first = false; const e = f.entities[0]; map.jumpTo({ center: [e.lon, e.lat], zoom: 12 }); }
   overlay.setProps({ layers: [
     new deck.PolygonLayer({ id: "tracks", data: f.tracks, getPolygon: ellipse, filled: true, stroked: true, getFillColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 30], getLineColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 160], lineWidthMinPixels: 1 }),
@@ -85,6 +94,45 @@ function render(f) {
     new deck.TextLayer({ id: "labels", data: f.entities, getPosition: (e) => [e.lon, e.lat], getText: (e) => e.name, getSize: 11, getPixelOffset: [0, -14], getColor: (e) => [...SIDE[e.side], 255], fontFamily: "system-ui" }),
   ] });
 }
+let bounds = null, project = null;
+function drawCanvas(f) {
+  const c = document.getElementById("canvas"), dpr = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * dpr; c.height = c.clientHeight * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  const W = c.clientWidth, H = c.clientHeight;
+  g.fillStyle = getComputedStyle(document.body).backgroundColor; g.fillRect(0, 0, W, H);
+  if (!bounds && f.entities.length) {
+    const lats = f.entities.map((e) => e.lat), lons = f.entities.map((e) => e.lon);
+    const pad = 0.15;
+    bounds = { s: Math.min(...lats), n: Math.max(...lats), w: Math.min(...lons), e: Math.max(...lons) };
+    const dl = (bounds.n - bounds.s) * pad + 0.005, dw = (bounds.e - bounds.w) * pad + 0.005;
+    bounds.s -= dl; bounds.n += dl; bounds.w -= dw; bounds.e += dw;
+  }
+  if (!bounds) return;
+  // Local equirectangular projection, metres, fitted to the window.
+  const c0 = Math.cos(((bounds.s + bounds.n) / 2) * Math.PI / 180);
+  const mx = (lon) => (lon - bounds.w) * 111320 * c0, my = (lat) => (lat - bounds.s) * 111320;
+  const k = Math.min(W / mx(bounds.e), H / my(bounds.n));
+  const x = (lon) => mx(lon) * k, y = (lat) => H - my(lat) * k;
+  project = { x, y };
+  for (const t of f.tracks) {
+    g.strokeStyle = `rgba(${SIDE[t.owner === "blue" ? "red" : "blue"].join(",")},0.6)`;
+    g.beginPath(); ellipse(t).forEach(([lo, la], i) => (i ? g.lineTo(x(lo), y(la)) : g.moveTo(x(lo), y(la)))); g.stroke();
+  }
+  g.font = "11px system-ui";
+  for (const e of f.entities) {
+    const [r, gg, b] = SIDE[e.side];
+    g.fillStyle = e.status === "destroyed" ? "rgba(90,90,90,0.6)" : `rgba(${r},${gg},${b},${e.status === "ok" ? 0.95 : 0.55})`;
+    g.beginPath(); g.arc(x(e.lon), y(e.lat), 6, 0, 2 * Math.PI); g.fill();
+    g.fillText(e.name, x(e.lon) + 8, y(e.lat) - 6);
+  }
+}
+document.getElementById("canvas").onclick = (ev) => {
+  if (!frame || !project) return;
+  const d = (e) => Math.hypot(project.x(e.lon) - ev.offsetX, project.y(e.lat) - ev.offsetY);
+  const near = [...frame.entities].sort((a, b) => d(a) - d(b))[0];
+  inspect(near && d(near) < 20 ? near : null);
+};
 function feed(events) {
   const el = document.getElementById("feed");
   for (const ev of events) { const d = document.createElement("div"); d.innerHTML = `<span class="t">${ev.clock}</span>${escapeHtml(ev.text || ev.kind)}`; el.prepend(d); }
