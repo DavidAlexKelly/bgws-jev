@@ -8,7 +8,7 @@ use crate::components::*;
 use crate::hq::Plan;
 use crate::sim::{Pending, Sim, Trigger};
 use crate::systems::{alive, name, threat_bearing};
-use bgws_behaviour::{build_question, needs_asking, Capability, Cohesion, Emcon, FactValue, Gates, QuestionContext, QuestionLimits, Roe, RulesChoice, WeaponRelease};
+use bgws_behaviour::{build_question, needs_asking, Capability, Cohesion, FactValue, Gates, QuestionContext, QuestionLimits, Roe, RulesChoice, WeaponRelease};
 use bgws_catalogue::Domain;
 use bgws_core::{Answer, AnswerSource, Enu, EntityId, QuestionId, QuestionKind, Side, SimDuration};
 use bgws_models::people::{reaction_median_s, sample_reaction_s, Drill, MoraleState};
@@ -108,7 +108,7 @@ fn gates(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> Gate
         fired_upon: c.last_incoming.is_some(),
         weapon_release: WeaponRelease::Free,
         target_identified: true,
-        emcon: Emcon::Unrestricted,
+        emcon: crate::domains::drones::emcon_gate(s, e),
         capabilities: Some(caps),
         cohesion: match c.morale.state {
             MoraleState::Steady => Cohesion::Steady,
@@ -244,7 +244,12 @@ pub fn apply(s: &mut Sim, qid: QuestionId) {
     if p.q.kind == QuestionKind::Hq {
         let plan = a.plan.clone().and_then(|v| serde_json::from_value::<Plan>(v).ok());
         match plan {
-            Some(plan) => apply_plan(s, p.q.side, &plan),
+            Some(plan) => {
+                // With nets, the plan waits for its planning time and travels as orders.
+                if !crate::domains::drones::route_plan(s, p.q.side, &plan, p.q.at) {
+                    apply_plan(s, p.q.side, &plan)
+                }
+            }
             None => {
                 s.ctx.log.push(s.ctx.now, "decide.plan").side(p.q.side).text(format!("{} HQ: no usable plan; units keep their orders", p.q.side));
             }
@@ -394,54 +399,61 @@ pub fn apply_plan(s: &mut Sim, side: Side, plan: &Plan) {
     let refs = s.hq_situation(side, "plan").reference_points;
     let mut given = 0;
     for o in &plan.orders {
-        let Some(&id) = s.ctx.by_name.get(&o.unit) else { continue };
-        let e = s.ctx.entity(id);
-        let Some(i) = s.world.get::<Ident>(e) else { continue };
-        if i.side != side {
-            continue;
+        if apply_unit_order(s, side, o, &refs) {
+            given += 1;
         }
-        let own = s.ctx.frame.enu_to_geodetic(s.world.get::<Kin>(e).expect("k").pos);
-        let phases: Vec<Activity> = o
-            .phases
-            .iter()
-            .map(|ph| {
-                let to = ph.to.as_ref().and_then(|p| p.resolve(&refs, own)).map(|g| s.ctx.frame.geodetic_to_enu(g));
-                let mode = match ph.mode.as_deref() {
-                    Some("march") => MoveModeS::March,
-                    Some("assault") => MoveModeS::Assault,
-                    Some("bound") => MoveModeS::Stealth,
-                    _ => MoveModeS::Tactical,
-                };
-                match (ph.action.as_str(), to) {
-                    ("move", Some(p)) => Activity::Move { route: route_for(s, e, p), mode, then: None },
-                    ("withdraw", Some(p)) => Activity::Withdraw { route: route_for(s, e, p), then: None },
-                    ("observe", _) => Activity::Observe,
-                    ("hold", _) => Activity::Hold,
-                    _ => Activity::Overwatch,
-                }
-            })
-            .collect();
-        let roe = match o.roe.as_deref() {
-            Some("never") => RoeS::Never,
-            Some("ifFiredUpon") => RoeS::IfFiredUpon,
-            Some("withinShortRange") => RoeS::WithinShortRange,
-            _ => RoeS::Always,
-        };
-        let urgent = o.urgency.as_deref() == Some("now");
-        let mut a = s.world.get_mut::<Act>(e).expect("a");
-        a.mission = Mission { purpose: format!("{}: {}", o.task, o.intent), phases: phases.clone(), phase: 0, urgent };
-        a.roe = roe;
-        let fighting = matches!(a.activity, Activity::Engage { .. } | Activity::Wait { met: true, .. });
-        if !fighting {
-            if let Some(first) = phases.first() {
-                a.activity = first.clone();
-            }
-        }
-        if fighting {
-            s.ctx.triggers.push(Trigger { entity: id, point: "D0", about: None });
-        }
-        given += 1;
     }
     s.ctx.log.push(s.ctx.now, "decide.plan").side(side).text(format!("{} HQ: {} ({} units tasked)", side, plan.plan, given)).data(serde_json::to_value(plan).unwrap_or_default());
     s.ctx.last_plan.insert(side, plan.clone());
+}
+
+/// One unit's orders from a plan: its mission, ROE and first phase.
+pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder, refs: &BTreeMap<String, bgws_core::Geodetic>) -> bool {
+    let Some(&id) = s.ctx.by_name.get(&o.unit) else { return false };
+    let e = s.ctx.entity(id);
+    let Some(i) = s.world.get::<Ident>(e) else { return false };
+    if i.side != side {
+        return false;
+    }
+    let own = s.ctx.frame.enu_to_geodetic(s.world.get::<Kin>(e).expect("k").pos);
+    let phases: Vec<Activity> = o
+        .phases
+        .iter()
+        .map(|ph| {
+            let to = ph.to.as_ref().and_then(|p| p.resolve(refs, own)).map(|g| s.ctx.frame.geodetic_to_enu(g));
+            let mode = match ph.mode.as_deref() {
+                Some("march") => MoveModeS::March,
+                Some("assault") => MoveModeS::Assault,
+                Some("bound") => MoveModeS::Stealth,
+                _ => MoveModeS::Tactical,
+            };
+            match (ph.action.as_str(), to) {
+                ("move", Some(p)) => Activity::Move { route: route_for(s, e, p), mode, then: None },
+                ("withdraw", Some(p)) => Activity::Withdraw { route: route_for(s, e, p), then: None },
+                ("observe", _) => Activity::Observe,
+                ("hold", _) => Activity::Hold,
+                _ => Activity::Overwatch,
+            }
+        })
+        .collect();
+    let roe = match o.roe.as_deref() {
+        Some("never") => RoeS::Never,
+        Some("ifFiredUpon") => RoeS::IfFiredUpon,
+        Some("withinShortRange") => RoeS::WithinShortRange,
+        _ => RoeS::Always,
+    };
+    let urgent = o.urgency.as_deref() == Some("now");
+    let mut a = s.world.get_mut::<Act>(e).expect("a");
+    a.mission = Mission { purpose: format!("{}: {}", o.task, o.intent), phases: phases.clone(), phase: 0, urgent };
+    a.roe = roe;
+    let fighting = matches!(a.activity, Activity::Engage { .. } | Activity::Wait { met: true, .. });
+    if !fighting {
+        if let Some(first) = phases.first() {
+            a.activity = first.clone();
+        }
+    }
+    if fighting {
+        s.ctx.triggers.push(Trigger { entity: id, point: "D0", about: None });
+    }
+    true
 }

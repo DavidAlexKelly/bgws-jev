@@ -371,7 +371,11 @@ impl Sim {
     /// A person or a planner gives a side's orders directly (an HQ's plan).
     pub fn command(&mut self, side: Side, plan: serde_json::Value) -> Result<(), CommandError> {
         let plan: Plan = serde_json::from_value(plan).map_err(|e| CommandError::BadPlan(e.to_string()))?;
-        crate::decide::apply_plan(self, side, &plan);
+        // With nets, a person's orders travel them like anyone else's (§10.4).
+        let now = self.ctx.now;
+        if !crate::domains::drones::route_plan(self, side, &plan, now) {
+            crate::decide::apply_plan(self, side, &plan);
+        }
         Ok(())
     }
 
@@ -421,21 +425,24 @@ impl Sim {
             subs.push(i.name.clone());
             let reach = i.platform.mounts.iter().filter_map(|m| m.munitions.first()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
             let role = if i.hq { "post" } else if i.platform.role.contains("artillery") || i.platform.role.contains("mortar") { "fires" } else if i.platform.role.contains("engineer") { "engineer" } else { "manoeuvre" };
+            // With nets, the HQ knows its units as they last reported (§9.2).
+            let rep = crate::domains::drones::hq_unit_report(self, side, i.id);
             units.push(HqUnit {
                 id: i.name.clone(),
                 label: i.label.clone(),
                 role: role.into(),
-                strength: h.strength(),
-                vehicles_fit: h.fit,
+                strength: rep.as_ref().map(|r| r.strength).unwrap_or(h.strength()),
+                vehicles_fit: rep.as_ref().map(|r| r.fit).unwrap_or(h.fit),
                 vehicles_total: h.start,
-                at: self.ctx.frame.enu_to_geodetic(k.pos),
+                at: self.ctx.frame.enu_to_geodetic(rep.as_ref().map(|r| r.at).unwrap_or(k.pos)),
                 reach_m: if reach > 0.0 { Some(reach) } else { None },
-                alive: !h.destroyed,
+                alive: rep.as_ref().map(|r| r.alive).unwrap_or(!h.destroyed),
             });
             centroid = centroid.add(k.pos);
             n += 1.0;
         }
-        let cop = self.ctx.tracks[&side]
+        // The top HQ's COP when the side has HQs; else the side's tracks.
+        let cop = crate::domains::drones::hq_cop_tracks(self, side).unwrap_or_else(|| self.ctx.tracks[&side]
             .confirmed(&self.ctx.p.know)
             .into_iter()
             .map(|t| hq::CopTrack {
@@ -448,7 +455,7 @@ impl Sim {
                 error_m: t.ellipse.semi_major,
                 at: Some(self.ctx.frame.enu_to_geodetic(t.position)),
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>());
         // The objective: the enemy's start centroid as briefed (the scenario's intelligence).
         let enemy: Vec<Geodetic> = self.ctx.scenario.forces_of(side.enemy()).map(|f| f.position).collect();
         let objective = if enemy.is_empty() {
@@ -469,7 +476,7 @@ impl Sim {
             planner: if self.ctx.scenario.scope.planners.iter().any(|p| format!("{p:?}").to_lowercase() == "overall") { "overall".into() } else { "land".into() },
             subordinates: subs,
             sub_hqs: vec![],
-            post: None,
+            post: crate::domains::drones::hq_post(self, side).and_then(|p| self.world.get::<Kin>(self.ctx.entity(p))).map(|k| self.ctx.frame.enu_to_geodetic(k.pos)),
             why: why.into(),
             cop,
             units,

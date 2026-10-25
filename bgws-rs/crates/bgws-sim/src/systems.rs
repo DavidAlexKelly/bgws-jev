@@ -737,6 +737,7 @@ pub fn people(s: &mut Sim, dt: f64) {
         let q = UnitQuality { leadership: (quality as f64 - 1.0) / 5.0, training: (quality as f64 - 1.0) / 5.0 };
         let pp = s.ctx.p.people.clone();
         let mut rng = s.ctx.rng("morale", id.0 as u64, 0);
+        let observed = crate::domains::drones::drone_observed(s, id);
         let change = {
             let mut c = s.world.get_mut::<Crew>(e).expect("crew");
             let incoming = IncomingFire { near_misses_per_min: c.near_misses_per_min, blasts_per_min: c.blasts_per_min };
@@ -745,7 +746,7 @@ pub fn people(s: &mut Sim, dt: f64) {
             let fade = (-dt / 60.0f64).exp();
             c.near_misses_per_min *= fade;
             c.blasts_per_min *= fade;
-            let inputs = StressInputs { new_casualties: c.new_casualties, suppression: c.suppression.level, isolated, surprised: false, drone_observed: false, success: c.success };
+            let inputs = StressInputs { new_casualties: c.new_casualties, suppression: c.suppression.level, isolated, surprised: false, drone_observed: observed, success: c.success };
             c.new_casualties = 0.0;
             c.success = false;
             if c.last_incoming.map(|(t, _)| (now - t).secs() > 120.0).unwrap_or(false) {
