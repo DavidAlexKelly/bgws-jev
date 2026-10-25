@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn known_value_is_stable_across_builds() {
         // Locks the derivation: a change here breaks every saved replay.
-        assert_eq!(fnv1a(b"bgws"), 0x2a42_c74f_1e66_57e7 ^ 0x2a42_c74f_1e66_57e7 ^ fnv1a(b"bgws"));
+        assert_eq!(fnv1a(b"a"), 0xaf63_dc4c_8601_ec8c);
         assert_eq!(mix64(0), 0xe220_a839_7b1d_cdaf);
     }
 }
