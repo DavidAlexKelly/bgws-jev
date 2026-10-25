@@ -1,15 +1,14 @@
 // ── behaviour/store.ts ───────────────────────────────────────────────────
 // The user's behaviour templates and which asset uses which, kept in this
-// browser's localStorage (docs/plan/DECISION_FLOW_GRAPHS.md §6; sharing
-// through Foundry comes later).
+// browser's localStorage (docs/plan/DECISION_FLOW_GRAPHS.md §6); shared with
+// a team through Foundry by behaviour/shared.ts and data/templateStore.ts.
 //
 // Built-in templates (templates/core/*.json) ship with the app and are
 // read-only. User templates are always ids "custom/<slug>" and are checked
 // with the same validation CI runs on the shipped files.
 
-import { LAND_ACTIONS } from "./actions/land";
 import { DEFAULT_TEMPLATE_ID, defaultTemplateForClass } from "./archetypes";
-import { LAND_FACTS } from "./facts";
+import { vocabulary } from "./vocabulary";
 import { buildRegistry, bundledTemplateFiles, type TemplateFiles } from "./load";
 import type { Template } from "./types";
 
@@ -70,7 +69,7 @@ export function allTemplateFiles(custom: Template[] = customTemplates()): Templa
 /** Validate the whole set as it would be with `custom` saved. Empty = valid. */
 export function checkTemplates(custom: Template[] = customTemplates()): string[] {
   try {
-    buildRegistry(allTemplateFiles(custom), { actions: new Set(LAND_ACTIONS), facts: new Set<string>(LAND_FACTS) });
+    buildRegistry(allTemplateFiles(custom), vocabulary());
     return [];
   } catch (e) {
     const text = e instanceof Error ? e.message : String(e);
@@ -126,6 +125,19 @@ export function saveCustomTemplate(t: Template, previousId?: string): string[] {
     for (const [asset, tid] of Object.entries(a)) if (tid === previousId) a[asset] = t.id;
     write(ASSIGN_KEY, a);
   }
+  changed();
+  return [];
+}
+
+/**
+ * Replace the user templates with this set (a pull from the team's shared
+ * templates, behaviour/shared.ts), if the whole set validates; returns the problems if not.
+ */
+export function replaceCustomTemplates(templates: Template[]): string[] {
+  const custom = templates.filter((t) => !isBuiltIn(t.id)).sort((a, b) => a.id.localeCompare(b.id));
+  const problems = checkTemplates(custom);
+  if (problems.length) return problems;
+  write(CUSTOM_KEY, custom);
   changed();
   return [];
 }

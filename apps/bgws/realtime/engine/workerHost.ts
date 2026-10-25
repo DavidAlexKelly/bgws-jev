@@ -7,7 +7,8 @@
 // postMessage / addEventListener — the worker's global scope in the browser
 // (runner.worker.ts), a MessagePort in the tests.
 //
-// DECIDERS STAY ON THE MAIN THREAD. A side with a decider there gets a proxy
+// DECIDERS STAY ON THE MAIN THREAD — land deciders, world deciders and HQ
+// planners alike. A side with one there gets a proxy
 // here that posts the questions and waits for the answers. The runner already
 // waits for answers in SIMULATED time, so the game does not depend on how
 // long the round trip takes: the same seed and the same answers give the
@@ -28,6 +29,9 @@ import { entryContext, type EntryContext } from "./feed";
 import { RealtimeRunner, type RtLogEntry } from "./runner";
 import { diff, type Patch } from "./statePatch";
 import type { RtState, UnitOrders } from "./types";
+import type { WorldAnswer, WorldDecider } from "../world/deciders";
+import type { PlannerSeat } from "../world/command/seat";
+import type { PlanAnswer, PlanRequest, WorldQuestion } from "../world/types";
 
 /** Anything messages can be posted to and heard from: a Worker, its global scope, a MessagePort. */
 export interface MessageEndpoint {
@@ -56,16 +60,28 @@ export type ToWorker =
       state: RtState;
       /** Sides whose decider is on the main thread. */
       proxied: Side[];
+      /** Sides whose world decider (world questions) is on the main thread. */
+      proxiedWorld?: Side[];
+      /** Sides whose HQ planner (Claude) is on the main thread. */
+      proxiedPlanners?: Side[];
       logLimit?: number;
     }
   | { type: "advance"; id: number; seconds: number }
   | { type: "issueOrders"; id: number; orders: Record<string, UnitOrders>; plan?: { side: Side; text: string } }
-  | { type: "decision"; id: number; decisions: RtDecision[] };
+  | { type: "decision"; id: number; decisions: RtDecision[] }
+  | { type: "worldAnswers"; id: number; answers: WorldAnswer[] }
+  | { type: "planAnswer"; id: number; answer: PlanAnswer }
+  | { type: "command"; id: number; hq: string; answer: PlanAnswer }
+  | { type: "setSeat"; id: number; hq: string; seat: "human" | "claude" | "heuristic" };
 
 export type FromWorker =
   | { type: "done"; id: number; snapshot: RunnerSnapshot }
   /** `patch` brings the replica to the state the question was asked from. */
   | { type: "decide"; id: number; side: Side; requests: RtDecisionRequest[]; patch: Patch | null }
+  /** World questions for a world decider on the main thread. */
+  | { type: "decideWorld"; id: number; side: Side; questions: WorldQuestion[]; patch: Patch | null }
+  /** A plan request for an HQ planner on the main thread. */
+  | { type: "plan"; id: number; side: Side; request: PlanRequest; patch: Patch | null }
   | { type: "error"; id: number; message: string };
 
 /** Serve a runner over `endpoint`. Returns a function that stops listening. */
@@ -91,6 +107,29 @@ export function hostRunner(endpoint: MessageEndpoint): () => void {
       return new Promise<RtDecision[]>((resolve) => {
         answers.set(id, resolve);
         post({ type: "decide", id, side, requests, patch: patchTo(state) });
+      });
+    },
+  });
+
+  const worldAnswers = new Map<number, (answers: WorldAnswer[]) => void>();
+  const worldProxy = (side: Side): WorldDecider => ({
+    name: `main-thread world (${side})`,
+    decide(state, _side, questions) {
+      const id = nextAsk++;
+      return new Promise<WorldAnswer[]>((resolve) => {
+        worldAnswers.set(id, resolve);
+        post({ type: "decideWorld", id, side, questions, patch: patchTo(state) });
+      });
+    },
+  });
+  const planAnswers = new Map<number, (answer: PlanAnswer) => void>();
+  const plannerProxy = (side: Side): PlannerSeat => ({
+    name: `main-thread planner (${side})`,
+    plan(state, request) {
+      const id = nextAsk++;
+      return new Promise<PlanAnswer>((resolve) => {
+        planAnswers.set(id, resolve);
+        post({ type: "plan", id, side, request, patch: patchTo(state) });
       });
     },
   });
@@ -129,8 +168,12 @@ export function hostRunner(endpoint: MessageEndpoint): () => void {
           initError = null;
           // The main thread starts from the state it sent.
           sent = message.state;
+          const worldDeciders = Object.fromEntries((message.proxiedWorld ?? []).map((side) => [side, worldProxy(side)]));
+          const planners = Object.fromEntries((message.proxiedPlanners ?? []).map((side) => [side, plannerProxy(side)]));
           runner = new RealtimeRunner(message.state, config, {
             deciders,
+            worldDeciders,
+            planners,
             logLimit: message.logLimit,
             onEntry: (entry, state) => entries.push({ entry, context: entryContext(entry, state) }),
           });
@@ -153,6 +196,24 @@ export function hostRunner(endpoint: MessageEndpoint): () => void {
         resolve?.(message.decisions);
         break;
       }
+      case "worldAnswers": {
+        const resolve = worldAnswers.get(message.id);
+        worldAnswers.delete(message.id);
+        resolve?.(message.answers);
+        break;
+      }
+      case "planAnswer": {
+        const resolve = planAnswers.get(message.id);
+        planAnswers.delete(message.id);
+        resolve?.(message.answer);
+        break;
+      }
+      case "command":
+        serve(message.id, (r) => r.command(message.hq, message.answer));
+        break;
+      case "setSeat":
+        serve(message.id, (r) => r.setSeat(message.hq, message.seat));
+        break;
     }
   };
   endpoint.addEventListener("message", listener);

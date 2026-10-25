@@ -28,6 +28,7 @@ export function describeEntry(entry: RtLogEntry): string {
   if (entry.type === "shot") return `${at}  ${entry.shot.firerId} fires on ${entry.shot.targetId}: ${entry.shot.result}`;
   if (entry.type === "event") return `${at}  ${entry.event.unitId} ${entry.event.kind}: ${entry.event.detail}`;
   if (entry.type === "flag") return `${at}  ⚑ ${entry.flag.text}`;
+  if (entry.type === "world") return `${at}  ◆ ${entry.item.domain}: ${entry.item.text}`;
   if (entry.type === "message") {
     const m = entry.delivery.message;
     const to = entry.delivery.to.length === 1 ? entry.delivery.to[0] : `${entry.delivery.to.length} units`;
@@ -100,6 +101,8 @@ export interface StreamRow {
     options: { id: string; summary: string; probability: number | null }[];
   } | null;
   flag: { kind: string; text: string } | null;
+  /** Only on world rows (realtime/world): streams created before the world layer have no such column. */
+  world?: { domain: string; kind: string; text: string; ids: string[] } | null;
   /** Only on message rows: streams created before radio messages have no such column. */
   message?: {
     kind: string;
@@ -124,7 +127,9 @@ export function entryUnitId(entry: RtLogEntry): string | null {
         ? entry.decision.unitId
         : entry.type === "message"
           ? entry.delivery.message.from
-          : (entry.flag.unitId ?? null);
+          : entry.type === "world"
+            ? (entry.item.ids?.[0] ?? null)
+            : (entry.flag.unitId ?? null);
 }
 
 /**
@@ -139,7 +144,7 @@ export interface EntryContext {
 
 export function entryContext(entry: RtLogEntry, state: RtState): EntryContext {
   const unitId = entryUnitId(entry);
-  const at = unitId ? state.game.forceElements[unitId]?.position : undefined;
+  const at = entry.type === "world" ? (entry.item.at ?? (unitId ? state.game.forceElements[unitId]?.position ?? state.world?.entities[unitId]?.pos : undefined)) : unitId ? state.game.forceElements[unitId]?.position : undefined;
   const targetSide = entry.type === "shot" ? state.game.forceElements[entry.shot.targetId]?.side : undefined;
   return { ...(at ? { at } : {}), ...(targetSide ? { targetSide } : {}) };
 }
@@ -242,5 +247,7 @@ export function streamRow(entry: RtLogEntry, context: EntryContext, run: StreamR
     }
     case "flag":
       return { ...base, flag: { kind: entry.flag.kind, text: entry.flag.text } };
+    case "world":
+      return { ...base, world: { domain: entry.item.domain, kind: entry.item.kind, text: entry.item.text, ids: entry.item.ids ?? [] } };
   }
 }

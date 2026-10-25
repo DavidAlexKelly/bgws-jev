@@ -1,0 +1,7 @@
+{
+  "id": "core/satellite",
+  "version": 1,
+  "name": "Satellite",
+  "parent": "core/world",
+  "doctrine": "A satellite images what the plan's information requirements ask for, pass by pass."
+}

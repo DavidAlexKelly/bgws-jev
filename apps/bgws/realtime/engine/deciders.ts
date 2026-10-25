@@ -27,6 +27,15 @@ export interface RtDecisionRequest {
   options: RtOption[];
   /** The rules' choice here, following its actions on contact. */
   fallback: string;
+  /** How the unit's behaviour template got to these options (the decision log's path view, DFG step 11). */
+  walk?: DecisionWalk;
+}
+
+/** The template, the path walked through it, and the options the template or their conditions took away. */
+export interface DecisionWalk {
+  template: string;
+  path: string[];
+  dropped: { id: string; why: "removed" | "condition" }[];
 }
 
 /** One unit's answer: an option id, and how it was reached. */

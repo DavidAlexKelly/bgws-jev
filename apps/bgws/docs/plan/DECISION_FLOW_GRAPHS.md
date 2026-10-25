@@ -382,16 +382,18 @@ A new screen at `/bgws/behaviour`, linked from Home and from the real-time setup
 
 Each later workstream adds its verbs, facts, triggers and core templates, and a golden scene in `situations.ts` for each new decision.
 
-### Status (October 2026), against milestone M1
+### Status (October 2026): all steps done
 
 | Step | State |
 |---|---|
 | 1–4 | **Done.** `types.ts`, `walk.ts`, `actions/land.ts` (53 named verbs) and `templates/core/default.json`. The runner walks the graph, and the golden test is unchanged. |
-| 5 | **Partly.** `core/armour` and `core/infantry` exist (doctrine only, parent `core/default`). IFV, ATGM team, mortar, recce and HQ do not yet; they need those unit types in the catalogue (W14, M2). |
+| 5 | **Done.** Core templates for every archetype in the catalogue (`templates/core/`): armour, IFV, infantry, ATGM team, mortar, artillery, recce, engineer, HQ, and the world's (drones, aircraft, GBAD, warships, submarines, EW, satellites, cyber, convoys, nodes). |
 | 6 | **Done.** Patches and inheritance (`parent`, `remove`, `bias`, `when`, `doctrine`). Assignment, most specific first (`store.ts` `resolveBehaviour`): a scenario file's own per-unit choice; a **side assignment by kind** ("Red armour uses *Stand fast*", set from the template's page in the Behaviour Manager: armour, infantry, soft-skinned vehicles); the unit type's assignment (Asset Manager); the kind's built-in default. The setup review says where units' behaviours come from. Assignment is by target class until the archetype table of step 5 exists. |
 | 7 | **Done:** the Behaviour Manager (`/bgws/assets/behaviours`), which covers the library, editing, validation and assignment. |
 | 8 | **Done:** the **Test bench** tab in the Behaviour Manager (`BehaviourBench.tsx`, `behaviour/bench.ts`). Pick a scene from `situations.ts` and one or two templates. Each column shows: the template's lineage and doctrine; the path walked; every option, either offered or why not (switched off by the template, condition not met, or nothing of that kind to offer here); and what the rules would choose, checked against the scene's hand-judged sensible options. `bench.test.ts` proves the bench shows exactly what the game offers and chooses in every scene. Jev is not asked on the bench. |
-| 9–11 | Not started. |
+| 9 | **Done.** `behaviour/shared.ts`: a team's templates published to and pulled from Foundry (`data/templateStore.ts`, the client passed in so it tests without one), with an in-memory remote for tests. **Share** and **Get team templates** in the Behaviour Manager. |
+| 10 | **Done**, in plain SVG rather than React Flow (no new package): `BehaviourGraph.tsx` over `behaviour/graphLayout.ts`, the **Graph** tab of the Behaviour Manager. Every patch op (remove or restore, bias, "only when", node title, question and fallback overrides, doctrine) is reachable from the canvas; built-ins are read-only. |
+| 11 | **Done.** The unit inspector's **Behaviour** row names the template and its lineage; a decision in the feed opens its walked path (`DecisionWalk` on each request, logged with the decision). |
 
 ## 8. Risks
 

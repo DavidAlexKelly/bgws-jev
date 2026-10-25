@@ -256,7 +256,7 @@ export interface UnitOrders {
   roe: Roe;
   onContact: OnContact;
   boundaries: Boundary[];
-  by: "claude" | "heuristic" | "rules";
+  by: "claude" | "heuristic" | "rules" | "commander";
   issuedAt: number;
   /**
    * A phase it found it cannot carry out (the ground, or a line it may not
@@ -407,6 +407,12 @@ export interface RtState {
   /** Each side's plan, in its commander's words. */
   plan: Partial<Record<Side, string>>;
   over?: { winner: Side | null; reason: string };
+  /**
+   * Everything beyond the land engine (realtime/world): other domains'
+   * entities, land units' stores and mounts, networks, HQs. Absent in a game
+   * that needs none, which then plays exactly as it always has.
+   */
+  world?: import("../world/types").WorldState;
 }
 
 export type RtEventKind =

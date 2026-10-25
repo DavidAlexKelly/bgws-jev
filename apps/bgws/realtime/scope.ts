@@ -80,6 +80,35 @@ export interface Scope {
   planners: Planner[];
   /** Aggregation away from contact, and which units Jev leads. */
   detail: { aggregateAwayFromContact: boolean; jev: "all" | "nearContact" };
+  /** Start time, weather, how fast the clock may run, and quiet-period skipping (§5.1). Absent: 10:00, clear, today's speeds. */
+  time?: ScopeTime;
+}
+
+export const WEATHERS = ["clear", "overcast", "rain", "fog", "snow", "storm"] as const;
+export type Weather = (typeof WEATHERS)[number];
+
+export interface ScopeTime {
+  /** The hour of the day at the start, 0–24 (local). */
+  startHour: number;
+  weather: Weather;
+  /** The fastest the clock may run, × real time. */
+  maxCompression: number;
+  /** Run the clock faster while nothing is happening (quietPeriod, world/quiet.ts). */
+  skipQuiet: boolean;
+}
+
+export const DEFAULT_TIME: ScopeTime = { startHour: 10, weather: "clear", maxCompression: 60, skipQuiet: false };
+
+/** The scope's time, or the default: a game of days may run the clock at up to 10 minutes a second. */
+export function timeOf(scope: Scope | undefined): ScopeTime {
+  const long = (scope?.durationMin ?? 0) > 24 * 60;
+  return { ...DEFAULT_TIME, ...(long ? { maxCompression: 600 } : {}), ...scope?.time };
+}
+
+/** Does the scope ask for other than the default light and weather? Then even a land-only game needs the world's environment. */
+export function changesEnvironment(scope: Scope | undefined): boolean {
+  const t = scope?.time;
+  return t != null && (t.startHour !== DEFAULT_TIME.startHour || t.weather !== DEFAULT_TIME.weather);
 }
 
 const domains = (simulated: Domain[], abstracted: Domain[] = []): Record<Domain, DomainMode> =>
@@ -241,6 +270,7 @@ export function scopeFor(type: ScenarioType): Scope {
     domains: { ...d.domains },
     planners: [...d.planners],
     detail: { ...d.detail },
+    ...(d.time ? { time: { ...d.time } } : {}),
   };
 }
 
@@ -248,8 +278,23 @@ export function scopeFor(type: ScenarioType): Scope {
  * What the engine can actually do today. Each domain lists the modes that
  * are built; `limits` are what today's board, rules and command allow.
  */
+/** Which modes each domain has built, as the workstreams land (§7). */
+const BUILT: Record<Domain, readonly DomainMode[]> = {
+  land: ["simulated"],
+  fires: ["simulated", "abstracted", "off"],
+  drones: ["simulated", "abstracted", "off"],
+  ew: ["simulated", "abstracted", "off"],
+  air: ["simulated", "abstracted", "off"],
+  airDefence: ["simulated", "off"],
+  naval: ["simulated", "off"],
+  space: ["simulated", "abstracted", "off"],
+  cyber: ["simulated", "off"],
+  logistics: ["simulated", "abstracted", "off"],
+  medical: ["simulated", "abstracted", "off"],
+};
+
 export const ENGINE_CAN = {
-  domains: Object.fromEntries(DOMAINS.map((d): [Domain, readonly DomainMode[]] => [d, d === "land" ? ["simulated"] : ["off"]])) as Record<Domain, readonly DomainMode[]>,
+  domains: BUILT,
   /** The milestone that first builds each domain (§7), for the notes. */
   builtIn: {
     land: "now",
@@ -265,11 +310,11 @@ export const ENGINE_CAN = {
     medical: "M4",
   } satisfies Record<Domain, string>,
   limits: {
-    durationMin: { min: 5, max: 600 },
-    /** The board is one 10 km square today. */
-    areaKm: { max: 10 },
-    echelons: ["platoon", "company"] as readonly Echelon[],
-    planners: ["tactical"] as readonly Planner[],
+    durationMin: { min: 5, max: 14 * 24 * 60 },
+    /** Ground is generated, so the board can be as large as a theatre needs. */
+    areaKm: { max: 1500 },
+    echelons: ECHELONS,
+    planners: PLANNERS,
   },
 };
 
@@ -311,12 +356,14 @@ export function effectiveScope(scope: Scope): ScopeCheck {
   if (!echelons.includes(scope.echelons.highest) || !echelons.includes(scope.echelons.lowest)) {
     errors.push(`Only ${echelons.join(" and ")} levels exist today (asked for ${scope.echelons.lowest} → ${scope.echelons.highest}).`);
   }
+  if (ECHELONS.indexOf(scope.echelons.lowest) > ECHELONS.indexOf(scope.echelons.highest)) {
+    errors.push(`The lowest command level (${scope.echelons.lowest}) is above the highest (${scope.echelons.highest}).`);
+  }
   const unbuilt = scope.planners.filter((p) => !planners.includes(p));
   if (unbuilt.length) {
     out.planners = out.planners.filter((p) => planners.includes(p));
     notes.push(`Only the tactical planner exists today; ${unbuilt.join(", ")} come later.`);
   }
-  if (scope.detail.aggregateAwayFromContact) errors.push("Aggregating units away from contact is not built yet.");
   return { scope: out, notes, errors };
 }
 
@@ -351,6 +398,13 @@ export function scopeErrors(raw: unknown): string[] {
   const det = isObj(raw.detail) ? raw.detail : {};
   if (typeof det.aggregateAwayFromContact !== "boolean" || (det.jev !== "all" && det.jev !== "nearContact")) {
     errors.push('"scope.detail" must be { aggregateAwayFromContact: true/false, jev: "all" | "nearContact" }');
+  }
+  if (raw.time !== undefined) {
+    const t = isObj(raw.time) ? raw.time : {};
+    if (!(typeof t.startHour === "number" && t.startHour >= 0 && t.startHour < 24)) errors.push('"scope.time.startHour" must be a number from 0 to 24');
+    if (!WEATHERS.includes(t.weather as Weather)) errors.push(`"scope.time.weather" must be one of ${WEATHERS.join(", ")}`);
+    if (!(typeof t.maxCompression === "number" && t.maxCompression >= 1)) errors.push('"scope.time.maxCompression" must be a number, 1 or more');
+    if (typeof t.skipQuiet !== "boolean") errors.push('"scope.time.skipQuiet" must be true or false');
   }
   return errors;
 }

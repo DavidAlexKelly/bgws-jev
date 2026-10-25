@@ -38,7 +38,7 @@ describe("real-time scenario files", () => {
   it("refuses other files and versions outright", () => {
     expect(parseScenario([]).errors[0]).toMatch(/JSON object/);
     expect(parseScenario({ format: "something" }).errors[0]).toMatch(/Not a real-time scenario/);
-    expect(parseScenario({ ...scenario(), version: 3 }).errors[0]).toMatch(/version 3 is not supported/);
+    expect(parseScenario({ ...scenario(), version: 4 }).errors[0]).toMatch(/version 4 is not supported/);
   });
 
   it("lists every problem at once", () => {
@@ -71,9 +71,9 @@ describe("real-time scenario files", () => {
     const broken = parseScenario({ ...scenario(), scope: { ...scopeFor("skirmish"), durationMin: -1, domains: { land: "maybe" } } });
     expect(broken.errors.join("\n")).toMatch(/durationMin/);
     expect(broken.errors.join("\n")).toMatch(/scope.domains.land/);
-    const tooBig = parseScenario({ ...scenario(), scope: scopeFor("combinedArms") });
-    expect(tooBig.scenario).toBeUndefined();
-    expect(tooBig.errors.join("\n")).toMatch(/scope: Drones cannot be simulated yet/);
+    const landless = parseScenario({ ...scenario(), scope: { ...scopeFor("skirmish"), domains: { ...scopeFor("skirmish").domains, land: "off" } } });
+    expect(landless.scenario).toBeUndefined();
+    expect(landless.errors.join("\n")).toMatch(/scope: Land cannot be off/);
   });
 
   it("rejects an invalid bundled template", () => {

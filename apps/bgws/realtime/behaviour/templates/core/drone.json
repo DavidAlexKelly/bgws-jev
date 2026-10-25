@@ -1,0 +1,7 @@
+{
+  "id": "core/drone",
+  "version": 1,
+  "name": "Drone",
+  "parent": "core/world",
+  "doctrine": "A drone is cheap and expendable; the team behind it is not."
+}

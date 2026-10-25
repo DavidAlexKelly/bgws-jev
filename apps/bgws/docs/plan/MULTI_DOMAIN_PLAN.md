@@ -1,6 +1,33 @@
 # BGWS real-time: the multi-domain plan
 
-**Status:** plan, October 2026. **Scope:** the real-time mode only. Turn mode stays exactly as it is, as every earlier plan has required.
+**Status:** built to M9, October 2026 (see "Where it stands" below). **Scope:** the real-time mode only. Turn mode stays exactly as it is, as every earlier plan has required.
+
+### Where it stands
+
+Every workstream W0–W15 is built, and each milestone has its preset scenario (`realtime/presets.ts`, chosen from the setup screen) and its acceptance tests. The decision golden test is unchanged: a game without a world plays exactly as before.
+
+| Milestone | Where | Tests |
+|---|---|---|
+| M0 Foundations | `scope.ts` (with the time dimension), `scenario.ts`, `headless.ts`, `engine/workerHost.ts`, `world/figures.ts`, the scheduler in `world/step.ts` | `scope.test.ts`, `headless.test.ts`, `world/foundation.test.ts` |
+| M1 Editable behaviour | `behaviour/` (DECISION_FLOW_GRAPHS.md, steps 1–11) | `behaviour/*.test.ts` |
+| M2 Combined-arms company | `world/domains/fires.ts`, `landExt.ts`, `support.ts`, `world/munitions.ts`; preset `M2` | `world/combinedArms.test.ts` |
+| M3 Battalion C2 | `world/net.ts`, `world/domains/c2.ts`, `world/command/` (seats, fusion, heuristic and Claude planners); preset `M3` | `world/c2.test.ts` |
+| M4 Transparent battlefield | `world/domains/drones.ts`, `ew.ts`, `world/jamming.ts`, `world/pnt.ts`; preset `M4` | `world/droneLine.test.ts` |
+| M5 Air over the battle | `world/domains/air.ts`, `world/airspace.ts`, `world/victory.ts`; preset `M5` | `world/air.test.ts` |
+| M6 Sustained fight | `world/domains/logistics.ts` (with medical), `world/lod.ts`; preset `M6` | `world/logistics.test.ts`, `world/lod.test.ts` |
+| M7 Littoral | `world/sea.ts`, `world/domains/naval.ts`; preset `M7` | `world/naval.test.ts` |
+| M8 Joint all-domain | `world/domains/space.ts`, `cyber.ts`, `killweb.ts`, `world/imagery.ts`; preset `M8` | `world/joint.test.ts` |
+| W12 Calibration | `world/vignettes.ts`, `world/batch.ts`, `npm run bgws:run -- --vignettes` / `--sensitivity` | `world/vignettes.test.ts` |
+| W13 UI | `worldOverlays.ts`, `WorldPanel.tsx`, the world layers and milestone presets in `RealtimePlay.tsx` | `worldOverlays.test.ts` |
+| M9 Human command | `world/command/console.ts`, `HqConsole.tsx`, `runner.command` / `setSeat`, `compareWithPlanner` in `headless.ts`; Jev for world questions in `world/jevWorldDecider.ts` | `world/humanSeat.test.ts`, `world/jevWorldDecider.test.ts` |
+
+**What is still true of it:**
+
+- **The catalogue is synthetic** (W14) and the figures are declared, not calibrated (W12): "in band" means a plausible order of magnitude. `world/figures.ts` lists every figure with its range and source; the Figures tab and `--sensitivity` show which ones matter.
+- **Only rules-decided games replay exactly.** Jev's and Claude's answers are not recorded; orders and a person's commands are.
+- **Raster ground in Node** still needs the raster, which the headless runner does not load. The browser-versus-Node check is done by hand.
+- **Multiplayer** (W15, "later still") is not built: one person, one seat, on one machine.
+- **The HQ console lives in `realtime/HqConsole.tsx`**, next to the screen it opens from, not in `apps/bgws/hq/`.
 
 **How to read this:**
 
@@ -548,7 +575,7 @@ Each workstream has the same parts:
 5. **Event scheduler** next to the tick (§4.2), with tests that replay is unchanged.
 6. **Scope wiring.** The engine loads only the systems the scope's domain modes need. Abstracted domains run as support services (§5.2). Needs the scenario file (step 3).
 
-   **Status: first part done** (`realtime/scope.ts`).
+   **Status: done** (`realtime/scope.ts`). The notes below are the first part, kept as written; what was "still to do" is now built: support services (`world/domains/support.ts`) arrived with each workstream, the time dimension is `Scope.time` (start hour, weather into the world's environment, the clock's top speed, quiet-period skipping in `world/quiet.ts`), the scope is editable on the setup screen after the type is chosen, and the headless runner is `scripts/bgws-run.ts`.
    - **The scope as data.** The seven dimensions of §5.1 are typed: duration, area, echelons, domain modes, planners and detail, plus the type. Time (weather and the like) is not yet included. All eight presets of §5.3 and Custom carry their default scopes, victory conditions and milestones.
    - **Scenario file version 2** carries the scope; its duration is the time limit. Version 1 files are read as Skirmishes.
    - **The config spec and the engine's config carry the scope.** `domainMode(config, domain)` is the switch each domain's systems will ask.
@@ -1125,7 +1152,7 @@ W1 comes early (§7) because every later domain adds its decisions as templates 
 
 **Goal.** The end state: a person commands from an HQ while the simulation runs. They receive updates as and if they are sent, and send orders back, with all of it subject to the networks, delay and EW.
 
-**Not built until after M8.** These rules hold from W4 on, so nothing has to be redesigned:
+**Built (M9).** A person takes or hands back any HQ's seat from the HQ console during play; their FRAGOs and staff-approved plans go out through `runner.command` over the HQ's nets. These rules held from W4 on, so nothing had to be redesigned:
 
 - Every planner works through a **commander seat** (§4.4.3).
 - Every report and order is a **message on a net**.
@@ -1239,7 +1266,7 @@ M0 Foundations ──► M1 Editable behaviour ──► M2 Combined-arms compan
 | Question | Decision | Where in the plan |
 |---|---|---|
 | Scale and scope | The user sets the scope at the start: from a single battle to a weeks-long operation across every domain over an area they choose. Preset scenario types contain all domains or a chosen selection. | §5 |
-| Human command | Yes, eventually: a person in an HQ who gets updates as and if they are sent and sends commands back, all subject to EW. Not built yet, but designed for from W4 on. | §4.4.3, W15, M9 |
+| Human command | Yes, eventually: a person in an HQ who gets updates as and if they are sent and sends commands back, all subject to EW. Built in M9: the HQ console (`HqConsole.tsx`). Multiplayer is not. | §4.4.3, W15, M9 |
 | Claude's place | Several Claude planners, one per scope and domain, with one overall Claude managing their aims together | §4.4.2 |
 | Data | Best-guess synthetic data with every property the simulation needs; realistic data later | W14, §2 rule 3 |
 | Sides | Blue and red only, for now. The `Side` type stays shared with turn mode. Neutral traffic is non-combatant scenery owned by neither side, not a third side. New code uses `SIDES` and `opposing()` rather than new literals, so more sides stay possible later without being built now. | W0 step 2, W8 |

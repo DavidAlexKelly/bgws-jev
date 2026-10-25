@@ -1,0 +1,7 @@
+{
+  "id": "core/coastal",
+  "version": 1,
+  "name": "Coastal battery",
+  "parent": "core/default",
+  "doctrine": "A coastal battery stays hidden and silent until a target is cued, fires a salvo, and moves."
+}

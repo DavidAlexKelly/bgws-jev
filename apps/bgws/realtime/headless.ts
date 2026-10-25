@@ -17,6 +17,7 @@
 // generated ground needs nothing.
 
 import { DEFAULT_ORIGIN, toGameStateFromPlaced, type PlacedElement } from "../lib/forceBuilder";
+import type { PlanAnswer } from "./world/types";
 import type { Side } from "../lib/state";
 import { HOUSE_V1 } from "../rules/ruleset";
 import { configFromSpec, RT_CONFIG_SPEC_VERSION, timingSpec, type RtConfigSpec, type RtGroundSpec, type RtRaster } from "./engine/configSpec";
@@ -27,7 +28,9 @@ import type { RtLogEntry } from "./engine/runner";
 import { InThreadRunner } from "./engine/runnerHandle";
 import { DEFAULT_TIMING } from "./engine/timing";
 import type { RtConfig, RtState, UnitOrders } from "./engine/types";
-import type { RealtimeScenario } from "./scenario";
+import type { RealtimeScenario, ScenarioWorld } from "./scenario";
+import { withWorld } from "./world/create";
+import { holdSupport } from "./world/command/heuristicPlanner";
 import type { Scope } from "./scope";
 
 export const GAME_RECORD_FORMAT = "bgws.realtime.game";
@@ -38,6 +41,10 @@ export interface IssuedOrders {
   time: number;
   orders: Record<string, UnitOrders>;
   plan?: { side: Side; text: string };
+  /** A commander's orders from an HQ seat, sent over its nets (W15); `orders` is then empty. */
+  command?: { hq: string; answer: PlanAnswer };
+  /** An HQ's seat taken or handed back (W15). */
+  seat?: { hq: string; seat: "human" | "claude" | "heuristic" };
 }
 
 export interface GameRecord {
@@ -106,10 +113,16 @@ export function scenarioSpec(scenario: RealtimeScenario, raster?: { origin: { la
   });
 }
 
-/** Forces placed and the simple opening orders given (the setup screen's "Simple orders"). */
-export function openingState(forces: PlacedElement[], gameSeed: string, config: RtConfig): RtState {
+/** Forces placed and the simple opening orders given (the setup screen's "Simple orders"), with the world the scope or scenario needs. */
+export function openingState(forces: PlacedElement[], gameSeed: string, config: RtConfig, world?: ScenarioWorld): RtState {
   let state = createRealtimeState(toGameStateFromPlaced(forces, HOUSE_V1, { gameId: gameSeed }));
-  for (const side of ["blue", "red"] as const) state = applyOrders(state, heuristicOrders(state, side), config);
+  state = withWorld(state, config, { platforms: Object.fromEntries(forces.map((f) => [f.id, f.platform])), ...world });
+  for (const side of ["blue", "red"] as const) {
+    const simple = heuristicOrders(state, side);
+    // With a world, support units hold where they were placed rather than charge.
+    const support = state.world ? holdSupport(state) : {};
+    state = applyOrders(state, { ...simple, orders: { ...simple.orders, ...Object.fromEntries(Object.entries(support).filter(([id]) => simple.orders[id])) } }, config);
+  }
   return state;
 }
 
@@ -122,7 +135,7 @@ export function recordFromScenario(scenario: RealtimeScenario): GameRecord {
     name: scenario.name,
     recordedAt: new Date(0).toISOString(),
     spec,
-    initial: openingState(scenario.forces, scenario.seed, configFromSpec(spec)),
+    initial: openingState(scenario.forces, scenario.seed, configFromSpec(spec), scenario.world),
     issued: [],
     deciders: "rules",
   };
@@ -180,11 +193,48 @@ export async function playRecord(
   let next = 0;
   while (!runner.state.over && runner.state.time < until) {
     while (next < issued.length && issued[next].time <= runner.state.time) {
-      await runner.issueOrders(issued[next].orders, issued[next].plan);
+      const at = issued[next];
+      if (at.seat) await runner.setSeat(at.seat.hq, at.seat.seat);
+      if (at.command) await runner.command(at.command.hq, at.command.answer);
+      else if (Object.keys(at.orders).length || at.plan) await runner.issueOrders(at.orders, at.plan);
       next++;
     }
     const stop = Math.min(until, next < issued.length ? issued[next].time : Infinity);
     await runner.advance(Math.min(chunk, stop - runner.state.time));
   }
   return { state: runner.state, ...fingerprint.value, time: runner.state.time };
+}
+
+/**
+ * The AAR's comparison (W15): the same seed played as the record has it —
+ * the person's seat and orders — and again with the heuristic planner in
+ * every seat the person took, nothing else changed. How each side ended.
+ */
+export async function compareWithPlanner(record: GameRecord, untilS?: number): Promise<{ person: SideOutcome; planner: SideOutcome }> {
+  const human = new Set(record.issued.filter((i) => i.seat?.seat === "human").map((i) => i.seat!.hq));
+  for (const [id, hq] of Object.entries(record.initial.world?.hqs ?? {})) if (hq.seat === "human") human.add(id);
+  const asPlanner: GameRecord = {
+    ...record,
+    initial: record.initial.world ? { ...record.initial, world: { ...record.initial.world, hqs: Object.fromEntries(Object.entries(record.initial.world.hqs).map(([id, hq]) => [id, human.has(id) ? { ...hq, seat: "heuristic" as const } : hq])) } } : record.initial,
+    issued: record.issued.filter((i) => !(i.command && human.has(i.command.hq)) && !(i.seat && human.has(i.seat.hq))),
+  };
+  const until = untilS ?? record.played?.time;
+  const person = await playRecord(record, until != null ? { untilS: until } : {});
+  const planner = await playRecord(asPlanner, until != null ? { untilS: until } : {});
+  return { person: outcome(person.state), planner: outcome(planner.state) };
+}
+
+export interface SideOutcome {
+  over: RtState["over"] | null;
+  time: number;
+  /** Fighting strength left, as a share of the start, by side. */
+  strength: Record<Side, number>;
+}
+
+function outcome(state: RtState): SideOutcome {
+  const strength = (side: Side) => {
+    const now = Object.values(state.game.forceElements).filter((f) => f.side === side && f.combatStrength > 0 && state.units[f.id]?.cohesion !== "broken").reduce((s, f) => s + f.combatStrength, 0);
+    return Math.round((now / Math.max(1, state.startStrength?.[side] ?? 1)) * 100) / 100;
+  };
+  return { over: state.over ?? null, time: state.time, strength: { blue: strength("blue"), red: strength("red") } };
 }

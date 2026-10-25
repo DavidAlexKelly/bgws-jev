@@ -59,6 +59,10 @@ import { PositionGrid } from "./grid";
 import { heldTrack, holderOf, ReportWriter, trackFor, trackedBy, type Holder, type PictureSource } from "./picture";
 import { elementRank, type ElementRank } from "./rank";
 export { elementRank, type ElementRank } from "./rank";
+import { stepWorld } from "../world/tickHook";
+import { landSightConditions } from "../world/environment";
+import { landRadioJamming } from "../world/jamming";
+import type { WorldLogItem } from "../world/types";
 
 /**
  * How this game treats a domain (scope.ts): simulated, abstracted or off.
@@ -191,6 +195,8 @@ export interface TickResult {
   shots: RtShot[];
   /** Radio messages delivered this second (comms.ts). */
   messages: Delivery[];
+  /** The world layer's feed lines this second (realtime/world), if the game has a world. */
+  world?: WorldLogItem[];
 }
 
 /** "3:05" for a span of seconds. */
@@ -545,6 +551,15 @@ export function remember(unit: RtUnit, entry: DecisionMemory): DecisionMemory[] 
 
 /** A fresh real-time game from a placed board. Everyone holds until ordered. */
 export function createRealtimeState(game: GameState): RtState {
+  return createState(game);
+}
+
+/** A fresh RtUnit for an element joining a game already running (a dismounted section). */
+export function freshUnitFor(fe: ForceElement): RtUnit {
+  return freshUnit(fe);
+}
+
+function createState(game: GameState): RtState {
   const units: Record<string, RtUnit> = {};
   const forceElements: GameState["forceElements"] = {};
   const startStrength: Record<Side, number> = { blue: 0, red: 0 };
@@ -953,7 +968,8 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     });
   };
   /** The net's view of this tick. */
-  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known, pictures, reports });
+  const jammed = prev.world && prev.world.jammers.some((j) => j.on) ? landRadioJamming(prev.world, () => game, rng) : undefined;
+  const commsContext = (): CommsContext => ({ time, game, units, config, setUnit, emit, known, pictures, reports, ...(jammed ? { jammed } : {}) });
 
   /**
    * React to contact (Battle Drill 1): return fire at once, get into the
@@ -1252,6 +1268,9 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   }
 
   // ── 4. Sighting ───────────────────────────────────────────────────────────
+  // Light and weather, when the game has a world to say what they are; a
+  // game without one is fought in the clear daylight it always was.
+  const sightConditions = prev.world ? landSightConditions(prev.world.env, time) : null;
   for (const side of SIDES) {
     const observers = ids.filter((id) => fe(id).side === side && alive(id));
     const enemies = ids.filter((id) => fe(id).side !== side && alive(id));
@@ -1268,6 +1287,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
         const observer = fe(observerId);
         const range = distanceM(observer.position, enemy.position);
         if (range > LOS_CAP_M) continue;
+        if (sightConditions && range > sightConditions.maxRangeM) continue;
         if (!sees(observer.position, enemy.position)) continue;
 
         // Already found by this crew: tracked while in sight, no roll — and
@@ -1284,7 +1304,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
 
         // Not yet found: a chance per second (detection.ts).
         const mine = units[observerId];
-        const p = detectChance(
+        const p = (sightConditions?.factor ?? 1) * detectChance(
           range,
           {
             targetMoving: their.lastMovedAt === time,
@@ -2092,6 +2112,40 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   }
 
+  // ── 12. The world layer ───────────────────────────────────────────────────
+  //
+  // Other domains, land units' stores and mounts, networks and HQs
+  // (realtime/world), one second at a time, through the same closures as the
+  // rest of this tick. Absent in a game without a world.
+  let world = prev.world;
+  let worldLog: WorldLogItem[] | undefined;
+  if (world) {
+    const stepped = stepWorld(world, {
+      time,
+      config,
+      rng,
+      get game() {
+        return game;
+      },
+      units,
+      setFe,
+      setUnit,
+      order: (id, order, extra = {}) => setUnit(id, { ...extra, order: routed(order, fe(id), config), bound: undefined, laying: undefined }),
+      addUnit: (element, unit) => {
+        // Appended: every existing element keeps its place in element order.
+        game = { ...game, forceElements: { ...game.forceElements, [element.id]: element } };
+        units[element.id] = unit;
+      },
+      shots,
+      emit,
+      radio: (draft) => void queueMessage(comms, commsContext(), draft),
+      known,
+      prev,
+    });
+    world = stepped.world;
+    worldLog = stepped.log;
+  }
+
   // Morale as the shared rules see it.
   for (const id of ids) {
     const unit = units[id];
@@ -2105,7 +2159,7 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
     }
   }
 
-  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms, reports: reports.reports };
+  let state: RtState = { ...prev, time, game, units, lastSeen, lastFiredOn, lastKnown, comms, reports: reports.reports, ...(world ? { world } : {}) };
 
   // ── 11. Is it over? ───────────────────────────────────────────────────────
   //
@@ -2113,7 +2167,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
   // is destroyed or broken — a
   // breakpoint, not the last tank.
   const lost = (side: Side) => {
-    const start = Math.max(1, prev.startStrength?.[side] ?? 0);
+    // A side with no land force at all (an air or sea scenario) cannot be
+    // beaten on land: the world layer judges it (world/victory.ts).
+    if (prev.world && (prev.startStrength?.[side] ?? 0) <= 0) return 0;
+    // A scenario with its own victory conditions is won by them, not by the land breakpoint.
+    if (prev.world?.victory?.length) return 0;
+    // Troops that joined during the game (dismounted sections) count as if they had been there from the start.
+    const start = Math.max(1, (prev.startStrength?.[side] ?? 0) + (world?.joinedStrength?.[side] ?? 0));
     const fighting = forceElementsOf(game, side)
       .filter((one) => one.combatStrength > 0 && units[one.id]?.cohesion !== "broken")
       .reduce((sum, one) => sum + one.combatStrength, 0);
@@ -2148,10 +2208,13 @@ export function tick(prev: RtState, config: RtConfig): TickResult {
               )} of its strength destroyed or broken`,
       },
     };
+  } else if (world?.verdict) {
+    // The world layer judged it: air superiority won, a fleet sunk, the operation's aims met (world/victory.ts).
+    state = { ...state, over: world.verdict };
   } else if (time >= timing.maxDurationS) {
     const verdict = judgeVictory(game, config.ruleset);
     state = { ...state, over: { winner: verdict.winner, reason: "time limit" } };
   }
 
-  return { state, events, shots, messages };
+  return { state, events, shots, messages, ...(worldLog ? { world: worldLog } : {}) };
 }

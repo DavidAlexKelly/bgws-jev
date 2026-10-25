@@ -36,12 +36,22 @@
 import { distanceM } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import { SIDES } from "../../lib/state";
-import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
+import type { DecisionWalk, RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
+import { landOptions, type LandTrace } from "../behaviour/actions/land";
 import { ruleDecider } from "./deciders";
 import type { Delivery } from "./comms";
-import { decisionPointOf, inContact, optionsAt, ruleFallback } from "./decisions";
+import { decisionPointOf, inContact, ruleFallback } from "./decisions";
 import { knownEnemies, remember, sendMessage, setOrder, tick } from "./engine";
 import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
+import type { WorldLogItem } from "../world/types";
+import { ruleWorldDecider, type WorldAnswer, type WorldDecider } from "../world/deciders";
+import { rulesOnly } from "../world/lod";
+import { answerQuestion, markAsked, unaskedQuestions } from "../world/questions";
+import { seatAt, type PlannerSeat } from "../world/command/seat";
+import { heuristicPlan } from "../world/command/heuristicPlanner";
+import { issuePlan } from "../world/domains/c2";
+import { withWorldCtx } from "../world/standalone";
+import type { PlanAnswer, PlanRequest } from "../world/types";
 
 /** Something the player should know about, while the clock runs. */
 export interface RtFlag {
@@ -64,10 +74,14 @@ export type RtLogEntry =
       summary: string;
       /** When it was asked for, and when it took effect. */
       askedAt: number;
+      /** How the behaviour template got there: its path and what it took away. */
+      walk?: DecisionWalk;
     }
   | { type: "flag"; time: number; side: Side; flag: RtFlag }
   /** A radio message, as it was heard (comms.ts). */
-  | { type: "message"; time: number; side: Side; delivery: Delivery };
+  | { type: "message"; time: number; side: Side; delivery: Delivery }
+  /** Something in the world layer (realtime/world): another domain, a world decision, a network. */
+  | { type: "world"; time: number; side: Side; item: WorldLogItem };
 
 interface InFlight {
   side: Side;
@@ -82,6 +96,10 @@ interface InFlight {
 export interface RunnerOptions {
   /** Per side. Absent means the rules decide for that side. */
   deciders?: Partial<Record<Side, RtDecider>>;
+  /** Per side, for world questions (realtime/world). Absent means the rules decide. */
+  worldDeciders?: Partial<Record<Side, WorldDecider>>;
+  /** Per side, the planner in Claude-commanded HQ seats (world/command/seat.ts). Absent: the heuristic plans. */
+  planners?: Partial<Record<Side, PlannerSeat>>;
   /** How many feed entries to keep. */
   logLimit?: number;
   /** Called with every feed entry as it is made — to stream the log elsewhere. Must not throw. */
@@ -131,6 +149,10 @@ export class RealtimeRunner {
   private readonly raised = new Set<string>();
   private readonly lastAsked = new Map<string, number>();
   private readonly inflight: InFlight[] = [];
+  /** Plans asked of a Claude (or human) seat: request id → its answer. */
+  private readonly planInflight = new Map<number, { promise: Promise<PlanAnswer>; result?: PlanAnswer }>();
+  /** World questions handed to a decider: question id → its batch's answers. */
+  private readonly worldInflight = new Map<number, { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] }>();
 
   constructor(
     initial: RtState,
@@ -142,7 +164,7 @@ export class RealtimeRunner {
 
   /** Is a decision outstanding right now? For the "Jev thinking" indicator. */
   get thinking(): boolean {
-    return this.inflight.some((batch) => batch.result === undefined);
+    return this.inflight.some((batch) => batch.result === undefined) || [...this.worldInflight.values()].some((b) => b.result === undefined);
   }
 
   /** The last few things this side saw happen, as short lines, for Jev. */
@@ -155,6 +177,31 @@ export class RealtimeRunner {
    * of contact, a unit takes them at once; in a fight, it is asked how to
    * comply (D0). Units not named keep what they have.
    */
+  /**
+   * A commander at an HQ sends orders (W15): they leave as FRAGOs and
+   * guidance over the HQ's nets, as any plan does — delayed, lost or jammed
+   * on the way. Nothing reaches a unit until its message does.
+   */
+  command(hqId: string, answer: PlanAnswer): void {
+    const hq = this.state.world?.hqs[hqId];
+    if (!hq) throw new Error(`no HQ "${hqId}"`);
+    const applied = withWorldCtx(this.state, this.config, (c) => {
+      const request: PlanRequest = { id: c.newNumber(), hq: hqId, side: hq.side, planner: hq.planner ?? "tactical", seat: hq.seat, raisedAt: c.time, readyAt: c.time, why: "the commander's orders" };
+      issuePlan(c, request, answer);
+    });
+    this.state = applied.state;
+    for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
+  }
+
+  /** Take an HQ's seat, or hand it back (W15): "human", "claude" or "heuristic". */
+  setSeat(hqId: string, seat: "human" | "claude" | "heuristic"): void {
+    const world = this.state.world;
+    const hq = world?.hqs[hqId];
+    if (!world || !hq || hq.seat === seat) return;
+    this.state = { ...this.state, world: { ...world, hqs: { ...world.hqs, [hqId]: { ...hq, seat } }, plans: world.plans.map((p) => (p.hq === hqId && !p.asked ? { ...p, seat } : p)) } };
+    this.push({ type: "world", time: this.state.time, side: hq.side, item: { time: this.state.time, side: hq.side, domain: "c2", kind: "seat", text: `${hqId}'s seat is now ${seat === "human" ? "a person's" : seat}`, ids: [hqId] } });
+  }
+
   issueOrders(orders: Record<string, UnitOrders>, plan?: { side: Side; text: string }): void {
     for (const [unitId, next] of Object.entries(orders)) {
       const fe = this.state.game.forceElements[unitId];
@@ -216,6 +263,9 @@ export class RealtimeRunner {
         const side = this.state.game.forceElements[shot.firerId]?.side ?? "blue";
         this.push({ type: "shot", time: shot.time, side, shot });
       }
+      for (const item of result.world ?? []) {
+        this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
+      }
       for (const event of result.events) {
         const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
         this.push({ type: "event", time: event.time, side, event });
@@ -236,6 +286,132 @@ export class RealtimeRunner {
       }
       this.checkFlags();
       this.dispatch();
+      this.dispatchWorld();
+      this.deliverOrders();
+      this.dispatchPlans();
+    }
+  }
+
+  /** Orders that have arrived at units by message (W4): handed over as orders issued while paused are. */
+  private deliverOrders(): void {
+    const queue = this.state.world?.orderQueue;
+    if (!queue?.length) return;
+    const due = queue.filter((o) => o.dueAt <= this.state.time);
+    if (!due.length) return;
+    this.state = { ...this.state, world: { ...this.state.world!, orderQueue: queue.filter((o) => o.dueAt > this.state.time) } };
+    const orders: Record<string, UnitOrders> = {};
+    for (const o of due) orders[o.unitId] = o.orders;
+    this.issueOrders(orders);
+  }
+
+  /** Hand new plan requests to Claude-commanded seats. */
+  private dispatchPlans(): void {
+    const world = this.state.world;
+    if (!world?.plans.length) return;
+    for (const request of world.plans) {
+      // A person's seat plans when the person chooses (command()); the heuristic answers inside the world.
+      if (request.asked || request.seat === "heuristic" || request.seat === "human") continue;
+      const planner = this.options.planners?.[request.side];
+      const seat = seatAt(this.state, request.hq);
+      const hq = world.hqs[request.hq];
+      if (!planner || !seat || !hq) continue;
+      const snapshot = this.state;
+      const fallback = () => heuristicPlan(snapshot, hq);
+      const batch: { promise: Promise<PlanAnswer>; result?: PlanAnswer } = {
+        promise: planner.plan(snapshot, request, seat).catch((err: unknown) => ({ ...fallback(), warnings: [`the planner could not be reached (${err instanceof Error ? err.message : String(err)}): the heuristic planned`] })),
+      };
+      batch.promise.then((r) => {
+        batch.result = r;
+      });
+      this.planInflight.set(request.id, batch);
+    }
+    const asked = new Set(this.planInflight.keys());
+    if (world.plans.some((p) => asked.has(p.id) && !p.asked)) {
+      this.state = { ...this.state, world: { ...world, plans: world.plans.map((p) => (asked.has(p.id) ? { ...p, asked: true } : p)) } };
+    }
+  }
+
+  /** Plans due now from non-heuristic seats: waiting for the answer if it is late, as for every decision. */
+  private async applyPlansDue(): Promise<void> {
+    const world = this.state.world;
+    if (!world?.plans.length) return;
+    for (const request of world.plans.filter((p) => p.seat !== "heuristic" && p.readyAt <= this.state.time)) {
+      let answer: PlanAnswer | undefined;
+      const batch = this.planInflight.get(request.id);
+      if (request.seat === "human") {
+        // The battle rhythm or a CCIR has come round: the commander is told, and no orders go until they send some.
+        answer = { by: "human", plan: `${request.why}: over to the commander`, orders: {} };
+      } else if (batch) {
+        if (!batch.result) {
+          this.waits += 1;
+          batch.result = await batch.promise;
+        }
+        answer = batch.result;
+        this.planInflight.delete(request.id);
+      } else {
+        const hq = this.state.world!.hqs[request.hq];
+        if (!hq) continue;
+        answer = heuristicPlan(this.state, hq);
+      }
+      const applied = withWorldCtx(this.state, this.config, (c) => issuePlan(c, request, answer!));
+      this.state = applied.state;
+      for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
+    }
+  }
+
+  /** Hand every new world question to its side's world decider, one batch per side. */
+  private dispatchWorld(): void {
+    const fresh = unaskedQuestions(this.state);
+    if (!fresh.length) return;
+    this.state = markAsked(this.state, new Set(fresh.map((q) => q.id)));
+    for (const side of SIDES) {
+      const questions = fresh.filter((q) => q.side === side);
+      if (!questions.length) continue;
+      const chosen = this.options.worldDeciders?.[side] ?? ruleWorldDecider;
+      const byRules = questions.filter((q) => rulesOnly(this.state, q.agentId));
+      const groups: [WorldDecider, typeof questions][] =
+        chosen === ruleWorldDecider || !byRules.length ? [[chosen, questions]] : [[chosen, questions.filter((q) => !byRules.includes(q))], [ruleWorldDecider, byRules]];
+      for (const [decider, group] of groups) {
+        if (!group.length) continue;
+        const batch: { promise: Promise<WorldAnswer[]>; result?: WorldAnswer[] } = {
+          promise: decider.decide(this.state, side, group, this.config).catch(() => ruleWorldDecider.decide(this.state, side, group, this.config)),
+        };
+        batch.promise.then((result) => {
+          batch.result = result;
+        });
+        for (const q of group) this.worldInflight.set(q.id, batch);
+      }
+    }
+  }
+
+  /** Apply every world answer due now, waiting for it if it is not back yet; in question order. */
+  private async applyWorldDue(): Promise<void> {
+    const world = this.state.world;
+    if (!world) return;
+    const due = world.questions.filter((q) => q.dueAt <= this.state.time && (q.answer || this.worldInflight.has(q.id))).sort((a, b) => a.dueAt - b.dueAt || a.id - b.id);
+    for (const q of due) {
+      let answer: WorldAnswer | undefined = q.answer ? { questionId: q.id, optionId: q.answer.optionId, by: q.answer.by, rationale: q.answer.rationale } : undefined;
+      if (!answer) {
+        const batch = this.worldInflight.get(q.id)!;
+        if (!batch.result) {
+          this.waits += 1;
+          batch.result = await batch.promise;
+        }
+        answer = batch.result.find((a) => a.questionId === q.id) ?? { questionId: q.id, optionId: q.fallback, by: "rules" as const };
+      }
+      if (!answer) continue;
+      this.worldInflight.delete(q.id);
+      const applied = answerQuestion(this.state, this.config, q.id, answer.optionId, answer.by, answer.rationale);
+      this.state = applied.state;
+      for (const event of applied.events) {
+        const side = this.state.game.forceElements[event.unitId]?.side ?? "blue";
+        this.push({ type: "event", time: event.time, side, event });
+        if (event.info) continue;
+        const held = this.pending.get(event.unitId);
+        if (held) held.events.push(event);
+        else this.pending.set(event.unitId, { events: [event], firstAt: event.time });
+      }
+      for (const item of applied.log) this.push({ type: "world", time: item.time, side: item.side === "red" ? "red" : "blue", item });
     }
   }
 
@@ -321,7 +497,9 @@ export class RealtimeRunner {
         const events = this.pending.get(unitId)!.events;
         const { point, event } = decisionPointOf(events)!;
         const orders = this.pendingOrders.get(unitId);
-        const options = optionsAt(state, unitId, point, event, config, { orders });
+        const trace: LandTrace = { steps: [] };
+        const options = landOptions(state, unitId, point, event, config, { orders }, trace);
+        const walk = trace.walk && trace.walk.kind === "choose" ? { template: trace.templateId ?? "core/default", path: trace.walk.path, dropped: trace.walk.dropped.map((d) => ({ id: d.id, why: d.why })) } : undefined;
         this.pending.delete(unitId);
         this.lastAsked.set(unitId, time);
         // A new order with nothing to choose (the fight ended meanwhile): it simply takes over.
@@ -329,35 +507,49 @@ export class RealtimeRunner {
           this.install(unitId, orders, true);
           continue;
         }
-        requests.push({ unitId, point, event, events, options, fallback: ruleFallback(state, unitId, point, options) });
+        requests.push({ unitId, point, event, events, options, fallback: ruleFallback(state, unitId, point, options), ...(walk ? { walk } : {}) });
       }
       if (requests.length === 0) continue;
 
-      const decider = this.options.deciders?.[side] ?? ruleDecider;
-      const batch: InFlight = {
-        side,
-        askedAt: time,
-        dueAt: new Map(
-          requests.map((request) => [
-            request.unitId,
-            time + timing.reactionS(state.game.forceElements[request.unitId].troopQuality),
-          ]),
-        ),
-        requests: new Map(requests.map((request) => [request.unitId, request])),
-        // A decider must not reject; if one does anyway, the rules answer.
-        promise: decider.decide(state, side, requests, config).catch(() =>
-          ruleDecider.decide(state, side, requests, config),
-        ),
-      };
-      batch.promise.then((result) => {
-        batch.result = result;
-      });
-      this.inflight.push(batch);
+      // Formations aggregated away from contact (§4.2) are decided by the rules, not Jev.
+      const side_ = this.options.deciders?.[side] ?? ruleDecider;
+      const byRules = requests.filter((r) => rulesOnly(state, r.unitId));
+      const groups: [RtDecider, RtDecisionRequest[]][] =
+        side_ === ruleDecider || byRules.length === 0
+          ? [[side_, requests]]
+          : [
+              [side_, requests.filter((r) => !byRules.includes(r))],
+              [ruleDecider, byRules],
+            ];
+      for (const [decider, group] of groups) {
+        if (!group.length) continue;
+        const batch: InFlight = {
+          side,
+          askedAt: time,
+          dueAt: new Map(
+            group.map((request) => [
+              request.unitId,
+              time + timing.reactionS(state.game.forceElements[request.unitId].troopQuality),
+            ]),
+          ),
+          requests: new Map(group.map((request) => [request.unitId, request])),
+          // A decider must not reject; if one does anyway, the rules answer.
+          promise: decider.decide(state, side, group, config).catch(() =>
+            ruleDecider.decide(state, side, group, config),
+          ),
+        };
+        batch.promise.then((result) => {
+          batch.result = result;
+        });
+        this.inflight.push(batch);
+      }
     }
   }
 
   /** Apply every answer that is due now, waiting for it if it is not back yet. */
   private async applyDue(): Promise<void> {
+    await this.applyWorldDue();
+    await this.applyPlansDue();
     const time = this.state.time;
     for (const batch of [...this.inflight]) {
       const due = [...batch.dueAt.entries()].filter(([, at]) => at <= time);
@@ -441,6 +633,7 @@ export class RealtimeRunner {
           decision,
           summary: option.summary,
           askedAt: batch.askedAt,
+          ...(request!.walk ? { walk: request!.walk } : {}),
         });
       }
       if (batch.dueAt.size === 0) this.inflight.splice(this.inflight.indexOf(batch), 1);

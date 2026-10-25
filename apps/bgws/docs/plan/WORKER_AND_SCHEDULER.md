@@ -190,11 +190,13 @@ It saved nothing, for two reasons:
 - **Most pictures still need scanning.** At 600 units with fights to the death, someone dies almost every second, and it is usually an enemy everyone has heard about. So about 60% of pictures really do lose a report each step, and removing one key from a ~190-key object still means copying the object.
 - **Even when skipped, it didn't help.** The stale-report section stayed at about 22 ms per simulated second. Total time was 164–167 ms per simulated second, against 158–179 for master and 166–178 for `pruned` alone, all within noise.
 
-The added coupling between comms and the engine was not worth that, so it was removed. The real cost is copying units × enemies pictures. That is option B, designed in `SIDE_PICTURE.md` (for review, no code yet).
+The added coupling between comms and the engine was not worth that, so it was removed. The real cost is copying units × enemies pictures. That is option B, designed and now built in `SIDE_PICTURE.md`.
+
+**The event scheduler** itself arrived with the world layer (MULTI_DOMAIN_PLAN W0): world systems schedule what is due (`schedule` / `onScheduled` in `world/context.ts` and `world/step.ts`), ties broken by a stable key. The land engine keeps its fixed step, so its golden snapshots are unchanged. The worker host also carries world deciders and HQ planners to the main thread, and a person's commands and seat changes from it (W15).
 
 ## Step 5: scope wiring
 
-As in MULTI_DOMAIN_PLAN W0. Not covered here.
+As in MULTI_DOMAIN_PLAN W0: done (`scope.ts`, `domainMode`).
 
 ## Risks
 

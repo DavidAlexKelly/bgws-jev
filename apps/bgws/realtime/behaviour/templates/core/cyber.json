@@ -1,0 +1,7 @@
+{
+  "id": "core/cyber",
+  "version": 1,
+  "name": "Cyber cell",
+  "parent": "core/world",
+  "doctrine": "A cyber cell executes only what has been authorised, at the moment it does the most good, and abandons an access that may have been detected."
+}

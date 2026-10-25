@@ -1,0 +1,10 @@
+{
+  "id": "core/mortar",
+  "version": 1,
+  "name": "Mortar section",
+  "parent": "core/default",
+  "doctrine": "A mortar section answers the company's calls for fire at once and moves after a few missions, before counter-battery fire finds it.",
+  "bias": {
+    "fireNow": 1
+  }
+}

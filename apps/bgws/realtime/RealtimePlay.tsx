@@ -78,6 +78,15 @@ import { EVENT_STREAM_RID, STREAM_MESSAGES, foundryStreamPublisher } from "../da
 import { EventStreamQueue } from "../data/eventStreamQueue";
 import { describeEntry, jevFailure, streamRow } from "./engine/feed";
 import { OVERLAY_SOURCES, overlayLayerSpecs, SOURCE } from "./overlayLayers";
+import { PRESET_SCENARIOS } from "./presets";
+import type { RtLogEntry } from "./engine/runner";
+import WorldPanel from "./WorldPanel";
+import HqConsole from "./HqConsole";
+import { jevWorldDecider } from "./world/jevWorldDecider";
+import { claudePlanners } from "./world/command/claudePlanner";
+import type { PlanAnswer } from "./world/types";
+import { withWorld } from "./world/create";
+import { WORLD_LAYERS, WORLD_SOURCE, worldLayerSpecs, worldOverlay, type WorldLayer } from "./worldOverlays";
 import {
   fireOverlay,
   newWrecks,
@@ -100,6 +109,7 @@ import {
   SCENARIO_FORMAT,
   SCENARIO_VERSION,
   type RealtimeScenario,
+  type ScenarioWorld,
 } from "./scenario";
 import {
   Blockers,
@@ -131,6 +141,8 @@ import {
   type Scope,
   type ScenarioType,
 } from "./scope";
+import { DOMAIN_MODES, ECHELONS, timeOf, WEATHERS, type DomainMode, type Echelon, type ScopeTime, type Weather } from "./scope";
+import { clockSpeed, quietPeriod } from "./world/quiet";
 
 type Phase = "setup" | "ordered" | "running";
 type Viewpoint = Side | "both";
@@ -141,7 +153,7 @@ const ORDER_SOURCE = "rt-orders";
 const LAST_KNOWN_SOURCE = "rt-last-known";
 /** The selected unit's own picture: where it believes each enemy is, and how sure. */
 const PICTURE_SOURCE = "rt-picture";
-const SPEEDS = [1, 5, 10, 30, 60];
+const SPEEDS = [1, 5, 10, 30, 60, 300, 600];
 /** How long a decision's tag stays beside its counter, in simulated seconds. */
 const DECISION_TAG_S = 40;
 const SIDE_COLOUR: Record<Side, string> = { blue: "#8fc2ff", red: "#ff9e8f" };
@@ -425,6 +437,8 @@ function UnitInspector(props: {
   id: string;
   viewpoint: Viewpoint;
   awaitingOrders: boolean;
+  /** Its behaviour template for this game, and why it has that one. */
+  behaviour?: { template: string; why: string };
   onClose: () => void;
 }) {
   const { state, id, viewpoint } = props;
@@ -526,6 +540,11 @@ function UnitInspector(props: {
         <Line label="purpose">{unit.mission.purpose}</Line>
       )}
       {props.awaitingOrders && <div style={{ ...subtle, color: "#e8c547" }}>New orders waiting: it is being asked how to comply.</div>}
+      {props.behaviour && (
+        <Line label="behaviour">
+          {props.behaviour.template} <span style={{ color: "#6a7292" }}>({props.behaviour.why})</span>
+        </Line>
+      )}
 
       <div style={{ ...groupTitle, marginTop: 8 }}>What it knows</div>
       <Line label="been seen?">
@@ -576,10 +595,63 @@ function UnitInspector(props: {
         </Line>
       ))}
 
+      {state.world?.land[id] && <WorldComponents state={state} id={id} />}
+
       {unit.history.length > 0 && <div style={{ ...groupTitle, marginTop: 8 }}>Last decisions</div>}
       {[...unit.history].reverse().map((memory, index) => (
         <Line key={index} label={clock(memory.time)}>
           {memory.chose} <span style={{ color: memory.by === "jev" ? "#e8c547" : "#6a7292" }}>({memory.by}; {memory.because})</span>
+        </Line>
+      ))}
+    </>
+  );
+}
+
+/** A decision's walk through its template: the path, what was offered, what was taken away and why, and the odds Jev gave. */
+function DecisionPath({ entry }: { entry: Extract<RtLogEntry, { type: "decision" }> }) {
+  const t = entry.decision.trace;
+  return (
+    <div style={{ margin: "2px 0 4px 10px", borderLeft: "1px solid #2a3350", paddingLeft: 6, color: "#9aa3bb" }}>
+      {entry.walk ? (
+        <>
+          <div>template {entry.walk.template}: {entry.walk.path.join(" → ")}</div>
+          {entry.walk.dropped.length > 0 && <div>not offered: {entry.walk.dropped.map((d) => `${d.id} (${d.why === "removed" ? "the template removes it" : "its condition failed"})`).join(", ")}</div>}
+        </>
+      ) : (
+        <div>a drill or a single option: nothing to choose</div>
+      )}
+      <div>
+        offered:{" "}
+        {t.options
+          .map((o) => `${o.id === t.chosenId ? "▶ " : ""}${o.id}${t.probabilities?.[o.id] != null ? ` ${Math.round(t.probabilities[o.id] * 100)}%` : ""}`)
+          .join(" · ")}
+      </div>
+      <div>decided by {t.chosenBy}{t.fallback ? ` (fell back: ${t.fallback})` : ""}{t.rationale ? `: ${t.rationale}` : ""}</div>
+    </div>
+  );
+}
+
+/** A unit's world components (W2, W13 step 4): stores, mounts, damage, wounded, emissions, level of detail, its HQ. */
+function WorldComponents({ state, id }: { state: RtState; id: string }) {
+  const c = state.world!.land[id];
+  const ammo = Object.entries(c.stores.ammo).filter(([, n]) => n != null);
+  const damage = Object.entries(c.damage).filter(([, d]) => d).map(([k]) => k);
+  const questions = state.world!.questions.filter((q) => q.agentId === id).slice(-3);
+  return (
+    <>
+      <div style={{ ...groupTitle, marginTop: 8 }}>Stores and state</div>
+      <Line label="type">{c.archetype.replace("generic/", "")}{c.hq ? ` · under ${c.hq}` : ""}{c.lod ? ` · ${c.lod === "aggregated" ? "moving aggregated" : "rules lead (far from contact)"}` : ""}</Line>
+      <Line label="fuel">{Math.round(c.stores.fuelL)} L</Line>
+      {ammo.length > 0 && <Line label="ammunition">{ammo.map(([f, n]) => `${f} ${n}`).join(" · ")}</Line>}
+      {c.mounts.length > 0 && <Line label="mounts">{c.mounts.map((m) => `${m.weaponId} ${m.rounds}`).join(" · ")}</Line>}
+      {c.drones > 0 && <Line label="drones">{c.drones} to launch</Line>}
+      {damage.length > 0 && <Line label="damaged">{damage.join(", ")}</Line>}
+      {(c.wounded.length > 0 || c.killed > 0) && <Line label="casualties">{c.killed} killed · {c.wounded.length} wounded waiting</Line>}
+      {c.disabled > 0 && <Line label="disabled">{c.disabled} vehicles awaiting recovery</Line>}
+      <Line label="emissions">{c.emcon}{c.onAirS > 0 ? ` · on the air ${Math.round(c.onAirS)} s` : ""}{c.dugIn > 0 ? ` · dug in ${Math.round(c.dugIn * 100)}%` : ""}</Line>
+      {questions.map((q) => (
+        <Line key={q.id} label={clock(q.raisedAt)}>
+          {q.title}: {q.answer ? (q.options.find((o) => o.id === q.answer!.optionId)?.summary ?? q.answer.optionId) : "waiting"} <span style={{ color: "#6a7292" }}>({q.answer?.by ?? "…"})</span>
         </Line>
       ))}
     </>
@@ -612,7 +684,21 @@ export default function RealtimePlay() {
   const [timeLimitMin, setTimeLimitMin] = useState(90);
   /** What the game covers (scope.ts). Its duration is `timeLimitMin`, set on the victory step. */
   const [scope, setScope] = useState<Scope>(() => scopeFor("skirmish"));
+  const clockTime = useMemo(() => timeOf(scope), [scope]);
+  /** The scenario's world (entities, HQs, obstacles, sea, events…), from a loaded file or preset. */
+  const [scenarioWorld, setScenarioWorld] = useState<ScenarioWorld | undefined>(undefined);
+  /** Which world layers the map draws (worldOverlays.ts), and whether the world panel is open. */
+  const [worldLayers, setWorldLayers] = useState<ReadonlySet<WorldLayer>>(() => new Set(WORLD_LAYERS));
+  const worldLayersRef = useRef(worldLayers);
+  worldLayersRef.current = worldLayers;
+  const [worldPanelOpen, setWorldPanelOpen] = useState(false);
+  const [hqConsoleOpen, setHqConsoleOpen] = useState(false);
+  /** The decision line opened in the feed, to show its walked path (DFG §5.3). */
+  const [openDecision, setOpenDecision] = useState<string | null>(null);
   const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
+  /** Adjust any part of the scope after choosing its type (§5.1); the type's victory conditions stay. */
+  const editScope = (patch: Partial<Scope>) => setScope((was) => ({ ...was, ...patch }));
+  const editTime = (patch: Partial<ScopeTime>) => setScope((was) => ({ ...was, time: { ...timeOf(was), ...patch } }));
   const chooseScenarioType = (type: ScenarioType) => {
     const next = scopeFor(type);
     setScope(next);
@@ -782,6 +868,7 @@ export default function RealtimePlay() {
       forces: placed,
       behaviours,
       behaviourTemplates: referencedTemplates(behaviours, behaviourTemplates),
+      ...(scenarioWorld ? { world: scenarioWorld } : {}),
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(scenario, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
@@ -804,6 +891,21 @@ export default function RealtimePlay() {
       setScenarioMessage({ tone: "danger", text: `Couldn't load ${file.name}:`, details: errors });
       return;
     }
+    applyScenario(scenario);
+  };
+  /** A milestone scenario (presets.ts), loaded exactly as its file would be. */
+  const loadPreset = (key: string) => {
+    const make = PRESET_SCENARIOS[key];
+    if (!make) return;
+    const { scenario, errors } = parseScenario(JSON.parse(JSON.stringify(make())));
+    if (!scenario) {
+      setScenarioMessage({ tone: "danger", text: `Couldn't load the ${key} scenario:`, details: errors });
+      return;
+    }
+    applyScenario(scenario);
+  };
+  const applyScenario = (scenario: RealtimeScenario) => {
+    setScenarioWorld(scenario.world);
     setPlaced(scenario.forces);
     setGameSeed(scenario.seed);
     setGroundChoice(scenario.ground.choice);
@@ -905,6 +1007,8 @@ export default function RealtimePlay() {
     try {
       const config = makeConfig();
       let state = createRealtimeState(toGameStateFromPlaced(placed, HOUSE_V1, { gameId: gameSeed }));
+      // The world layer, when the scope or the scenario needs one (world/create.ts): otherwise the game is as it always was.
+      state = withWorld(state, config, { platforms: Object.fromEntries(placed.map((f) => [f.id, f.platform])), ...scenarioWorld });
       const results: OrdersResult[] = [];
       for (const s of ["blue", "red"] as const) {
         const result = await ordersFor(state, s, config, {});
@@ -919,7 +1023,7 @@ export default function RealtimePlay() {
     } finally {
       setBusy(false);
     }
-  }, [makeConfig, placed, gameSeed, ordersFor]);
+  }, [makeConfig, placed, gameSeed, ordersFor, scenarioWorld]);
 
   /** Paused: new orders for one side or both, for review before the clock resumes. */
   const generatePausedOrders = useCallback(async () => {
@@ -954,6 +1058,20 @@ export default function RealtimePlay() {
     setDraft([]);
     setPlaying(true);
   }, [draft]);
+
+  /** A person's orders from an HQ seat (W15): over the nets, and into the record for replay. */
+  const commandFromHq = useCallback((hq: string, answer: PlanAnswer) => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    recordRef.current?.issued.push({ time: runner.state.time, orders: {}, command: { hq, answer } });
+    runner.command(hq, answer).catch((thrown: unknown) => setError(thrown instanceof Error ? thrown.message : String(thrown)));
+  }, []);
+  const seatHq = useCallback((hq: string, seat: "human" | "claude" | "heuristic") => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    recordRef.current?.issued.push({ time: runner.state.time, orders: {}, seat: { hq, seat } });
+    runner.setSeat(hq, seat).catch((thrown: unknown) => setError(thrown instanceof Error ? thrown.message : String(thrown)));
+  }, []);
 
   /** How many times this scenario has been run: the first uses the seed, each later one fresh dice. */
   const runsRef = useRef(0);
@@ -1023,20 +1141,33 @@ export default function RealtimePlay() {
           red: jevRealtimeDecider({ side: "red", call: jevCall, directive: redDirective }),
         }
       : undefined;
+    // World questions (W2) go to Jev too; Claude-seated HQs plan with Claude (W4, W15).
+    const worldDeciders = useJev && initial.world
+      ? {
+          blue: jevWorldDecider({ side: "blue", call: jevCall, directive: blueDirective }),
+          red: jevWorldDecider({ side: "red", call: jevCall, directive: redDirective }),
+        }
+      : undefined;
+    const planners = useCommander && initial.world
+      ? {
+          blue: claudePlanners(foundryModelCall(model, blueDirective, "realtime"), config),
+          red: claudePlanners(foundryModelCall(model, redDirective, "realtime"), config),
+        }
+      : undefined;
     runnerRef.current?.dispose();
     const runner: RunnerHandle = useWorker
       ? spawnWorkerRunner(
           { spec, raster: rasterUsable && raster ? raster.exportGrid() : null, initial, config },
-          { deciders, onEntry },
+          { deciders, worldDeciders, planners, onEntry },
         )
-      : new InThreadRunner(initial, config, { deciders, onEntry });
+      : new InThreadRunner(initial, config, { deciders, worldDeciders, planners, onEntry });
     wrecksRef.current = { list: [], after: -1 };
     runnerRef.current = runner;
     setEndDismissed(false);
     setDraft([]);
     setPhase("running");
     setPlaying(true);
-  }, [makeSpec, rasterUsable, raster, useWorker, useJev, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
+  }, [makeSpec, rasterUsable, raster, useWorker, useJev, useCommander, model, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
 
   const reset = useCallback(() => {
     stopStream();
@@ -1068,6 +1199,7 @@ export default function RealtimePlay() {
   const newScenario = useCallback(() => {
     reset();
     setPlaced([]);
+    setScenarioWorld(undefined);
   }, [reset]);
 
   // The loop: wall time × speed → simulated seconds. One advance in flight at
@@ -1083,7 +1215,8 @@ export default function RealtimePlay() {
     const loop = (now: number) => {
       const runner = runnerRef.current;
       if (!runner) return;
-      owed += ((now - last) / 1000) * speed;
+      // The scope's time dimension: no faster than it allows, and faster still while quiet if it skips quiet periods.
+      owed += ((now - last) / 1000) * clockSpeed(runner.state, speed, clockTime);
       last = now;
       if (!advancing && owed >= 1) {
         const step = Math.min(Math.floor(owed), 120);
@@ -1110,7 +1243,7 @@ export default function RealtimePlay() {
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed]);
+  }, [playing, speed, clockTime]);
 
   // ── The map ───────────────────────────────────────────────────────────────
 
@@ -1189,6 +1322,11 @@ export default function RealtimePlay() {
         // The overlays (overlayLayers.ts): impacts, wrecks, spotting, bearings, radio, the selected unit's plan.
         for (const id of OVERLAY_SOURCES) if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyCollection() });
         for (const spec of overlayLayerSpecs(SIDE_COLOUR)) {
+          if (!map.getLayer(spec.id as string)) map.addLayer(spec as unknown as maplibregl.LayerSpecification);
+        }
+        // The world layer (worldOverlays.ts): aircraft, ships, satellites, missiles, jammers, air-defence rings.
+        for (const id of Object.values(WORLD_SOURCE)) if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyCollection() });
+        for (const spec of worldLayerSpecs(SIDE_COLOUR)) {
           if (!map.getLayer(spec.id as string)) map.addLayer(spec as unknown as maplibregl.LayerSpecification);
         }
       };
@@ -1452,6 +1590,11 @@ export default function RealtimePlay() {
     const radioTraffic = radioOverlay(state, log, overlay);
     set(SOURCE.radio, radioTraffic.lines);
     set(SOURCE.pulse, radioTraffic.pulses);
+    // The world, as the chosen picture shows it: the truth, or one side's own and what it holds tracks of.
+    const world = worldOverlay(state, { seenBy: viewpointRef.current === "both" ? "truth" : viewpointRef.current, layers: worldLayersRef.current });
+    set(WORLD_SOURCE.entity, world.entities);
+    set(WORLD_SOURCE.area, world.areas);
+    set(WORLD_SOURCE.line, world.lines);
     const plan = planOverlay(state, selectedRef.current, overlay);
     set(SOURCE.plan, plan.lines);
     set(SOURCE.planZone, plan.zones);
@@ -1642,13 +1785,24 @@ export default function RealtimePlay() {
                   <div className="su-review-row">
                     <span className="su-review-label">Area</span>
                     <span className="su-review-value">
-                      {scopeCheck.scope.area.widthKm} × {scopeCheck.scope.area.depthKm} km
+                      <input type="number" min={1} max={1500} value={scope.area.widthKm} onChange={(e) => editScope({ area: { ...scope.area, widthKm: Math.max(1, Number(e.target.value) || 1) } })} style={{ width: 64 }} /> ×{" "}
+                      <input type="number" min={1} max={1500} value={scope.area.depthKm} onChange={(e) => editScope({ area: { ...scope.area, depthKm: Math.max(1, Number(e.target.value) || 1) } })} style={{ width: 64 }} /> km
                     </span>
                   </div>
                   <div className="su-review-row">
                     <span className="su-review-label">Command levels</span>
                     <span className="su-review-value">
-                      {scope.echelons.lowest} to {scope.echelons.highest}
+                      <select value={scope.echelons.lowest} onChange={(e) => editScope({ echelons: { ...scope.echelons, lowest: e.target.value as Echelon } })}>
+                        {ECHELONS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>{" "}
+                      to{" "}
+                      <select value={scope.echelons.highest} onChange={(e) => editScope({ echelons: { ...scope.echelons, highest: e.target.value as Echelon } })}>
+                        {ECHELONS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
                     </span>
                   </div>
                   <div className="su-review-row">
@@ -1658,9 +1812,43 @@ export default function RealtimePlay() {
                   {DOMAINS.map((domain) => (
                     <div className="su-review-row" key={domain}>
                       <span className="su-review-label">{DOMAIN_LABEL[domain]}</span>
-                      <span className="su-review-value">{scopeCheck.scope.domains[domain]}</span>
+                      <span className="su-review-value">
+                        <select value={scope.domains[domain]} onChange={(e) => editScope({ domains: { ...scope.domains, [domain]: e.target.value as DomainMode } })}>
+                          {DOMAIN_MODES.map((m) => (
+                            <option key={m}>{m}</option>
+                          ))}
+                        </select>
+                      </span>
                     </div>
                   ))}
+                  <div className="su-review-row">
+                    <span className="su-review-label">Starts at</span>
+                    <span className="su-review-value">
+                      <input type="number" min={0} max={23.99} step={0.5} value={clockTime.startHour} onChange={(e) => editTime({ startHour: Math.min(23.99, Math.max(0, Number(e.target.value) || 0)) })} style={{ width: 56 }} />
+                      :00,{" "}
+                      <select value={clockTime.weather} onChange={(e) => editTime({ weather: e.target.value as Weather })}>
+                        {WEATHERS.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                    </span>
+                  </div>
+                  <div className="su-review-row">
+                    <span className="su-review-label">Clock</span>
+                    <span className="su-review-value">
+                      up to ×
+                      <select value={clockTime.maxCompression} onChange={(e) => editTime({ maxCompression: Number(e.target.value) })}>
+                        {SPEEDS.map((x) => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>{" "}
+                      <label>
+                        <input type="checkbox" checked={clockTime.skipQuiet} onChange={(e) => editTime({ skipQuiet: e.target.checked })} /> skip quiet periods
+                      </label>
+                    </span>
+                  </div>
                 </div>
                 {scopeCheck.notes.length > 0 && (
                   <Callout tone="info">
@@ -1706,6 +1894,22 @@ export default function RealtimePlay() {
                       }}
                     />
                   </label>
+                  <select
+                    className="su-btn"
+                    data-variant="ghost"
+                    value=""
+                    title="The milestone scenarios: each exercises what its milestone built"
+                    onChange={(e) => {
+                      if (e.target.value) loadPreset(e.target.value);
+                    }}
+                  >
+                    <option value="">Milestone scenario…</option>
+                    {Object.entries(PRESET_SCENARIOS).map(([key, make]) => (
+                      <option key={key} value={key}>
+                        {make().name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {scenarioNotice}
               </Section>
@@ -2133,14 +2337,15 @@ export default function RealtimePlay() {
                   </div>
                 )}
                 <div style={row}>
-                  {SPEEDS.map((x) => (
+                  {SPEEDS.filter((x) => x <= clockTime.maxCompression).map((x) => (
                     <button key={x} onClick={() => setSpeed(x)} style={{ ...chip, flex: 1, borderColor: speed === x ? "#e8c547" : "transparent", color: speed === x ? "#e8c547" : "#8a91a8" }}>
                       &times;{x}
                     </button>
                   ))}
                 </div>
                 <div style={{ ...subtle, lineHeight: 1.5 }}>
-                  {clock(state?.time ?? 0)} simulated &middot; {decisions.length} decisions ({byJev} by Jev
+                  {clock(state?.time ?? 0)} simulated
+                  {clockTime.skipQuiet && state && quietPeriod(state) ? ` · quiet: ×${clockTime.maxCompression}` : ""} &middot; {decisions.length} decisions ({byJev} by Jev
                   {useJev && decisions.length > 0 && byJev === 0 ? " — every one fell back to the rules; see the reason above" : ""})
                   {runner && runner.waits > 0 ? ` · clock waited for Jev ${runner.waits}×` : ""}
                   {runner?.where === "worker" ? " · engine in a background thread" : ""}
@@ -2168,6 +2373,35 @@ export default function RealtimePlay() {
                 </button>
               ))}
             </div>
+            {state?.world && (
+              <>
+                <div style={{ ...groupTitle, marginTop: 10 }}>World layers</div>
+                <div style={{ ...row, flexWrap: "wrap" }}>
+                  {WORLD_LAYERS.map((layer) => (
+                    <button
+                      key={layer}
+                      onClick={() =>
+                        setWorldLayers((was) => {
+                          const next = new Set(was);
+                          if (next.has(layer)) next.delete(layer);
+                          else next.add(layer);
+                          return next;
+                        })
+                      }
+                      style={{ ...chip, borderColor: worldLayers.has(layer) ? "#e8c547" : "transparent", color: worldLayers.has(layer) ? "#e8c547" : "#8a91a8" }}
+                    >
+                      {layer}
+                    </button>
+                  ))}
+                  <button onClick={() => setWorldPanelOpen((o) => !o)} style={{ ...chip, color: worldPanelOpen ? "#e8c547" : "#8a91a8" }} title="Feed, kill chains, HQs, logistics, network, figures">
+                    {worldPanelOpen ? "hide" : "show"} the world panel
+                  </button>
+                  <button onClick={() => setHqConsoleOpen((o) => !o)} style={{ ...chip, color: hqConsoleOpen ? "#e8c547" : "#8a91a8" }} title="Take an HQ's seat and command from what reaches it">
+                    {hqConsoleOpen ? "hide" : "show"} the HQ console
+                  </button>
+                </div>
+              </>
+            )}
             {view && (
               <div style={{ ...subtle, lineHeight: 1.5 }}>
                 {view.contacts.length} enemy contact{view.contacts.length === 1 ? "" : "s"} in sight
@@ -2239,10 +2473,27 @@ export default function RealtimePlay() {
                           : "#8a91a8",
               }}
             >
-              {describeEntry(entry)}
+              <span
+                onClick={entry.type === "decision" ? () => setOpenDecision((k) => (k === `${entry.time}-${index}` ? null : `${entry.time}-${index}`)) : undefined}
+                style={entry.type === "decision" ? { cursor: "pointer" } : undefined}
+                title={entry.type === "decision" ? "Click for how the behaviour template got here" : undefined}
+              >
+                {describeEntry(entry)}
+              </span>
+              {entry.type === "decision" && openDecision === `${entry.time}-${index}` && <DecisionPath entry={entry} />}
             </div>
           ))}
           </div>
+          {worldPanelOpen && state?.world && (
+            <div style={{ flex: "0 0 auto", maxHeight: "45%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
+              <WorldPanel state={state} onClose={() => setWorldPanelOpen(false)} />
+            </div>
+          )}
+          {hqConsoleOpen && state?.world && runner && (
+            <div style={{ flex: "0 0 auto", maxHeight: "45%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
+              <HqConsole state={state} config={runner.config} side={viewpoint === "red" ? "red" : "blue"} onCommand={commandFromHq} onSeat={seatHq} />
+            </div>
+          )}
           <div style={{ flex: "0 0 auto", maxHeight: "48%", overflowY: "auto", borderTop: "1px solid #191e37", paddingTop: 8, marginTop: 6 }}>
             {selectedId && state ? (
               <UnitInspector
@@ -2250,6 +2501,10 @@ export default function RealtimePlay() {
                 id={selectedId}
                 viewpoint={viewpoint}
                 awaitingOrders={runner?.awaitingOrders.includes(selectedId) ?? false}
+                behaviour={{
+                  template: runner?.config.behaviours?.[selectedId] ?? "its type's default",
+                  why: { scenario: "from the scenario file", side: "side assignment", asset: "the unit type's assignment" }[behaviourPlan().why[selectedId] ?? ""] ?? "built-in default for its kind",
+                }}
                 onClose={() => setSelectedId(null)}
               />
             ) : (
