@@ -702,6 +702,7 @@ mod tests {
         let b = error_budget(&p.mbt_gun, &fc, &still(2000.0), &p);
         let pres = presented_vehicle(&mbt(), 0.0, VehiclePosture::Exposed, &p);
         let ph = ph_expected(&pres, &b);
+        eprintln!("P27: modern MBT Ph at 2 km = {ph:.3}");
         assert!(ph > 0.7, "P27: Ph {ph} at 2 km, budget {b:?}");
         // Monte Carlo with per-engagement bias agrees with the marginal.
         let mut r = rng(7);

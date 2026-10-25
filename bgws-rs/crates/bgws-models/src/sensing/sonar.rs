@@ -94,17 +94,31 @@ pub fn passive(sl_db: f64, tl_db: f64, nl_db: f64, di_db: f64, dt_db: f64, p: &S
     SonarResult { signal_db: signal, interference_db: interference, signal_excess_db: se, pd: pd_from_signal_excess(se, p.sigma_se_db) }
 }
 
-/// Active: SE = SL − 2TL + TS − (NL − DI ⊕ RL) − DT. With `rl_db = None` it
-/// is noise-limited; otherwise noise and reverberation are power-summed (the
+/// The levels of an active sonar problem, dB.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ActiveLevels {
+    pub sl_db: f64,
+    /// One-way transmission loss.
+    pub tl_db: f64,
+    pub ts_db: f64,
+    pub nl_db: f64,
+    pub di_db: f64,
+    /// Reverberation level, if any (see `reverberation_level`).
+    pub rl_db: Option<f64>,
+    pub dt_db: f64,
+}
+
+/// Active: SE = SL − 2TL + TS − (NL − DI ⊕ RL) − DT. With no RL it is
+/// noise-limited; otherwise noise and reverberation are power-summed (the
 /// reverberation-limited form when RL dominates).
-pub fn active(sl_db: f64, tl_db: f64, ts_db: f64, nl_db: f64, di_db: f64, rl_db: Option<f64>, dt_db: f64, p: &SonarParams) -> SonarResult {
-    let signal = sl_db - 2.0 * tl_db + ts_db;
-    let noise = nl_db - di_db;
-    let interference = match rl_db {
+pub fn active(l: &ActiveLevels, p: &SonarParams) -> SonarResult {
+    let signal = l.sl_db - 2.0 * l.tl_db + l.ts_db;
+    let noise = l.nl_db - l.di_db;
+    let interference = match l.rl_db {
         Some(rl) => power_sum_db(&[noise, rl]),
         None => noise,
     };
-    let se = signal - interference - dt_db;
+    let se = signal - interference - l.dt_db;
     SonarResult { signal_db: signal, interference_db: interference, signal_excess_db: se, pd: pd_from_signal_excess(se, p.sigma_se_db) }
 }
 
@@ -142,10 +156,11 @@ mod tests {
         let r = passive(140.0, 80.0, 60.0, 15.0, 10.0, &p);
         assert_relative_eq!(r.signal_excess_db, 5.0);
         assert!(r.pd > 0.5);
-        let a = active(220.0, 70.0, 10.0, 60.0, 20.0, None, 15.0, &p);
+        let lv = ActiveLevels { sl_db: 220.0, tl_db: 70.0, ts_db: 10.0, nl_db: 60.0, di_db: 20.0, rl_db: None, dt_db: 15.0 };
+        let a = active(&lv, &p);
         assert_relative_eq!(a.signal_excess_db, 220.0 - 140.0 + 10.0 - 40.0 - 15.0);
         let rl = reverberation_level(220.0, 70.0, -30.0, 1.0e5);
-        let rev = active(220.0, 70.0, 10.0, 60.0, 20.0, Some(rl), 15.0, &p);
+        let rev = active(&ActiveLevels { rl_db: Some(rl), ..lv }, &p);
         assert!(rev.signal_excess_db < a.signal_excess_db);
         assert_relative_eq!(pd_from_signal_excess(0.0, 6.0), 0.5);
     }

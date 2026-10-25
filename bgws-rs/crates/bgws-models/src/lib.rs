@@ -85,4 +85,25 @@ mod tests {
             );
         }
     }
+
+    /// Rule 3: every declared figure is read by some model's parameters.
+    #[test]
+    fn every_figure_is_used() {
+        let f = bgws_core::Figures::from_list(figures()).unwrap();
+        let _ = ground::GroundParams::from_figures(&f);
+        let _ = sensing::acquire::AcquireParams::from_figures(&f);
+        let _ = sensing::radar::RadarParams::from_figures(&f);
+        let _ = sensing::esm::EsmParams::from_figures(&f);
+        let _ = sensing::sonar::SonarParams::from_figures(&f);
+        let _ = sensing::acoustic::AcousticParams::from_figures(&f);
+        let _ = sensing::imagery::ImageryParams::from_figures(&f);
+        let _ = sensing::observer::ObserverParams::from_figures(&f);
+        let _ = signature::SignatureParams::from_figures(&f);
+        let _ = direct_fire::DirectFireParams::from_figures(&f);
+        let _ = indirect_fire::IndirectParams::from_figures(&f);
+        let _ = guided::GuidedParams::from_figures(&f);
+        let _ = engineers::EngineerParams::from_figures(&f);
+        let _ = people::PeopleParams::from_figures(&f);
+        assert!(f.unused().is_empty(), "unused figures: {:?}", f.unused());
+    }
 }
