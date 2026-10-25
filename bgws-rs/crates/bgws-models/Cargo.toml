@@ -11,9 +11,6 @@ bgws-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-bgws-catalogue.workspace = true
-bgws-env.workspace = true
-bgws-prop.workspace = true
 rand.workspace = true
 rand_distr.workspace = true
 libm.workspace = true
@@ -21,3 +18,4 @@ libm.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+rand_chacha.workspace = true

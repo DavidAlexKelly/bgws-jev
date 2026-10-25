@@ -1,0 +1,10 @@
+{
+  "id": "core/aircraft",
+  "version": 1,
+  "name": "Aircraft",
+  "parent": "core/world",
+  "doctrine": "Aircraft are scarce. They do not fly into an air-defence ring without suppression, and they come home with enough fuel to land.",
+  "bias": {
+    "around": 1
+  }
+}

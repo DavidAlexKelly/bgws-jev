@@ -1,0 +1,10 @@
+{
+  "id": "core/hq",
+  "version": 1,
+  "name": "Headquarters",
+  "parent": "core/default",
+  "doctrine": "A command post plans, fuses the reports it receives and passes orders. It stays hidden: it limits its time on the air and moves when it may have been found.",
+  "bias": {
+    "displace": 1
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "core/artillery",
+  "version": 1,
+  "name": "Artillery",
+  "parent": "core/default",
+  "doctrine": "Artillery fires the missions it is given, priority first, and shoots and scoots: the guns move within minutes of firing, because counter-battery radar finds them.",
+  "bias": {
+    "fireThenScoot": 1,
+    "displaceNow": 1
+  }
+}

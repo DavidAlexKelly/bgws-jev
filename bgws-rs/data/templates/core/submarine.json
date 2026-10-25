@@ -1,0 +1,10 @@
+{
+  "id": "core/submarine",
+  "version": 1,
+  "name": "Submarine",
+  "parent": "core/world",
+  "doctrine": "A submarine lives by not being found: it stays quiet, attacks from where it cannot be seen, and evades when counter-detected.",
+  "bias": {
+    "evade": 1
+  }
+}

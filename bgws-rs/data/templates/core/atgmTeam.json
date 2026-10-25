@@ -1,0 +1,7 @@
+{
+  "id": "core/atgmTeam",
+  "version": 1,
+  "name": "Anti-tank missile team",
+  "parent": "core/default",
+  "doctrine": "A missile team ambushes armour from cover at long range, fires once or twice and moves before it is found."
+}

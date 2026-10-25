@@ -1,0 +1,7 @@
+{
+  "id": "core/convoy",
+  "version": 1,
+  "name": "Convoy and robots",
+  "parent": "core/default",
+  "doctrine": "Supply and evacuation keep moving: they avoid the drone-covered ground where they can and scatter when attacked."
+}

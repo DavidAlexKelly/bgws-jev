@@ -13,7 +13,9 @@ serde_json.workspace = true
 thiserror.workspace = true
 nalgebra.workspace = true
 pathfinding.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+rand_chacha.workspace = true

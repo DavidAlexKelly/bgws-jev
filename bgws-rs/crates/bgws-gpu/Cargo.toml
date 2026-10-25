@@ -12,6 +12,7 @@ serde.workspace = true
 thiserror.workspace = true
 rayon.workspace = true
 bytemuck.workspace = true
+libm.workspace = true
 wgpu = { workspace = true, optional = true }
 pollster = { workspace = true, optional = true }
 
@@ -22,3 +23,5 @@ gpu = ["dep:wgpu", "dep:pollster"]
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

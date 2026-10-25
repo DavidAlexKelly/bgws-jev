@@ -1,0 +1,7 @@
+{
+  "id": "core/neutral",
+  "version": 1,
+  "name": "Neutral shipping",
+  "parent": "core/world",
+  "doctrine": "Neutral shipping keeps to its lanes and is protected by the rules of engagement."
+}

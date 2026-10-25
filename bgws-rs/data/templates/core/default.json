@@ -1,0 +1,350 @@
+{
+  "id": "core/default",
+  "version": 1,
+  "name": "Default land behaviour",
+  "triggers": {
+    "D0": "D0",
+    "D1": "D1",
+    "D2": "D2",
+    "D3": "D3",
+    "D4": "D4",
+    "D5": "D5",
+    "D6": "D6",
+    "D7": "D7",
+    "D8": "D8",
+    "D9": "D9",
+    "D10": "D10",
+    "D11": "D11",
+    "D12": "D12"
+  },
+  "nodes": {
+    "D0": {
+      "kind": "choose",
+      "title": "New orders arrive",
+      "question": "New orders have come down while it is in a fight. How does it comply?",
+      "options": [
+        {
+          "id": "comply",
+          "action": "land.complyWithOrders"
+        },
+        {
+          "id": "covered",
+          "action": "land.breakOffCovered"
+        },
+        {
+          "id": "fireAndBack",
+          "action": "land.fireAndBack"
+        },
+        {
+          "id": "finish",
+          "action": "land.finishFightFirst"
+        },
+        {
+          "id": "breakContact",
+          "action": "land.breakContactFirst"
+        }
+      ],
+      "fallback": "comply"
+    },
+    "D1": {
+      "kind": "choose",
+      "title": "New contact",
+      "question": "It has found an enemy it did not know about. What now?",
+      "options": [
+        {
+          "id": "keep",
+          "action": "land.carryOn"
+        },
+        {
+          "id": "engage",
+          "action": "land.engageNow"
+        },
+        {
+          "id": "wait",
+          "action": "land.waitFor"
+        },
+        {
+          "id": "better",
+          "action": "land.betterPosition"
+        },
+        {
+          "id": "observe",
+          "action": "land.observe"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.pullBackToFriends"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D2": {
+      "kind": "choose",
+      "title": "Fired on, shooter located",
+      "question": "It is under fire and can see who is firing. How does it answer?",
+      "options": [
+        {
+          "id": "returnFire",
+          "action": "land.returnFire"
+        },
+        {
+          "id": "hullDown",
+          "action": "land.hullDownThenFire"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.outOfSight"
+        },
+        {
+          "id": "askFriend",
+          "action": "land.askFriendForHelp"
+        },
+        {
+          "id": "assault",
+          "action": "land.assault"
+        },
+        {
+          "id": "quiet",
+          "action": "land.goQuietInCover"
+        }
+      ],
+      "fallback": "returnFire"
+    },
+    "D3": {
+      "kind": "choose",
+      "title": "Fired on, shooter not located",
+      "question": "It is under fire from a shooter it cannot see; it knows only the bearing. What now?",
+      "options": [
+        {
+          "id": "search",
+          "action": "land.searchBearing"
+        },
+        {
+          "id": "cover",
+          "action": "land.coverFromBearing"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.pullBackFromBearing"
+        },
+        {
+          "id": "keep",
+          "action": "land.carryOn"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D4": {
+      "kind": "choose",
+      "title": "Trigger met",
+      "question": "The moment it was waiting for has come. Fire now?",
+      "options": [
+        {
+          "id": "fire",
+          "action": "land.fireNow"
+        },
+        {
+          "id": "closer",
+          "action": "land.waitCloser"
+        },
+        {
+          "id": "letPass",
+          "action": "land.letPass"
+        }
+      ],
+      "fallback": "fire"
+    },
+    "D5": {
+      "kind": "choose",
+      "title": "Enemy behaviour changed",
+      "question": "An enemy it is watching from hiding did something that may mean it has been seen. What now?",
+      "options": [
+        {
+          "id": "fireFirst",
+          "action": "land.fireFirst"
+        },
+        {
+          "id": "keep",
+          "action": "land.keepHolding"
+        },
+        {
+          "id": "relocate",
+          "action": "land.relocateQuietly"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.slipAway"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D6": {
+      "kind": "choose",
+      "title": "After a volley",
+      "question": "It has fired on a target. Keep going, or change something before the enemy finds it?",
+      "options": [
+        {
+          "id": "keep",
+          "action": "land.keepFiring"
+        },
+        {
+          "id": "fireAndMove",
+          "action": "land.fireAndMove"
+        },
+        {
+          "id": "shift",
+          "action": "land.shiftFire"
+        },
+        {
+          "id": "quiet",
+          "action": "land.goQuiet"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.outOfSight"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D7": {
+      "kind": "choose",
+      "title": "Target lost",
+      "question": "Its target is out of sight or out of the fight. What next?",
+      "options": [
+        {
+          "id": "resume",
+          "action": "land.resumeOrCarryOn"
+        },
+        {
+          "id": "watch",
+          "action": "land.watchLastSeen"
+        },
+        {
+          "id": "regain",
+          "action": "land.regainContact"
+        },
+        {
+          "id": "shift",
+          "action": "land.shiftFireFromLost"
+        }
+      ],
+      "fallback": "resume"
+    },
+    "D8": {
+      "kind": "choose",
+      "title": "Fire not working",
+      "question": "It has been firing for minutes and knocked nothing out. Change something?",
+      "options": [
+        {
+          "id": "better",
+          "action": "land.betterShotOnTarget"
+        },
+        {
+          "id": "shift",
+          "action": "land.shiftFireFromTarget"
+        },
+        {
+          "id": "quiet",
+          "action": "land.stopFiring"
+        },
+        {
+          "id": "pullBack",
+          "action": "land.outOfTargetSight"
+        },
+        {
+          "id": "keep",
+          "action": "land.keepAtIt"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D9": {
+      "kind": "choose",
+      "title": "Friend needs help",
+      "question": "A friend close by is in trouble and this unit knows its attacker. Help?",
+      "options": [
+        {
+          "id": "help",
+          "action": "land.helpFriend"
+        },
+        {
+          "id": "support",
+          "action": "land.moveToSupport"
+        },
+        {
+          "id": "keep",
+          "action": "land.carryOn"
+        }
+      ],
+      "fallback": "keep"
+    },
+    "D10": {
+      "kind": "choose",
+      "title": "Order step done or blocked",
+      "question": "Its current step is done or it cannot go on. What next?",
+      "options": [
+        {
+          "id": "resume",
+          "action": "land.resumeOrders"
+        },
+        {
+          "id": "nextPhase",
+          "action": "land.skipToNextPhase"
+        },
+        {
+          "id": "hold",
+          "action": "land.holdHere"
+        },
+        {
+          "id": "overwatch",
+          "action": "land.overwatchHere"
+        },
+        {
+          "id": "keep",
+          "action": "land.keepHoldingHere"
+        }
+      ],
+      "fallback": "overwatch"
+    },
+    "D11": {
+      "kind": "choose",
+      "title": "Rallied",
+      "question": "It has pulled itself together and takes orders again. What now?",
+      "options": [
+        {
+          "id": "resume",
+          "action": "land.rejoin"
+        },
+        {
+          "id": "hold",
+          "action": "land.holdAndRecover"
+        },
+        {
+          "id": "join",
+          "action": "land.joinNearestFriends"
+        }
+      ],
+      "fallback": "hold"
+    },
+    "D12": {
+      "kind": "choose",
+      "title": "Request received",
+      "question": "A friend has asked it for help over the radio. How does it answer?",
+      "options": [
+        {
+          "id": "comply",
+          "action": "land.complyWithRequest"
+        },
+        {
+          "id": "partly",
+          "action": "land.partlyOverwatch"
+        },
+        {
+          "id": "cannot",
+          "action": "land.cannotComply"
+        }
+      ],
+      "fallback": "cannot"
+    }
+  }
+}

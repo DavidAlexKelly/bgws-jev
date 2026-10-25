@@ -1,0 +1,8 @@
+{
+  "id": "core/armour",
+  "version": 1,
+  "name": "Armour",
+  "archetype": "armoured_vehicle",
+  "parent": "core/default",
+  "doctrine": "Armour fights from hull-down positions and at long range, where its gun and protection count most. It avoids being drawn close to infantry it cannot see, and moves between firing positions out of the enemy's sight."
+}

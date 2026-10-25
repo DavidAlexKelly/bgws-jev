@@ -12,7 +12,11 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 rand.workspace = true
+petgraph.workspace = true
+libm.workspace = true
+lz4_flex = { version = "0.11", default-features = false, features = ["safe-encode", "safe-decode"] }
 
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+rand_chacha.workspace = true

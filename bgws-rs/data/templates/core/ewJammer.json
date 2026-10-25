@@ -1,0 +1,7 @@
+{
+  "id": "core/ewJammer",
+  "version": 1,
+  "name": "Electronic attack",
+  "parent": "core/default",
+  "doctrine": "A jammer denies the enemy his radios, drone links and GNSS where the force needs it, accepting that it jams its own side's too, and moves before it is found by its own emissions."
+}
