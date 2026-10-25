@@ -54,7 +54,7 @@ fn vignette(forces: &[F], obstacles: Value, domains: &[(&str, &str)], events: Va
 }
 
 fn sim(sc: &ScenarioV4, seed: u64) -> Sim {
-    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None }).unwrap()
+    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None }).unwrap()
 }
 
 fn entity(s: &Sim, name: &str) -> bevy_ecs::prelude::Entity {

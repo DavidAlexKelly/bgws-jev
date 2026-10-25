@@ -27,12 +27,21 @@ rand.workspace = true
 rand_chacha.workspace = true
 rand_distr.workspace = true
 nalgebra.workspace = true
-
+# Profiling (§13): per-system spans for Tracy, off unless `--features profile`.
+tracing = { version = "0.1.40", optional = true }
+tracing-subscriber = { version = "0.3.18", optional = true, default-features = false, features = ["registry", "std"] }
+tracing-tracy = { version = "0.11.1", optional = true }
 ts-rs = { version = "9", optional = true, features = ["serde-json-impl"] }
 
 [features]
+profile = ["dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy"]
 ts = ["dep:ts-rs", "bgws-core/ts"]
 
 [dev-dependencies]
 proptest.workspace = true
 approx.workspace = true
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "tick"
+harness = false

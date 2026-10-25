@@ -44,6 +44,7 @@ pub fn all_figures() -> Vec<Figure> {
     v.extend(crate::domains::air::figures());
     v.extend(crate::domains::naval::figures());
     v.extend(crate::domains::space::figures());
+    v.extend(crate::domains::lod::figures());
     v.extend(bgws_catalogue::figures());
     v.extend(bgws_env::figures());
     v.extend(bgws_prop::figures());

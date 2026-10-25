@@ -28,6 +28,11 @@ fn is_land(s: &Sim, e: Entity) -> bool {
     s.world.get::<Ident>(e).map(|i| i.domain == Domain::Land).unwrap_or(false)
 }
 
+/// Its level of detail (§6.4); entity level unless the LOD domain says otherwise.
+pub(crate) fn lod(s: &Sim, e: Entity) -> Lod {
+    s.world.get::<Lod>(e).copied().unwrap_or_default()
+}
+
 /// Posture from how long it has been still (moving, halted, settled, hull-down).
 pub fn posture(s: &mut Sim) {
     let now = s.ctx.now;
@@ -56,7 +61,7 @@ pub fn posture(s: &mut Sim) {
     }
 }
 
-fn mover_class(k: MoverKind) -> (bgws_env::VehicleClass, bool) {
+pub(crate) fn mover_class(k: MoverKind) -> (bgws_env::VehicleClass, bool) {
     match k {
         MoverKind::Tracked => (bgws_env::VehicleClass::Tracked, true),
         MoverKind::Wheeled => (bgws_env::VehicleClass::Wheeled, true),
@@ -70,7 +75,8 @@ fn mover_class(k: MoverKind) -> (bgws_env::VehicleClass, bool) {
 pub fn movement(s: &mut Sim, dt: f64) {
     let now = s.ctx.now;
     for &e in &s.ctx.order.clone() {
-        if !alive(s, e) || !is_land(s, e) {
+        // Aggregated formations move by their formation mover (domains::lod).
+        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
             continue;
         }
         let (platform, can_move) = {
@@ -139,7 +145,7 @@ pub fn movement(s: &mut Sim, dt: f64) {
 }
 
 /// Reached the end of a route: carry on with `then`, else the next phase, else hold.
-fn arrive(s: &mut Sim, e: Entity) {
+pub(crate) fn arrive(s: &mut Sim, e: Entity) {
     let id = s.world.get::<Ident>(e).expect("ident").id;
     let mut a = s.world.get_mut::<Act>(e).expect("act");
     let then = match &a.activity {
@@ -169,8 +175,6 @@ struct SenseEnt {
     side: Side,
     pos: Enu,
     agl: f64,
-    land: bool,
-    alive: bool,
     eye_h: f64,
     crit: f64,
     contrast: f64,
@@ -183,7 +187,7 @@ struct SenseEnt {
     dummy: bool,
 }
 
-fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
+pub(crate) fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
     let r = p.role.to_lowercase();
     let c = p.class.to_lowercase();
     match p.domain {
@@ -216,6 +220,9 @@ fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
     }
 }
 
+/// The entities the land sensing pass works on: living land units at entity
+/// level (aggregated and Far units are carried by `domains::lod` and neither
+/// observe nor are observed here, §6.4).
 fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
     let now = s.ctx.now;
     s.ctx
@@ -223,8 +230,14 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
         .iter()
         .filter_map(|&e| {
             let i = s.world.get::<Ident>(e)?;
-            let k = s.world.get::<Kin>(e)?;
+            if i.domain != Domain::Land || lod(s, e) != Lod::Entity {
+                return None;
+            }
             let h = s.world.get::<Health>(e)?;
+            if h.destroyed {
+                return None;
+            }
+            let k = s.world.get::<Kin>(e)?;
             let a = s.world.get::<Act>(e)?;
             let c = s.world.get::<Crew>(e)?;
             let sig = s.world.get::<SigState>(e)?;
@@ -254,8 +267,6 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
                 side: i.side,
                 pos: k.pos,
                 agl: k.agl,
-                land: i.domain == Domain::Land,
-                alive: !h.destroyed,
                 eye_h: p.sensors.iter().map(|x| x.height_m).fold(2.0, f64::max).min(6.0),
                 crit,
                 contrast,
@@ -296,92 +307,185 @@ struct Sight {
     sensor: SensorKind,
 }
 
-/// Sensing (§8.2): candidate pairs in range, line of sight over the terrain,
-/// ACQUIRE/TTP detection hazards by sensor, then keyed dice.
+/// The best sensor of an observer against one target (highest detection rate).
+struct Best {
+    rate: f64,
+    sensor: SensorKind,
+    contrast: Contrast,
+    res: f64,
+    n50: [f64; 3],
+    /// The pair's first die.
+    u: f64,
+}
+
+/// The hash-grid layer of a side's units.
+fn side_layer(side: Side) -> u32 {
+    match side {
+        Side::Blue => 0,
+        Side::Red => 1,
+        Side::Neutral => 2,
+    }
+}
+
+/// Candidate pairs (§11.1): land observers × enemy land targets within the
+/// observer's reach, in (observer, target) order. The kernel layer's hash grid
+/// narrows (with a hair of slack on the range), the exact horizontal test here
+/// decides, so the list is the one the all-pairs loop gave.
+fn candidate_pairs(s: &Sim, ents: &[SenseEnt], max_r: f64) -> Vec<(usize, usize, f64)> {
+    use bgws_gpu::{Kernels, PairEntity, PairParams};
+    let reach: Vec<f64> = ents.iter().map(|o| if o.sensors.is_empty() || o.dummy { -1.0 } else { o.sensors.iter().map(|x| x.1).fold(0.0, f64::max).min(max_r) }).collect();
+    let pe: Vec<PairEntity> = ents
+        .iter()
+        .zip(&reach)
+        .map(|(x, &r)| {
+            let own = side_layer(x.side);
+            PairEntity {
+                x: x.pos.e,
+                y: x.pos.n,
+                z: 0.0,
+                layer: own,
+                sees_layers: if r >= 0.0 { 0b111 & !(1u32 << own) } else { 0 },
+                sensor_range: if r >= 0.0 { r * (1.0 + 1e-9) + 1e-6 } else { 0.0 },
+                heading: 0.0,
+                half_fov: std::f64::consts::PI,
+            }
+        })
+        .collect();
+    let params = PairParams { cell_m: 0.0, ..PairParams::from_figures(&s.ctx.figures) };
+    s.ctx
+        .ground
+        .backend
+        .candidate_pairs(&pe, &params)
+        .into_iter()
+        .filter_map(|c| {
+            let (oi, ti) = (c.observer as usize, c.target as usize);
+            let r = ents[ti].pos.sub(ents[oi].pos).horizontal();
+            (r <= reach[oi]).then_some((oi, ti, r))
+        })
+        .collect()
+}
+
+/// Sensing (§8.2): candidate pairs in range on the hash grid, the best
+/// sensor's ACQUIRE/TTP detection rate, line of sight over the terrain for
+/// the pairs that could detect (batched through the kernel layer, §11), then
+/// keyed dice; recognition and identification are worked out only for the
+/// detections. The work is ordered for speed; every draw and every number is
+/// the one the plain per-pair loop gave.
 pub fn sensing(s: &mut Sim, dt: f64) {
     let now = s.ctx.now;
-    let ents = snapshot_for_sensing(s);
+    let ents = {
+        prof_span!("sensing.snapshot");
+        snapshot_for_sensing(s)
+    };
     let lat = s.ctx.frame.origin.lat;
     let lon = s.ctx.frame.origin.lon;
     let cloud = s.ctx.weather.sample(0.0, 0.0, now).cloud_cover;
     let lux = bgws_env::illuminance_at(&s.ctx.start.at(now), lat, lon, cloud, &s.ctx.p.light).total_lux;
     let night = lux < s.ctx.p.night_lux;
     let max_r = s.ctx.p.sense_max_m;
-    // Candidate pairs: land observers × enemy land targets within range.
-    let mut pairs = Vec::new();
-    for (oi, o) in ents.iter().enumerate() {
-        if !o.alive || !o.land || o.sensors.is_empty() || o.dummy {
-            continue;
-        }
-        let reach = o.sensors.iter().map(|x| x.1).fold(0.0, f64::max).min(max_r);
-        for (ti, t) in ents.iter().enumerate() {
-            if !t.alive || !t.land || t.side == o.side || t.side == Side::Neutral && o.side == Side::Neutral {
-                continue;
-            }
-            let r = t.pos.sub(o.pos).horizontal();
-            if r <= reach {
-                pairs.push((oi, ti, r));
-            }
-        }
-    }
+    let pairs = {
+        prof_span!("sensing.pairs");
+        candidate_pairs(s, &ents, max_r)
+    };
     let ground = &s.ctx.ground;
     let p = &s.ctx.p;
     let seed = s.ctx.seed;
-    let seen: Vec<std::collections::BTreeSet<EntityId>> = ents.iter().map(|o| s.world.get::<Aware>(o.e).map(|a| a.seen.keys().copied().collect()).unwrap_or_default()).collect();
-    let sights: Vec<Sight> = pairs
-        .par_iter()
-        .filter_map(|&(oi, ti, range)| {
-            let o = &ents[oi];
-            let t = &ents[ti];
-            let los = ground.los(o.pos, o.eye_h + o.agl, t.pos, 1.5 + t.agl);
-            if los.p_visible <= 0.0 {
-                return None;
-            }
-            let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
-            let cued = seen[oi].contains(&t.id);
-            let tau_mult = tau_multiplier(&o.observer, &p.observer);
-            let mut best: Option<(f64, SensorKind, f64, f64)> = None;
-            for &(kind, rmax, res, n50) in &o.sensors {
-                if range > rmax {
-                    continue;
+    let world = &s.world;
+    let cued = |o: &SenseEnt, t: &SenseEnt| world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false);
+    // 1. The best sensor per pair and its first die (no terrain yet).
+    let best: Vec<Option<Best>> = {
+        prof_span!("sensing.acquire");
+        pairs
+            .par_iter()
+            .map(|&(oi, ti, range)| {
+                let o = &ents[oi];
+                let t = &ents[ti];
+                let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
+                let cued = cued(o, t);
+                let tau_mult = tau_multiplier(&o.observer, &p.observer);
+                let mut best: Option<Best> = None;
+                for &(kind, rmax, res, n50) in &o.sensors {
+                    if range > rmax {
+                        continue;
+                    }
+                    let (contrast, mut res, sk) = match kind {
+                        CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) }, res, SensorKind::Thermal),
+                        _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) }, res, SensorKind::Visual),
+                    };
+                    if night && matches!(kind, CatSensor::Eye | CatSensor::Optic | CatSensor::Eo) {
+                        res *= p.eye_night_factor;
+                    }
+                    let mut ap = p.acquire.clone();
+                    ap.n50 = n50;
+                    let input = AcquireInput {
+                        critical_dim_m: t.crit,
+                        range_m: range,
+                        cycles_per_mrad: res,
+                        metric: Metric::Johnson,
+                        atmos_mtf: 1.0,
+                        contrast,
+                        stage: Stage::Detect,
+                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+                    };
+                    let det = acquire(&input, &ap);
+                    if best.as_ref().map(|b| det.rate_per_s > b.rate).unwrap_or(true) {
+                        best = Some(Best { rate: det.rate_per_s, sensor: sk, contrast, res, n50, u: 1.0 });
+                    }
                 }
-                let (contrast, mut res, sk) = match kind {
-                    CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) }, res, SensorKind::Thermal),
-                    _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) }, res, SensorKind::Visual),
-                };
-                if night && matches!(kind, CatSensor::Eye | CatSensor::Optic | CatSensor::Eo) {
-                    res *= p.eye_night_factor;
+                // The pair's first die, drawn now from its keyed stream (the
+                // same value the dice below would draw). Line of sight only
+                // lowers the chance, so a die that fails with a clear line
+                // fails anyway: those pairs need no terrain at all.
+                let b = best.filter(|b| b.rate > 0.0)?;
+                let mut rng = seed.stream(StreamKey::new("sense", o.id.0 as u64, t.id.0 as u64, now.0));
+                let u: f64 = rng.gen();
+                (u < hazard_probability(b.rate, dt)).then_some(Best { u, ..b })
+            })
+            .collect()
+    };
+    // 2. Line of sight for the pairs whose die could still pass, in one batch.
+    let live: Vec<usize> = (0..pairs.len()).filter(|&i| best[i].is_some()).collect();
+    let los = {
+        prof_span!("sensing.los");
+        let queries: Vec<bgws_gpu::LosQuery> = live
+            .iter()
+            .map(|&i| {
+                let (o, t) = (&ents[pairs[i].0], &ents[pairs[i].1]);
+                bgws_gpu::LosQuery { obs_x: o.pos.e, obs_y: o.pos.n, obs_agl: o.eye_h + o.agl, tgt_x: t.pos.e, tgt_y: t.pos.n, tgt_agl: 1.5 + t.agl }
+            })
+            .collect();
+        ground.los_batch(&queries)
+    };
+    // 3. The dice, then recognition and identification for detections.
+    let sights: Vec<Sight> = {
+        prof_span!("sensing.dice");
+        live.par_iter()
+            .zip(los.par_iter())
+            .filter_map(|(&i, los)| {
+                if los.p_visible <= 0.0 {
+                    return None;
                 }
+                let (oi, ti, range) = pairs[i];
+                let (o, t) = (&ents[oi], &ents[ti]);
+                let b = best[i].as_ref()?;
+                let pdet = los.p_visible * hazard_probability(b.rate, dt);
+                if b.u >= pdet {
+                    return None;
+                }
+                let mut rng = seed.stream(StreamKey::new("sense", o.id.0 as u64, t.id.0 as u64, now.0));
+                let _first: f64 = rng.gen();
                 let mut ap = p.acquire.clone();
-                ap.n50 = n50;
-                let input = |stage| AcquireInput {
-                    critical_dim_m: t.crit,
-                    range_m: range,
-                    cycles_per_mrad: res,
-                    metric: Metric::Johnson,
-                    atmos_mtf: 1.0,
-                    contrast,
-                    stage,
-                    search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
-                };
-                let det = acquire(&input(Stage::Detect), &ap);
+                ap.n50 = b.n50;
+                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer) };
+                let input = |stage| AcquireInput { critical_dim_m: t.crit, range_m: range, cycles_per_mrad: b.res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: b.contrast, stage, search };
                 let rec = acquire(&input(Stage::Recognise), &ap).p_inf;
                 let idn = acquire(&input(Stage::Identify), &ap).p_inf;
-                if best.as_ref().map(|b| det.rate_per_s > b.0).unwrap_or(true) {
-                    best = Some((det.rate_per_s, sk, rec, idn));
-                }
-            }
-            let (rate, sk, rec, idn) = best?;
-            let pdet = los.p_visible * hazard_probability(rate, dt);
-            let mut rng = seed.stream(StreamKey::new("sense", o.id.0 as u64, t.id.0 as u64, now.0));
-            if rng.gen::<f64>() >= pdet {
-                return None;
-            }
-            let u: f64 = rng.gen();
-            let level = if u < idn { 2 } else if u < rec { 1 } else { 0 };
-            Some(Sight { obs: oi, tgt: ti, p: pdet, level, range, sensor: sk })
-        })
-        .collect();
+                let u: f64 = rng.gen();
+                let level = if u < idn { 2 } else if u < rec { 1 } else { 0 };
+                Some(Sight { obs: oi, tgt: ti, p: pdet, level, range, sensor: b.sensor })
+            })
+            .collect()
+    };
     // Apply in pair order.
     let mut detections: Vec<(Side, Detection)> = Vec::new();
     for sg in sights {
@@ -501,7 +605,13 @@ pub fn direct_fire(s: &mut Sim) {
     let start: Vec<Option<(bool, u32)>> = order.iter().map(|&e| s.world.get::<Health>(e).map(|h| (h.can_fire(), h.fit))).collect();
     for (k, &e) in order.iter().enumerate() {
         let Some((could_fire, fit0)) = start[k] else { continue };
-        if !could_fire || !is_land(s, e) {
+        // Aggregated and Far units do not fight individually (§6.4).
+        if !could_fire || !is_land(s, e) || lod(s, e) != Lod::Entity {
+            continue;
+        }
+        // Nothing seen in the last 3 s means no target: the same test as the
+        // candidate list below, made before anything is cloned.
+        if !s.world.get::<Aware>(e).map(|a| a.seen.values().any(|v| v.last == now || (now - v.last).secs() < 3.0)).unwrap_or(false) {
             continue;
         }
         let (id, side, platform, quality) = {
@@ -721,10 +831,13 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
 pub fn people(s: &mut Sim, dt: f64) {
     let now = s.ctx.now;
     let order = s.ctx.order.clone();
-    // Friend positions for isolation.
-    let friends: Vec<(Side, Enu, bool)> = order.iter().filter_map(|&e| Some((s.world.get::<Ident>(e)?.side, s.world.get::<Kin>(e)?.pos, alive(s, e)))).collect();
+    // Living friend positions for isolation, on a grid of isolation-range cells.
+    let iso = s.ctx.p.isolation_m;
+    let friends = FriendGrid::new(order.iter().enumerate().filter(|(_, &e)| alive(s, e)).filter_map(|(j, &e)| Some((j, s.world.get::<Ident>(e)?.side, s.world.get::<Kin>(e)?.pos))), iso);
+    let pp = s.ctx.p.people.clone();
     for (idx, &e) in order.iter().enumerate() {
-        if !alive(s, e) || !is_land(s, e) {
+        // An aggregated formation carries its people as distributions (§6.4).
+        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
             continue;
         }
         let (id, side, quality) = {
@@ -733,9 +846,8 @@ pub fn people(s: &mut Sim, dt: f64) {
         };
         let pos = s.world.get::<Kin>(e).expect("k").pos;
         let cover = s.ctx.ground.micro(pos.e, pos.n).cover;
-        let isolated = !friends.iter().enumerate().any(|(j, f)| j != idx && f.0 == side && f.2 && f.1.sub(pos).horizontal() <= s.ctx.p.isolation_m);
+        let isolated = !friends.any_within(idx, side, pos, iso);
         let q = UnitQuality { leadership: (quality as f64 - 1.0) / 5.0, training: (quality as f64 - 1.0) / 5.0 };
-        let pp = s.ctx.p.people.clone();
         let mut rng = s.ctx.rng("morale", id.0 as u64, 0);
         let observed = crate::domains::drones::drone_observed(s, id);
         let change = {
@@ -774,6 +886,36 @@ pub fn people(s: &mut Sim, dt: f64) {
                 _ => {}
             }
         }
+    }
+}
+
+/// Friends by grid cell, for "is any living friend within r" in O(k) instead
+/// of a scan of every unit (the same answer).
+struct FriendGrid {
+    cell: f64,
+    /// ((cell x, cell y), order index, side, position), sorted by cell then index.
+    bins: Vec<((i64, i64), usize, Side, Enu)>,
+}
+
+impl FriendGrid {
+    fn new(items: impl Iterator<Item = (usize, Side, Enu)>, r: f64) -> Self {
+        let cell = r.max(1.0);
+        let mut bins: Vec<((i64, i64), usize, Side, Enu)> = items.map(|(j, side, p)| (((p.e / cell).floor() as i64, (p.n / cell).floor() as i64), j, side, p)).collect();
+        bins.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        FriendGrid { cell, bins }
+    }
+
+    /// Is a unit of `side` other than `me` within `r` of `pos`? (`r` at most the cell.)
+    fn any_within(&self, me: usize, side: Side, pos: Enu, r: f64) -> bool {
+        let (cx, cy) = ((pos.e / self.cell).floor() as i64, (pos.n / self.cell).floor() as i64);
+        for gx in cx - 1..=cx + 1 {
+            let lo = self.bins.partition_point(|b| b.0 < (gx, cy - 1));
+            let hi = self.bins.partition_point(|b| b.0 <= (gx, cy + 1));
+            if self.bins[lo..hi].iter().any(|b| b.1 != me && b.2 == side && b.3.sub(pos).horizontal() <= r) {
+                return true;
+            }
+        }
+        false
     }
 }
 

@@ -283,7 +283,31 @@ impl Sim {
     }
 
     /// Advance the clock to `until`, stopping early at a decision point or the end.
+    /// With `scope.time.skipQuiet`, quiet stretches skip the land sensing pass
+    /// (see [`Sim::advance_quiet`]); the outcome is the same either way.
     pub fn advance(&mut self, until: SimTime) -> Step {
+        let skip = self.ctx.scenario.scope.time.map(|t| t.skip_quiet).unwrap_or(false);
+        self.advance_with(until, skip)
+    }
+
+    /// Advance with quiet skipping (§6.3) whatever the scope says: while
+    /// nothing is in contact, in flight or waiting, base ticks before the
+    /// earliest possible detection ([`Sim::next_interesting_time`]) run
+    /// without the sensing pass, which provably has nothing to do there. It
+    /// never changes what happens: the event log is the stepped one.
+    pub fn advance_quiet(&mut self, until: SimTime) -> Step {
+        self.advance_with(until, true)
+    }
+
+    /// Quiet now? Then the next scheduled event or the earliest time a sensor
+    /// could detect something (from closing speeds and sensor reach), capped
+    /// by `sim.quiet.max_jump_s` and the time limit. `None` when there is
+    /// contact, something in flight, or a question or report waiting.
+    pub fn next_interesting_time(&self) -> Option<SimTime> {
+        crate::domains::lod::quiet::next_interesting_time(self)
+    }
+
+    fn advance_with(&mut self, until: SimTime, skip_quiet: bool) -> Step {
         loop {
             if let Some(o) = &self.ctx.over {
                 return Step::Over(o.clone());
@@ -304,35 +328,76 @@ impl Sim {
             if t <= self.ctx.now {
                 t = next_stop(self.ctx.now, fast, air);
             }
-            self.tick(t);
+            let sense = !(skip_quiet && Rate::Base.due(t) && crate::domains::lod::quiet::may_skip_sensing(self, t));
+            self.tick(t, sense);
         }
     }
 
-    /// One stop of the clock at `t`.
-    fn tick(&mut self, t: SimTime) {
+    /// One stop of the clock at `t`. `sense` false skips the land sensing
+    /// pass (quiet skipping only, when it provably finds nothing).
+    fn tick(&mut self, t: SimTime, sense: bool) {
         let dt = (t - self.ctx.now).secs();
         self.ctx.now = t;
         // Scheduled events due now.
-        for (_, ev) in self.ctx.queue.pop_due(t) {
-            self.handle(ev);
+        {
+            prof_span!("events");
+            for (_, ev) in self.ctx.queue.pop_due(t) {
+                self.handle(ev);
+            }
         }
-        crate::world::fast(self, dt);
+        {
+            prof_span!("world.fast");
+            crate::world::fast(self, dt);
+        }
         if Rate::Base.due(t) {
-            crate::systems::posture(self);
-            crate::systems::movement(self, 1.0);
-            crate::world::base(self, 1.0);
-            crate::systems::sensing(self, 1.0);
-            crate::systems::reports(self);
-            crate::systems::direct_fire(self);
-            crate::systems::people(self, 1.0);
-            crate::systems::autopilot_events(self);
-            crate::decide::raise(self);
-            crate::systems::victory(self);
+            prof_span!("base");
+            {
+                prof_span!("posture");
+                crate::systems::posture(self);
+            }
+            {
+                prof_span!("movement");
+                crate::systems::movement(self, 1.0);
+            }
+            {
+                prof_span!("world.base");
+                crate::world::base(self, 1.0);
+            }
+            if sense {
+                prof_span!("sensing");
+                crate::systems::sensing(self, 1.0);
+            }
+            {
+                prof_span!("reports");
+                crate::systems::reports(self);
+            }
+            {
+                prof_span!("direct_fire");
+                crate::systems::direct_fire(self);
+            }
+            {
+                prof_span!("people");
+                crate::systems::people(self, 1.0);
+            }
+            {
+                prof_span!("autopilot");
+                crate::systems::autopilot_events(self);
+            }
+            {
+                prof_span!("decide");
+                crate::decide::raise(self);
+            }
+            {
+                prof_span!("victory");
+                crate::systems::victory(self);
+            }
         }
         if Rate::Slow.due(t) {
+            prof_span!("world.slow");
             crate::world::slow(self, 10.0);
         }
         if Rate::Minute.due(t) {
+            prof_span!("minute");
             crate::systems::fatigue(self, 60.0);
             crate::world::minute(self, 60.0);
         }
@@ -430,7 +495,13 @@ impl Sim {
             }
             subs.push(i.name.clone());
             let reach = i.platform.mounts.iter().filter_map(|m| m.munitions.first()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
-            let role = if i.hq { "post" } else if i.platform.role.contains("artillery") || i.platform.role.contains("mortar") { "fires" } else if i.platform.role.contains("engineer") { "engineer" } else { "manoeuvre" };
+            let role = match i.platform.template.as_str() {
+                _ if i.hq => "post",
+                "core/artillery" | "core/mortar" => "fires",
+                "core/engineer" => "engineer",
+                "core/convoy" | "core/node" | "core/sensor" => "support",
+                _ => "manoeuvre",
+            };
             // With nets, the HQ knows its units as they last reported (§9.2).
             let rep = crate::domains::drones::hq_unit_report(self, side, i.id);
             units.push(HqUnit {
@@ -632,7 +703,7 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
         Side::Red => 180.0,
         Side::Neutral => 90.0,
     });
-    let hq = f.command_rating.is_some() || platform.role.contains("hq") || platform.class.contains("hq");
+    let hq = f.command_rating.is_some() || platform.template == "core/hq";
     let e = world
         .spawn((
             Ident { id, name: f.id.clone(), label: f.label.clone(), side: f.side, platform: platform.clone(), domain, template, quality, dummy: f.dummy || platform.signatures.decoy, hq },
