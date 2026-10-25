@@ -22,6 +22,7 @@ import {
   freeCustomId,
   isBuiltIn,
   saveCustomTemplate,
+  replaceCustomTemplates,
   DEFAULT_TEMPLATE_ID,
   assignSide,
   sideAssignmentFor,
@@ -33,6 +34,15 @@ import type { Bias, Comparison, Condition, FactValue, ResolvedTemplate, Template
 import { LAND_FACT_INFO, LAND_FACTS, type FactInfo, type LandFact } from "./realtime/behaviour/facts";
 import "./behaviour.css";
 import BehaviourBench from "./BehaviourBench";
+import BehaviourGraph from "./BehaviourGraph";
+import { publish, pull } from "./realtime/behaviour/shared";
+import { foundryTemplateRemote } from "./data/templateStore";
+
+/** The team's shared templates in Foundry, through the app's own client (loaded only when used). */
+async function teamRemote() {
+  const { platformClient } = await import("@/client");
+  return foundryTemplateRemote(platformClient as unknown as { baseUrl: string; tokenProvider: () => Promise<string> });
+}
 
 const BIAS_LABEL: Record<Bias, string> = {
   [-2]: "−2 strongly discouraged",
@@ -130,8 +140,11 @@ export default function BehaviourManager() {
   const selectedId = params.get("id") ?? DEFAULT_TEMPLATE_ID;
   const selected = templates.find((t) => t.id === selectedId) ?? templates[0];
   const select = (id: string) => setParams({ id }, { replace: true });
-  const bench = params.get("view") === "bench";
-  const showBench = (on: boolean) => setParams(on ? { id: selectedId, view: "bench" } : { id: selectedId }, { replace: true });
+  const view = params.get("view") ?? "templates";
+  const bench = view === "bench";
+  const graph = view === "graph";
+  const showView = (v: "templates" | "bench" | "graph") => setParams(v === "templates" ? { id: selectedId } : { id: selectedId, view: v }, { replace: true });
+  const showBench = (on: boolean) => showView(on ? "bench" : "templates");
 
   const createFrom = (base: Template, copyOf?: Template) => {
     const name = copyOf ? `${displayName(copyOf)} (copy)` : `New behaviour based on ${displayName(base)}`;
@@ -145,6 +158,33 @@ export default function BehaviourManager() {
 
   const builtIn = templates.filter((t) => isBuiltIn(t.id));
   const mine = templates.filter((t) => !isBuiltIn(t.id));
+  const [teamNote, setTeamNote] = useState<string | null>(null);
+  const share = async () => {
+    try {
+      const r = await publish(await teamRemote(), customTemplates(), templates);
+      setTeamNote(
+        `Shared: ${r.created.length} new, ${r.edited.length} updated` +
+          (r.conflicts.length ? `; not overwritten (newer in Foundry): ${r.conflicts.map((c) => `${c.id} v${c.theirs}${c.by ? ` by ${c.by}` : ""}`).join(", ")}` : ""),
+      );
+    } catch (e) {
+      setTeamNote(`Could not share: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const getTeam = async () => {
+    try {
+      const r = await pull(await teamRemote(), customTemplates());
+      const problems = replaceCustomTemplates(r.templates);
+      setTeamNote(
+        problems.length
+          ? `Team templates not loaded: ${problems.join("; ")}`
+          : `From the team: ${r.added.length} new, ${r.updated.length} updated` +
+              (r.staleParents.length ? `; built on an older parent: ${r.staleParents.join(", ")}` : "") +
+              (r.problems.length ? `; skipped: ${r.problems.join("; ")}` : ""),
+      );
+    } catch (e) {
+      setTeamNote(`Could not reach the team's templates: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   return (
     <div className="bm-page">
@@ -155,8 +195,11 @@ export default function BehaviourManager() {
           <p className="bm-sub">What units are offered at each decision, and how Jev is nudged to choose.</p>
         </div>
         <div className="bm-tabs" role="tablist" aria-label="View">
-          <button className="bm-btn" role="tab" aria-selected={!bench} data-variant={bench ? undefined : "primary"} onClick={() => showBench(false)}>
+          <button className="bm-btn" role="tab" aria-selected={!bench && !graph} data-variant={bench || graph ? undefined : "primary"} onClick={() => showBench(false)}>
             Templates
+          </button>
+          <button className="bm-btn" role="tab" aria-selected={graph} data-variant={graph ? "primary" : undefined} onClick={() => showView("graph")}>
+            Graph
           </button>
           <button className="bm-btn" role="tab" aria-selected={bench} data-variant={bench ? "primary" : undefined} onClick={() => showBench(true)}>
             Test bench
@@ -177,10 +220,22 @@ export default function BehaviourManager() {
           {mine.map((t) => (
             <ListItem key={t.id} t={t} current={t.id === selected?.id} onClick={() => select(t.id)} />
           ))}
+          <div className="bm-list-head">Team (Foundry)</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button className="bm-btn" onClick={() => void share()} disabled={!mine.length} title="Publish your templates to Foundry for the team">
+              Share yours
+            </button>
+            <button className="bm-btn" onClick={() => void getTeam()} title="Get the team's templates; the newer version of each wins">
+              Get the team's
+            </button>
+          </div>
+          {teamNote && <div className="bm-item-meta" style={{ padding: "4px" }}>{teamNote}</div>}
         </aside>
         <main className="bm-detail">
           {bench ? (
             <BehaviourBench initialTemplate={selected?.id ?? DEFAULT_TEMPLATE_ID} />
+          ) : graph && selected ? (
+            <BehaviourGraph template={selected} templates={templates} />
           ) : selected ? (
             <TemplateDetail
               key={selected.id}

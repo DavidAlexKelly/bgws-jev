@@ -79,6 +79,7 @@ import { EventStreamQueue } from "../data/eventStreamQueue";
 import { describeEntry, jevFailure, streamRow } from "./engine/feed";
 import { OVERLAY_SOURCES, overlayLayerSpecs, SOURCE } from "./overlayLayers";
 import { PRESET_SCENARIOS } from "./presets";
+import type { RtLogEntry } from "./engine/runner";
 import WorldPanel from "./WorldPanel";
 import { withWorld } from "./world/create";
 import { WORLD_LAYERS, WORLD_SOURCE, worldLayerSpecs, worldOverlay, type WorldLayer } from "./worldOverlays";
@@ -430,6 +431,8 @@ function UnitInspector(props: {
   id: string;
   viewpoint: Viewpoint;
   awaitingOrders: boolean;
+  /** Its behaviour template for this game, and why it has that one. */
+  behaviour?: { template: string; why: string };
   onClose: () => void;
 }) {
   const { state, id, viewpoint } = props;
@@ -531,6 +534,11 @@ function UnitInspector(props: {
         <Line label="purpose">{unit.mission.purpose}</Line>
       )}
       {props.awaitingOrders && <div style={{ ...subtle, color: "#e8c547" }}>New orders waiting: it is being asked how to comply.</div>}
+      {props.behaviour && (
+        <Line label="behaviour">
+          {props.behaviour.template} <span style={{ color: "#6a7292" }}>({props.behaviour.why})</span>
+        </Line>
+      )}
 
       <div style={{ ...groupTitle, marginTop: 8 }}>What it knows</div>
       <Line label="been seen?">
@@ -590,6 +598,30 @@ function UnitInspector(props: {
         </Line>
       ))}
     </>
+  );
+}
+
+/** A decision's walk through its template: the path, what was offered, what was taken away and why, and the odds Jev gave. */
+function DecisionPath({ entry }: { entry: Extract<RtLogEntry, { type: "decision" }> }) {
+  const t = entry.decision.trace;
+  return (
+    <div style={{ margin: "2px 0 4px 10px", borderLeft: "1px solid #2a3350", paddingLeft: 6, color: "#9aa3bb" }}>
+      {entry.walk ? (
+        <>
+          <div>template {entry.walk.template}: {entry.walk.path.join(" → ")}</div>
+          {entry.walk.dropped.length > 0 && <div>not offered: {entry.walk.dropped.map((d) => `${d.id} (${d.why === "removed" ? "the template removes it" : "its condition failed"})`).join(", ")}</div>}
+        </>
+      ) : (
+        <div>a drill or a single option: nothing to choose</div>
+      )}
+      <div>
+        offered:{" "}
+        {t.options
+          .map((o) => `${o.id === t.chosenId ? "▶ " : ""}${o.id}${t.probabilities?.[o.id] != null ? ` ${Math.round(t.probabilities[o.id] * 100)}%` : ""}`)
+          .join(" · ")}
+      </div>
+      <div>decided by {t.chosenBy}{t.fallback ? ` (fell back: ${t.fallback})` : ""}{t.rationale ? `: ${t.rationale}` : ""}</div>
+    </div>
   );
 }
 
@@ -653,6 +685,8 @@ export default function RealtimePlay() {
   const worldLayersRef = useRef(worldLayers);
   worldLayersRef.current = worldLayers;
   const [worldPanelOpen, setWorldPanelOpen] = useState(false);
+  /** The decision line opened in the feed, to show its walked path (DFG §5.3). */
+  const [openDecision, setOpenDecision] = useState<string | null>(null);
   const scopeCheck = useMemo(() => effectiveScope({ ...scope, durationMin: timeLimitMin }), [scope, timeLimitMin]);
   const chooseScenarioType = (type: ScenarioType) => {
     const next = scopeFor(type);
@@ -2351,7 +2385,14 @@ export default function RealtimePlay() {
                           : "#8a91a8",
               }}
             >
-              {describeEntry(entry)}
+              <span
+                onClick={entry.type === "decision" ? () => setOpenDecision((k) => (k === `${entry.time}-${index}` ? null : `${entry.time}-${index}`)) : undefined}
+                style={entry.type === "decision" ? { cursor: "pointer" } : undefined}
+                title={entry.type === "decision" ? "Click for how the behaviour template got here" : undefined}
+              >
+                {describeEntry(entry)}
+              </span>
+              {entry.type === "decision" && openDecision === `${entry.time}-${index}` && <DecisionPath entry={entry} />}
             </div>
           ))}
           </div>
@@ -2367,6 +2408,10 @@ export default function RealtimePlay() {
                 id={selectedId}
                 viewpoint={viewpoint}
                 awaitingOrders={runner?.awaitingOrders.includes(selectedId) ?? false}
+                behaviour={{
+                  template: runner?.config.behaviours?.[selectedId] ?? "its type's default",
+                  why: { scenario: "from the scenario file", side: "side assignment", asset: "the unit type's assignment" }[behaviourPlan().why[selectedId] ?? ""] ?? "built-in default for its kind",
+                }}
                 onClose={() => setSelectedId(null)}
               />
             ) : (

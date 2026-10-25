@@ -36,10 +36,11 @@
 import { distanceM } from "../../lib/board";
 import type { Side } from "../../lib/state";
 import { SIDES } from "../../lib/state";
-import type { RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
+import type { DecisionWalk, RtDecider, RtDecision, RtDecisionRequest } from "./deciders";
+import { landOptions, type LandTrace } from "../behaviour/actions/land";
 import { ruleDecider } from "./deciders";
 import type { Delivery } from "./comms";
-import { decisionPointOf, inContact, optionsAt, ruleFallback } from "./decisions";
+import { decisionPointOf, inContact, ruleFallback } from "./decisions";
 import { knownEnemies, remember, sendMessage, setOrder, tick } from "./engine";
 import type { RtConfig, RtEvent, RtShot, RtState, UnitOrders } from "./types";
 import type { WorldLogItem } from "../world/types";
@@ -73,6 +74,8 @@ export type RtLogEntry =
       summary: string;
       /** When it was asked for, and when it took effect. */
       askedAt: number;
+      /** How the behaviour template got there: its path and what it took away. */
+      walk?: DecisionWalk;
     }
   | { type: "flag"; time: number; side: Side; flag: RtFlag }
   /** A radio message, as it was heard (comms.ts). */
@@ -465,7 +468,9 @@ export class RealtimeRunner {
         const events = this.pending.get(unitId)!.events;
         const { point, event } = decisionPointOf(events)!;
         const orders = this.pendingOrders.get(unitId);
-        const options = optionsAt(state, unitId, point, event, config, { orders });
+        const trace: LandTrace = { steps: [] };
+        const options = landOptions(state, unitId, point, event, config, { orders }, trace);
+        const walk = trace.walk && trace.walk.kind === "choose" ? { template: trace.templateId ?? "core/default", path: trace.walk.path, dropped: trace.walk.dropped.map((d) => ({ id: d.id, why: d.why })) } : undefined;
         this.pending.delete(unitId);
         this.lastAsked.set(unitId, time);
         // A new order with nothing to choose (the fight ended meanwhile): it simply takes over.
@@ -473,7 +478,7 @@ export class RealtimeRunner {
           this.install(unitId, orders, true);
           continue;
         }
-        requests.push({ unitId, point, event, events, options, fallback: ruleFallback(state, unitId, point, options) });
+        requests.push({ unitId, point, event, events, options, fallback: ruleFallback(state, unitId, point, options), ...(walk ? { walk } : {}) });
       }
       if (requests.length === 0) continue;
 
@@ -599,6 +604,7 @@ export class RealtimeRunner {
           decision,
           summary: option.summary,
           askedAt: batch.askedAt,
+          ...(request!.walk ? { walk: request!.walk } : {}),
         });
       }
       if (batch.dueAt.size === 0) this.inflight.splice(this.inflight.indexOf(batch), 1);
