@@ -4,6 +4,11 @@ A Foundry-hosted React app for playing battlegroup-level engagements on real
 terrain, turn-based or real-time, with optional AI commanders. Moved here from
 the Mapplications repo.
 
+The real-time mode can also run a multi-domain world (drones, EW, air and air
+defence, naval, space, cyber, logistics, a joint kill web and HQs on simulated
+nets), with eight preset scenario types and a seat for a person at any HQ. See
+`src/apps/bgws/docs/plan/MULTI_DOMAIN_PLAN.md`, "Where it stands".
+
 ## Screens
 
 | Route          | Screen          | Source                                    |
@@ -35,6 +40,10 @@ in `src/apps/bgws/docs/`.
   datasets and media sets BGWS reads (terrain, asset cards, profiles, unit
   images, event stream, basemap), must be enabled on the application. Missing
   resources show up as 403s and blank maps or panels.
+- **Team behaviour templates** (optional): the `BgwsBehaviourTemplate` object
+  type and its create, edit and delete actions (`data/templateStore.ts`). Without
+  them, Share and Get team templates report the error and local templates still
+  work.
 - **Optional**: `VITE_OPENROUTER_API_KEY` enables the OpenRouter-backed JEV
   commander. Vite inlines `VITE_*` values into the shipped bundle, so the key is
   visible to every user of the site.

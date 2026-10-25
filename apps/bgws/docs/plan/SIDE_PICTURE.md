@@ -1,6 +1,6 @@
 # Side picture: one record of reports per side, not one per unit
 
-Status: **design, for review**. This is option B in `WORKER_AND_SCHEDULER.md`, step 4. There is no code yet.
+Status: **built** (`realtime/engine/picture.ts`; `picture.test.ts` guards that no unit picture comes back). This is option B in `WORKER_AND_SCHEDULER.md`, step 4. The HQs' fused pictures of the multi-domain plan (W4, `world/command/fusion.ts`) sit on top of it.
 
 ## 1. Why
 
