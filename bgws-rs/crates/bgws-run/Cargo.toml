@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 bgws-core.workspace = true
+bgws-behaviour.workspace = true
 bgws-catalogue.workspace = true
 bgws-scenario.workspace = true
 bgws-sim.workspace = true

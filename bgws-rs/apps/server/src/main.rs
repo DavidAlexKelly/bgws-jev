@@ -429,7 +429,12 @@ async fn main() -> Result<()> {
     let game_out = out.clone();
     let cfg = GameConfig { person: a.person, record: a.record, keyframe_s: a.keyframe_s };
     std::thread::spawn(move || game(host, cfg, inbox, game_out));
-    let app = Router::new().route("/", get(|| async { Html(VIEWER) })).route("/ws", get(ws)).with_state(AppState { out, to_game });
+    let behaviour = bgws_run::behaviour::builtin_html()?;
+    let app = Router::new()
+        .route("/", get(|| async { Html(VIEWER) }))
+        .route("/behaviour", get(move || async move { Html(behaviour) }))
+        .route("/ws", get(ws))
+        .with_state(AppState { out, to_game });
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], a.port));
     eprintln!("bgws-server: open http://{addr}/");
     let listener = tokio::net::TcpListener::bind(addr).await?;

@@ -157,6 +157,11 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// The Behaviour Manager page: every template's decision graphs and the action library.
+    Behaviour {
+        #[arg(long, default_value = "behaviour.html")]
+        html: PathBuf,
+    },
     /// Run a vignette as shipped and with figures changed, and compare (§16 workbench).
     Compare {
         vignette: String,
@@ -377,6 +382,10 @@ fn main() -> Result<()> {
             if !failing.is_empty() {
                 bail!("out of band: {}", failing.join(", "));
             }
+        }
+        Cmd::Behaviour { html } => {
+            std::fs::write(&html, bgws_run::behaviour::builtin_html()?)?;
+            eprintln!("Behaviour Manager written to {}", html.display());
         }
         Cmd::Compare { vignette, set, n, seed, html } => {
             let a_fig = default_figures();

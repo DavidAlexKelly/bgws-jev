@@ -540,6 +540,7 @@ dependencies = [
  "anyhow",
  "approx",
  "bgws-analysis",
+ "bgws-behaviour",
  "bgws-catalogue",
  "bgws-core",
  "bgws-decide",

@@ -18,6 +18,7 @@ target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
 target/release/bgws vignettes --html workbench.html  # the workbench page: each vignette against band and baseline
+target/release/bgws behaviour --html behaviour.html   # the Behaviour Manager: every template's decision graphs (also /behaviour on the server)
 target/release/bgws compare breach-time --set engineers.breach.rate_mph.line_charge=1000 --html cmp.html   # A/B a figure change
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
