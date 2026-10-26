@@ -1,6 +1,6 @@
 # BGWS in Rust: a local, GPU-assisted, physics-first simulation
 
-**Status:** plan, October 2026. **Scope:** a new, separate engine and desktop app, written in Rust. The simulation runs locally and uses the GPU where that helps. Jev and Claude stay decision makers, **called remotely at first** (Jev through OpenRouter, Claude through the Anthropic API); running a model locally is a later option behind the same interface (§10.5). The TypeScript engine is not replaced in place, and exact replay parity with it is not a goal.
+**Status:** built in `bgws-rs/`, October 2026 (§21 says where it stands); this text is still the design. **Scope:** a new, separate engine and desktop app, written in Rust. The simulation runs locally and uses the GPU where that helps. Jev and Claude stay decision makers, **called remotely at first** (Jev through OpenRouter, Claude through the Anthropic API); running a model locally is a later option behind the same interface (§10.5). The TypeScript engine is not replaced in place, and exact replay parity with it is not a goal.
 
 **How to read this:**
 
@@ -26,6 +26,7 @@
 | §18 | Roadmap: phases and "done when" |
 | §19 | What carries over from the TypeScript build |
 | §20 | Risks and open questions |
+| §21 | Where it stands: what is built |
 
 Evidence is cited as in the multi-domain plan: **[ref R4.3, P12]** points to `research/MODERN_WARFARE_REFERENCE.md`. **[default]** marks a value or method chosen without a source, awaiting one.
 
@@ -796,3 +797,21 @@ Total: about 90–110 weeks for one person; about 9–12 months for a team of th
 - How many of the research reference's unsourced areas can be closed with open sources: DF-to-strike, Western F2T2EA timings, sortie and tanker rates, ASW detection probabilities, radar and anti-ship missile detection ranges, jamming radius by power, readiness and repair rates?
 - Multiplayer: is it needed early enough to shape phase 4's host design? The sans-IO core supports it either way.
 - Should the browser build (the sim compiled to WASM with WebGPU) be maintained alongside the desktop one, or only the desktop?
+
+---
+
+## 21. Where it stands
+
+The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates and the per-phase table). In short:
+
+- **The workspace:** every crate in §3.1 exists. The models are split into `bgws-models` (land and people), `bgws-domains` (air, missiles, air defence, naval, space) and `bgws-ops` (comms, drones, EW, PNT, logistics, medical, C2, cyber, aggregation), so each can be tested without the ECS. `bgws-sim` runs them all behind the sans-IO API of §3.2.
+- **Phases 1–9** are in the sim and play in the shipped scenarios: the skirmishes and M2–M8, the 3-day M6 included. Determinism tests pass across seeds and thread counts, and game records replay exactly.
+- **Benchmark vignettes** are in their bands (§15.3), except detect-to-strike [P2] at about 5.3 min (the README's calibration backlog). The sensitivity analysis and research backlog run (`bgws sensitivity`).
+- **Deciders:** Jev (OpenRouter), Claude (Messages API), a local OpenAI-compatible model and recorded answers all sit behind one router, with fallbacks to the templates.
+- **Departures from this plan:**
+  - The host is a browser server (`bgws-server` and `web/viewer`) rather than Tauri.
+  - Event logs are JSONL rather than DuckDB.
+  - The catalogue loads from embedded JSON rather than SQLite.
+  - Missiles and air defence are modelled at the engagement level: kinematic flights, per-shot kill probabilities and kill chains, with no guidance-law or seeker models.
+  - The React screens are not yet wired to the Rust host. A typed client (`web/client`) is the boundary they would bind to.
+

@@ -10,6 +10,10 @@ cargo build --release
 target/release/bgws scenarios                        # the shipped scenarios
 target/release/bgws play skirmish-advance-to-contact-v1 --record game.json --events events.jsonl
 target/release/bgws replay game.json                 # exact replay, no model calls
+target/release/bgws branch game.json --at 30 --deciders jev   # "what if": replay to minute 30, play on
+target/release/bgws aar events.jsonl                 # after-action review
+target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, with the figures
+target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes                        # benchmark vignettes against their bands
 target/release/bgws sensitivity shahed-raid          # Morris + Sobol, the research backlog
@@ -45,6 +49,7 @@ fallbacks decide and the log says why.
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
 | `apps/server` | `bgws-server`: the game on its own thread, the map viewer over a WebSocket |
 | `web/viewer` | the viewer page: MapLibre + deck.gl when online, a plain canvas offline |
+| `web/types`, `web/client` | TypeScript types generated from Rust (`ts-rs`) and a typed client for the server |
 
 ## Rules the code keeps (plan §2)
 
@@ -61,18 +66,27 @@ fallbacks decide and the log says why.
 
 | Phase | State |
 |---|---|
-| 0 Spike | Workspace, core, ECS, terrain, CPU/GPU LOS twins. The desktop shell is the browser server (see below). |
+| 0 Spike | Workspace, core, ECS, terrain, CPU/GPU LOS twins, a brigade bench and Tracy spans (`--features profile`). The desktop shell is the browser server (see below). |
 | 1 Land tactical | Done: movement on trafficability with cost-raster routes, EO/IR sensing, tracks, direct fire, people, templates, rules decider, v3 converter, CLI. MBT Ph and attack-halt vignettes in band. |
 | 2 Deciders | Done: Jev, Claude, local and recorded deciders, batching, caching, timeouts, fallbacks, cost logging, exact replay. |
 | 3 Fires, engineers, sustainment | Done in the sim: calls for fire, adjust, Carleton lethality, counter-battery radar, displacement, minefields and breaching, digging in, stores. Breach time and counter-battery survival in band. |
 | 4 C2 and comms | Done: nets with link budgets, PACE, HQ COPs and staff queues, planning time, CCIRs, succession, orders over the nets. |
 | 5 Drones, EW, PNT | Done: drone flights and link dependence, the FPV strike chain, counter-drone, jammers, ESM/DF, GNSS and INS. FPV and precision-under-jamming in band; detect-to-strike just outside (backlog). |
 | 6 Air and air defence | Done: aircraft on tasks, sorties, munitions in flight, radar, kill chains and WTA, airspace. Shahed raid and sortie rates in band. |
-| 7 Logistics, medical, aggregation | Logistics, maintenance and medical done in the sim (culmination test, evacuation delays in band). Aggregation: see `domains/lod`. |
+| 7 Logistics, medical, aggregation | Done: logistics, maintenance and medical in the sim (culmination test, evacuation delays in band); level of detail with Lanchester attrition fitted against entity runs; quiet skipping. |
 | 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
 | 9 Space, cyber, kill web | Satellites and imagery, GNSS and satcom helpers, scripted space events, cyber access campaigns. |
-| 10 People and tools | HQ seats for a person (server), AAR data in the event log, inspectors via the viewer; the full React screens are not yet ported. |
+| 10 People and tools | A person's HQ seat and plans (server), the after-action review and per-unit inspector (`bgws aar`, `bgws why`), "what if" branches (`bgws branch`), theatre packs (`bgws pack`); the full React screens are not yet ported. |
 | 11 Calibration | The vignette suite, sensitivity and the research backlog run; the campaign itself is ongoing. |
+
+### Performance (this 4-core container, release build)
+
+| Case | Measured |
+|---|---|
+| Brigade, 2,000 land entities, whole tick | about 47 ms per simulated second (×21) |
+| M6 sustained offensive, 47 forces, 72 h | 90 s wall (×2,900) |
+| M7 littoral, 24 h / M8 joint strike, 24 h | 25 s / 20 s wall |
+| Skirmish batch, rules deciders | about 0.1 s per game |
 
 ### Calibration backlog
 
@@ -81,6 +95,8 @@ fallbacks decide and the log says why.
 - **Lethality:** meeting engagements in open ground end within a minute or two.
   Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
   fire are worth checking against playtests.
+- **Morale:** a unit can cascade from steady to routed within seconds under
+  heavy fire. The hazard rates in `bgws_models::people` want playtesting.
 - **Mostly unsourced figures:** most figures are `[default]`.
   `bgws sensitivity <vignette>` ranks which ones matter.
 
@@ -88,9 +104,11 @@ fallbacks decide and the log says why.
 
 - **No Tauri desktop shell:** this environment has no WebKitGTK. The host runs
   in-process in `bgws-server` and the viewer is a web page.
-- **TypeScript types for the UI** (`ts-rs`) are not generated yet.
 - **The React screens** from the TypeScript build are not wired to the Rust host
-  yet.
+  yet. `web/client/bgwsClient.ts` is the typed boundary they would bind to. A
+  `RunnerHandle` adapter would map frames onto the TS engine's `RtState`.
+- **Snapshots** are JSON for inspection; a game restarts from a moment by
+  replaying its record (`bgws branch`), not by restoring a snapshot.
 - **Event logs** are JSONL; DuckDB is not used, because it needs a C++ build.
 - **Missile and air-defence models** work at the engagement level: kinematic
   flights, per-shot kill probabilities and kill chains. They do not model
