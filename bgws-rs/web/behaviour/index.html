@@ -52,6 +52,15 @@
   th { color: var(--ink-2); }
   h2 { font-size: 16px; margin: 28px 0 8px; }
   .muted { color: var(--muted); }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .bar button, #editor button, #editor input, #editor select, #editor textarea { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
+  .bar button, #editor button { cursor: pointer; }
+  #editor { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+  #editor label { display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: start; margin: 6px 0; font-size: 13px; color: var(--ink-2); }
+  #editor textarea { min-height: 60px; resize: vertical; }
+  #editor td { font-size: 13px; }
+  #edit-status { white-space: pre-wrap; font-size: 13px; margin-top: 6px; }
+  #edit-status.bad { color: #d03b3b; }
   #tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; display: none; max-width: 360px; white-space: pre-wrap; z-index: 9; }
 </style>
 </head>
@@ -60,6 +69,16 @@
   <nav><input id="q" placeholder="Find a template" aria-label="Find a template"><div id="list"></div></nav>
   <main>
     <div id="head"></div>
+    <div class="bar" id="bar"></div>
+    <section id="editor" hidden>
+      <label>Id <span>custom/<input id="ed-name" placeholder="armour-stand-fast" style="width:60%"></span></label>
+      <label>Display name <input id="ed-title"></label>
+      <label>Doctrine <textarea id="ed-doctrine" placeholder="Added to the parent's doctrine for every question"></textarea></label>
+      <p class="muted">Options of every ask node in the parent's graph: remove takes an option away; a bias tells the decider it is discouraged (−) or preferred (+).</p>
+      <div style="overflow-x:auto"><table id="ed-options"></table></div>
+      <div class="bar"><button id="ed-save">Save</button><button id="ed-cancel">Cancel</button></div>
+      <div id="edit-status"></div>
+    </section>
     <div class="triggers" id="triggers"></div>
     <div class="graph"><svg id="g" role="img"></svg></div>
     <p class="muted">Ask: a decider picks one option (the fallback when it cannot). Rule: the first case that holds. Drill: no question. Struck-through options are removed by this template or an ancestor; a bias nudges the decider without removing anything.</p>
@@ -70,9 +89,11 @@
 <div id="tip"></div>
 <script type="application/json" id="data">__BGWS_DATA__</script>
 <script>
-const D = JSON.parse(document.getElementById("data").textContent);
+let D = JSON.parse(document.getElementById("data").textContent);
+// Editing needs the host (bgws-server or bgws-desktop); a saved page is read-only.
+const EDITABLE = location.protocol.startsWith("http");
 const NS = "http://www.w3.org/2000/svg", tip = document.getElementById("tip");
-const ACT = new Map(D.actions.map((a) => [a.name, a]));
+let ACT = new Map(D.actions.map((a) => [a.name, a]));
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const label = (a) => (ACT.get(a) ? ACT.get(a).label : a);
 function cond(c) {
@@ -118,6 +139,7 @@ function select(id, trig) {
     <div class="chips">${r.lineage.map((l, i) => `<span class="chip">${i ? "inherits " : ""}${esc(l)}</span>`).join("")}${current.archetype ? `<span class="chip">default for ${esc(current.archetype)}</span>` : ""}</div>
     ${r.doctrine.map((d) => `<p class="doctrine">${esc(d)}</p>`).join("")}
     ${own.remove ? `<p class="muted">Removes: ${own.remove.map(esc).join(", ")}</p>` : ""}${own.bias ? `<p class="muted">Bias: ${Object.entries(own.bias).map(([k, v]) => `${esc(k)} ${v > 0 ? "+" : ""}${v}`).join(", ")}</p>` : ""}`;
+  bar();
   const tb = document.getElementById("triggers");
   tb.innerHTML = "";
   for (const t of triggers) {
@@ -129,6 +151,77 @@ function select(id, trig) {
   }
   renderList();
   draw();
+}
+
+// ── Editing: variants in the library (data/templates/custom/) ────────────
+function bar() {
+  const b = document.getElementById("bar");
+  b.innerHTML = "";
+  if (!EDITABLE) return;
+  const add = (text, fn) => { const x = document.createElement("button"); x.textContent = text; x.onclick = fn; b.appendChild(x); };
+  add("Make a variant", () => openEditor(null));
+  if (current.custom) {
+    add("Edit", () => openEditor(current));
+    add("Delete", async () => {
+      if (!confirm(`Delete ${current.id}?`)) return;
+      const r = await fetch(`/api/templates/${encodeURIComponent(current.id.slice("custom/".length))}`, { method: "DELETE" }).then((x) => x.json());
+      if (r.ok) await refresh(current.own.parent || "core/default");
+      else alert(r.errors.join("\n"));
+    });
+  }
+}
+let editing = null;
+/** The options a template's ask nodes offer: id → where, and its action. */
+function optionsOf(t) {
+  const out = new Map();
+  for (const n of Object.values(t.resolved.nodes)) if (n.kind === "choose") for (const o of n.options) {
+    const e = out.get(o.id) || { action: o.action, where: [] };
+    if (!e.where.includes(n.title)) e.where.push(n.title);
+    out.set(o.id, e);
+  }
+  return out;
+}
+function openEditor(t) {
+  // A new variant inherits from the template shown; an edit keeps its parent.
+  const parentId = t ? t.own.parent : current.id;
+  const parent = D.templates.find((x) => x.id === parentId);
+  editing = { id: t ? t.id : null, parent: parentId };
+  const own = t ? t.own : {};
+  document.getElementById("ed-name").value = t ? t.id.slice("custom/".length) : "";
+  document.getElementById("ed-name").disabled = !!t;
+  document.getElementById("ed-title").value = own.name || "";
+  document.getElementById("ed-doctrine").value = own.doctrine || "";
+  const removed = new Set(own.remove || []), bias = own.bias || {};
+  document.getElementById("ed-options").innerHTML = `<tr><th>Option</th><th>Where</th><th>Remove</th><th>Bias</th></tr>` +
+    [...optionsOf(parent)].sort(([a], [b]) => a.localeCompare(b)).map(([id, o]) => `<tr><td>${esc(id)} <span class="muted">→ ${esc(label(o.action))}</span></td><td class="muted">${esc(o.where.slice(0, 3).join(", "))}${o.where.length > 3 ? "…" : ""}</td>
+      <td><input type="checkbox" data-remove="${esc(id)}" ${removed.has(id) ? "checked" : ""} aria-label="remove ${esc(id)}"></td>
+      <td><select data-bias="${esc(id)}" aria-label="bias for ${esc(id)}">${["", -2, -1, 0, 1, 2].map((v) => `<option value="${v}" ${String(bias[id] ?? "") === String(v) ? "selected" : ""}>${v === "" ? "—" : v > 0 ? "+" + v : v}</option>`).join("")}</select></td></tr>`).join("");
+  document.getElementById("edit-status").textContent = `Inherits ${parentId}.`;
+  document.getElementById("edit-status").className = "";
+  document.getElementById("editor").hidden = false;
+}
+document.getElementById("ed-cancel").onclick = () => (document.getElementById("editor").hidden = true);
+document.getElementById("ed-save").onclick = async () => {
+  const name = document.getElementById("ed-name").value.trim();
+  const t = { id: editing.id || `custom/${name}`, version: 1, parent: editing.parent };
+  const title = document.getElementById("ed-title").value.trim(), doctrine = document.getElementById("ed-doctrine").value.trim();
+  if (title) t.name = title;
+  if (doctrine) t.doctrine = doctrine;
+  const remove = [...document.querySelectorAll("[data-remove]")].filter((x) => x.checked).map((x) => x.dataset.remove);
+  if (remove.length) t.remove = remove;
+  const bias = Object.fromEntries([...document.querySelectorAll("[data-bias]")].filter((x) => x.value !== "").map((x) => [x.dataset.bias, Number(x.value)]));
+  if (Object.keys(bias).length) t.bias = bias;
+  const st = document.getElementById("edit-status");
+  st.textContent = "checking…"; st.className = "";
+  const r = await fetch("/api/templates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(t) }).then((x) => x.json(), () => ({ ok: false, errors: ["the host did not answer"] }));
+  if (!r.ok) { st.textContent = "Not saved:\n- " + r.errors.join("\n- "); st.className = "bad"; return; }
+  document.getElementById("editor").hidden = true;
+  await refresh(t.id);
+};
+async function refresh(id) {
+  D = await fetch("/api/behaviour").then((x) => x.json());
+  ACT = new Map(D.actions.map((a) => [a.name, a]));
+  select(D.templates.some((t) => t.id === id) ? id : D.templates[0].id, trigger);
 }
 
 // The graph: columns by depth from the trigger's start node; options and drills end in actions.

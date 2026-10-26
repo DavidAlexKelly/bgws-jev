@@ -13,12 +13,15 @@ target/release/bgws replay game.json                 # exact replay, no model ca
 target/release/bgws branch game.json --at 30 --deciders jev   # "what if": replay to minute 30, play on
 target/release/bgws aar events.jsonl                 # after-action review
 target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, with the figures
+cargo build --release -p bgws-run --features duckdb  # event logs as DuckDB databases (builds DuckDB, ~25 min)
+target/release/bgws play m4-drone-line --events game.duckdb
+target/release/bgws events game.duckdb --sql "SELECT kind, count(*) FROM events WHERE side = 'blue' GROUP BY kind"
 target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
 target/release/bgws vignettes --html workbench.html  # the workbench page: each vignette against band and baseline
-target/release/bgws behaviour --html behaviour.html   # the Behaviour Manager: every template's decision graphs (also /behaviour on the server)
+target/release/bgws behaviour --html behaviour.html   # the Behaviour Manager: every template's decision graphs (/behaviour on the server also makes and edits variants)
 target/release/bgws compare breach-time --set engineers.breach.rate_mph.line_charge=1000 --html cmp.html   # A/B a figure change
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
@@ -82,7 +85,7 @@ fallbacks decide and the log says why.
 | 7 Logistics, medical, aggregation | Done: logistics, maintenance and medical in the sim (culmination test, evacuation delays in band); level of detail with Lanchester attrition fitted against entity runs; quiet skipping. |
 | 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
 | 9 Space, cyber, kill web | Satellites and imagery, GNSS and satcom helpers, scripted space events, cyber access campaigns. |
-| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains in progress, a spectrum view, the per-unit *Why?* inspector, a detection inspector (why a unit sees another or not, with every factor), a link-budget inspector (each message hop by hop: queueing, airtime, attempts, SINR, fallbacks) and the after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`); a scenario editor (`/editor`: theatre, time, weather, forces from the catalogue placed on a map, checked, saved or loaded into the game); the Behaviour Manager's graph view (`/behaviour`); the analysis workbench (`--html`, `bgws compare`). The full React screens are not yet ported. |
+| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains in progress, a spectrum view, the per-unit *Why?* inspector, a detection inspector (why a unit sees another or not, with every factor), a link-budget inspector (each message hop by hop: queueing, airtime, attempts, SINR, fallbacks) and the after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`); a scenario editor (`/editor`: theatre, time, weather, forces from the catalogue placed on a map, checked, saved or loaded into the game); the Behaviour Manager (`/behaviour`: graph views, and variants of any template made, checked and saved to `data/templates/custom/`, which the editor assigns to forces); the analysis workbench (`--html`, `bgws compare`). The full React screens are not yet ported. |
 | 11 Calibration | The vignette suite, sensitivity and the research backlog run; the campaign itself is ongoing. |
 
 ### Performance (this 4-core container, release build)
@@ -135,7 +138,10 @@ fallbacks decide and the log says why.
   *Branch here* on the server's timeline), which is exact: a branch played on
   with the same deciders ends with the same fingerprint. The server scrubs
   through keyframes of each view (`--keyframe-s`), not snapshots.
-- **Event logs** are JSONL; DuckDB is not used, because it needs a C++ build.
+- **Event logs** are JSONL by default. With `--features duckdb` a log named
+  `*.duckdb` is a DuckDB table (`events`, the figures in `data` as JSON) that
+  `bgws events` queries with SQL; `bgws aar` and `bgws why` read either.
+  DuckDB is a feature because it compiles from C++.
 - **Missile and air-defence models** work at the engagement level: kinematic
   flights, per-shot kill probabilities and kill chains. They do not model
   guidance laws or seekers.

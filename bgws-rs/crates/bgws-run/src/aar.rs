@@ -6,21 +6,11 @@
 
 use bgws_core::{LogEvent, Side, SimTime};
 use std::collections::BTreeMap;
-use std::io::BufRead;
 use std::path::Path;
 
-/// Read an event log written by `bgws play --events`.
+/// Read an event log written by `bgws play --events` (JSONL or DuckDB).
 pub fn read_log(path: &Path) -> anyhow::Result<Vec<LogEvent>> {
-    let f = std::io::BufReader::new(std::fs::File::open(path)?);
-    let mut out = Vec::new();
-    for (i, line) in f.lines().enumerate() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        out.push(serde_json::from_str(&line).map_err(|e| anyhow::anyhow!("line {}: {e}", i + 1))?);
-    }
-    Ok(out)
+    crate::eventlog::read_log(path)
 }
 
 fn side_word(s: Option<Side>) -> &'static str {

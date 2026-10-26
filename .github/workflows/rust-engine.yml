@@ -50,6 +50,17 @@ jobs:
           xvfb-run -a target/release/bgws-desktop skirmish-advance-to-contact-v1 --deciders rules --smoke-s 2 2>&1 | tee desktop.log
           grep -q "bgws-desktop: loaded http://127.0.0.1" desktop.log
 
+  duckdb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bgws-rs
+      - name: Event logs as DuckDB databases (builds DuckDB from C++)
+        run: cargo test --release -p bgws-run --features duckdb --lib eventlog
+
   vignettes:
     runs-on: ubuntu-latest
     steps:

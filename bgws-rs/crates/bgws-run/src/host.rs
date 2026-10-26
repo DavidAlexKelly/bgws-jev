@@ -10,7 +10,6 @@ use bgws_scenario::record::{BuildInfo, CommandKind, GameRecord, MachineInfo, Rec
 use bgws_scenario::v4::{Decider, ScenarioV4};
 use bgws_sim::{SeatKind, Sim, SimOptions, Step};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -146,7 +145,7 @@ pub struct Host {
     pub router: Router,
     pub record: GameRecord,
     rt: tokio::runtime::Runtime,
-    events_out: Option<std::io::BufWriter<std::fs::File>>,
+    events_out: Option<Box<dyn crate::eventlog::EventSink>>,
     /// Answers from a record, for a replay: questions are answered from here only.
     replay: Option<GameRecord>,
     /// The next recorded command a replay applies.
@@ -246,7 +245,7 @@ impl Host {
     }
 
     pub fn write_events_to(&mut self, path: &Path) -> Result<()> {
-        self.events_out = Some(std::io::BufWriter::new(std::fs::File::create(path)?));
+        self.events_out = Some(crate::eventlog::open_sink(path)?);
         Ok(())
     }
 
@@ -321,11 +320,7 @@ impl Host {
     fn flush_events(&mut self) -> Result<()> {
         let events: Vec<LogEvent> = self.sim.drain_events();
         if let Some(w) = &mut self.events_out {
-            for e in &events {
-                serde_json::to_writer(&mut *w, e)?;
-                w.write_all(b"\n")?;
-            }
-            w.flush()?;
+            w.write(&events)?;
         }
         Ok(())
     }

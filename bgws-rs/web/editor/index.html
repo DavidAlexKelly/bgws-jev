@@ -54,7 +54,7 @@
     <h2>Forces</h2>
     <div class="row"><button id="add">Add a force</button><span class="muted" style="color:var(--muted);font-size:12px">Select a row, then click the map to place it.</span></div>
     <datalist id="platforms"></datalist>
-    <table><thead><tr><th>Id</th><th>Side</th><th>Platform</th><th>Count</th><th>Quality</th><th></th></tr></thead><tbody id="forces"></tbody></table>
+    <table><thead><tr><th>Id</th><th>Side</th><th>Platform</th><th>Count</th><th>Quality</th><th>Behaviour</th><th></th></tr></thead><tbody id="forces"></tbody></table>
     <h2>Save</h2>
     <div class="row"><button id="check">Check</button><button id="download">Download JSON</button><button id="load">Load into the game</button></div>
     <div id="status"></div>
@@ -73,6 +73,24 @@ for (const p of D.presets) $("preset").add(new Option(p.scenario.name, p.id));
 for (const w of D.weather) $("weather").add(new Option(w, w));
 $("platforms").innerHTML = D.platforms.map((p) => `<option value="${p.id}">${p.name} (${p.domain}, ${p.role})</option>`).join("");
 const platformName = new Map(D.platforms.map((p) => [p.id, p.name]));
+// Behaviour templates: the shipped ones and the custom library (made in the Behaviour Manager).
+const templateOptions = `<option value="">platform default</option>` + D.templates.map((t) => `<option value="${t.id}">${t.custom ? "★ " : ""}${t.name || t.id}</option>`).join("");
+const behaviours = () => (sc.behaviours = sc.behaviours || { assign: {}, templates: [] }, sc.behaviours.assign = sc.behaviours.assign || {}, sc.behaviours);
+/** Put the custom templates the forces use, and their custom ancestors, into the scenario. */
+function withTemplates() {
+  const b = behaviours(), lib = new Map(D.custom.map((t) => [t.id, t]));
+  const keep = (b.templates || []).filter((t) => !lib.has(t.id));
+  const need = [], todo = Object.values(b.assign).filter((id) => lib.has(id));
+  while (todo.length) {
+    const id = todo.pop();
+    if (need.some((t) => t.id === id) || !lib.has(id)) continue;
+    const t = lib.get(id);
+    need.push(t);
+    if (t.parent) todo.push(t.parent);
+  }
+  b.templates = [...keep, ...need];
+  return sc;
+}
 
 function loadPreset(id) {
   sc = JSON.parse(JSON.stringify(D.presets.find((p) => p.id === id).scenario));
@@ -121,15 +139,20 @@ function table() {
       <td><input list="platforms" value="${f.platform}" data-k="platform" title="${platformName.get(f.platform) || "unknown platform"}"></td>
       <td><input type="number" min="1" value="${f.count}" data-k="count" style="width:4em"></td>
       <td><select data-k="quality">${["conscript", "regular", "veteran", "elite"].map((q) => `<option ${(f.quality || "regular") === q ? "selected" : ""}>${q}</option>`).join("")}</select></td>
+      <td><select data-b aria-label="Behaviour template">${templateOptions}</select></td>
       <td><button title="Remove">✕</button></td>`;
     tr.onclick = (ev) => { if (ev.target.tagName === "BUTTON") return; selected = i; for (const r of tb.children) r.className = ""; tr.className = "sel"; hint(); draw(); };
+    const bsel = tr.querySelector("[data-b]");
+    bsel.value = behaviours().assign[f.id] || "";
+    bsel.onchange = () => { if (bsel.value) behaviours().assign[f.id] = bsel.value; else delete behaviours().assign[f.id]; };
     for (const inp of tr.querySelectorAll("[data-k]")) inp.onchange = (ev) => {
       const k = ev.target.dataset.k;
+      if (k === "id" && behaviours().assign[f.id]) { behaviours().assign[ev.target.value] = behaviours().assign[f.id]; delete behaviours().assign[f.id]; }
       f[k] = k === "count" ? Math.max(1, Number(ev.target.value)) : ev.target.value;
       if (k === "id") f.label = f.label && f.label !== f.id ? f.label : ev.target.value;
       draw();
     };
-    tr.querySelector("button").onclick = () => { sc.forces.splice(i, 1); selected = null; table(); draw(); };
+    tr.querySelector("button").onclick = () => { delete behaviours().assign[f.id]; sc.forces.splice(i, 1); selected = null; table(); draw(); };
     tb.appendChild(tr);
   });
   hint();
@@ -191,16 +214,20 @@ let ws = null;
 function connect() {
   if (ws && ws.readyState <= 1) return ws;
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.binaryType = "arraybuffer";
   ws.onmessage = (m) => {
+    // The game's binary position updates are for the viewer.
+    if (typeof m.data !== "string") return;
     const msg = JSON.parse(m.data);
     if (msg.kind === "checked") status(msg.errors.length ? "Problems:\n- " + msg.errors.join("\n- ") : (msg.loaded ? "Loaded into the game: open the viewer and press Play." : "No problems found."), msg.errors.length ? "bad" : "good");
   };
   return ws;
 }
 function sendWhenOpen(o) { const w = connect(); if (w.readyState === 1) w.send(JSON.stringify(o)); else w.addEventListener("open", () => w.send(JSON.stringify(o)), { once: true }); }
-$("check").onclick = () => { status("checking…"); sendWhenOpen({ kind: "check", scenario: sc }); };
-$("load").onclick = () => { if (confirm("Replace the running game with this scenario?")) { status("loading…"); sendWhenOpen({ kind: "load", scenario: sc }); } };
+$("check").onclick = () => { status("checking…"); sendWhenOpen({ kind: "check", scenario: withTemplates() }); };
+$("load").onclick = () => { if (confirm("Replace the running game with this scenario?")) { status("loading…"); sendWhenOpen({ kind: "load", scenario: withTemplates() }); } };
 $("download").onclick = () => {
+  withTemplates();
   sc.savedAt = new Date().toISOString();
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(sc, null, 2)], { type: "application/json" }));

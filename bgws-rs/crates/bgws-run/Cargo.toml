@@ -28,6 +28,8 @@ bgws-env.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
+# Event logs as DuckDB databases (`--features duckdb`; builds DuckDB from source).
+duckdb = { version = "1", features = ["bundled", "json"], optional = true }
 clap.workspace = true
 tokio.workspace = true
 rayon.workspace = true
@@ -37,3 +39,6 @@ tiff = "0.9"
 
 [dev-dependencies]
 approx.workspace = true
+
+[features]
+duckdb = ["dep:duckdb"]

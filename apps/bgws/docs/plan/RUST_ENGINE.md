@@ -812,8 +812,8 @@ The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates 
 - **Tools (§16):** the server's map viewer has the timeline scrubber and branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains, a spectrum view, an HQ console for a person's orders, and inspectors for detections (every factor), messages (the link budget hop by hop), a unit's history and the after-action review. `/editor` edits scenarios and loads them into the game; `/behaviour` draws every template's decision graphs; `bgws vignettes --html`, `bgws sensitivity --html` and `bgws compare` write the analysis workbench. Frames go as JSON with binary position updates between them.
 - **Departures from this plan:**
   - The desktop shell (`bgws-desktop`, Tauri 2) runs the host in-process and shows the server's pages; its window talks to the host over a localhost WebSocket rather than Tauri's IPC, so the same pages serve a browser (`bgws-server`).
-  - Event logs are JSONL rather than DuckDB.
+  - Event logs are JSONL by default and DuckDB with the `duckdb` feature (it compiles DuckDB from C++).
   - The catalogue loads from embedded JSON rather than SQLite.
   - Missiles and air defence are modelled at the engagement level: kinematic flights, per-shot kill probabilities and kill chains, with no guidance-law or seeker models.
-  - The React screens reach the Rust engine through `RustRunner` (a `RunnerHandle` over `bgws-server`'s WebSocket) rather than a `TauriRunner`; the server's deciders decide, and the screens' own Jev and commander do not. The Behaviour Manager page is read-only (templates are edited as files).
+  - The React screens reach the Rust engine through `RustRunner` (a `RunnerHandle` over `bgws-server`'s WebSocket) rather than a `TauriRunner`; the server's deciders decide, and the screens' own Jev and commander do not. The Behaviour Manager makes and edits variants (a library in `data/templates/custom/`), not the shipped templates.
 

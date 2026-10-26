@@ -23,8 +23,12 @@ pub fn data(scenarios_dir: &Path) -> Result<Value> {
         }
     }
     let platforms: Vec<Value> = cat.platforms().map(|p| json!({ "id": p.id, "name": p.name, "domain": p.domain, "role": p.role, "class": p.class })).collect();
+    // Behaviour templates to assign: the shipped ones and the custom library.
+    let lib = crate::behaviour::library(&crate::behaviour::library_dir())?;
+    let reg = bgws_behaviour::Registry::with_custom(&lib, &bgws_behaviour::Vocabulary::builtin(), bgws_behaviour::LoadMode::Strict).map_err(|e| anyhow!("{e}"))?;
+    let templates: Vec<Value> = reg.templates().iter().map(|(id, t)| json!({ "id": id, "name": t.name, "custom": id.starts_with("custom/") })).collect();
     let weather: Vec<Value> = [Weather::Clear, Weather::Overcast, Weather::Rain, Weather::Fog, Weather::Snow, Weather::Storm].iter().map(|w| serde_json::to_value(w).unwrap_or_default()).collect();
-    Ok(json!({ "presets": presets, "platforms": platforms, "weather": weather }))
+    Ok(json!({ "presets": presets, "platforms": platforms, "weather": weather, "templates": templates, "custom": lib }))
 }
 
 pub fn html(scenarios_dir: &Path) -> Result<String> {

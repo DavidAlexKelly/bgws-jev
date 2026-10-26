@@ -11,6 +11,7 @@
 //! bgws vignettes [--only id] [-n 200] [--store dir]   benchmark vignettes; regression against a baseline
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
 //! bgws aar <events.jsonl>                the after-action review
+//! bgws events <events.duckdb> [--sql Q]  SQL over a game's events (needs --features duckdb)
 //! bgws why <events.jsonl> <unit>          what happened to or by a unit, and why
 //! bgws figures [--markdown]               the figures registry report
 //! bgws platform <id>                      a resolved catalogue record and its munitions
@@ -175,6 +176,12 @@ enum Cmd {
         /// Also write the workbench page with the two side by side.
         #[arg(long)]
         html: Option<PathBuf>,
+    },
+    /// SQL over a game's event log (table `events`); with no query, events by kind.
+    Events {
+        log: PathBuf,
+        #[arg(long)]
+        sql: Option<String>,
     },
     /// The after-action review of a game's event log (`play --events`).
     Aar { events: PathBuf },
@@ -382,6 +389,10 @@ fn main() -> Result<()> {
             if !failing.is_empty() {
                 bail!("out of band: {}", failing.join(", "));
             }
+        }
+        Cmd::Events { log, sql } => {
+            let t = bgws_run::eventlog::query(&log, sql.as_deref().unwrap_or(bgws_run::eventlog::SUMMARY_SQL))?;
+            print!("{}", t.markdown());
         }
         Cmd::Behaviour { html } => {
             std::fs::write(&html, bgws_run::behaviour::builtin_html()?)?;

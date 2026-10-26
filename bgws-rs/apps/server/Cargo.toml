@@ -17,6 +17,7 @@ path = "src/main.rs"
 bgws-core.workspace = true
 bgws-sim.workspace = true
 bgws-run.workspace = true
+bgws-behaviour.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

@@ -97,3 +97,7 @@ debug = false
 
 [profile.release]
 debug = "line-tables-only"
+
+# DuckDB (the `duckdb` feature) compiles from C++; without debug info its objects are a fraction of the size.
+[profile.release.package.libduckdb-sys]
+debug = false

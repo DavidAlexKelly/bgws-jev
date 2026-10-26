@@ -16,9 +16,10 @@
 
 use anyhow::{anyhow, Result};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{Path as UrlPath, State};
 use axum::response::{Html, IntoResponse};
-use axum::routing::get;
+use axum::routing::{delete, get, post};
+use axum::Json;
 use axum::Router;
 use bgws_core::{Answer, AnswerSource, Question, QuestionId, Seed, Side, SimDuration, SimTime};
 use bgws_run::{default_figures, load_scenario, DeciderChoice, Host, HostOptions};
@@ -498,6 +499,48 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
     }
 }
 
+// ── The Behaviour Manager's library (custom templates as files) ───────────
+
+fn scenarios_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios")
+}
+
+async fn editor_page() -> axum::response::Response {
+    match bgws_run::editor::html(&scenarios_dir()) {
+        Ok(h) => Html(h).into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn behaviour_page() -> axum::response::Response {
+    match bgws_run::behaviour::library_html(&bgws_run::behaviour::library_dir()) {
+        Ok(h) => Html(h).into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn behaviour_data() -> axum::response::Response {
+    match bgws_run::behaviour::registry_with(&bgws_run::behaviour::library_dir()) {
+        Ok(r) => Json(bgws_run::behaviour::data(&r)).into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn save_template(Json(t): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    let errors = match serde_json::from_value::<bgws_behaviour::Template>(t) {
+        Ok(t) => bgws_run::behaviour::save(&bgws_run::behaviour::library_dir(), &t).err().unwrap_or_default(),
+        Err(e) => vec![format!("not a template: {e}")],
+    };
+    Json(json!({ "ok": errors.is_empty(), "errors": errors }))
+}
+
+async fn delete_template(UrlPath(name): UrlPath<String>) -> Json<serde_json::Value> {
+    match bgws_run::behaviour::delete(&bgws_run::behaviour::library_dir(), &format!("custom/{name}")) {
+        Ok(()) => Json(json!({ "ok": true, "errors": [] })),
+        Err(e) => Json(json!({ "ok": false, "errors": [e.to_string()] })),
+    }
+}
+
 async fn ws(upgrade: WebSocketUpgrade, State(st): State<AppState>) -> impl IntoResponse {
     upgrade.on_upgrade(move |socket| client(socket, st))
 }
@@ -542,12 +585,17 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
     let game_out = out.clone();
     let cfg = GameConfig { person: a.person, opts: opts.clone(), record: a.record, keyframe_s: a.keyframe_s };
     std::thread::spawn(move || game(host, cfg, inbox, game_out));
-    let behaviour = bgws_run::behaviour::builtin_html()?;
-    let editor = bgws_run::editor::html(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios"))?;
+    // Fail early if the custom library does not load.
+    bgws_run::behaviour::library_html(&bgws_run::behaviour::library_dir())?;
+    // Fail early if the editor's data does not load; it is rebuilt per request (new templates appear).
+    bgws_run::editor::html(&scenarios_dir())?;
     let app = Router::new()
         .route("/", get(|| async { Html(VIEWER) }))
-        .route("/behaviour", get(move || async move { Html(behaviour) }))
-        .route("/editor", get(move || async move { Html(editor) }))
+        .route("/behaviour", get(behaviour_page))
+        .route("/api/behaviour", get(behaviour_data))
+        .route("/api/templates", post(save_template))
+        .route("/api/templates/:name", delete(delete_template))
+        .route("/editor", get(editor_page))
         .route("/ws", get(ws))
         .with_state(AppState { out, to_game });
     let listener = tokio::net::TcpListener::bind(std::net::SocketAddr::from(([127, 0, 0, 1], a.port))).await?;
