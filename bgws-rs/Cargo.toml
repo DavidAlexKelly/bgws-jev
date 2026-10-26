@@ -17,6 +17,26 @@ members = [
   "crates/bgws-analysis",
   "crates/bgws-run",
   "apps/server",
+  "apps/desktop",
+]
+# The desktop shell needs WebKitGTK (libwebkit2gtk-4.1-dev); build it with -p bgws-desktop.
+default-members = [
+  "crates/bgws-core",
+  "crates/bgws-catalogue",
+  "crates/bgws-env",
+  "crates/bgws-prop",
+  "crates/bgws-gpu",
+  "crates/bgws-know",
+  "crates/bgws-behaviour",
+  "crates/bgws-scenario",
+  "crates/bgws-models",
+  "crates/bgws-domains",
+  "crates/bgws-ops",
+  "crates/bgws-sim",
+  "crates/bgws-decide",
+  "crates/bgws-analysis",
+  "crates/bgws-run",
+  "apps/server",
 ]
 
 [workspace.package]

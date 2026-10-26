@@ -23,6 +23,8 @@ target/release/bgws compare breach-time --set engineers.breach.rate_mph.line_cha
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
 target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/ (/editor, /behaviour)
+cargo build --release -p bgws-desktop                # the desktop shell (needs libwebkit2gtk-4.1-dev)
+target/release/bgws-desktop m4-drone-line --deciders rules   # the same game and pages in a native window
 ```
 
 Deciders: `--deciders rules|jev|claude|local` (or as the scenario says).
@@ -50,7 +52,8 @@ fallbacks decide and the log says why.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
-| `apps/server` | `bgws-server`: the game on its own thread, the map viewer over a WebSocket |
+| `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, the viewer, editor and Behaviour Manager over HTTP and a WebSocket |
+| `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `web/viewer` | the viewer page: MapLibre + deck.gl when online, a plain canvas offline |
 | `web/types`, `web/client` | TypeScript types generated from Rust (`ts-rs`) and a typed client for the server |
 
@@ -69,7 +72,7 @@ fallbacks decide and the log says why.
 
 | Phase | State |
 |---|---|
-| 0 Spike | Workspace, core, ECS, terrain, CPU/GPU LOS twins, a brigade bench and Tracy spans (`--features profile`). The desktop shell is the browser server (see below). |
+| 0 Spike | Workspace, core, ECS, terrain, CPU/GPU LOS twins, a brigade bench and Tracy spans (`--features profile`). The desktop shell: `bgws-desktop` (Tauri 2), and `bgws-server` for a browser. |
 | 1 Land tactical | Done: movement on trafficability with cost-raster routes, EO/IR sensing, tracks, direct fire, people, templates, rules decider, v3 converter, CLI. MBT Ph and attack-halt vignettes in band. |
 | 2 Deciders | Done: Jev, Claude, local and recorded deciders, batching, caching, timeouts, fallbacks, cost logging, exact replay. |
 | 3 Fires, engineers, sustainment | Done in the sim: calls for fire, adjust, Carleton lethality, counter-battery radar, displacement, minefields and breaching, digging in, stores. Breach time and counter-battery survival in band. |
@@ -111,8 +114,9 @@ fallbacks decide and the log says why.
 
 ### Known gaps
 
-- **No Tauri desktop shell:** this environment has no WebKitGTK. The host runs
-  in-process in `bgws-server` and the viewer is a web page. The channel is
+- **The desktop shell** (`apps/desktop`, Tauri 2) runs the host and the game
+  in its own process and shows the viewer, editor and Behaviour Manager in a
+  native window; `bgws-server` is the same host for a browser. The channel is
   the one §16 describes: JSON commands one way; full frames when the units on
   the map change (or once a second) and binary position updates between
   them (about 20× smaller) the other.
@@ -154,8 +158,8 @@ game. A record saved mid-game says where it stops (`endedAt`).
 ## Tests and CI
 
 ```sh
-cargo test --workspace          # unit, property, golden, determinism, vignette and integration tests
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --exclude bgws-desktop     # unit, property, golden, determinism, vignette and integration tests
+cargo clippy --workspace --exclude bgws-desktop --all-targets -- -D warnings
 cargo test -p bgws-gpu --features gpu   # GPU twin tests (skip without an adapter)
 target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails on out-of-band or a shifted distribution
 ```

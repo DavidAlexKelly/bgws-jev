@@ -24,11 +24,31 @@ jobs:
         with:
           workspaces: bgws-rs
       - name: Lint
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude bgws-desktop --all-targets -- -D warnings
       - name: Tests
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude bgws-desktop
       - name: GPU kernels compile (twin tests skip without an adapter)
         run: cargo test -p bgws-gpu --features gpu
+
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bgws-rs
+      - name: WebKitGTK and a virtual display
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev xvfb
+      - name: Lint
+        run: cargo clippy -p bgws-desktop --all-targets -- -D warnings
+      - name: The shell starts its host and loads the viewer
+        run: |
+          cargo build --release -p bgws-desktop
+          xvfb-run -a target/release/bgws-desktop skirmish-advance-to-contact-v1 --deciders rules --smoke-s 2 2>&1 | tee desktop.log
+          grep -q "bgws-desktop: loaded http://127.0.0.1" desktop.log
 
   vignettes:
     runs-on: ubuntu-latest

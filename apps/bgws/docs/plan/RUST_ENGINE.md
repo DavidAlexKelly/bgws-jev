@@ -811,7 +811,7 @@ The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates 
 - **Records and "what if" (§12):** game records hold every answer, every plan and seat change with its place in the answers, the run setup and the figure overrides, and replay exactly; a game restarts from any moment by replaying its record there (`bgws branch`, or the viewer's timeline).
 - **Tools (§16):** the server's map viewer has the timeline scrubber and branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains, a spectrum view, an HQ console for a person's orders, and inspectors for detections (every factor), messages (the link budget hop by hop), a unit's history and the after-action review. `/editor` edits scenarios and loads them into the game; `/behaviour` draws every template's decision graphs; `bgws vignettes --html`, `bgws sensitivity --html` and `bgws compare` write the analysis workbench. Frames go as JSON with binary position updates between them.
 - **Departures from this plan:**
-  - The host is a browser server (`bgws-server` and `web/viewer`) rather than Tauri.
+  - The desktop shell (`bgws-desktop`, Tauri 2) runs the host in-process and shows the server's pages; its window talks to the host over a localhost WebSocket rather than Tauri's IPC, so the same pages serve a browser (`bgws-server`).
   - Event logs are JSONL rather than DuckDB.
   - The catalogue loads from embedded JSON rather than SQLite.
   - Missiles and air defence are modelled at the engagement level: kinematic flights, per-shot kill probabilities and kill chains, with no guidance-law or seeker models.
