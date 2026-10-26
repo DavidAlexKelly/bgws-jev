@@ -34,6 +34,7 @@ export interface FrameMsg {
 export type Outbound =
   | FrameMsg
   | { kind: "branched"; t: number }
+  | { kind: "report"; title: string; text: string }
   | { kind: "events"; events: FeedEvent[] }
   | { kind: "questions"; questions: Question[] }
   | { kind: "status"; text: string };
@@ -50,12 +51,16 @@ export type Inbound =
   | { kind: "seek"; t: number }
   | { kind: "live" }
   | { kind: "branch"; t: number }
-  | { kind: "save" };
+  | { kind: "save" }
+  | { kind: "why"; unit: string }
+  | { kind: "review" };
 
 export interface ClientHandlers {
   onFrame?: (frame: FrameView, at: { t: number; live: number; scrub: boolean }) => void;
   /** The game restarted at `t`: drop anything shown from after it. */
   onBranched?: (t: number) => void;
+  /** A `why` or `review` answer: Markdown over the events this viewer may see. */
+  onReport?: (title: string, text: string) => void;
   onEvents?: (events: FeedEvent[]) => void;
   onQuestions?: (questions: Question[]) => void;
   onStatus?: (text: string) => void;
@@ -90,6 +95,9 @@ export class BgwsClient {
         break;
       case "branched":
         this.handlers.onBranched?.(m.t);
+        break;
+      case "report":
+        this.handlers.onReport?.(m.title, m.text);
         break;
       case "events":
         this.handlers.onEvents?.(m.events);
@@ -149,6 +157,14 @@ export class BgwsClient {
   /** Write the game record on the server (`--record`). */
   save(): void {
     this.send({ kind: "save" });
+  }
+  /** What happened to a unit (by label), with the figures behind it. */
+  why(unit: string): void {
+    this.send({ kind: "why", unit });
+  }
+  /** The after-action review so far. */
+  review(): void {
+    this.send({ kind: "review" });
   }
   close(): void {
     this.ws.close();

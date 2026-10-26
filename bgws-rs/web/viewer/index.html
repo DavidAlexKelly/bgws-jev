@@ -28,6 +28,15 @@
   #questions button { margin: 2px 4px 2px 0; }
   #inspect { right: 12px; bottom: 12px; width: min(320px, calc(100% - 48px)); display: none; white-space: pre-wrap; }
   .muted { color: var(--muted); }
+  #layers { left: 12px; top: 110px; display: flex; flex-direction: column; gap: 2px; }
+  #layers label { cursor: pointer; }
+  #spectrum { left: 12px; right: 12px; bottom: 12px; height: 150px; display: none; padding: 6px 10px; }
+  body.spec #inspect, body.spec #questions { bottom: 174px; }
+  #spectrum svg { width: 100%; height: 120px; display: block; }
+  #report { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 32px)); max-height: 70vh; overflow: auto; display: none; }
+  #report pre { white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; margin: 8px 0 0; }
+  #report .close, #inspect button { font: inherit; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+  #report .close { float: right; }
 </style>
 </head>
 <body>
@@ -42,9 +51,17 @@
   <button id="live" title="Back to the live game">Live</button>
   <button id="branch" title="Restart the game from the moment shown and play on">Branch here</button>
   <button id="save" title="Write the game record on the server">Save</button>
+  <button id="review" title="The after-action review so far">Review</button>
   <span id="status" class="muted">connecting…</span>
 </div>
 <div id="feed" class="panel"></div>
+<div id="layers" class="panel">
+  <label><input type="checkbox" id="lyr-sensors"> Sensor footprints</label>
+  <label><input type="checkbox" id="lyr-spectrum"> Spectrum and jamming</label>
+  <label><input type="checkbox" id="lyr-nets"> Nets</label>
+</div>
+<div id="spectrum" class="panel"><span class="muted">On the air (log frequency; jammers as bands)</span><svg id="spectrum-svg"></svg></div>
+<div id="report" class="panel"><button class="close" id="report-close">Close</button><b id="report-title"></b><pre id="report-text"></pre></div>
 <div id="questions" class="panel"></div>
 <div id="inspect" class="panel"></div>
 <script>
@@ -75,6 +92,7 @@ ws.onmessage = (m) => {
   else if (msg.kind === "events") feed(msg.events);
   else if (msg.kind === "questions") questions(msg.questions);
   else if (msg.kind === "status") document.getElementById("status").textContent = msg.text;
+  else if (msg.kind === "report") showReport(msg.title, msg.text);
 };
 function setPlaying(p) { playing = p; document.getElementById("play").textContent = playing ? "Pause" : "Play"; }
 document.getElementById("play").onclick = () => { setPlaying(!playing); send({ kind: playing ? "play" : "pause" }); };
@@ -87,6 +105,56 @@ document.getElementById("branch").onclick = () => {
   if (confirm(`Restart the game from ${document.getElementById("clock").textContent}? Everything after it is replaced.`)) send({ kind: "branch", t: shownT });
 };
 document.getElementById("save").onclick = () => send({ kind: "save" });
+document.getElementById("review").onclick = () => send({ kind: "review" });
+document.getElementById("report-close").onclick = () => (document.getElementById("report").style.display = "none");
+function showReport(title, text) {
+  document.getElementById("report-title").textContent = title;
+  document.getElementById("report-text").textContent = text;
+  document.getElementById("report").style.display = "block";
+}
+const layerOn = (k) => document.getElementById("lyr-" + k).checked;
+for (const k of ["sensors", "spectrum", "nets"]) document.getElementById("lyr-" + k).onchange = () => frame && render(frame);
+// A sensor's footprint: a circle, or a wedge for a sector, as lon/lat points.
+function footprint(e, s) {
+  const pts = [], mLat = 111320, mLon = 111320 * Math.cos(e.lat * Math.PI / 180);
+  const all = s.for_deg >= 359, half = (s.for_deg / 2) * Math.PI / 180, h = s.heading_deg * Math.PI / 180;
+  if (!all) pts.push([e.lon, e.lat]);
+  for (let i = 0; i <= 32; i++) {
+    const a = all ? (i / 32) * 2 * Math.PI : h - half + (i / 32) * 2 * half;
+    pts.push([e.lon + (Math.sin(a) * s.range_m) / mLon, e.lat + (Math.cos(a) * s.range_m) / mLat]);
+  }
+  return pts;
+}
+function overlays(f) {
+  const byId = new Map(f.entities.map((e) => [e.id, e]));
+  const sensors = layerOn("sensors") ? f.sensors.filter((s) => byId.has(s.entity)).map((s) => ({ ...s, poly: footprint(byId.get(s.entity), s) })) : [];
+  const jammers = layerOn("spectrum") ? f.emitters.filter((x) => x.kind === "jammer") : [];
+  const emitters = layerOn("spectrum") ? f.emitters.filter((x) => x.kind !== "jammer") : [];
+  const links = layerOn("nets") ? f.links.filter((l) => byId.has(l.from) && byId.has(l.to)).map((l) => ({ ...l, a: byId.get(l.from), b: byId.get(l.to) })) : [];
+  return { sensors, jammers, emitters, links };
+}
+// The spectrum: emitters on a log-frequency axis, 1 MHz to 20 GHz; height by power.
+function spectrum(f) {
+  const panel = document.getElementById("spectrum");
+  panel.style.display = layerOn("spectrum") ? "block" : "none";
+  document.body.classList.toggle("spec", layerOn("spectrum"));
+  if (!layerOn("spectrum")) return;
+  const svg = document.getElementById("spectrum-svg"), W = svg.clientWidth || 600, H = 120;
+  const x = (mhz) => ((Math.log10(Math.max(mhz, 1)) - 0) / Math.log10(20000)) * W;
+  const y = (w) => H - 14 - Math.min(1, Math.max(0.08, (Math.log10(Math.max(w, 0.01)) + 2) / 6)) * (H - 20);
+  let out = "";
+  for (const mhz of [1, 10, 100, 1000, 10000]) out += `<line x1="${x(mhz)}" x2="${x(mhz)}" y1="0" y2="${H - 14}" stroke="currentColor" stroke-opacity="0.15"/><text x="${x(mhz) + 2}" y="${H - 2}" font-size="10" fill="currentColor" fill-opacity="0.6">${mhz >= 1000 ? mhz / 1000 + " GHz" : mhz + " MHz"}</text>`;
+  for (const e of f.emitters) {
+    const c = `rgb(${SIDE[e.side].join(",")})`;
+    if (e.kind === "jammer") {
+      const x0 = x(e.freq_mhz - e.bw_mhz / 2), x1 = x(e.freq_mhz + e.bw_mhz / 2);
+      out += `<rect x="${x0}" y="${y(e.erp_w)}" width="${Math.max(2, x1 - x0)}" height="${H - 14 - y(e.erp_w)}" fill="${c}" fill-opacity="0.25" stroke="${c}"><title>jammer ${e.freq_mhz.toFixed(0)} MHz ±${(e.bw_mhz / 2).toFixed(0)}, ${e.erp_w.toFixed(0)} W</title></rect>`;
+    } else {
+      out += `<line x1="${x(e.freq_mhz)}" x2="${x(e.freq_mhz)}" y1="${y(e.erp_w)}" y2="${H - 14}" stroke="${c}" stroke-width="2"><title>${e.kind} ${e.freq_mhz.toFixed(1)} MHz, ${e.erp_w.toFixed(1)} W</title></line>`;
+    }
+  }
+  svg.innerHTML = out;
+}
 function timeline(msg) {
   shownT = msg.t;
   tl.max = Math.max(1, Math.floor(msg.live));
@@ -112,7 +180,13 @@ function render(f) {
   document.getElementById("clock").textContent = f.clock;
   if (!online) return drawCanvas(f);
   if (first && f.entities.length) { first = false; const e = f.entities[0]; map.jumpTo({ center: [e.lon, e.lat], zoom: 12 }); }
+  spectrum(f);
+  const o = overlays(f);
   overlay.setProps({ layers: [
+    new deck.PolygonLayer({ id: "sensors", data: o.sensors, getPolygon: (s) => s.poly, filled: true, stroked: true, getFillColor: (s) => [...SIDE[s.side], 14], getLineColor: (s) => [...SIDE[s.side], 90], lineWidthMinPixels: 1 }),
+    new deck.ScatterplotLayer({ id: "jammers", data: o.jammers, getPosition: (j) => [j.lon, j.lat], getRadius: (j) => j.radius_m, radiusUnits: "meters", filled: true, stroked: true, getFillColor: (j) => [...SIDE[j.side], 25], getLineColor: (j) => [...SIDE[j.side], 140], lineWidthMinPixels: 1 }),
+    new deck.LineLayer({ id: "nets", data: o.links, getSourcePosition: (l) => [l.a.lon, l.a.lat], getTargetPosition: (l) => [l.b.lon, l.b.lat], getColor: (l) => (l.up ? [...SIDE[l.side], 160] : [120, 120, 110, 120]), getWidth: (l) => 1 + Math.min(4, l.traffic), widthUnits: "pixels" }),
+    new deck.ScatterplotLayer({ id: "emitters", data: o.emitters, getPosition: (x) => [x.lon, x.lat], getRadius: 11, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (x) => [...SIDE[x.side], 200], lineWidthMinPixels: 2 }),
     new deck.PolygonLayer({ id: "tracks", data: f.tracks, getPolygon: ellipse, filled: true, stroked: true, getFillColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 30], getLineColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 160], lineWidthMinPixels: 1 }),
     new deck.ScatterplotLayer({ id: "entities", data: f.entities, pickable: true, getPosition: (e) => [e.lon, e.lat], getRadius: 6, radiusUnits: "pixels",
       getFillColor: (e) => e.status === "destroyed" ? [90, 90, 90, 120] : [...SIDE[e.side], e.status === "ok" ? 230 : 140],
@@ -142,6 +216,25 @@ function drawCanvas(f) {
   const k = Math.min(W / mx(bounds.e), H / my(bounds.n));
   const x = (lon) => mx(lon) * k, y = (lat) => H - my(lat) * k;
   project = { x, y };
+  spectrum(f);
+  const o = overlays(f);
+  const rgba = (side, a) => `rgba(${SIDE[side].join(",")},${a})`;
+  const mPerPx = 1 / k;
+  for (const s of o.sensors) {
+    g.strokeStyle = rgba(s.side, 0.35); g.fillStyle = rgba(s.side, 0.05);
+    g.beginPath(); s.poly.forEach(([lo, la], i) => (i ? g.lineTo(x(lo), y(la)) : g.moveTo(x(lo), y(la)))); g.closePath(); g.fill(); g.stroke();
+  }
+  for (const j of o.jammers) {
+    g.strokeStyle = rgba(j.side, 0.6); g.fillStyle = rgba(j.side, 0.1);
+    g.beginPath(); g.arc(x(j.lon), y(j.lat), j.radius_m / mPerPx, 0, 2 * Math.PI); g.fill(); g.stroke();
+  }
+  for (const l of o.links) {
+    g.strokeStyle = l.up ? rgba(l.side, 0.6) : "rgba(120,120,110,0.5)"; g.lineWidth = 1 + Math.min(4, l.traffic);
+    g.beginPath(); g.moveTo(x(l.a.lon), y(l.a.lat)); g.lineTo(x(l.b.lon), y(l.b.lat)); g.stroke();
+  }
+  g.lineWidth = 2;
+  for (const e of o.emitters) { g.strokeStyle = rgba(e.side, 0.8); g.beginPath(); g.arc(x(e.lon), y(e.lat), 11, 0, 2 * Math.PI); g.stroke(); }
+  g.lineWidth = 1;
   for (const t of f.tracks) {
     g.strokeStyle = `rgba(${SIDE[t.owner === "blue" ? "red" : "blue"].join(",")},0.6)`;
     g.beginPath(); ellipse(t).forEach(([lo, la], i) => (i ? g.lineTo(x(lo), y(la)) : g.moveTo(x(lo), y(la)))); g.stroke();
@@ -181,6 +274,13 @@ function inspect(e) {
   if (!e) { el.style.display = "none"; return; }
   el.style.display = "block";
   el.textContent = JSON.stringify(e, null, 2);
+  if (e.domain !== "drone") {
+    const b = document.createElement("button");
+    b.textContent = "Why?";
+    b.title = "What happened to this unit, with the figures behind it";
+    b.onclick = () => send({ kind: "why", unit: e.label || e.name });
+    el.prepend(b, document.createElement("br"));
+  }
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
 </script>

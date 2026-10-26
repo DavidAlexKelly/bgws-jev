@@ -66,6 +66,53 @@ pub struct FrameTrack {
     pub quality: u8,
 }
 
+/// Something on the air (§16 spectrum view): jammers, radars, drone links
+/// and radios that transmitted in the last second.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameEmitter {
+    pub entity: u32,
+    pub side: Side,
+    /// "jammer", "radar", "drone link" or "radio".
+    pub kind: String,
+    pub freq_mhz: f64,
+    pub bw_mhz: f64,
+    pub erp_w: f64,
+    pub lat: f64,
+    pub lon: f64,
+    /// A jammer's nominal radius, m (0 for other emitters).
+    pub radius_m: f64,
+}
+
+/// A comms net link from a member to its HQ post (§16 network graph).
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameLink {
+    pub from: u32,
+    pub to: u32,
+    pub side: Side,
+    /// The bearer ("Vhf", "Hf", "SatcomLeo"…).
+    pub bearer: String,
+    /// Neither end is dead or cut off.
+    pub up: bool,
+    /// Messages on their way between the two now.
+    pub traffic: u32,
+}
+
+/// A unit's longest-reaching sensor (§16 sensor footprints).
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameSensor {
+    pub entity: u32,
+    pub side: Side,
+    pub kind: String,
+    pub range_m: f64,
+    /// Field of regard; 360 is all round.
+    pub for_deg: f64,
+    pub heading_deg: f64,
+    pub active: bool,
+}
+
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FrameView {
@@ -74,6 +121,9 @@ pub struct FrameView {
     pub viewer: Viewer,
     pub entities: Vec<FrameEntity>,
     pub tracks: Vec<FrameTrack>,
+    pub emitters: Vec<FrameEmitter>,
+    pub links: Vec<FrameLink>,
+    pub sensors: Vec<FrameSensor>,
     pub waiting: usize,
     pub over: Option<crate::sim::Outcome>,
 }
@@ -176,15 +226,95 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
             });
         }
     }
+    let (emitters, links) = spectrum_and_nets(s, viewer);
+    let sensors = sensors(s, viewer);
     FrameView {
         t: s.ctx.now.secs(),
         clock: format!("{}", s.ctx.now),
         viewer,
         entities,
         tracks,
+        emitters,
+        links,
+        sensors,
         waiting: s.ctx.pending.values().filter(|p| !p.answered).count(),
         over: s.ctx.over.clone(),
     }
+}
+
+fn sees(viewer: Viewer, side: Side) -> bool {
+    viewer.side().is_none_or(|v| v == side)
+}
+
+/// What is on the air, and the nets, from the C4 domain (empty without it).
+fn spectrum_and_nets(s: &Sim, viewer: Viewer) -> (Vec<FrameEmitter>, Vec<FrameLink>) {
+    use crate::domains::drones::C4;
+    let Some(c4) = s.world.get_resource::<C4>() else { return (Vec::new(), Vec::new()) };
+    let at = |id: EntityId| {
+        let e = s.ctx.entity(id);
+        s.world.get::<crate::components::Kin>(e).map(|k| s.ctx.frame.enu_to_geodetic(k.pos))
+    };
+    let mut emitters = Vec::new();
+    let mut push = |id: EntityId, side: Side, kind: &str, f: f64, bw: f64, erp: f64, radius: f64| {
+        if !sees(viewer, side) {
+            return;
+        }
+        if let Some(g) = at(id) {
+            emitters.push(FrameEmitter { entity: id.0, side, kind: kind.into(), freq_mhz: f / 1e6, bw_mhz: bw / 1e6, erp_w: erp, lat: g.lat, lon: g.lon, radius_m: radius });
+        }
+    };
+    for j in c4.ew.jammers.iter().filter(|j| j.jam.on) {
+        for b in &j.jam.bands {
+            push(j.entity, j.side, "jammer", b.centre_hz, b.width_hz, j.jam.power_w / j.jam.bands.len().max(1) as f64, j.radius_m);
+        }
+    }
+    let mut seen_radio = std::collections::BTreeSet::new();
+    for t in &c4.ew.tx {
+        if t.what != "jammer" && seen_radio.insert((t.entity, t.what)) {
+            push(t.entity, t.side, if t.what.starts_with("radar") || t.what.starts_with("drone") { t.what } else { "radio" }, t.freq_hz, t.bw_hz, t.erp_w, 0.0);
+        }
+    }
+    for (id, role) in &c4.roles {
+        let side = s.world.get::<Ident>(s.ctx.entity(*id)).map(|i| i.side);
+        let Some(side) = side.filter(|_| crate::systems::alive(s, s.ctx.entity(*id))) else { continue };
+        if c4.may_emit(*id) && !seen_radio.contains(&(*id, "radar")) {
+            for (f, erp, _) in &role.radars {
+                push(*id, side, "radar", *f, 1e6, *erp, 0.0);
+            }
+        }
+        if let Some((f, erp, bw)) = role.drone_link {
+            if !seen_radio.contains(&(*id, "drone link")) && c4.drones.flights.values().any(|fl| fl.team == *id && !fl.done && fl.spec.jammable() && !fl.link.lost) {
+                push(*id, side, "drone link", f, bw, erp, 0.0);
+            }
+        }
+    }
+    let mut links = Vec::new();
+    if c4.comms.active {
+        for net in c4.comms.nets.iter().filter(|n| sees(viewer, n.side)) {
+            let Some(post) = c4.c2.hqs.get(net.hq).map(|h| h.post) else { continue };
+            let down = |id: &EntityId| c4.comms.dead.contains(id) || c4.comms.cut.contains(id);
+            for m in net.members.iter().filter(|m| **m != post) {
+                let traffic = c4.comms.flying.values().filter(|f| (f.from == *m && f.to == post) || (f.from == post && f.to == *m)).count() as u32;
+                links.push(FrameLink { from: m.0, to: post.0, side: net.side, bearer: format!("{:?}", net.kind), up: !down(m) && !down(&post), traffic });
+            }
+        }
+    }
+    (emitters, links)
+}
+
+/// Each unit's longest-reaching sensor.
+fn sensors(s: &Sim, viewer: Viewer) -> Vec<FrameSensor> {
+    let mut out = Vec::new();
+    for &e in &s.ctx.order {
+        let (Some(i), Some(k)) = (s.world.get::<Ident>(e), s.world.get::<crate::components::Kin>(e)) else { continue };
+        if !sees(viewer, i.side) || !crate::systems::alive(s, e) {
+            continue;
+        }
+        if let Some(best) = i.platform.sensors.iter().max_by(|a, b| a.range_max_m.total_cmp(&b.range_max_m)) {
+            out.push(FrameSensor { entity: i.id.0, side: i.side, kind: format!("{:?}", best.kind), range_m: best.range_max_m, for_deg: best.for_deg, heading_deg: k.heading.to_degrees(), active: best.active });
+        }
+    }
+    out
 }
 
 /// What a side's deciders may read: its own forces (as reported) and the

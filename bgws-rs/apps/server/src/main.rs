@@ -78,6 +78,10 @@ enum Inbound {
     Branch { t: f64 },
     /// Write the game record.
     Save,
+    /// What happened to a unit, with the figures behind it (the AAR inspector).
+    Why { unit: String },
+    /// The after-action review so far.
+    Review,
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -133,12 +137,19 @@ fn scenario_path(s: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios").join(format!("{}.json", s.trim_end_matches(".json")))
 }
 
+/// Does this viewer see this event? The umpire sees all; a side sees its own and unsided ones.
+fn visible(viewer: Viewer, e: &bgws_core::LogEvent) -> bool {
+    viewer.side().is_none_or(|s| e.side.is_none_or(|es| es == s))
+}
+
 /// The game thread: the sim never waits on the network or the UI in wall
 /// time; it waits in simulated time for answers (§3.2).
 fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<String>) {
     let person = cfg.person;
     let mut keys = Keyframes { every: SimDuration::from_secs(cfg.keyframe_s), frames: Vec::new() };
     let mut scrub: Option<SimTime> = None;
+    // Every event so far, for the inspectors (`why`, `review`).
+    let mut log: Vec<bgws_core::LogEvent> = Vec::new();
     let mut playing = false;
     let mut speed = 10.0;
     let mut viewer = Viewer::Umpire;
@@ -172,6 +183,15 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     scrub = Some(SimTime::from_secs(t.max(0.0)));
                 }
                 Inbound::Live => scrub = None,
+                // A side's viewer reads only what its feed shows: no truth through the inspectors.
+                Inbound::Why { unit } => {
+                    let seen: Vec<_> = log.iter().filter(|e| visible(viewer, e)).cloned().collect();
+                    send(&out, json!({ "kind": "report", "title": format!("Why: {unit}"), "text": bgws_run::aar::why(&seen, &unit) }));
+                }
+                Inbound::Review => {
+                    let seen: Vec<_> = log.iter().filter(|e| visible(viewer, e)).cloned().collect();
+                    send(&out, json!({ "kind": "report", "title": "After-action review", "text": bgws_run::aar::review(&seen) }));
+                }
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {
                         Ok(()) => format!("saved {}", cfg.record.display()),
@@ -191,6 +211,7 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                             waiting.clear();
                             held.clear();
                             keys.truncate_after(at);
+                            log.retain(|e| e.t <= at);
                             send(&out, json!({ "kind": "branched", "t": at.secs() }));
                             send(&out, json!({ "kind": "status", "text": format!("branched at {at}: press Play") }));
                         }
@@ -247,7 +268,9 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
             }
         }
         keys.take(&host.sim);
-        let events: Vec<serde_json::Value> = host.sim.drain_events().into_iter().filter(|e| viewer.side().map(|s| e.side.map(|es| es == s).unwrap_or(true)).unwrap_or(true)).map(|e| json!({ "clock": format!("{}", e.t), "kind": e.kind, "text": e.text })).collect();
+        let drained = host.sim.drain_events();
+        log.extend(drained.iter().cloned());
+        let events: Vec<serde_json::Value> = drained.into_iter().filter(|e| visible(viewer, e)).map(|e| json!({ "clock": format!("{}", e.t), "kind": e.kind, "text": e.text })).collect();
         if !events.is_empty() {
             send(&out, json!({ "kind": "events", "events": events }));
         }
