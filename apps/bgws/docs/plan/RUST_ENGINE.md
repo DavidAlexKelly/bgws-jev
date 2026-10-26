@@ -808,10 +808,12 @@ The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates 
 - **Phases 1–9** are in the sim and play in the shipped scenarios: the skirmishes and M2–M8, the 3-day M6 included. Determinism tests pass across seeds and thread counts, and game records replay exactly.
 - **Benchmark vignettes:** all fifteen of §15.3 run, fourteen in their bands; networked detect-to-strike [P2] measures 5.35 min against 2–5 (the README's calibration backlog), pre-network about 23 min against ~20. The sensitivity analysis and research backlog run (`bgws sensitivity`).
 - **Deciders:** Jev (OpenRouter), Claude (Messages API), a local OpenAI-compatible model and recorded answers all sit behind one router, with fallbacks to the templates.
+- **Records and "what if" (§12):** game records hold every answer, every plan and seat change with its place in the answers, the run setup and the figure overrides, and replay exactly; a game restarts from any moment by replaying its record there (`bgws branch`, or the viewer's timeline).
+- **Tools (§16):** the server's map viewer has the timeline scrubber and branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains, a spectrum view, an HQ console for a person's orders, and inspectors for detections (every factor), messages (the link budget hop by hop), a unit's history and the after-action review. `/editor` edits scenarios and loads them into the game; `/behaviour` draws every template's decision graphs; `bgws vignettes --html`, `bgws sensitivity --html` and `bgws compare` write the analysis workbench. Frames go as JSON with binary position updates between them.
 - **Departures from this plan:**
   - The host is a browser server (`bgws-server` and `web/viewer`) rather than Tauri.
   - Event logs are JSONL rather than DuckDB.
   - The catalogue loads from embedded JSON rather than SQLite.
   - Missiles and air defence are modelled at the engagement level: kinematic flights, per-shot kill probabilities and kill chains, with no guidance-law or seeker models.
-  - The React screens are not yet wired to the Rust host. A typed client (`web/client`) is the boundary they would bind to.
+  - The React screens are not yet wired to the Rust host: the server's own pages cover the views above, and the typed client (`web/client`) is the boundary the React screens would bind to. The Behaviour Manager is read-only (templates are edited as files).
 
