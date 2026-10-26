@@ -83,7 +83,8 @@ pub struct Role {
     /// Its drone ground-station link: (freq, ERP W, bandwidth).
     pub drone_link: Option<(f64, f64, f64)>,
     pub cuas_sensors: Vec<CuasSensor>,
-    /// Mount indices: an air-defence gun, an interceptor-drone launcher, a short-range SAM.
+    /// Mount indices: an air-defence gun, an interceptor-drone launcher, a
+    /// short- or medium-range SAM (short preferred).
     pub ad_gun: Option<usize>,
     pub interceptor: Option<usize>,
     pub sam: Option<usize>,
@@ -326,7 +327,8 @@ pub(crate) fn role_of(p: &Platform, catalogue: &bgws_catalogue::Catalogue, pr: &
         match m.kind {
             W::GunAd => r.ad_gun = r.ad_gun.or(Some(i)),
             W::InterceptorDrone => r.interceptor = r.interceptor.or(Some(i)),
-            W::SamShort => r.sam = r.sam.or(Some(i)),
+            W::SamShort => r.sam = Some(r.sam.filter(|&j| p.mounts[j].kind == W::SamShort).unwrap_or(i)),
+            W::SamMedium => r.sam = r.sam.or(Some(i)),
             W::SmallArms => r.small_arms = true,
             _ => {}
         }

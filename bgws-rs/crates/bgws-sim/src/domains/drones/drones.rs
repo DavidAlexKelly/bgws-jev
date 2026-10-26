@@ -38,7 +38,7 @@ use bgws_core::{hazard_probability, Enu, EntityId, Side, SimDuration, SimTime, T
 use bgws_env::{transmission, OpticalBand};
 use bgws_know::{ClassEvidence, Detection, Hypothesis, IdLevel, Measurement, MotionHint, SensorKind, TruthTag};
 use bgws_models::sensing::acquire::{acquire, AcquireInput, Contrast, Metric, Search, Stage};
-use bgws_ops::counter_drone::{defeat, detect, passive_modifiers, DefeatMeans, DetectionInput, Engagement, PassiveMeasure};
+use bgws_ops::counter_drone::{defeat, detect, CuasSensor, passive_modifiers, DefeatMeans, DetectionInput, Engagement, PassiveMeasure};
 use bgws_ops::drones::{assess_link, link_loss_outcome, terminal_hit_probability, ControlLink, DroneSpec, DroneStores, DroneType, LinkAssessment, LinkInputs, LinkLossBehaviour, Operator, StrikeInputs, StrikeParams, StrikeStage, TargetClass};
 use bgws_scenario::scope::{DomainMode, ScopeDomain};
 use bgws_scenario::v4::Emcon;
@@ -1256,11 +1256,16 @@ fn counter_drone(s: &mut Sim, c4: &mut C4) {
                 continue;
             }
             let horiz = fl.pos.sub(*upos).horizontal();
-            if horiz > c4.p.cuas_range_m {
+            let Some(role) = c4.roles.get(uid) else { continue };
+            // An air-defence unit's radar and missiles reach a fixed-wing
+            // drone well beyond the counter-drone sensors.
+            let fixed_wing = fl.platform.mover.kind == bgws_catalogue::MoverKind::FixedWing;
+            let sam_reach = if fixed_wing && role.sam.is_some() && role.cuas_sensors.contains(&CuasSensor::Radar) { c4.p.sam_reach_m } else { 0.0 };
+            if horiz > c4.p.cuas_range_m.max(sam_reach) {
                 continue;
             }
+            let role = role.clone();
             let range = (horiz * horiz + (fl.pos.u - upos.u).powi(2)).sqrt();
-            let Some(role) = c4.roles.get(uid).cloned() else { continue };
             let key = (*uid, fid);
             let tracked = c4.drones.cuas_tracks.get(&key).map(|t| now - *t <= hold).unwrap_or(false);
             if !tracked {
@@ -1275,7 +1280,6 @@ fn counter_drone(s: &mut Sim, c4: &mut C4) {
             c4.drones.cuas_tracks.insert(key, now);
             // Engage with what it has, cheapest first.
             let eng = Engagement { drone: fl.spec.clone(), range_m: range, exposure_s: 1.0, target_speed_mps: fl.spec.speed_mps };
-            let fixed_wing = fl.platform.mover.kind == bgws_catalogue::MoverKind::FixedWing;
             let can_fire = s.world.get::<Health>(*e).map(|h| h.can_fire()).unwrap_or(false) && s.world.get::<Act>(*e).map(|a| a.roe != RoeS::Never && a.activity != Activity::Quiet).unwrap_or(true);
             if !can_fire {
                 continue;

@@ -275,3 +275,20 @@ fn hq_situation_uses_the_cop_and_seats_answer() {
     let ev = sim.drain_events();
     assert!(ev.iter().any(|e| e.kind == "c2.planning"), "no CCIR or rhythm plan in 40 min");
 }
+
+#[test]
+fn air_defence_takes_on_fixed_wing_drones_beyond_counter_drone_range() {
+    // M8: medium SAM batteries with radars reach ISR drones that the
+    // short-range counter-drone sensors (sim.drones.cuas_range_m) cannot.
+    let cuas = default_figures().get("sim.drones.cuas_range_m");
+    let mut far = 0;
+    for seed in 1..=3 {
+        let (_, ev) = play("m8-joint-strike", seed, 15.0);
+        far += ev
+            .iter()
+            .filter(|e| e.kind == "drones.shot_down")
+            .filter(|e| e.data["means"] == "SAM" && e.data["rangeM"].as_f64().unwrap_or(0.0) > cuas)
+            .count();
+    }
+    assert!(far > 0, "no SAM engaged a drone beyond {cuas} m");
+}

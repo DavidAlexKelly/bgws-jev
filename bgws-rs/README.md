@@ -114,8 +114,10 @@ fallbacks decide and the log says why.
   flights, per-shot kill probabilities and kill chains. They do not model
   guidance laws or seekers.
 - **Drones:** drones in flight are records in the drones module, not ECS
-  entities, so the air-defence module does not engage them. Counter-drone
-  handles them instead.
+  entities, so the air-defence kill chains and WTA do not see them. The
+  counter-drone loop engages them instead, and units with a short- or
+  medium-range SAM and a radar take on fixed-wing drones out to
+  `sim.drones.sam_reach_m`.
 
 ## Tests and CI
 
