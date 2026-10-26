@@ -36,6 +36,11 @@
   #report { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 32px)); max-height: 70vh; overflow: auto; display: none; }
   #report pre { white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; margin: 8px 0 0; }
   #report .close, #inspect button { font: inherit; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+  #hq { left: 12px; top: 200px; width: min(380px, calc(100% - 48px)); max-height: calc(55vh - 200px); min-height: 160px; overflow: auto; display: none; }
+  #hq table { width: 100%; border-collapse: collapse; }
+  #hq td { padding: 2px 4px 2px 0; border-bottom: 1px solid var(--line); }
+  #hq select, #hq input, #hq button { font: inherit; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+  #hq .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
   #report .close { float: right; }
 </style>
 </head>
@@ -52,6 +57,7 @@
   <button id="branch" title="Restart the game from the moment shown and play on">Branch here</button>
   <button id="save" title="Write the game record on the server">Save</button>
   <button id="review" title="The after-action review so far">Review</button>
+  <button id="hq-open" title="Give your side's orders as its HQ (pick Blue or Red view first)">HQ orders</button>
   <span id="status" class="muted">connecting…</span>
 </div>
 <div id="feed" class="panel"></div>
@@ -61,6 +67,15 @@
   <label><input type="checkbox" id="lyr-nets"> Nets</label>
 </div>
 <div id="spectrum" class="panel"><span class="muted">On the air (log frequency; jammers as bands)</span><svg id="spectrum-svg"></svg></div>
+<div id="hq" class="panel">
+  <div class="row"><b id="hq-title">HQ orders</b><span class="muted" id="hq-note"></span></div>
+  <div class="row">Seat <select id="hq-seat"><option value="planner">planner (model)</option><option value="person">person (me)</option><option value="rules">rules</option></select></div>
+  <div class="row"><input id="hq-name" placeholder="Plan, in a few words" style="flex:1"></div>
+  <div class="row"><button id="hq-pick">Pick objective on map</button><span id="hq-obj" class="muted">no objective</span></div>
+  <div class="row">ROE <select id="hq-roe"><option value="always">fire at will</option><option value="withinShortRange" selected>within short range</option><option value="ifFiredUpon">if fired upon</option><option value="never">hold fire</option></select></div>
+  <table id="hq-units"></table>
+  <div class="row"><button id="hq-issue">Issue orders</button><button id="hq-close">Close</button></div>
+</div>
 <div id="report" class="panel"><button class="close" id="report-close">Close</button><b id="report-title"></b><pre id="report-text"></pre></div>
 <div id="questions" class="panel"></div>
 <div id="inspect" class="panel"></div>
@@ -78,6 +93,7 @@ if (online) {
   });
   overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
   map.addControl(overlay);
+  map.on("click", (e) => picking && setObjective(e.lngLat.lng, e.lngLat.lat));
 } else {
   document.getElementById("canvas").style.display = "block";
 }
@@ -112,6 +128,59 @@ function showReport(title, text) {
   document.getElementById("report-text").textContent = text;
   document.getElementById("report").style.display = "block";
 }
+// ── HQ console: a person's orders for the side they view, sent over its nets ──
+let picking = false, objective = null;
+const hqSide = () => document.getElementById("viewer").value;
+const TASKS = [["", "—"], ["advance", "advance to the objective"], ["assault", "assault the objective"], ["hold", "hold"], ["observe", "observe"], ["overwatch", "overwatch"], ["withdraw", "withdraw from the objective"]];
+function hqUnits() {
+  if (!frame) return [];
+  return frame.entities.filter((e) => e.side === hqSide() && e.domain !== "drone" && e.status !== "destroyed");
+}
+function openHq() {
+  const side = hqSide(), el = document.getElementById("hq");
+  if (side === "umpire") { document.getElementById("status").textContent = "pick Blue or Red view to give that side's orders"; return; }
+  document.getElementById("hq-title").textContent = `${side[0].toUpperCase() + side.slice(1)} HQ orders`;
+  document.getElementById("hq-units").innerHTML = hqUnits().map((u) => `<tr><td>${escapeHtml(u.label || u.name)}</td><td><select data-unit="${escapeHtml(u.name)}">${TASKS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></td></tr>`).join("");
+  el.style.display = "block";
+}
+document.getElementById("hq-open").onclick = openHq;
+document.getElementById("hq-close").onclick = () => (document.getElementById("hq").style.display = "none");
+document.getElementById("hq-seat").onchange = (e) => hqSide() !== "umpire" && send({ kind: "seat", side: hqSide(), seat: e.target.value });
+document.getElementById("hq-pick").onclick = () => { picking = true; document.getElementById("hq-obj").textContent = "click the map…"; };
+function setObjective(lon, lat) {
+  picking = false;
+  objective = { lat, lon };
+  document.getElementById("hq-obj").textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
+// A point `m` metres from `from`, directly away from `away`.
+function awayFrom(from, away, m) {
+  const mLat = 111320, mLon = 111320 * Math.cos(from.lat * Math.PI / 180);
+  const de = (from.lon - away.lon) * mLon, dn = (from.lat - away.lat) * mLat, d = Math.hypot(de, dn) || 1;
+  return { lat: from.lat + (dn / d) * m / mLat, lon: from.lon + (de / d) * m / mLon };
+}
+document.getElementById("hq-issue").onclick = () => {
+  const side = hqSide(), roe = document.getElementById("hq-roe").value;
+  const byName = new Map(hqUnits().map((u) => [u.name, u]));
+  const orders = [];
+  for (const sel of document.querySelectorAll("#hq-units select")) {
+    const task = sel.value, u = byName.get(sel.dataset.unit);
+    if (!task || !u) continue;
+    const needsObj = ["advance", "assault", "withdraw"].includes(task);
+    if (needsObj && !objective) { document.getElementById("hq-note").textContent = "pick an objective first"; return; }
+    const phases = {
+      advance: [{ label: "advance", do: "move", to: objective, mode: "tactical" }, { label: "hold the objective", do: "overwatch" }],
+      assault: [{ label: "assault", do: "move", to: objective, mode: "assault" }, { label: "hold the objective", do: "overwatch" }],
+      withdraw: [{ label: "withdraw", do: "withdraw", to: needsObj ? awayFrom(u, objective, 1500) : null }, { label: "hold", do: "hold" }],
+      hold: [{ label: "hold", do: "hold" }],
+      observe: [{ label: "observe", do: "observe" }],
+      overwatch: [{ label: "overwatch", do: "overwatch" }],
+    }[task];
+    orders.push({ unit: u.name, task, intent: document.getElementById("hq-name").value || task, roe, phases });
+  }
+  if (!orders.length) { document.getElementById("hq-note").textContent = "no unit has a task"; return; }
+  send({ kind: "command", side, plan: { plan: document.getElementById("hq-name").value || `${side} HQ orders`, orders } });
+  document.getElementById("hq-note").textContent = `${orders.length} orders sent over the nets`;
+};
 const layerOn = (k) => document.getElementById("lyr-" + k).checked;
 for (const k of ["sensors", "spectrum", "nets"]) document.getElementById("lyr-" + k).onchange = () => frame && render(frame);
 // A sensor's footprint: a circle, or a wedge for a sector, as lon/lat points.
@@ -187,6 +256,7 @@ function render(f) {
     new deck.ScatterplotLayer({ id: "jammers", data: o.jammers, getPosition: (j) => [j.lon, j.lat], getRadius: (j) => j.radius_m, radiusUnits: "meters", filled: true, stroked: true, getFillColor: (j) => [...SIDE[j.side], 25], getLineColor: (j) => [...SIDE[j.side], 140], lineWidthMinPixels: 1 }),
     new deck.LineLayer({ id: "nets", data: o.links, getSourcePosition: (l) => [l.a.lon, l.a.lat], getTargetPosition: (l) => [l.b.lon, l.b.lat], getColor: (l) => (l.up ? [...SIDE[l.side], 160] : [120, 120, 110, 120]), getWidth: (l) => 1 + Math.min(4, l.traffic), widthUnits: "pixels" }),
     new deck.ScatterplotLayer({ id: "emitters", data: o.emitters, getPosition: (x) => [x.lon, x.lat], getRadius: 11, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (x) => [...SIDE[x.side], 200], lineWidthMinPixels: 2 }),
+    new deck.ScatterplotLayer({ id: "objective", data: objective ? [objective] : [], getPosition: (o) => [o.lon, o.lat], getRadius: 9, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: [200, 150, 0, 230], lineWidthMinPixels: 3 }),
     new deck.PolygonLayer({ id: "tracks", data: f.tracks, getPolygon: ellipse, filled: true, stroked: true, getFillColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 30], getLineColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 160], lineWidthMinPixels: 1 }),
     new deck.ScatterplotLayer({ id: "entities", data: f.entities, pickable: true, getPosition: (e) => [e.lon, e.lat], getRadius: 6, radiusUnits: "pixels",
       getFillColor: (e) => e.status === "destroyed" ? [90, 90, 90, 120] : [...SIDE[e.side], e.status === "ok" ? 230 : 140],
@@ -214,8 +284,10 @@ function drawCanvas(f) {
   const c0 = Math.cos(((bounds.s + bounds.n) / 2) * Math.PI / 180);
   const mx = (lon) => (lon - bounds.w) * 111320 * c0, my = (lat) => (lat - bounds.s) * 111320;
   const k = Math.min(W / mx(bounds.e), H / my(bounds.n));
-  const x = (lon) => mx(lon) * k, y = (lat) => H - my(lat) * k;
-  project = { x, y };
+  // Centred in the window.
+  const ox = (W - mx(bounds.e) * k) / 2, oy = (H - my(bounds.n) * k) / 2;
+  const x = (lon) => ox + mx(lon) * k, y = (lat) => H - oy - my(lat) * k;
+  project = { x, y, lon: (px) => bounds.w + (px - ox) / k / (111320 * c0), lat: (py) => bounds.s + (H - oy - py) / k / 111320 };
   spectrum(f);
   const o = overlays(f);
   const rgba = (side, a) => `rgba(${SIDE[side].join(",")},${a})`;
@@ -235,6 +307,7 @@ function drawCanvas(f) {
   g.lineWidth = 2;
   for (const e of o.emitters) { g.strokeStyle = rgba(e.side, 0.8); g.beginPath(); g.arc(x(e.lon), y(e.lat), 11, 0, 2 * Math.PI); g.stroke(); }
   g.lineWidth = 1;
+  if (objective) { g.strokeStyle = "rgba(200,150,0,0.9)"; g.lineWidth = 2; const ox = x(objective.lon), oy = y(objective.lat); g.beginPath(); g.moveTo(ox - 9, oy - 9); g.lineTo(ox + 9, oy + 9); g.moveTo(ox + 9, oy - 9); g.lineTo(ox - 9, oy + 9); g.stroke(); g.lineWidth = 1; }
   for (const t of f.tracks) {
     g.strokeStyle = `rgba(${SIDE[t.owner === "blue" ? "red" : "blue"].join(",")},0.6)`;
     g.beginPath(); ellipse(t).forEach(([lo, la], i) => (i ? g.lineTo(x(lo), y(la)) : g.moveTo(x(lo), y(la)))); g.stroke();
@@ -249,6 +322,7 @@ function drawCanvas(f) {
 }
 document.getElementById("canvas").onclick = (ev) => {
   if (!frame || !project) return;
+  if (picking) return setObjective(project.lon(ev.offsetX), project.lat(ev.offsetY));
   const d = (e) => Math.hypot(project.x(e.lon) - ev.offsetX, project.y(e.lat) - ev.offsetY);
   const near = [...frame.entities].sort((a, b) => d(a) - d(b))[0];
   inspect(near && d(near) < 20 ? near : null);
