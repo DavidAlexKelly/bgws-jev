@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BGWS workbench</title>
+<style>
+  /* The analysis workbench (RUST_ENGINE.md §16): vignettes against their
+     bands and baselines, and sensitivity rankings. Written by
+     `bgws vignettes --html` and `bgws sensitivity --html`; the data is the
+     JSON block at the end. Palette: the dataviz reference instance. */
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
+    --series-1: #2a78d6; --band: rgba(137, 135, 129, 0.18);
+    --good: #0ca30c; --serious: #ec835a; --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+      --series-1: #3987e5; --band: rgba(137, 135, 129, 0.22);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5; --band: rgba(137, 135, 129, 0.22);
+  }
+  html, body { margin: 0; }
+  body.viz-root { background: var(--page); color: var(--text-primary); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 32px 0 8px; }
+  .sub { color: var(--text-secondary); margin: 0 0 16px; }
+  .tabs { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+  .tabs button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; }
+  .tabs button[aria-pressed="true"] { border-color: var(--series-1); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 12px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .card h3 { font-size: 15px; margin: 0; }
+  .card p { margin: 4px 0; color: var(--text-secondary); font-size: 13px; }
+  .verdict { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; font-weight: 600; margin-left: 6px; color: var(--text-secondary); }
+  .verdict i { font-style: normal; width: 16px; height: 16px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font-size: 11px; }
+  .verdict.in i { background: var(--good); } .verdict.out i { background: var(--critical); } .verdict.backlog i { background: var(--serious); }
+  svg { display: block; width: 100%; overflow: visible; }
+  svg text { fill: var(--text-muted); font: 11px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  svg .lbl { fill: var(--text-secondary); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  #tip { position: fixed; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.12); z-index: 9; }
+  .muted { color: var(--text-muted); }
+</style>
+</head>
+<body class="viz-root">
+<main>
+  <h1>BGWS workbench</h1>
+  <p class="sub" id="sub"></p>
+  <section id="vignettes" hidden>
+    <h2>Benchmark vignettes</h2>
+    <p class="sub">Each strip shows the acceptance band (shaded), the estimate with its interval (blue) and the stored baseline (hollow mark). Continuous metrics also show the distribution of per-game values.</p>
+    <div class="tabs" id="vtabs"></div>
+    <div class="grid" id="vgrid"></div>
+    <h2>Table</h2>
+    <div class="tablewrap"><table id="vtable"></table></div>
+  </section>
+  <section id="sensitivity" hidden>
+    <h2>Sensitivity</h2>
+    <div id="sens"></div>
+  </section>
+</main>
+<div id="tip"></div>
+<script type="application/json" id="data">__BGWS_DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const tip = document.getElementById("tip");
+const NS = "http://www.w3.org/2000/svg";
+const fmt = (v) => (v == null || !isFinite(v) ? "—" : Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(3));
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function el(name, attrs, parent) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function hover(node, text) {
+  node.addEventListener("pointermove", (ev) => { tip.textContent = text; tip.style.display = "block"; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 240) + "px"; tip.style.top = ev.clientY + 12 + "px"; });
+  node.addEventListener("pointerleave", () => (tip.style.display = "none"));
+}
+document.getElementById("sub").textContent = [D.title, D.generated].filter(Boolean).join(" · ");
+const backlog = new Set(D.backlog || []);
+const baseline = new Map((D.regression || []).map((r) => [r.id, r.baseline_estimate]));
+const verdictOf = (v) => (v.verdict === "in_band" ? "in" : backlog.has(v.id) ? "backlog" : "out");
+const VERDICT = { in: ["✓", "in band"], out: ["✕", "out of band"], backlog: ["!", "out of band · backlog"] };
+
+// A band strip: the band shaded, the interval, the estimate and the baseline on one scale.
+function strip(v, W) {
+  const H = 46, pad = 6, base = baseline.get(v.id);
+  const xs = [v.band.lo, v.band.hi, v.estimate, v.interval && v.interval.lo, v.interval && v.interval.hi, base].filter((x) => x != null && isFinite(x));
+  let lo = Math.min(...xs), hi = Math.max(...xs);
+  const span = hi - lo || Math.abs(hi) || 1; lo -= span * 0.08; hi += span * 0.08;
+  const x = (val) => pad + ((val - lo) / (hi - lo)) * (W - 2 * pad);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": `${v.title}: estimate ${fmt(v.estimate)} against band ${fmt(v.band.lo)}–${fmt(v.band.hi)}` });
+  el("line", { x1: pad, x2: W - pad, y1: 22, y2: 22, stroke: "var(--axis)" }, svg);
+  const band = el("rect", { x: x(v.band.lo), y: 10, width: Math.max(2, x(v.band.hi) - x(v.band.lo)), height: 24, rx: 4, fill: "var(--band)" }, svg);
+  hover(band, `band ${fmt(v.band.lo)} – ${fmt(v.band.hi)} ${v.unit} (${v.source})`);
+  for (const [val, anchor] of [[v.band.lo, "middle"], [v.band.hi, "middle"]]) { const t = el("text", { x: x(val), y: 44, "text-anchor": anchor }, svg); t.textContent = fmt(val); }
+  if (v.interval) el("line", { x1: x(v.interval.lo), x2: x(v.interval.hi), y1: 22, y2: 22, stroke: "var(--series-1)", "stroke-width": 2, "stroke-linecap": "round" }, svg);
+  if (base != null && isFinite(base)) {
+    const b = el("circle", { cx: x(base), cy: 22, r: 6, fill: "none", stroke: "var(--text-secondary)", "stroke-width": 1.5 }, svg);
+    hover(b, `stored baseline ${fmt(base)} ${v.unit}`);
+  }
+  if (isFinite(v.estimate)) {
+    const e = el("circle", { cx: x(v.estimate), cy: 22, r: 5, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+    hover(e, `${v.band.statistic} ${fmt(v.estimate)} ${v.unit}` + (v.interval ? `, ${Math.round(v.interval.level * 100)}% CI ${fmt(v.interval.lo)} – ${fmt(v.interval.hi)}` : "") + `, ${v.sample.values.length} games`);
+    const t = el("text", { x: x(v.estimate), y: 7, "text-anchor": "middle", class: "lbl" }, svg); t.textContent = fmt(v.estimate);
+  }
+  return svg;
+}
+
+// The distribution of per-game values, band shaded behind.
+function histogram(v, W) {
+  const vals = v.sample.values.filter(isFinite);
+  if (vals.length < 5 || new Set(vals).size < 4) return null;
+  const H = 110, padL = 6, padB = 18, top = 6;
+  let lo = Math.min(...vals, v.band.lo), hi = Math.max(...vals, v.band.hi);
+  if (hi === lo) hi = lo + 1;
+  const bins = 20, bw = (hi - lo) / bins, counts = new Array(bins).fill(0);
+  for (const val of vals) counts[Math.min(bins - 1, Math.floor((val - lo) / bw))]++;
+  const max = Math.max(...counts), x = (val) => padL + ((val - lo) / (hi - lo)) * (W - 2 * padL), y = (c) => H - padB - (c / max) * (H - padB - top);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": `Distribution of ${vals.length} per-game values` });
+  el("rect", { x: x(Math.max(lo, v.band.lo)), y: top, width: Math.max(0, x(Math.min(hi, v.band.hi)) - x(Math.max(lo, v.band.lo))), height: H - padB - top, fill: "var(--band)" }, svg);
+  const cw = (W - 2 * padL) / bins;
+  counts.forEach((c, i) => {
+    if (!c) return;
+    const bx = padL + i * cw + 1, bwid = Math.max(1, cw - 2), by = y(c), bh = H - padB - by, r = Math.min(4, bwid / 2, bh);
+    // Rounded at the data end only, anchored to the baseline.
+    const p = el("path", { d: `M${bx},${H - padB} V${by + r} Q${bx},${by} ${bx + r},${by} H${bx + bwid - r} Q${bx + bwid},${by} ${bx + bwid},${by + r} V${H - padB} Z`, fill: "var(--series-1)" }, svg);
+    hover(p, `${fmt(lo + i * bw)} – ${fmt(lo + (i + 1) * bw)} ${v.unit}: ${c} game${c === 1 ? "" : "s"}`);
+  });
+  el("line", { x1: padL, x2: W - padL, y1: H - padB, y2: H - padB, stroke: "var(--axis)" }, svg);
+  for (const val of [lo, (lo + hi) / 2, hi]) { const t = el("text", { x: x(val), y: H - 4, "text-anchor": val === lo ? "start" : val === hi ? "end" : "middle" }, svg); t.textContent = fmt(val); }
+  return svg;
+}
+
+function renderVignettes(filter) {
+  const grid = document.getElementById("vgrid");
+  grid.innerHTML = "";
+  for (const v of D.vignettes.filter((v) => filter === "all" || verdictOf(v) === filter)) {
+    const card = document.createElement("div");
+    card.className = "card";
+    const vd = verdictOf(v), [icon, word] = VERDICT[vd];
+    card.innerHTML = `<h3>${esc(v.title)}<span class="verdict ${vd}"><i aria-hidden="true">${icon}</i>${word}</span></h3><p>${esc(v.hypothesis)}</p>`;
+    grid.appendChild(card);
+    const W = Math.max(280, card.clientWidth - 28);
+    card.appendChild(strip(v, W));
+    if (v.band.statistic !== "proportion") { const h = histogram(v, W); if (h) card.appendChild(h); }
+    const note = document.createElement("p"); note.className = "muted"; note.textContent = `${v.unit} · [${v.source}] · ${v.sample.values.length} games${v.sample.missing ? `, ${v.sample.missing} without a value` : ""}`; card.appendChild(note);
+  }
+}
+
+if (D.vignettes && D.vignettes.length) {
+  document.getElementById("vignettes").hidden = false;
+  const tabs = document.getElementById("vtabs");
+  const counts = { all: D.vignettes.length, in: 0, out: 0, backlog: 0 };
+  for (const v of D.vignettes) counts[verdictOf(v)]++;
+  for (const [k, label] of [["all", "All"], ["in", "In band"], ["out", "Out of band"], ["backlog", "Backlog"]]) {
+    if (k !== "all" && !counts[k]) continue;
+    const b = document.createElement("button");
+    b.textContent = `${label} (${counts[k]})`;
+    b.setAttribute("aria-pressed", k === "all");
+    b.onclick = () => { for (const o of tabs.children) o.setAttribute("aria-pressed", o === b); renderVignettes(k); };
+    tabs.appendChild(b);
+  }
+  renderVignettes("all");
+  addEventListener("resize", () => renderVignettes(document.querySelector("#vtabs [aria-pressed=true]")?.textContent.startsWith("In") ? "in" : "all"));
+  document.getElementById("vtable").innerHTML = `<tr><th>Vignette</th><th>Statistic</th><th>Estimate</th><th>Interval</th><th>Band</th><th>Baseline</th><th>Games</th><th>Verdict</th></tr>` +
+    D.vignettes.map((v) => `<tr><td>${esc(v.title)}</td><td>${v.band.statistic}</td><td>${fmt(v.estimate)} ${esc(v.unit)}</td><td>${v.interval ? `${fmt(v.interval.lo)} – ${fmt(v.interval.hi)}` : "—"}</td><td>${fmt(v.band.lo)} – ${fmt(v.band.hi)}</td><td>${fmt(baseline.get(v.id))}</td><td>${v.sample.values.length}</td><td>${VERDICT[verdictOf(v)][1]}</td></tr>`).join("");
+}
+
+// Sensitivity: μ* (normalised) per figure, ranked; unsourced figures flagged.
+if (D.sensitivity && D.sensitivity.length) {
+  document.getElementById("sensitivity").hidden = false;
+  const root = document.getElementById("sens");
+  for (const r of D.sensitivity) {
+    const card = document.createElement("div"); card.className = "card"; root.appendChild(card);
+    const src = new Map(r.factors.map((f) => [f.key, f]));
+    const sob = new Map(((r.sobol && r.sobol.indices) || []).map((s) => [s.key, s]));
+    card.innerHTML = `<h3>${esc(r.subject)}</h3><p>Morris screening, ${r.morris.evaluations} evaluations: μ* is the mean absolute effect of moving a figure across its range, as a share of the largest. Figures marked [default] are unsourced — research them first.</p>`;
+    const moved = r.morris.effects.filter((e) => e.mu_star > 0);
+    const effects = [...moved].sort((a, b) => b.mu_star - a.mu_star).slice(0, 20);
+    const quiet = r.morris.effects.length - moved.length;
+    if (quiet) card.querySelector("p").textContent += ` ${quiet} of ${r.morris.effects.length} figures had no effect and are not listed.`;
+    const W = Math.max(320, card.clientWidth - 28), row = 22, labelW = Math.min(300, W * 0.45), H = effects.length * row + 8;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": `Figures ranked by influence on ${r.subject}` });
+    effects.forEach((e, i) => {
+      const f = src.get(e.key), unsourced = f && f.confidence === "default", y = 4 + i * row;
+      const t = el("text", { x: labelW - 8, y: y + 14, "text-anchor": "end", class: "lbl" }, svg); t.textContent = e.key + (unsourced ? " [default]" : "");
+      const w = Math.max(2, (W - labelW - 60) * e.mu_star_normalised), r4 = Math.min(4, w / 2);
+      const bar = el("path", { d: `M${labelW},${y + 4} H${labelW + w - r4} Q${labelW + w},${y + 4} ${labelW + w},${y + 4 + r4} V${y + 16 - r4} Q${labelW + w},${y + 16} ${labelW + w - r4},${y + 16} H${labelW} Z`, fill: "var(--series-1)" }, svg);
+      const s = sob.get(e.key);
+      hover(bar, `${e.key}: μ* ${fmt(e.mu_star)} (${Math.round(e.mu_star_normalised * 100)}%), μ ${fmt(e.mu)}, σ ${fmt(e.sigma)}` + (s ? `, Sobol S₁ ${fmt(s.first)}, S_T ${fmt(s.total)}` : "") + (f ? ` · ${f.base} ${f.unit} in ${f.min}–${f.max} [${f.source}]` : ""));
+      const v = el("text", { x: labelW + w + 6, y: y + 14 }, svg); v.textContent = `${Math.round(e.mu_star_normalised * 100)}%`;
+    });
+    card.appendChild(svg);
+    const tw = document.createElement("div"); tw.className = "tablewrap";
+    tw.innerHTML = `<table><tr><th>Figure</th><th>Value</th><th>Range</th><th>Source</th><th>μ*</th><th>σ</th><th>Sobol S_T</th></tr>` +
+      effects.map((e) => { const f = src.get(e.key) || {}, s = sob.get(e.key); return `<tr><td>${esc(e.key)}</td><td>${f.base ?? "—"} ${esc(f.unit || "")}</td><td>${f.min ?? ""}–${f.max ?? ""}</td><td>${f.confidence === "default" ? "[default]" : esc(f.source || "")}</td><td>${fmt(e.mu_star)}</td><td>${fmt(e.sigma)}</td><td>${s ? fmt(s.total) : "—"}</td></tr>`; }).join("") + `</table>`;
+    card.appendChild(tw);
+  }
+}
+</script>
+</body>
+</html>

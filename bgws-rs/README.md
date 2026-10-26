@@ -16,7 +16,8 @@ target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, 
 target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
-target/release/bgws sensitivity shahed-raid          # Morris + Sobol, the research backlog
+target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
+target/release/bgws vignettes --html workbench.html  # the workbench page: each vignette against band and baseline
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
 target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/

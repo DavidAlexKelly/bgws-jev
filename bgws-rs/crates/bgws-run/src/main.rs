@@ -139,6 +139,9 @@ enum Cmd {
         /// but being out of band does not fail the run.
         #[arg(long, value_delimiter = ',')]
         backlog: Vec<String>,
+        /// Also write the workbench page (charts of each vignette against its band and baseline).
+        #[arg(long)]
+        html: Option<PathBuf>,
     },
     /// Sensitivity analysis of one vignette over its unsourced figures.
     Sensitivity {
@@ -150,6 +153,9 @@ enum Cmd {
         prefix: Option<String>,
         #[arg(long, default_value_t = 1)]
         seed: u64,
+        /// Also write the workbench page (figures ranked by influence).
+        #[arg(long)]
+        html: Option<PathBuf>,
     },
     /// The after-action review of a game's event log (`play --events`).
     Aar { events: PathBuf },
@@ -301,7 +307,7 @@ fn main() -> Result<()> {
                 std::fs::write(p, serde_json::to_string_pretty(&batch.replicates.iter().map(|r| &r.output).collect::<Vec<_>>())?)?;
             }
         }
-        Cmd::Vignettes { only, n, seed, json, store, accept, backlog } => {
+        Cmd::Vignettes { only, n, seed, json, store, accept, backlog, html } => {
             let on_backlog = |id: &str| backlog.iter().any(|b| b == id);
             let figures = default_figures();
             let load = |name: &str| load_scenario(&scenario_path(name)).ok();
@@ -312,6 +318,7 @@ fn main() -> Result<()> {
             };
             let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), &scenarios);
             let mut regressed = false;
+            let mut regression = Vec::new();
             if let Some(dir) = &store {
                 let st = bgws_analysis::regression::RegressionStore::open(dir).map_err(|e| anyhow!("{e}"))?;
                 let ro = bgws_analysis::regression::RegressionOptions::from_figures(&figures);
@@ -324,12 +331,18 @@ fn main() -> Result<()> {
                         None => verdicts.push(st.check_and_record(r, &ro).map_err(|e| anyhow!("{e}"))?),
                     }
                 }
+                regression = verdicts.clone();
                 if !verdicts.is_empty() {
                     regressed = verdicts.iter().any(|v| v.status.fails() && !(on_backlog(&v.id) && v.status == bgws_analysis::regression::RegressionStatus::OutOfBand));
                     println!("{}", bgws_analysis::report::regression_markdown(&verdicts));
                 }
             }
             let suite = VignetteSuite::new(results);
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": "Benchmark vignettes", "generated": format!("{n} games each, seed {seed}"), "vignettes": suite.results, "regression": regression, "backlog": backlog });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
+            }
             println!("{}", suite.to_markdown());
             if regressed {
                 bail!("a vignette regressed against its baseline (accept with --accept \"why\" if intended)");
@@ -346,8 +359,14 @@ fn main() -> Result<()> {
                 bail!("out of band: {}", failing.join(", "));
             }
         }
-        Cmd::Sensitivity { vignette, replicates, prefix, seed } => {
-            bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed))?;
+        Cmd::Sensitivity { vignette, replicates, prefix, seed, html } => {
+            let report = bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed))?;
+            println!("{}", bgws_analysis::report::sensitivity_markdown(&report));
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": format!("Sensitivity: {vignette}"), "generated": format!("{replicates} replicates, seed {seed}"), "sensitivity": [report] });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
+            }
         }
         Cmd::Aar { events } => println!("{}", bgws_run::aar::review(&bgws_run::aar::read_log(&events)?)),
         Cmd::Why { events, who } => println!("{}", bgws_run::aar::why(&bgws_run::aar::read_log(&events)?, &who)),

@@ -442,7 +442,7 @@ impl<F: Fn(&Figures, Seed) -> Value + Sync> Experiment for Wrap<'_, F> {
 
 /// Morris screening then Sobol indices for a vignette over its figures, and
 /// the research backlog of unsourced figures ranked by sensitivity (§15.4).
-pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed) -> anyhow::Result<()> {
+pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed) -> anyhow::Result<bgws_analysis::sensitivity::SensitivityReport> {
     use bgws_analysis::sensitivity::*;
     let figures = crate::default_figures();
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
@@ -475,9 +475,7 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let resp = BatchResponse { experiment: &Wrap(&wrap), metric: &metric, config: bgws_analysis::batch::BatchConfig::new(replicates, seed), statistic: v.band.statistic };
     let morris = MorrisOptions::from_figures(&figures);
     let sobol = SobolOptions::from_figures(&figures);
-    let report = analyse(&v.id, &figures, &facs, &resp, &morris, &sobol, seed);
-    println!("{}", bgws_analysis::report::sensitivity_markdown(&report));
-    Ok(())
+    Ok(analyse(&v.id, &figures, &facs, &resp, &morris, &sobol, seed))
 }
 
 #[cfg(test)]
