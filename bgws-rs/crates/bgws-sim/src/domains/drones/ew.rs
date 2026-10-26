@@ -88,6 +88,11 @@ pub struct EwStats {
 pub struct EwState {
     pub jammers: Vec<JammerRec>,
     pub tx: Vec<TxEmission>,
+    /// The last second's emissions, for the spectrum view.
+    pub last_tx: Vec<TxEmission>,
+    /// Each unit's latest radio transmission and when (radios are bursty,
+    /// so the spectrum view shows those of the last few seconds).
+    pub last_radio: BTreeMap<EntityId, (SimTime, TxEmission)>,
     pub bearings: BTreeMap<(Side, EntityId), Vec<BearingObs>>,
     pub fixes: BTreeMap<(Side, EntityId), FixRec>,
     pub first_heard: BTreeMap<(Side, EntityId), SimTime>,
@@ -245,6 +250,10 @@ pub fn base(s: &mut Sim, dt: f64) {
             *c4.on_air.entry(j.entity).or_insert(0.0) += dt;
         }
     }
+    for t in tx.iter().filter(|t| t.what == "radio") {
+        c4.ew.last_radio.insert(t.entity, (now, t.clone()));
+    }
+    c4.ew.last_tx = tx.clone();
     if ew_on {
         esm(s, &mut c4, &tx);
         if now.0 % 10_000_000 == 0 {

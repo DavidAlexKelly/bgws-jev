@@ -54,7 +54,8 @@ export type Inbound =
   | { kind: "save" }
   | { kind: "why"; unit: string }
   | { kind: "review" }
-  | { kind: "detect"; observer: string; target: string };
+  | { kind: "detect"; observer: string; target: string }
+  | { kind: "messages"; unit: string };
 
 export interface ClientHandlers {
   onFrame?: (frame: FrameView, at: { t: number; live: number; scrub: boolean }) => void;
@@ -170,6 +171,10 @@ export class BgwsClient {
   /** Why one unit would see another now, with every factor (umpire view only: it reads truth). */
   detect(observer: string, target: string): void {
     this.send({ kind: "detect", observer, target });
+  }
+  /** A unit's latest messages and why each was slow or lost (own units only in a side view). */
+  messages(unit: string): void {
+    this.send({ kind: "messages", unit });
   }
   close(): void {
     this.ws.close();

@@ -246,6 +246,9 @@ fn sees(viewer: Viewer, side: Side) -> bool {
     viewer.side().is_none_or(|v| v == side)
 }
 
+/// How long after a radio transmission the spectrum view still shows it, s.
+const RADIO_SHOWN_S: f64 = 10.0;
+
 /// What is on the air, and the nets, from the C4 domain (empty without it).
 fn spectrum_and_nets(s: &Sim, viewer: Viewer) -> (Vec<FrameEmitter>, Vec<FrameLink>) {
     use crate::domains::drones::C4;
@@ -269,7 +272,8 @@ fn spectrum_and_nets(s: &Sim, viewer: Viewer) -> (Vec<FrameEmitter>, Vec<FrameLi
         }
     }
     let mut seen_radio = std::collections::BTreeSet::new();
-    for t in &c4.ew.tx {
+    let heard = c4.ew.last_radio.values().filter(|(at, _)| (s.ctx.now - *at).secs() <= RADIO_SHOWN_S).map(|(_, t)| t);
+    for t in c4.ew.last_tx.iter().filter(|t| t.what != "radio").chain(heard) {
         if t.what != "jammer" && seen_radio.insert((t.entity, t.what)) {
             push(t.entity, t.side, if t.what.starts_with("radar") || t.what.starts_with("drone") { t.what } else { "radio" }, t.freq_hz, t.bw_hz, t.erp_w, 0.0);
         }

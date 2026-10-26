@@ -84,6 +84,8 @@ enum Inbound {
     Review,
     /// Why one unit would see another now (the detection inspector; umpire only).
     Detect { observer: String, target: String },
+    /// A unit's latest messages and why each was slow or lost (the link-budget inspector).
+    Messages { unit: String },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -137,6 +139,31 @@ fn scenario_path(s: &str) -> PathBuf {
         return p;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios").join(format!("{}.json", s.trim_end_matches(".json")))
+}
+
+/// The link-budget inspector's answer: each message, how it went, hop by hop.
+fn messages_text(sim: &bgws_sim::Sim, msgs: &[bgws_sim::domains::drones::comms::MessageRecord]) -> String {
+    if msgs.is_empty() {
+        return "No messages yet (or this scenario does not model the nets).".into();
+    }
+    let name = |id: bgws_core::EntityId| sim.world.get::<bgws_sim::components::Ident>(sim.ctx.entity(id)).map(|i| i.label.clone()).unwrap_or_else(|| format!("#{}", id.0));
+    let node = |n: u32| name(bgws_core::EntityId(n));
+    let mut t = String::new();
+    for m in msgs {
+        let took = (m.done - m.sent).secs();
+        let how = if m.delivered { format!("delivered in {took:.0} s over {}", m.bearer.as_deref().unwrap_or("?")) } else { format!("LOST after {took:.0} s: {}", m.reason.as_deref().unwrap_or("?")) };
+        t.push_str(&format!("{}  {} → {}  {}: {how}\n", m.sent, name(m.from), name(m.to), m.what));
+        for f in &m.fallbacks {
+            t.push_str(&format!("    fell back from {:?} (PACE level {}) at {}: {:?}\n", f.bearer, f.pace_level, f.at, f.failure));
+        }
+        for h in &m.hops {
+            t.push_str(&format!(
+                "    {} → {} on {:?}: queued {:.1} s, on air {:.1} s, {} attempt{}, SINR {:.1} dB, P(success) {:.2}{}\n",
+                node(h.from.0), node(h.to.0), h.bearer, h.queue_wait_s, h.airtime_s, h.attempts, if h.attempts == 1 { "" } else { "s" }, h.sinr_db, h.p_success, if h.success { "" } else { ", failed" },
+            ));
+        }
+    }
+    t
 }
 
 /// The detection inspector's answer, in words, then every factor.
@@ -231,6 +258,20 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                         }
                     };
                     send(&out, json!({ "kind": "report", "title": format!("Can {observer} see {target}?"), "text": text }));
+                }
+                Inbound::Messages { unit } => {
+                    let text = match host.sim.ctx.by_name.get(&unit).copied() {
+                        None => "Unknown unit.".to_string(),
+                        Some(id) => {
+                            let side = host.sim.world.get::<bgws_sim::components::Ident>(host.sim.ctx.entity(id)).map(|i| i.side);
+                            if viewer.side().is_some_and(|v| Some(v) != side) {
+                                "Not one of your units.".to_string()
+                            } else {
+                                messages_text(&host.sim, &bgws_sim::domains::drones::comms::messages_of(&host.sim, id, 12))
+                            }
+                        }
+                    };
+                    send(&out, json!({ "kind": "report", "title": format!("Messages: {unit}"), "text": text }));
                 }
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {

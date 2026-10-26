@@ -144,6 +144,40 @@ pub struct CommsState {
     pub stats: CommsStats,
     /// Arrivals the C2 layer has not yet taken.
     pub arrived: Vec<Arrived>,
+    /// The latest messages delivered or lost, with their hops and fallbacks
+    /// (§16 link-budget inspector), oldest first.
+    pub recent: std::collections::VecDeque<MessageRecord>,
+}
+
+/// How many finished messages the link-budget inspector keeps.
+const RECENT_MESSAGES: usize = 4_000;
+
+/// A finished message: where it went, how, and why it was slow or lost.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageRecord {
+    pub from: EntityId,
+    pub to: EntityId,
+    pub what: String,
+    pub sent: SimTime,
+    pub done: SimTime,
+    pub delivered: bool,
+    pub bearer: Option<String>,
+    pub reason: Option<String>,
+    pub hops: Vec<bgws_ops::comms::HopRecord>,
+    pub fallbacks: Vec<bgws_ops::comms::BearerFailure>,
+}
+
+fn remember(c4: &mut C4, r: MessageRecord) {
+    if c4.comms.recent.len() >= RECENT_MESSAGES {
+        c4.comms.recent.pop_front();
+    }
+    c4.comms.recent.push_back(r);
+}
+
+/// A unit's latest `n` messages, sent or received, newest first.
+pub fn messages_of(s: &Sim, unit: EntityId, n: usize) -> Vec<MessageRecord> {
+    s.world.get_resource::<C4>().map(|c| c.comms.recent.iter().rev().filter(|m| m.from == unit || m.to == unit).take(n).cloned().collect()).unwrap_or_default()
 }
 
 fn node(id: EntityId) -> NodeId {
@@ -538,12 +572,14 @@ pub fn base(s: &mut Sim) {
         let word = m.payload.word().to_string();
         match o {
             CommsOutcome::Delivered(d) => {
+                remember(&mut c4, MessageRecord { from: m.from, to: m.to, what: word.clone(), sent: m.sent, done: d.delivered_at, delivered: true, bearer: Some(format!("{:?}", d.bearer)), reason: None, hops: d.hops.clone(), fallbacks: d.fallbacks.clone() });
                 *c4.comms.stats.delivered.entry(word.clone()).or_insert(0) += 1;
                 *c4.comms.stats.latency_s.entry(word).or_insert(0.0) += d.latency_s();
                 *c4.comms.stats.by_bearer.entry(format!("{:?}/{}", d.bearer, d.pace_level)).or_insert(0) += 1;
                 c4.comms.arrived.push(Arrived { from: m.from, to: m.to, sent: m.sent, at: d.delivered_at, bearer: Some(d.bearer), payload: m.payload });
             }
             CommsOutcome::Lost(l) => {
+                remember(&mut c4, MessageRecord { from: m.from, to: m.to, what: word.clone(), sent: m.sent, done: l.lost_at, delivered: false, bearer: None, reason: Some(format!("{:?}", l.reason)), hops: l.hops.clone(), fallbacks: l.fallbacks.clone() });
                 *c4.comms.stats.lost.entry(word.clone()).or_insert(0) += 1;
                 if matches!(m.payload, Payload::Order { .. } | Payload::Contact { new: true, .. } | Payload::Target { .. }) {
                     let text = format!("{} from {} to {} lost: {:?}", word, crate::systems::name(s, m.from), crate::systems::name(s, m.to), l.reason);

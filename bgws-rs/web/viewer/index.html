@@ -363,6 +363,11 @@ function inspect(e) {
     }
   }
   if (e.domain !== "drone") {
+    const m = document.createElement("button");
+    m.textContent = "Messages";
+    m.title = "Its latest messages and why each was slow or lost";
+    m.onclick = () => send({ kind: "messages", unit: e.name });
+    el.prepend(m, " ");
     const b = document.createElement("button");
     b.textContent = "Why?";
     b.title = "What happened to this unit, with the figures behind it";

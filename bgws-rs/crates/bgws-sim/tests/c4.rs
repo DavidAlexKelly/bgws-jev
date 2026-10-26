@@ -327,6 +327,7 @@ fn frames_show_the_spectrum_the_nets_and_sensor_footprints() {
     let kinds: std::collections::BTreeSet<&str> = all.emitters.iter().map(|e| e.kind.as_str()).collect();
     eprintln!("emitters {kinds:?}, links {}, sensors {}", all.links.len(), all.sensors.len());
     assert!(kinds.contains("jammer"), "M4's jammers are on the air");
+    assert!(kinds.contains("radio"), "radios heard in the last seconds show");
     assert!(!all.links.is_empty() && all.links.iter().all(|l| l.from != l.to));
     assert!(all.sensors.iter().all(|s| s.range_m > 0.0) && !all.sensors.is_empty());
     let blue = sim.view(bgws_sim::Viewer::Blue);
