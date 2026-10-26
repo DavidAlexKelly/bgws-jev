@@ -107,6 +107,21 @@ impl Ground {
         optical_los(&self.grid(), &q, &self.optical)
     }
 
+    /// What an observer at `at` (eye `agl` m) sees of a man-height target
+    /// over the terrain within `range` m, on a grid of at most `max_cells`
+    /// a side (§16 viewshed layer; canopy is per line, in `los`). Returns
+    /// the grid's south-west corner, cell size and row-major seen flags.
+    pub fn viewshed(&self, at: Enu, agl: f64, range: f64, max_cells: usize) -> Option<(Enu, f64, usize, Vec<bool>)> {
+        let cell = (2.0 * range / max_cells as f64).max(self.terrain.spec.cell);
+        let n = ((2.0 * range / cell).ceil() as usize + 1).max(2);
+        let sw = Enu::new(at.e - range, at.n - range, 0.0);
+        let heights: Vec<f32> = (0..n * n).map(|k| self.height(sw.e + (k % n) as f64 * cell, sw.n + (k / n) as f64 * cell) as f32).collect();
+        let grid = bgws_gpu::grid::HeightGrid::new(n, n, cell, sw.e, sw.n, heights).ok()?;
+        let o = bgws_gpu::viewshed::ViewshedObserver { x: at.e, y: at.n, agl, max_range: range };
+        let v = bgws_gpu::viewshed::viewshed_cpu(&grid, &[o], 1.5, &self.optical.los);
+        Some((sw, cell, n, v.count.iter().map(|c| *c > 0).collect()))
+    }
+
     /// Many at once, through the kernel layer.
     pub fn los_batch(&self, queries: &[LosQuery]) -> Vec<OpticalLos> {
         optical_los_batch(&self.backend, &self.grid(), queries, &self.optical)

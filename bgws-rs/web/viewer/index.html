@@ -110,6 +110,7 @@ ws.onmessage = (m) => {
   else if (msg.kind === "questions") questions(msg.questions);
   else if (msg.kind === "status") document.getElementById("status").textContent = msg.text;
   else if (msg.kind === "report") showReport(msg.title, msg.text);
+  else if (msg.kind === "viewshed") { viewshed = msg; viewshed.image = viewshedImage(msg); frame && render(frame); }
 };
 function setPlaying(p) { playing = p; document.getElementById("play").textContent = playing ? "Pause" : "Play"; }
 document.getElementById("play").onclick = () => { setPlaying(!playing); send({ kind: playing ? "play" : "pause" }); };
@@ -131,6 +132,19 @@ function showReport(title, text) {
 }
 // ── HQ console: a person's orders for the side they view, sent over its nets ──
 let picking = false, objective = null;
+// The viewshed layer: the unit's seen ground, as an image over its bounds.
+let viewshed = null;
+function viewshedImage(v) {
+  const c = document.createElement("canvas"); c.width = v.cols; c.height = v.rows;
+  const g = c.getContext("2d"), img = g.createImageData(v.cols, v.rows), [r, gr, b] = SIDE[v.side] || SIDE.neutral;
+  for (let j = 0; j < v.rows; j++) for (let i = 0; i < v.cols; i++) {
+    // The mask runs from the south-west; images from the top-left.
+    const seen = v.mask[j * v.cols + i] === "1", k = ((v.rows - 1 - j) * v.cols + i) * 4;
+    img.data[k] = r; img.data[k + 1] = gr; img.data[k + 2] = b; img.data[k + 3] = seen ? 70 : 0;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
 const hqSide = () => document.getElementById("viewer").value;
 const TASKS = [["", "—"], ["advance", "advance to the objective"], ["assault", "assault the objective"], ["hold", "hold"], ["observe", "observe"], ["overwatch", "overwatch"], ["withdraw", "withdraw from the objective"]];
 function hqUnits() {
@@ -261,6 +275,7 @@ function render(f) {
     new deck.LineLayer({ id: "chain-fire", data: o.chains, pickable: true, getSourcePosition: (c) => [c.from.lon, c.from.lat], getTargetPosition: (c) => [c.aim_lon, c.aim_lat], getColor: (c) => [...SIDE[c.side], 220], getWidth: 3, widthUnits: "pixels" }),
     new deck.ScatterplotLayer({ id: "chain-aim", data: o.chains, getPosition: (c) => [c.aim_lon, c.aim_lat], getRadius: 7, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (c) => [...SIDE[c.side], 230], lineWidthMinPixels: 2 }),
     new deck.ScatterplotLayer({ id: "emitters", data: o.emitters, getPosition: (x) => [x.lon, x.lat], getRadius: 11, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (x) => [...SIDE[x.side], 200], lineWidthMinPixels: 2 }),
+    ...(viewshed ? [new deck.BitmapLayer({ id: "viewshed", image: viewshed.image, bounds: [viewshed.west, viewshed.south, viewshed.east, viewshed.north] })] : []),
     new deck.ScatterplotLayer({ id: "objective", data: objective ? [objective] : [], getPosition: (o) => [o.lon, o.lat], getRadius: 9, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: [200, 150, 0, 230], lineWidthMinPixels: 3 }),
     new deck.PolygonLayer({ id: "tracks", data: f.tracks, getPolygon: ellipse, filled: true, stroked: true, getFillColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 30], getLineColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 160], lineWidthMinPixels: 1 }),
     new deck.ScatterplotLayer({ id: "entities", data: f.entities, pickable: true, getPosition: (e) => [e.lon, e.lat], getRadius: 6, radiusUnits: "pixels",
@@ -297,6 +312,10 @@ function drawCanvas(f) {
   const o = overlays(f);
   const rgba = (side, a) => `rgba(${SIDE[side].join(",")},${a})`;
   const mPerPx = 1 / k;
+  if (viewshed) {
+    g.imageSmoothingEnabled = false;
+    g.drawImage(viewshed.image, x(viewshed.west), y(viewshed.north), x(viewshed.east) - x(viewshed.west), y(viewshed.south) - y(viewshed.north));
+  }
   for (const s of o.sensors) {
     g.strokeStyle = rgba(s.side, 0.35); g.fillStyle = rgba(s.side, 0.05);
     g.beginPath(); s.poly.forEach(([lo, la], i) => (i ? g.lineTo(x(lo), y(la)) : g.moveTo(x(lo), y(la)))); g.closePath(); g.fill(); g.stroke();
@@ -374,6 +393,11 @@ function inspect(e) {
     }
   }
   if (e.domain !== "drone") {
+    const vs = document.createElement("button");
+    vs.textContent = viewshed && viewshed.unit === e.name ? "Hide viewshed" : "Viewshed";
+    vs.title = "What it can see over the terrain";
+    vs.onclick = () => { if (viewshed && viewshed.unit === e.name) { viewshed = null; frame && render(frame); vs.textContent = "Viewshed"; } else { send({ kind: "viewshed", unit: e.name }); vs.textContent = "Hide viewshed"; } };
+    el.prepend(vs, " ");
     const m = document.createElement("button");
     m.textContent = "Messages";
     m.title = "Its latest messages and why each was slow or lost";

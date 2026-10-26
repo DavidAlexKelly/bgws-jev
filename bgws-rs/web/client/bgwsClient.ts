@@ -35,6 +35,7 @@ export type Outbound =
   | FrameMsg
   | { kind: "branched"; t: number }
   | { kind: "report"; title: string; text: string }
+  | { kind: "viewshed"; unit: string; side: Side; cols: number; rows: number; cellM: number; rangeM: number; west: number; south: number; east: number; north: number; mask: string; coverage: number }
   | { kind: "events"; events: FeedEvent[] }
   | { kind: "questions"; questions: Question[] }
   | { kind: "status"; text: string };
@@ -55,12 +56,15 @@ export type Inbound =
   | { kind: "why"; unit: string }
   | { kind: "review" }
   | { kind: "detect"; observer: string; target: string }
-  | { kind: "messages"; unit: string };
+  | { kind: "messages"; unit: string }
+  | { kind: "viewshed"; unit: string };
 
 export interface ClientHandlers {
   onFrame?: (frame: FrameView, at: { t: number; live: number; scrub: boolean }) => void;
   /** The game restarted at `t`: drop anything shown from after it. */
   onBranched?: (t: number) => void;
+  /** A viewshed: `mask` is row-major 0/1 from the south-west corner. */
+  onViewshed?: (v: Extract<Outbound, { kind: "viewshed" }>) => void;
   /** A `why` or `review` answer: Markdown over the events this viewer may see. */
   onReport?: (title: string, text: string) => void;
   onEvents?: (events: FeedEvent[]) => void;
@@ -97,6 +101,9 @@ export class BgwsClient {
         break;
       case "branched":
         this.handlers.onBranched?.(m.t);
+        break;
+      case "viewshed":
+        this.handlers.onViewshed?.(m);
         break;
       case "report":
         this.handlers.onReport?.(m.title, m.text);
@@ -175,6 +182,10 @@ export class BgwsClient {
   /** A unit's latest messages and why each was slow or lost (own units only in a side view). */
   messages(unit: string): void {
     this.send({ kind: "messages", unit });
+  }
+  /** What a unit sees over the terrain (own units in a side view). */
+  viewshed(unit: string): void {
+    this.send({ kind: "viewshed", unit });
   }
   close(): void {
     this.ws.close();

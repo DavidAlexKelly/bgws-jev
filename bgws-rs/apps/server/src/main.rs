@@ -86,6 +86,8 @@ enum Inbound {
     Detect { observer: String, target: String },
     /// A unit's latest messages and why each was slow or lost (the link-budget inspector).
     Messages { unit: String },
+    /// What a unit sees over the terrain (the viewshed layer; own units in a side view).
+    Viewshed { unit: String },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -272,6 +274,22 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                         }
                     };
                     send(&out, json!({ "kind": "report", "title": format!("Messages: {unit}"), "text": text }));
+                }
+                Inbound::Viewshed { unit } => {
+                    let id = host.sim.ctx.by_name.get(&unit).copied();
+                    let side = id.and_then(|id| host.sim.world.get::<bgws_sim::components::Ident>(host.sim.ctx.entity(id)).map(|i| i.side));
+                    match id {
+                        Some(id) if viewer.side().is_none_or(|v| Some(v) == side) => match host.sim.viewshed(id, 160) {
+                            Some(mut v) => {
+                                v["kind"] = json!("viewshed");
+                                v["unit"] = json!(unit);
+                                v["side"] = json!(side);
+                                send(&out, v);
+                            }
+                            None => send(&out, json!({ "kind": "status", "text": "no viewshed: the unit is not on the ground" })),
+                        },
+                        _ => send(&out, json!({ "kind": "status", "text": "viewshed: not one of your units" })),
+                    }
                 }
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {

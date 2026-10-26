@@ -75,3 +75,22 @@ fn detection_inspector_agrees_with_sensing() {
     assert_eq!(x["alreadySeen"], true);
     assert!(!x["sensors"].as_array().unwrap().is_empty());
 }
+
+/// The viewshed layer: on flat ground a unit sees the whole disc of its
+/// reach (π/4 of the square); on the scenario's ground, hills hide some.
+#[test]
+fn viewsheds_follow_the_ground() {
+    let sc = scenario("skirmish-advance-to-contact-v1");
+    let flat = Sim::with_options(&sc, Seed(1), default_figures(), bgws_sim::SimOptions { flat_ground: true, ..Default::default() }).unwrap();
+    let real = Sim::new(&sc, Seed(1), default_figures()).unwrap();
+    let id = *real.ctx.by_name.values().next().unwrap();
+    let f = flat.viewshed(id, 120).unwrap();
+    let r = real.viewshed(id, 120).unwrap();
+    let (fc, rc) = (f["coverage"].as_f64().unwrap(), r["coverage"].as_f64().unwrap());
+    eprintln!("flat {fc:.3}, real {rc:.3}, {} cells", f["cols"]);
+    assert!((fc - std::f64::consts::FRAC_PI_4).abs() < 0.03, "flat ground: the disc ({fc})");
+    assert!(rc < fc && rc > 0.0, "hills hide some ({rc})");
+    let n = r["cols"].as_u64().unwrap() as usize;
+    assert_eq!(r["mask"].as_str().unwrap().len(), n * n);
+    assert_eq!(&r["mask"].as_str().unwrap()[(n / 2) * n + n / 2..][..1], "1", "it sees where it stands");
+}

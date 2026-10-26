@@ -571,6 +571,21 @@ impl Sim {
     }
 
     /// A frame for the UI: truth for the umpire, else what a side believes.
+    /// What a unit sees over the terrain within its longest sensor's reach
+    /// (capped at the search range): `{cols, rows, west, south, east, north, mask}`
+    /// with `mask` a row-major string of 0/1 from the south-west corner.
+    pub fn viewshed(&self, unit: EntityId, max_cells: usize) -> Option<serde_json::Value> {
+        let e = self.ctx.entity(unit);
+        let (i, k) = (self.world.get::<crate::components::Ident>(e)?, self.world.get::<crate::components::Kin>(e)?);
+        let reach = i.platform.sensors.iter().map(|s| s.range_max_m).fold(0.0, f64::max).min(self.ctx.p.sense_max_m).max(500.0);
+        let eye = i.platform.sensors.iter().map(|s| s.height_m).fold(2.0, f64::max) + k.agl;
+        let (sw, cell, n, seen) = self.ctx.ground.viewshed(k.pos, eye, reach, max_cells)?;
+        let a = self.ctx.frame.enu_to_geodetic(sw);
+        let b = self.ctx.frame.enu_to_geodetic(Enu::new(sw.e + cell * (n - 1) as f64, sw.n + cell * (n - 1) as f64, 0.0));
+        let mask: String = seen.iter().map(|&v| if v { '1' } else { '0' }).collect();
+        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "coverage": seen.iter().filter(|v| **v).count() as f64 / seen.len().max(1) as f64 }))
+    }
+
     /// Why one unit would see another now, with every factor (truth: for the umpire).
     pub fn explain_detection(&self, observer: EntityId, target: EntityId, over_s: f64) -> Option<serde_json::Value> {
         crate::systems::explain_detection(self, observer, target, over_s)
