@@ -48,7 +48,8 @@ pub enum Payload {
     /// One unit's orders from a plan.
     Order { hq: usize, side: Side, order: UnitOrder, refs: BTreeMap<String, Geodetic>, plan: String, issued: SimTime },
     /// A target handed to a strike team.
-    Target { track: TrackId, at: Enu, value: f64, seen: SimTime },
+    /// `cue` is the sighting that started the chain (detect-to-strike starts there).
+    Target { track: TrackId, at: Enu, value: f64, seen: SimTime, cue: SimTime },
 }
 
 impl Payload {

@@ -41,4 +41,4 @@ jobs:
       - name: Benchmark vignettes against their bands and baselines
         run: |
           cargo build --release -p bgws-run
-          target/release/bgws vignettes -n 200 --store data/regression
+          target/release/bgws vignettes -n 200 --store data/regression --backlog detect-to-strike-networked

@@ -95,7 +95,7 @@ impl TargetClass {
 pub fn figures() -> Vec<Figure> {
     let mut v = vec![
         // speed m/s, endurance s, range m by type.
-        figure!("drones.fpv_rf.speed_mps", 25.0, "m/s", 10.0, 50.0, "default", Default, "FPV cruise speed"),
+        figure!("drones.fpv_rf.speed_mps", 25.0, "m/s", 10.0, 50.0, "reported", Low, "FPV cruise speed, 90 km/h: strike FPVs are reported at 65–150 km/h cruise (UD-10 67 km/h, mezha.media; 150 km/h types in service, mil.in.ua)"),
         figure!("drones.fpv_rf.endurance_s", 600.0, "s", 180.0, 1_800.0, "default", Default, "FPV battery endurance"),
         figure!("drones.fpv_rf.range_m", 10_000.0, "m", 2_000.0, 25_000.0, "P8", Medium, "RF FPV control range; kill zone 5–20 km"),
         figure!("drones.fpv_fibre.speed_mps", 20.0, "m/s", 10.0, 40.0, "default", Default, "fibre FPV cruise speed"),

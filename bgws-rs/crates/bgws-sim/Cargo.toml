@@ -38,6 +38,8 @@ profile = ["dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy"]
 ts = ["dep:ts-rs", "bgws-core/ts"]
 
 [dev-dependencies]
+# The heuristic HQ planner, for tests that play as the host does.
+bgws-decide.workspace = true
 proptest.workspace = true
 approx.workspace = true
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }

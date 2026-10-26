@@ -54,10 +54,13 @@ pub struct CopTrack {
 #[serde(rename_all = "camelCase")]
 pub enum UnitRole {
     Manoeuvre,
+    /// Guns, rockets, mortars and strike drone teams: positioned by reach.
     Fires,
     Engineer,
     Support,
     Post,
+    /// Reconnaissance drone teams: positioned by reach to watch the objective.
+    Isr,
 }
 
 /// One of the HQ's own units, from its last report.
@@ -483,6 +486,15 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
                     vec![phase("command", "hold", None, None)]
                 };
                 orders.push(order(&u.id, phases, "command", &intent, "avoid", "ifFiredUpon"));
+            }
+            UnitRole::Isr => {
+                let reach = u.reach_m.unwrap_or(0.0);
+                let phases = if reach > 0.0 && u.at.surface_distance(objective) > reach * p.fires_move_up {
+                    vec![phase("move up to watch the objective", "move", Some(behind(reach * p.fires_standoff)), Some("tactical")), phase("watch the objective and report", "hold", None, None)]
+                } else {
+                    vec![phase("watch the objective and report", "hold", None, None)]
+                };
+                orders.push(order(&u.id, phases, "reconnaissance", &intent, "avoid", "withinShortRange"));
             }
             UnitRole::Support => orders.push(order(&u.id, vec![phase("cover the force", "hold", None, None)], "support the force", &intent, "avoid", "withinShortRange")),
         }

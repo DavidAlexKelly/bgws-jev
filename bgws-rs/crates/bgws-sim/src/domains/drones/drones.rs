@@ -97,6 +97,8 @@ pub struct Flight {
     pub battery_asked: bool,
     /// When the sighting that cued this strike was made.
     pub cue: Option<SimTime>,
+    /// The target came down the kill chain from an HQ (not the team's own eyes).
+    pub handed: bool,
     /// Finished: an outcome to record, or recovered.
     pub done: bool,
 }
@@ -107,6 +109,8 @@ pub struct TargetInfo {
     pub at: Enu,
     pub seen: SimTime,
     pub value: f64,
+    /// The sighting that started the chain to this target.
+    pub cue: SimTime,
 }
 
 /// A drone team.
@@ -156,6 +160,9 @@ pub struct StrikeRecord {
     pub first_seen: Option<SimTime>,
     /// The sighting that cued the strike was made at (detect-to-strike starts here).
     pub cued: Option<SimTime>,
+    /// The target came down the kill chain from an HQ, not from the team's own eyes.
+    #[serde(default)]
+    pub handed: bool,
 }
 
 #[derive(Default)]
@@ -292,21 +299,35 @@ fn target_class(p: &Platform, in_cover: bool) -> TargetClass {
 }
 
 /// An HQ hands a target to a team (arrived over the nets).
-pub fn hand_target(c4: &mut C4, team: EntityId, track: TrackId, at: Enu, value: f64, seen: SimTime, now: SimTime) {
+pub fn hand_target(c4: &mut C4, team: EntityId, track: TrackId, at: Enu, value: f64, seen: SimTime, cue: SimTime) {
     let Some(t) = c4.drones.teams.get_mut(&team) else { return };
     let key = (1u64 << 32) + track.0 as u64;
-    t.targets.insert(key, TargetInfo { at, seen, value });
-    let _ = now;
+    t.targets.insert(key, TargetInfo { at, seen, value, cue: cue.min(seen) });
 }
 
-/// An HQ's COP has a land target: the nearest strike team in reach gets it.
-pub fn offer_target(s: &mut Sim, c4: &mut C4, h: usize, entry: TrackId, v: &bgws_know::TrackView) {
+/// An HQ's COP has a land target: the strike team in reach that would hit
+/// it soonest gets it — the wait until the team can launch (its launch gap,
+/// or its first drone aloft reaching its aim) plus the flight. A team handed
+/// this target within `sim.c2.handoff_gap_s` is passed over for the next.
+pub fn offer_target(s: &mut Sim, c4: &mut C4, h: usize, entry: TrackId, v: &bgws_know::TrackView, cue: SimTime) {
     if !c4.drones.active {
         return;
     }
     let now = s.ctx.now;
     let at = v.position;
-    let mut best: Option<(EntityId, f64)> = None;
+    // Per team: drones aloft, and the soonest one of them reaches its aim (s).
+    let mut aloft: BTreeMap<EntityId, (usize, f64)> = BTreeMap::new();
+    for f in c4.drones.flights.values().filter(|f| !f.done) {
+        let left = match f.task {
+            Task::Strike { aim, .. } => aim.sub(f.pos).horizontal() / f.spec.speed_mps.max(1.0),
+            Task::Terminal => 0.0,
+            _ => f.endurance_s.max(0.0),
+        };
+        let e = aloft.entry(f.team).or_insert((0, f64::INFINITY));
+        e.0 += 1;
+        e.1 = e.1.min(left);
+    }
+    let mut candidates: Vec<(f64, EntityId)> = Vec::new();
     for (id, t) in &c4.drones.teams {
         if c4.c2.unit_hq.get(id) != Some(&h) || !strike_type(t.kind) || t.stores.drones.values().sum::<u32>() == 0 || !alive_id(s, *id) {
             continue;
@@ -316,18 +337,20 @@ pub fn offer_target(s: &mut Sim, c4: &mut C4, h: usize, entry: TrackId, v: &bgws
         if d > t.spec.range_m * 0.9 {
             continue;
         }
-        if best.map(|b| d < b.1).unwrap_or(true) {
-            best = Some((*id, d));
-        }
+        let (n, soonest) = aloft.get(id).copied().unwrap_or((0, 0.0));
+        let gap_wait = (c4.p.launch_gap_s - (now - t.last_launch).secs()).max(0.0);
+        let aloft_wait = if n >= c4.p.max_aloft { soonest } else { 0.0 };
+        candidates.push((gap_wait.max(aloft_wait) + d / t.spec.speed_mps.max(1.0), *id));
     }
-    let Some((team, _)) = best else { return };
-    if c4.c2.hqs[h].handed.get(&(entry, team)).map(|t| (now - *t).secs() < c4.p.handoff_gap_s).unwrap_or(false) {
-        return;
-    }
+    candidates.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let recently = |team: EntityId| c4.c2.hqs[h].handed.get(&(entry, team)).is_some_and(|t| (now - *t).secs() < c4.p.handoff_gap_s);
+    let Some(team) = candidates.iter().map(|c| c.1).find(|t| !recently(*t)) else { return };
     c4.c2.hqs[h].handed.insert((entry, team), now);
     let value = v.class_top.first().map(|(h, _)| value_of_hyp(*h)).unwrap_or(1.5);
     let post = c4.c2.hqs[h].post;
-    let payload = super::comms::Payload::Target { track: entry, at, value, seen: v.last_update };
+    let text = format!("{} hands a target to {} ({:.0} s after it was seen)", c4.c2.hqs[h].key, crate::systems::name(s, team), (now - cue).secs());
+    s.ctx.log.push(now, "c2.target_handed").side(c4.c2.hqs[h].side).entity(post).target(team).text(text).data(serde_json::json!({ "track": entry.0, "cueAgeS": (now - cue).secs() }));
+    let payload = super::comms::Payload::Target { track: entry, at, value, seen: v.last_update, cue };
     super::comms::send(now, c4, post, team, bgws_ops::comms::MessageKind::PlanOrder, 1, Some(2_000.0), payload);
 }
 
@@ -473,7 +496,7 @@ fn end_flight(s: &mut Sim, c4: &mut C4, fid: u64, stage: StrikeStage, why: &str,
     if striking {
         let range = pos_of(s, f.team).map(|p| p.sub(f.pos).horizontal()).unwrap_or(0.0);
         let first = f.target.and_then(|t| c4.drones.first_seen.get(&(f.side, t)).copied());
-        c4.drones.records.push(StrikeRecord { flight: fid, team: f.team, side: f.side, kind: f.kind, target: f.target, stage, launched: f.launched, at: now, range_m: range, p_hit: 0.0, p_kill: 0.0, first_seen: first, cued: f.cue });
+        c4.drones.records.push(StrikeRecord { flight: fid, team: f.team, side: f.side, kind: f.kind, target: f.target, stage, launched: f.launched, at: now, range_m: range, p_hit: 0.0, p_kill: 0.0, first_seen: first, cued: f.cue, handed: f.handed });
     }
     let text = format!("{}'s {} lost: {}", crate::systems::name(s, f.team), f.platform.name, why);
     s.ctx.log.push(now, "drones.lost").side(f.side).entity(f.team).text(text).data(serde_json::json!({ "flight": fid, "why": why, "stage": stage, "e": f.pos.e, "n": f.pos.n }));
@@ -583,14 +606,14 @@ fn teams(s: &mut Sim, c4: &mut C4) {
             for (tid, v) in &a.seen {
                 if (now - v.last).secs() <= c4.p.target_age_s && v.at.sub(me).horizontal() <= reach {
                     let val = ent(s, *tid).and_then(|x| s.world.get::<Ident>(x)).map(|i| value_of(&i.platform, i.hq)).unwrap_or(1.0);
-                    known.push((tid.0 as u64, TargetInfo { at: v.at, seen: v.last, value: val }));
+                    known.push((tid.0 as u64, TargetInfo { at: v.at, seen: v.last, value: val, cue: v.last }));
                 }
             }
         }
         if !c4.comms.active {
             for v in s.ctx.tracks[&t.side].confirmed(&s.ctx.p.know) {
                 if v.domain == bgws_know::Domain::Land && (now - v.last_update).secs() <= c4.p.target_age_s && v.position.sub(me).horizontal() <= reach {
-                    known.push(((1u64 << 32) + v.id.0 as u64, TargetInfo { at: v.position, seen: v.last_update, value: v.class_top.first().map(|(h, _)| value_of_hyp(*h)).unwrap_or(1.5) }));
+                    known.push(((1u64 << 32) + v.id.0 as u64, TargetInfo { at: v.position, seen: v.last_update, value: v.class_top.first().map(|(h, _)| value_of_hyp(*h)).unwrap_or(1.5), cue: v.last_update }));
                 }
             }
         }
@@ -629,7 +652,11 @@ fn teams(s: &mut Sim, c4: &mut C4) {
             if t.handoff == Some(k) {
                 c4.drones.teams.get_mut(&id).expect("team").handoff = None;
             }
-            launch(s, c4, id, Task::Strike { aim: x.at, agl: c4.p.cruise_agl_m }, "strike", Some(x.seen));
+            let fid = launch(s, c4, id, Task::Strike { aim: x.at, agl: c4.p.cruise_agl_m }, "strike", Some(x.cue));
+            // Keys above 2³² are HQ hand-offs (or the side's picture).
+            if let Some(f) = fid.and_then(|fid| c4.drones.flights.get_mut(&fid)) {
+                f.handed = k >= 1u64 << 32;
+            }
         } else if t.kind == DroneType::LoiteringMunition {
             if let Some(c) = enemy_centroid(s, t.side) {
                 let d = c.sub(me);
@@ -642,7 +669,8 @@ fn teams(s: &mut Sim, c4: &mut C4) {
     }
 }
 
-fn launch(s: &mut Sim, c4: &mut C4, team: EntityId, task: Task, why: &str, cue: Option<SimTime>) {
+/// The new flight's id, if the team could launch.
+fn launch(s: &mut Sim, c4: &mut C4, team: EntityId, task: Task, why: &str, cue: Option<SimTime>) -> Option<u64> {
     let now = s.ctx.now;
     let t = c4.drones.teams.get_mut(&team).expect("team");
     if let Err(err) = t.stores.launch(&t.spec.clone(), &s.ctx.figures) {
@@ -651,7 +679,7 @@ fn launch(s: &mut Sim, c4: &mut C4, team: EntityId, task: Task, why: &str, cue: 
             let text = format!("{} cannot launch: {err}", crate::systems::name(s, team));
             s.ctx.log.push(now, "drones.empty").side(t.side).entity(team).text(text);
         }
-        return;
+        return None;
     }
     t.last_launch = now;
     let id = c4.drones.next_id;
@@ -678,6 +706,7 @@ fn launch(s: &mut Sim, c4: &mut C4, team: EntityId, task: Task, why: &str, cue: 
         found_at: None,
         battery_asked: false,
         cue,
+        handed: false,
         done: false,
     };
     let aim = match &task {
@@ -687,6 +716,7 @@ fn launch(s: &mut Sim, c4: &mut C4, team: EntityId, task: Task, why: &str, cue: 
     let text = format!("{} launches a {} ({why}, {:.1} km)", crate::systems::name(s, team), f.platform.name, aim.sub(me).horizontal() / 1000.0);
     s.ctx.log.push(now, "drones.launch").side(f.side).entity(team).text(text).data(serde_json::json!({ "flight": id, "kind": f.kind, "why": why, "rangeM": aim.sub(me).horizontal() }));
     c4.drones.flights.insert(id, f);
+    Some(id)
 }
 
 /// The link budget at both ends of a drone's control link, for a drone at
@@ -1042,7 +1072,7 @@ fn report_sighting(s: &mut Sim, c4: &mut C4, f: &Flight, tid: EntityId, val: f64
     };
     super::comms::queue_detection(s, c4, f.team, f.side, det);
     if let Some(t) = c4.drones.teams.get_mut(&f.team) {
-        t.targets.insert(tid.0 as u64, TargetInfo { at: tpos.add(noise), seen: now, value: val });
+        t.targets.insert(tid.0 as u64, TargetInfo { at: tpos.add(noise), seen: now, value: val, cue: now });
     }
     let key = (f.side, tid);
     let asked = c4.drones.found_asked.get(&key).copied();
@@ -1131,7 +1161,7 @@ fn resolve(s: &mut Sim, c4: &mut C4, fid: u64, target: Option<EntityId>, sp: &St
     c4.drones.flights.get_mut(&fid).expect("f").done = true;
     let range = pos_of(s, f.team).map(|p| p.sub(f.pos).horizontal()).unwrap_or(0.0);
     let first = target.and_then(|t| c4.drones.first_seen.get(&(f.side, t)).copied());
-    c4.drones.records.push(StrikeRecord { flight: fid, team: f.team, side: f.side, kind: f.kind, target, stage, launched: f.launched, at: now, range_m: range, p_hit, p_kill, first_seen: first, cued: f.cue });
+    c4.drones.records.push(StrikeRecord { flight: fid, team: f.team, side: f.side, kind: f.kind, target, stage, launched: f.launched, at: now, range_m: range, p_hit, p_kill, first_seen: first, cued: f.cue, handed: f.handed });
     let mut destroyed = false;
     if let (Some(t), Some(e)) = (target, te) {
         destroyed = effect(s, c4, f.team, t, e, &class, stage, &mut rng);
@@ -1409,6 +1439,18 @@ pub fn airborne(s: &Sim) -> Vec<(u64, EntityId, Side, DroneType, Enu, f64, f64)>
         .unwrap_or_default()
 }
 
+/// A drone team's reach (its drones' control range or spool) and whether it
+/// strikes (else it watches), for the HQ that positions it; `None` for
+/// anything that is not a drone team.
+pub fn team_reach(s: &Sim, id: EntityId) -> Option<(f64, bool)> {
+    let t = s.world.get_resource::<C4>()?.drones.teams.get(&id)?;
+    let reach = match t.spec.link {
+        ControlLink::Fibre { spool_m } => spool_m.min(t.spec.range_m),
+        _ => t.spec.range_m,
+    };
+    Some((reach, strike_type(t.kind)))
+}
+
 /// Sorties launched.
 pub fn sorties(s: &Sim) -> u32 {
     s.world.get_resource::<C4>().map(|c| c.drones.sorties).unwrap_or(0)
@@ -1489,7 +1531,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
                     let key = q.target.map(|t| t.0 as u64).unwrap_or(u64::MAX);
                     let value = q.target.and_then(|t| ent(s, t)).and_then(|x| s.world.get::<Ident>(x)).map(|i| value_of(&i.platform, i.hq)).unwrap_or(2.0);
                     let t = c4.drones.teams.get_mut(&team).expect("team");
-                    t.targets.insert(key, TargetInfo { at, seen: now, value });
+                    t.targets.insert(key, TargetInfo { at, seen: now, value, cue: now });
                     t.handoff = Some(key);
                     t.last_launch = SimTime::from_secs(-1e6);
                     let text = format!("{} hands its target to {}", crate::systems::name(s, id), crate::systems::name(s, team));

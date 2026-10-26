@@ -31,6 +31,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.c2.work.tracks", 0.5, "1", 0.05, 5.0, "default", Default, "staff work of a batch of tracks from a subordinate HQ"),
         figure!("sim.c2.forward_gap_s", 60.0, "s", 5.0, 900.0, "default", Default, "an HQ forwards its new tracks to its parent at most this often"),
         figure!("sim.c2.ineffective_strength", 0.5, "fraction", 0.1, 0.9, "default", Default, "a subordinate below this strength is ineffective"),
+        figure!("sim.c2.voice_staff_s", 1_200.0, "s", 600.0, 2_400.0, "R3, P2", Low, "on voice nets, each echelon's staff holds a strike nomination this long (a side whose scenario network is `voice`)"),
         figure!("sim.c2.handoff_gap_s", 120.0, "s", 10.0, 1_800.0, "default", Default, "an HQ hands the same target to a strike team at most this often"),
         figure!("sim.c2.regain_m", 2_000.0, "m", 200.0, 10_000.0, "default", Default, "how close to its HQ a unit moves to regain comms"),
         // EW.
@@ -115,6 +116,7 @@ pub struct C4Params {
     pub forward_gap_s: f64,
     pub ineffective_strength: f64,
     pub handoff_gap_s: f64,
+    pub voice_staff_s: f64,
     pub regain_m: f64,
     pub expose_s: f64,
     pub bearing_window_s: f64,
@@ -201,6 +203,7 @@ impl C4Params {
             forward_gap_s: f.get("sim.c2.forward_gap_s"),
             ineffective_strength: f.get("sim.c2.ineffective_strength"),
             handoff_gap_s: f.get("sim.c2.handoff_gap_s"),
+            voice_staff_s: f.get("sim.c2.voice_staff_s"),
             regain_m: f.get("sim.c2.regain_m"),
             expose_s: f.get("sim.ew.expose_s"),
             bearing_window_s: f.get("sim.ew.bearing_window_s"),

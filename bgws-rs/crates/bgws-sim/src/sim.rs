@@ -495,11 +495,18 @@ impl Sim {
             }
             subs.push(i.name.clone());
             let reach = i.platform.mounts.iter().filter_map(|m| m.munitions.first()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
+            // Drone teams reach as far as their drones: strike teams are
+            // fire units, reconnaissance teams watch.
+            let team = crate::domains::drones::drones::team_reach(self, i.id);
+            let reach = team.map(|t| t.0).unwrap_or(reach);
             let role = match i.platform.template.as_str() {
                 _ if i.hq => "post",
-                "core/artillery" | "core/mortar" => "fires",
+                _ if team.is_some_and(|t| t.1) => "fires",
+                _ if team.is_some() => "isr",
+                "core/artillery" | "core/mortar" | "core/coastal" => "fires",
                 "core/engineer" => "engineer",
-                "core/convoy" | "core/node" | "core/sensor" => "support",
+                // EW and air defence cover the force: none of them assaults.
+                "core/convoy" | "core/node" | "core/sensor" | "core/droneTeam" | "core/ewEsm" | "core/ewJammer" | "core/gbad" | "core/cyber" => "support",
                 _ => "manoeuvre",
             };
             // With nets, the HQ knows its units as they last reported (§9.2).

@@ -37,6 +37,33 @@ fn play(name: &str, seed: u64, minutes: f64) -> (Sim, Vec<LogEvent>) {
     (sim, ev)
 }
 
+/// Play as the host and the vignettes do: each question's rules choice, and
+/// the heuristic planner for HQ plans (it positions fire and drone teams by
+/// their reach, where the sim's own rules plan only sends the attack in).
+fn play_planned(name: &str, seed: u64, minutes: f64) -> (Sim, Vec<LogEvent>) {
+    let sc = scenario(name);
+    let mut list = bgws_sim::all_figures();
+    list.extend(bgws_decide::figures());
+    let figures = bgws_core::Figures::from_list(list).unwrap();
+    let planner = bgws_decide::HeuristicPlanner::from_figures(&figures);
+    let mut sim = Sim::new(&sc, Seed(seed), figures).unwrap();
+    let limit = SimTime::from_secs(minutes * 60.0);
+    loop {
+        match sim.advance(limit) {
+            bgws_sim::Step::Advanced | bgws_sim::Step::Over(_) => break,
+            bgws_sim::Step::NeedsAnswers { questions, .. } => {
+                let a = questions
+                    .iter()
+                    .map(|q| if q.kind == bgws_core::QuestionKind::Hq { planner.answer(q, bgws_core::AnswerSource::Rules) } else { bgws_core::Answer::simple(q, q.rules_choice.clone(), bgws_core::AnswerSource::Rules) })
+                    .collect();
+                sim.answer(a).unwrap();
+            }
+        }
+    }
+    let ev = sim.drain_events();
+    (sim, ev)
+}
+
 #[test]
 fn m3_battalion_attack_runs_on_its_nets() {
     let (sim, ev) = play("m3-battalion-attack", 1, 60.0);
@@ -88,7 +115,7 @@ fn detect_to_strike_and_fpv_effectiveness_emerge_in_band() {
     let mut sorties = 0usize;
     let (mut e_hit, mut e_kill) = (0.0, 0.0);
     for seed in 1..=8 {
-        let (sim, _) = play("m4-drone-line", seed, 180.0);
+        let (sim, _) = play_planned("m4-drone-line", seed, 180.0);
         for r in drones::records(&sim) {
             if !matches!(r.kind, DroneType::FpvRf | DroneType::FpvFibre) {
                 continue;
@@ -117,11 +144,11 @@ fn detect_to_strike_and_fpv_effectiveness_emerge_in_band() {
     let fail = 1.0 - e_kill / e_hit.max(1e-9);
     eprintln!("FPV sorties {sorties}, terminal attacks {terminal}, hits {hits}, kills {kills}; rolled hits {:.2}, expected hit rate per attack {hit_rate:.2}, per sortie {:.2}; fail-to-destroy {fail:.2}; detect-to-strike median {median:.0} s over {}", hits as f64 / terminal.max(1) as f64, hits as f64 / sorties.max(1) as f64, d2s.len());
     assert!(terminal >= 10, "too few FPV attacks to measure ({terminal})");
-    // P2: networked detect-to-strike 2–5 min. With fires, air and C2 all in
-    // play the median sits at about 5.3 min (321 s over 21 attacks, seeds 1–8),
-    // just outside the band: a calibration item (README, "Calibration
-    // backlog"). This guard catches regressions beyond 6 min.
-    assert!((120.0..=360.0).contains(&median), "detect-to-strike median {median:.0} s outside 2–6 min");
+    // P2: networked detect-to-strike 2–5 min. Pooled over every terminal
+    // attack (re-strikes and teams' own sightings too) the median is about
+    // 4.9 min (293 s over 45, seeds 1–8); the detect-to-strike vignettes
+    // measure the HQ chain itself. The guard leaves room for that pooling.
+    assert!((120.0..=330.0).contains(&median), "detect-to-strike median {median:.0} s outside 2–5.5 min");
     // P9: 30–50% of attacks hit (10% for novices); 60–80% of hits fail to destroy.
     assert!((0.25..=0.55).contains(&hit_rate), "hit rate {hit_rate:.2}");
     assert!((0.55..=0.9).contains(&fail), "fail-to-destroy {fail:.2}");

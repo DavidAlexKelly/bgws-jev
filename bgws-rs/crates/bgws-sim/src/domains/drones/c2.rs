@@ -99,6 +99,9 @@ pub struct HqRec {
     pub new_contacts: u32,
     pub marks: BTreeSet<String>,
     pub handed: BTreeMap<(TrackId, EntityId), SimTime>,
+    /// On voice nets: strike nominations the staff are working, by COP
+    /// entry: (when they are done, the sighting that started it).
+    pub nominations: BTreeMap<TrackId, (SimTime, SimTime)>,
     pub relocating_until: Option<SimTime>,
 }
 
@@ -127,6 +130,8 @@ pub struct PendingPlan {
 #[derive(Default)]
 pub struct C2State {
     pub hqs: Vec<HqRec>,
+    /// Sides whose kill chain runs on voice nets (the scenario's `network`).
+    pub voice: BTreeSet<Side>,
     /// Each unit's HQ (a sub-HQ's post reports to the parent).
     pub unit_hq: BTreeMap<EntityId, usize>,
     pub last_contact: BTreeMap<EntityId, SimTime>,
@@ -192,12 +197,14 @@ fn new_hq(s: &Sim, key: String, side: Side, echelon: Echelon, post: EntityId, pl
         new_contacts: 0,
         marks: BTreeSet::new(),
         handed: BTreeMap::new(),
+        nominations: BTreeMap::new(),
         relocating_until: None,
     }
 }
 
 /// The command tree: the scenario's HQs, or one per side.
 pub fn setup(s: &mut Sim, c4: &mut C4) {
+    c4.c2.voice = s.ctx.scenario.world.network.iter().filter(|(_, n)| **n == bgws_scenario::v4::Network::Voice).map(|(side, _)| *side).collect();
     let sc = &s.ctx.scenario;
     let planners = !sc.scope.planners.is_empty();
     let mut hqs: Vec<HqRec> = Vec::new();
@@ -347,6 +354,7 @@ pub fn base(s: &mut Sim) {
         arrive(s, &mut c4, a, &mut after);
     }
     staff(s, &mut c4);
+    nominate(s, &mut c4);
     forward(s, &mut c4);
     if c4.comms.active {
         heartbeats(s, &mut c4);
@@ -420,9 +428,9 @@ fn arrive(s: &mut Sim, c4: &mut C4, a: Arrived, after: &mut Vec<After>) {
             }
             after.push(After::Apply { side, order, refs, unit: a.to, latency: (now - issued).secs(), issued });
         }
-        Payload::Target { track, at, value, seen } => {
+        Payload::Target { track, at, value, seen, cue } => {
             c4.c2.last_contact.insert(a.to, now);
-            super::drones::hand_target(c4, a.to, track, at, value, seen, now);
+            super::drones::hand_target(c4, a.to, track, at, value, seen, cue);
         }
     }
 }
@@ -563,8 +571,44 @@ fn fuse(s: &mut Sim, c4: &mut C4, h: usize, from: EntityId, views: Vec<TrackView
         }
     }
     if c4.comms.active {
-        for (entry, v) in fresh {
-            super::drones::offer_target(s, c4, h, entry, &v);
+        if c4.c2.voice.contains(&c4.c2.hqs[h].side) {
+            // Voice nets: the staff work a nomination before a team is tasked.
+            let due = now + SimDuration::from_secs(c4.p.voice_staff_s * (1 + echelons_above(c4, h)) as f64);
+            for (entry, v) in fresh {
+                c4.c2.hqs[h].nominations.entry(entry).or_insert((due, v.last_update));
+            }
+        } else {
+            for (entry, v) in fresh {
+                super::drones::offer_target(s, c4, h, entry, &v, v.last_update);
+            }
+        }
+    }
+}
+
+/// HQs above this one.
+fn echelons_above(c4: &C4, h: usize) -> u32 {
+    let mut n = 0;
+    let mut at = c4.c2.hqs[h].parent;
+    while let Some(p) = at.filter(|_| n < 6) {
+        n += 1;
+        at = c4.c2.hqs[p].parent;
+    }
+    n
+}
+
+/// Voice nets: nominations the staff have finished go to a strike team, if
+/// the target is still in the picture.
+fn nominate(s: &mut Sim, c4: &mut C4) {
+    let now = s.ctx.now;
+    for h in 0..c4.c2.hqs.len() {
+        if c4.c2.hqs[h].nominations.is_empty() || !c4.c2.hqs[h].up() {
+            continue;
+        }
+        let due: Vec<(TrackId, SimTime)> = c4.c2.hqs[h].nominations.iter().filter(|(_, (d, _))| *d <= now).map(|(k, (_, cue))| (*k, *cue)).collect();
+        for (entry, cue) in due {
+            c4.c2.hqs[h].nominations.remove(&entry);
+            let Some(v) = c4.c2.hqs[h].cop.entries.get(&entry).map(|e| e.fused.clone()) else { continue };
+            super::drones::offer_target(s, c4, h, entry, &v, cue);
         }
     }
 }

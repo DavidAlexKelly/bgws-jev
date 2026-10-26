@@ -806,7 +806,7 @@ The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates 
 
 - **The workspace:** every crate in §3.1 exists. The models are split into `bgws-models` (land and people), `bgws-domains` (air, missiles, air defence, naval, space) and `bgws-ops` (comms, drones, EW, PNT, logistics, medical, C2, cyber, aggregation), so each can be tested without the ECS. `bgws-sim` runs them all behind the sans-IO API of §3.2.
 - **Phases 1–9** are in the sim and play in the shipped scenarios: the skirmishes and M2–M8, the 3-day M6 included. Determinism tests pass across seeds and thread counts, and game records replay exactly.
-- **Benchmark vignettes** are in their bands (§15.3), except detect-to-strike [P2] at about 5.3 min (the README's calibration backlog). The sensitivity analysis and research backlog run (`bgws sensitivity`).
+- **Benchmark vignettes:** all fifteen of §15.3 run, fourteen in their bands; networked detect-to-strike [P2] measures 5.35 min against 2–5 (the README's calibration backlog), pre-network about 23 min against ~20. The sensitivity analysis and research backlog run (`bgws sensitivity`).
 - **Deciders:** Jev (OpenRouter), Claude (Messages API), a local OpenAI-compatible model and recorded answers all sit behind one router, with fallbacks to the templates.
 - **Departures from this plan:**
   - The host is a browser server (`bgws-server` and `web/viewer`) rather than Tauri.

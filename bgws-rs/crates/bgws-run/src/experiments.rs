@@ -12,7 +12,7 @@ use bgws_core::{Figures, Seed, Side, SimTime, StreamKey};
 use bgws_domains::air_defence::{engage_raid, AdSystem, Assignment, KillChain, Threat, ThreatClass};
 use bgws_domains::missile::{Flight, FlightClass, Profile};
 use bgws_domains::V3;
-use bgws_scenario::v4::ScenarioV4;
+use bgws_scenario::v4::{Network, ScenarioV4};
 use bgws_sim::components::{Act, Activity, Health, Ident};
 use bgws_sim::{Sim, SimOptions};
 use rand::Rng;
@@ -261,6 +261,110 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
     }
 }
 
+/// Detect-to-strike [P2]: the M4 drone line played with the rules for
+/// `hours`, both sides' kill chains on `network`. Per game, the median over
+/// detections of the time from the sighting to the first FPV arriving on
+/// it, in minutes. Only targets handed down by an HQ count (a team striking
+/// what it sees itself needs no network), and only the first strike on each
+/// detection (re-strikes are not a new chain).
+pub fn detect_to_strike(scenario: &ScenarioV4, network: Network, hours: f64) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
+    move |f: &Figures, seed: Seed| {
+        use bgws_ops::drones::{DroneType, StrikeStage};
+        let mut sc = scenario.clone();
+        sc.world.network = [(Side::Blue, network), (Side::Red, network)].into_iter().collect();
+        let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
+        play_with_rules(&mut sim, SimTime::from_secs(hours * 3600.0));
+        let mut first: std::collections::BTreeMap<(Side, SimTime), f64> = Default::default();
+        for r in bgws_sim::domains::drones::drones::records(&sim) {
+            if !r.handed || !matches!(r.kind, DroneType::FpvRf | DroneType::FpvFibre) || !matches!(r.stage, StrikeStage::Missed | StrikeStage::HitNoKill | StrikeStage::Destroyed) {
+                continue;
+            }
+            if let Some(c) = r.cued {
+                let m = first.entry((r.side, c)).or_insert(f64::INFINITY);
+                *m = m.min((r.at - c).secs() / 60.0);
+            }
+        }
+        let mut d: Vec<f64> = first.into_values().collect();
+        d.sort_by(f64::total_cmp);
+        d.get(d.len() / 2).copied()
+    }
+}
+
+/// The counter-battery scene on `base`'s frame (flat ground, no planners):
+/// three self-propelled guns 15 km south of an infantry position they are
+/// called to shell, a red counter-battery radar and a red battery.
+pub fn counter_battery_scene(base: &ScenarioV4) -> anyhow::Result<ScenarioV4> {
+    use serde_json::json;
+    let (lat, lon) = (base.theatre.origin.lat, base.theatre.origin.lon);
+    let at = |e: f64, n: f64| json!({ "lat": lat + n / 111_320.0, "lon": lon + e / (111_320.0 * lat.to_radians().cos()), "h": 0.0 });
+    let mut v = serde_json::to_value(base)?;
+    v["theatre"]["ground"] = json!("flat");
+    if let Some(t) = v["theatre"].as_object_mut() {
+        t.remove("bounds");
+    }
+    v["scope"]["planners"] = json!([]);
+    v["scope"]["durationMin"] = json!(600.0);
+    for (k, m) in [("fires", "simulated"), ("logistics", "off"), ("medical", "off")] {
+        v["scope"]["domains"][k] = json!(m);
+    }
+    let forces = [
+        ("b-gun", "blue", "generic/sph155", 3, 0.0, -15_000.0),
+        ("b-recce", "blue", "generic/recce", 2, 0.0, -3000.0),
+        ("r-inf-1", "red", "generic/infantrySection", 1, 0.0, 0.0),
+        ("r-inf-2", "red", "generic/infantrySection", 1, 250.0, 100.0),
+        ("r-inf-3", "red", "generic/infantrySection", 1, -250.0, 100.0),
+        ("r-cbr", "red", "generic/cbRadar", 1, 0.0, 5000.0),
+        ("r-gun", "red", "generic/sph155", 3, 1000.0, 8000.0),
+    ];
+    v["forces"] = serde_json::Value::Array(forces.iter().map(|(id, side, p, n, e, nn)| json!({ "id": id, "label": id, "side": side, "platform": p, "count": n, "quality": "regular", "position": at(*e, *nn), "layer": "unit" })).collect());
+    v["world"]["obstacles"] = json!([]);
+    v["events"] = json!([]);
+    Ok(ScenarioV4::from_json(&v.to_string())?)
+}
+
+/// Counter-battery survival [P23]: the blue battery fires when called and
+/// displaces when the counter-battery threat comes (shoot and scoot); 1 if
+/// it lost no vehicle in 40 minutes, else 0.
+pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
+    move |f: &Figures, seed: Seed| {
+        let opts = SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None };
+        let mut sim = Sim::with_options(scene, seed, f.clone(), opts).ok()?;
+        let gun = *sim.ctx.by_name.get("b-gun")?;
+        loop {
+            match sim.advance(SimTime::from_secs(2400.0)) {
+                bgws_sim::Step::Advanced | bgws_sim::Step::Over(_) => break,
+                bgws_sim::Step::NeedsAnswers { questions, .. } => {
+                    let mut a = sim.rules_answers(&questions);
+                    for (q, ans) in questions.iter().zip(a.iter_mut()) {
+                        let pick = match (q.agent.as_str(), q.trigger.as_str()) {
+                            ("b-gun", "fireRequestReceived") => Some("fireThenScoot"),
+                            ("b-gun", "counterBatteryThreat") => Some("displaceNow"),
+                            _ => None,
+                        };
+                        if let Some(c) = pick.filter(|c| q.has_option(c)) {
+                            *ans = bgws_core::Answer::simple(q, c, bgws_core::AnswerSource::Rules);
+                        }
+                    }
+                    sim.answer(a).ok()?;
+                }
+            }
+        }
+        let h = sim.world.get::<Health>(sim.ctx.entity(gun))?;
+        Some(if h.start == h.fit { 1.0 } else { 0.0 })
+    }
+}
+
+/// The scenarios the sim-played vignettes run on.
+#[derive(Default)]
+pub struct VignetteScenarios {
+    /// A company attack on a defended position (attack-halt).
+    pub attack: Option<ScenarioV4>,
+    /// The M4 drone line (detect-to-strike).
+    pub drone_line: Option<ScenarioV4>,
+    /// The counter-battery scene (`counter_battery_scene`).
+    pub counter_battery: Option<ScenarioV4>,
+}
+
 /// A whole scenario played with the rules: the outcome for batch statistics.
 pub fn scenario_run(scenario: &ScenarioV4, limit: SimTime, opts: SimOptions) -> impl Fn(&Figures, Seed) -> RunOutcome + Sync + '_ {
     move |f: &Figures, seed: Seed| {
@@ -278,7 +382,7 @@ pub fn scenario_run(scenario: &ScenarioV4, limit: SimTime, opts: SimOptions) -> 
 }
 
 /// Run the benchmark vignettes that have an experiment here.
-pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only: Option<&str>, attack_scenario: Option<&ScenarioV4>) -> Vec<VignetteResult> {
+pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only: Option<&str>, scenarios: &VignetteScenarios) -> Vec<VignetteResult> {
     let id_metric = |v: &vignettes::Vignette| MetricFn::new(v.metric.name.clone(), v.metric.unit.clone(), |o: &Value| *o);
     let mut out = Vec::new();
     for v in vignettes::benchmark_vignettes() {
@@ -302,11 +406,20 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
             "sortie-sustained" => check(&sortie_sustained),
             "casevac-delay" => check(&casevac),
             "red-sea-magazine" => check(&red_sea),
-            "attack-halt" => match attack_scenario {
-                Some(sc) => {
-                    let e = attack_halt(sc);
-                    check(&e)
-                }
+            "attack-halt" => match &scenarios.attack {
+                Some(sc) => check(&attack_halt(sc)),
+                None => continue,
+            },
+            "detect-to-strike-networked" => match &scenarios.drone_line {
+                Some(sc) => check(&detect_to_strike(sc, Network::Datalink, 3.0)),
+                None => continue,
+            },
+            "detect-to-strike-voice" => match &scenarios.drone_line {
+                Some(sc) => check(&detect_to_strike(sc, Network::Voice, 4.0)),
+                None => continue,
+            },
+            "counter-battery-survival" => match &scenarios.counter_battery {
+                Some(sc) => check(&counter_battery(sc)),
                 None => continue,
             },
             _ => continue,
@@ -375,7 +488,7 @@ mod tests {
     fn component_vignettes_are_in_band() {
         let f = crate::default_figures();
         let opts = CheckOptions { level: 0.95, replicates: Some(60) };
-        let results = run_vignettes(&f, Seed(1), &opts, None, None);
+        let results = run_vignettes(&f, Seed(1), &opts, None, &VignetteScenarios::default());
         assert!(results.len() >= 10, "{}", results.len());
         let out: Vec<_> = results.iter().filter(|r| r.verdict != bgws_analysis::vignettes::Verdict::InBand).map(|r| format!("{} = {:.3} not in [{}, {}]", r.id, r.estimate, r.band.lo, r.band.hi)).collect();
         assert!(out.is_empty(), "{out:#?}");

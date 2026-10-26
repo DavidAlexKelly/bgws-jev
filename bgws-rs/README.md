@@ -71,7 +71,7 @@ fallbacks decide and the log says why.
 | 2 Deciders | Done: Jev, Claude, local and recorded deciders, batching, caching, timeouts, fallbacks, cost logging, exact replay. |
 | 3 Fires, engineers, sustainment | Done in the sim: calls for fire, adjust, Carleton lethality, counter-battery radar, displacement, minefields and breaching, digging in, stores. Breach time and counter-battery survival in band. |
 | 4 C2 and comms | Done: nets with link budgets, PACE, HQ COPs and staff queues, planning time, CCIRs, succession, orders over the nets. |
-| 5 Drones, EW, PNT | Done: drone flights and link dependence, the FPV strike chain, counter-drone, jammers, ESM/DF, GNSS and INS. FPV and precision-under-jamming in band; detect-to-strike just outside (backlog). |
+| 5 Drones, EW, PNT | Done: drone flights and link dependence, the FPV strike chain, counter-drone, jammers, ESM/DF, GNSS and INS. FPV, precision under jamming and pre-network detect-to-strike in band; networked detect-to-strike just outside (backlog). |
 | 6 Air and air defence | Done: aircraft on tasks, sorties, munitions in flight, radar, kill chains and WTA, airspace. Shahed raid and sortie rates in band. |
 | 7 Logistics, medical, aggregation | Done: logistics, maintenance and medical in the sim (culmination test, evacuation delays in band); level of detail with Lanchester attrition fitted against entity runs; quiet skipping. |
 | 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
@@ -90,8 +90,14 @@ fallbacks decide and the log says why.
 
 ### Calibration backlog
 
-- **Detect-to-strike [P2]:** the median is about 5.3 minutes with every domain
-  in play, just outside the 2–5 minute band.
+- **Detect-to-strike, networked [P2]:** on the M4 drone line the median from
+  a detection to the first FPV arriving on it is 5.35 minutes (95% CI
+  5.03–5.97, 200 games), just above the 2–5 minute band. The HQ chain itself
+  (report, staff, hand-off, launch) takes about 1.5 minutes; the rest is
+  transit to targets 3–6 km away at 90 km/h, mid-range of the reported
+  65–150 km/h. On voice nets (the scenario's `network: voice`) the same chain
+  takes about 23 minutes, inside P2's ~20. CI runs it with
+  `--backlog detect-to-strike-networked`, so it is reported but does not fail.
 - **Lethality:** meeting engagements in open ground end within a minute or two.
   Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
   fire are worth checking against playtests.
@@ -142,6 +148,7 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 ```
 
 `.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`.
-All twelve benchmark vignettes are in band at the stored baselines. Batches and
+Fifteen benchmark vignettes run against stored baselines: fourteen are in band,
+and networked detect-to-strike is on the calibration backlog. Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.

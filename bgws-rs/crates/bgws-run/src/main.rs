@@ -135,6 +135,10 @@ enum Cmd {
         /// Accept this run as the new baseline, with the reason (needs --store).
         #[arg(long)]
         accept: Option<String>,
+        /// Vignettes on the calibration backlog (README): run and reported,
+        /// but being out of band does not fail the run.
+        #[arg(long, value_delimiter = ',')]
+        backlog: Vec<String>,
     },
     /// Sensitivity analysis of one vignette over its unsourced figures.
     Sensitivity {
@@ -297,10 +301,16 @@ fn main() -> Result<()> {
                 std::fs::write(p, serde_json::to_string_pretty(&batch.replicates.iter().map(|r| &r.output).collect::<Vec<_>>())?)?;
             }
         }
-        Cmd::Vignettes { only, n, seed, json, store, accept } => {
+        Cmd::Vignettes { only, n, seed, json, store, accept, backlog } => {
+            let on_backlog = |id: &str| backlog.iter().any(|b| b == id);
             let figures = default_figures();
-            let attack = load_scenario(&scenario_path("skirmish-advance-to-contact-v1")).ok();
-            let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), attack.as_ref());
+            let load = |name: &str| load_scenario(&scenario_path(name)).ok();
+            let scenarios = experiments::VignetteScenarios {
+                attack: load("skirmish-advance-to-contact-v1"),
+                drone_line: load("m4-drone-line"),
+                counter_battery: load("m2-mech-company-hasty-attack").and_then(|b| experiments::counter_battery_scene(&b).ok()),
+            };
+            let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), &scenarios);
             let mut regressed = false;
             if let Some(dir) = &store {
                 let st = bgws_analysis::regression::RegressionStore::open(dir).map_err(|e| anyhow!("{e}"))?;
@@ -315,7 +325,7 @@ fn main() -> Result<()> {
                     }
                 }
                 if !verdicts.is_empty() {
-                    regressed = verdicts.iter().any(|v| v.status.fails());
+                    regressed = verdicts.iter().any(|v| v.status.fails() && !(on_backlog(&v.id) && v.status == bgws_analysis::regression::RegressionStatus::OutOfBand));
                     println!("{}", bgws_analysis::report::regression_markdown(&verdicts));
                 }
             }
@@ -327,8 +337,13 @@ fn main() -> Result<()> {
             if let Some(p) = json {
                 std::fs::write(p, serde_json::to_string_pretty(&suite)?)?;
             }
-            if !suite.all_in_band() {
-                bail!("some vignettes are out of band");
+            let failing: Vec<&str> = suite.results.iter().filter(|r| !matches!(r.verdict, bgws_analysis::Verdict::InBand) && !on_backlog(&r.id)).map(|r| r.id.as_str()).collect();
+            let waived: Vec<&str> = suite.results.iter().filter(|r| !matches!(r.verdict, bgws_analysis::Verdict::InBand) && on_backlog(&r.id)).map(|r| r.id.as_str()).collect();
+            if !waived.is_empty() {
+                eprintln!("out of band, on the calibration backlog: {}", waived.join(", "));
+            }
+            if !failing.is_empty() {
+                bail!("out of band: {}", failing.join(", "));
             }
         }
         Cmd::Sensitivity { vignette, replicates, prefix, seed } => {

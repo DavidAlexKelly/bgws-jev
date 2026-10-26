@@ -597,6 +597,7 @@ dependencies = [
  "bgws-behaviour",
  "bgws-catalogue",
  "bgws-core",
+ "bgws-decide",
  "bgws-domains",
  "bgws-env",
  "bgws-gpu",
