@@ -4,6 +4,7 @@
 //! record; and the experiments that run the simulation for the analysis
 //! crate (batches, vignettes, sensitivity).
 
+pub mod aar;
 pub mod experiments;
 pub mod host;
 

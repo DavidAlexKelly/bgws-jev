@@ -10,6 +10,8 @@
 //! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
 //! bgws vignettes [--only id] [-n 200]     benchmark vignettes against their bands
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
+//! bgws aar <events.jsonl>                the after-action review
+//! bgws why <events.jsonl> <unit>          what happened to or by a unit, and why
 //! bgws figures [--markdown]               the figures registry report
 //! bgws platform <id>                      a resolved catalogue record and its munitions
 //! bgws convert <v3.json> <out.json>       convert a TypeScript v3 scenario to v4
@@ -135,6 +137,10 @@ enum Cmd {
         #[arg(long, default_value_t = 1)]
         seed: u64,
     },
+    /// The after-action review of a game's event log (`play --events`).
+    Aar { events: PathBuf },
+    /// Everything that happened to or by one force, with the figures behind each event.
+    Why { events: PathBuf, who: String },
     /// The figures registry as a report.
     Figures {
         #[arg(long)]
@@ -290,6 +296,8 @@ fn main() -> Result<()> {
         Cmd::Sensitivity { vignette, replicates, prefix, seed } => {
             bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed))?;
         }
+        Cmd::Aar { events } => println!("{}", bgws_run::aar::review(&bgws_run::aar::read_log(&events)?)),
+        Cmd::Why { events, who } => println!("{}", bgws_run::aar::why(&bgws_run::aar::read_log(&events)?, &who)),
         Cmd::Figures { markdown } => {
             let f = default_figures();
             if markdown {
