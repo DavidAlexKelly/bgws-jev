@@ -157,6 +157,20 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// Run a vignette as shipped and with figures changed, and compare (§16 workbench).
+    Compare {
+        vignette: String,
+        /// Figures for the variant: key=value, comma-separated.
+        #[arg(long, value_delimiter = ',', required = true)]
+        set: Vec<String>,
+        #[arg(short, default_value_t = 100)]
+        n: usize,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Also write the workbench page with the two side by side.
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
     /// The after-action review of a game's event log (`play --events`).
     Aar { events: PathBuf },
     /// Everything that happened to or by one force, with the figures behind each event.
@@ -182,6 +196,16 @@ enum Cmd {
 
 fn data_dir() -> PathBuf {
     std::env::var_os("BGWS_DATA").map(PathBuf::from).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+}
+
+/// The scenarios the sim-played vignettes run on, from the shipped presets.
+fn vignette_scenarios() -> experiments::VignetteScenarios {
+    let load = |name: &str| load_scenario(&scenario_path(name)).ok();
+    experiments::VignetteScenarios {
+        attack: load("skirmish-advance-to-contact-v1"),
+        drone_line: load("m4-drone-line"),
+        counter_battery: load("m2-mech-company-hasty-attack").and_then(|b| experiments::counter_battery_scene(&b).ok()),
+    }
 }
 
 /// A scenario by path, or by the name of a shipped one.
@@ -310,12 +334,7 @@ fn main() -> Result<()> {
         Cmd::Vignettes { only, n, seed, json, store, accept, backlog, html } => {
             let on_backlog = |id: &str| backlog.iter().any(|b| b == id);
             let figures = default_figures();
-            let load = |name: &str| load_scenario(&scenario_path(name)).ok();
-            let scenarios = experiments::VignetteScenarios {
-                attack: load("skirmish-advance-to-contact-v1"),
-                drone_line: load("m4-drone-line"),
-                counter_battery: load("m2-mech-company-hasty-attack").and_then(|b| experiments::counter_battery_scene(&b).ok()),
-            };
+            let scenarios = vignette_scenarios();
             let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), &scenarios);
             let mut regressed = false;
             let mut regression = Vec::new();
@@ -357,6 +376,41 @@ fn main() -> Result<()> {
             }
             if !failing.is_empty() {
                 bail!("out of band: {}", failing.join(", "));
+            }
+        }
+        Cmd::Compare { vignette, set, n, seed, html } => {
+            let a_fig = default_figures();
+            let mut b_fig = default_figures();
+            for kv in &set {
+                let (k, v) = kv.split_once('=').ok_or_else(|| anyhow!("--set wants key=value, got `{kv}`"))?;
+                let v: f64 = v.trim().parse().map_err(|_| anyhow!("`{v}` is not a number"))?;
+                let old = b_fig.try_get(k.trim()).ok_or_else(|| anyhow!("no figure `{k}`"))?;
+                b_fig.set(k.trim(), v).map_err(|e| anyhow!("{e}"))?;
+                eprintln!("{k}: {old} → {v}");
+            }
+            let scenarios = vignette_scenarios();
+            let opts = CheckOptions { level: 0.95, replicates: Some(n) };
+            let pick = |f: &bgws_core::Figures| experiments::run_vignettes(f, Seed(seed), &opts, Some(&vignette), &scenarios).into_iter().find(|r| r.id == vignette);
+            let a = pick(&a_fig).ok_or_else(|| anyhow!("no vignette `{vignette}` with an experiment"))?;
+            let b = pick(&b_fig).expect("the same vignette");
+            let ks = bgws_analysis::compare::ks_two_sample(&a.sample.values, &b.sample.values);
+            let mw = bgws_analysis::compare::mann_whitney(&a.sample.values, &b.sample.values);
+            let label_b = set.join(", ");
+            let ci = |r: &bgws_analysis::VignetteResult| r.interval.as_ref().map(|i| format!("{:.3} – {:.3}", i.lo, i.hi)).unwrap_or_else(|| "—".into());
+            println!("## {}: as shipped vs {label_b}\n", a.title);
+            println!("| Variant | Estimate | Interval | Band | Games | Verdict |\n|---|---|---|---|---|---|");
+            for (name, r) in [("as shipped", &a), (label_b.as_str(), &b)] {
+                println!("| {name} | {:.3} {} | {} | {:.3} – {:.3} | {} | {:?} |", r.estimate, r.unit, ci(r), r.band.lo, r.band.hi, r.sample.values.len(), r.verdict);
+            }
+            match (&ks, &mw) {
+                (Some(k), Some(m)) => println!("\nKS D {:.3}, p {:.3}; Mann–Whitney p {:.3}: the two {} at 5%.", k.d, k.p_value, m.p_value, if k.p_value < 0.05 || m.p_value < 0.05 { "differ" } else { "do not detectably differ" }),
+                _ => println!("\nToo few values to test."),
+            }
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": format!("Compare: {}", a.title), "generated": format!("{n} games each, seed {seed}"),
+                    "comparison": { "a": a, "b": b, "labelA": "as shipped", "labelB": label_b, "ks": ks, "mw": mw } });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
             }
         }
         Cmd::Sensitivity { vignette, replicates, prefix, seed, html } => {

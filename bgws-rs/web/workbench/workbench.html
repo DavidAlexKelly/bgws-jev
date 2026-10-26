@@ -14,7 +14,7 @@
     --surface-1: #fcfcfb; --page: #f9f9f7;
     --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
     --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
-    --series-1: #2a78d6; --band: rgba(137, 135, 129, 0.18);
+    --series-1: #2a78d6; --series-2: #eb6834; --band: rgba(137, 135, 129, 0.18);
     --good: #0ca30c; --serious: #ec835a; --critical: #d03b3b;
   }
   @media (prefers-color-scheme: dark) {
@@ -23,7 +23,7 @@
       --surface-1: #1a1a19; --page: #0d0d0d;
       --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
       --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
-      --series-1: #3987e5; --band: rgba(137, 135, 129, 0.22);
+      --series-1: #3987e5; --series-2: #d95926; --band: rgba(137, 135, 129, 0.22);
     }
   }
   :root[data-theme="dark"] .viz-root {
@@ -31,7 +31,7 @@
     --surface-1: #1a1a19; --page: #0d0d0d;
     --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
-    --series-1: #3987e5; --band: rgba(137, 135, 129, 0.22);
+    --series-1: #3987e5; --series-2: #d95926; --band: rgba(137, 135, 129, 0.22);
   }
   html, body { margin: 0; }
   body.viz-root { background: var(--page); color: var(--text-primary); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -58,6 +58,8 @@
   .tablewrap { overflow-x: auto; }
   #tip { position: fixed; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.12); z-index: 9; }
   .muted { color: var(--text-muted); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--c); vertical-align: -1px; }
 </style>
 </head>
 <body class="viz-root">
@@ -71,6 +73,10 @@
     <div class="grid" id="vgrid"></div>
     <h2>Table</h2>
     <div class="tablewrap"><table id="vtable"></table></div>
+  </section>
+  <section id="comparison" hidden>
+    <h2>Comparison</h2>
+    <div id="cmp"></div>
   </section>
   <section id="sensitivity" hidden>
     <h2>Sensitivity</h2>
@@ -122,11 +128,11 @@ function strip(v, W) {
 }
 
 // The distribution of per-game values, band shaded behind.
-function histogram(v, W) {
+function histogram(v, W, range, color) {
   const vals = v.sample.values.filter(isFinite);
   if (vals.length < 5 || new Set(vals).size < 4) return null;
   const H = 110, padL = 6, padB = 18, top = 6;
-  let lo = Math.min(...vals, v.band.lo), hi = Math.max(...vals, v.band.hi);
+  let lo = range ? range.lo : Math.min(...vals, v.band.lo), hi = range ? range.hi : Math.max(...vals, v.band.hi);
   if (hi === lo) hi = lo + 1;
   const bins = 20, bw = (hi - lo) / bins, counts = new Array(bins).fill(0);
   for (const val of vals) counts[Math.min(bins - 1, Math.floor((val - lo) / bw))]++;
@@ -138,7 +144,7 @@ function histogram(v, W) {
     if (!c) return;
     const bx = padL + i * cw + 1, bwid = Math.max(1, cw - 2), by = y(c), bh = H - padB - by, r = Math.min(4, bwid / 2, bh);
     // Rounded at the data end only, anchored to the baseline.
-    const p = el("path", { d: `M${bx},${H - padB} V${by + r} Q${bx},${by} ${bx + r},${by} H${bx + bwid - r} Q${bx + bwid},${by} ${bx + bwid},${by + r} V${H - padB} Z`, fill: "var(--series-1)" }, svg);
+    const p = el("path", { d: `M${bx},${H - padB} V${by + r} Q${bx},${by} ${bx + r},${by} H${bx + bwid - r} Q${bx + bwid},${by} ${bx + bwid},${by + r} V${H - padB} Z`, fill: color || "var(--series-1)" }, svg);
     hover(p, `${fmt(lo + i * bw)} – ${fmt(lo + (i + 1) * bw)} ${v.unit}: ${c} game${c === 1 ? "" : "s"}`);
   });
   el("line", { x1: padL, x2: W - padL, y1: H - padB, y2: H - padB, stroke: "var(--axis)" }, svg);
@@ -179,6 +185,45 @@ if (D.vignettes && D.vignettes.length) {
   addEventListener("resize", () => renderVignettes(document.querySelector("#vtabs [aria-pressed=true]")?.textContent.startsWith("In") ? "in" : "all"));
   document.getElementById("vtable").innerHTML = `<tr><th>Vignette</th><th>Statistic</th><th>Estimate</th><th>Interval</th><th>Band</th><th>Baseline</th><th>Games</th><th>Verdict</th></tr>` +
     D.vignettes.map((v) => `<tr><td>${esc(v.title)}</td><td>${v.band.statistic}</td><td>${fmt(v.estimate)} ${esc(v.unit)}</td><td>${v.interval ? `${fmt(v.interval.lo)} – ${fmt(v.interval.hi)}` : "—"}</td><td>${fmt(v.band.lo)} – ${fmt(v.band.hi)}</td><td>${fmt(baseline.get(v.id))}</td><td>${v.sample.values.length}</td><td>${VERDICT[verdictOf(v)][1]}</td></tr>`).join("");
+}
+
+// A comparison: the two variants on one scale, and their distributions as small multiples.
+if (D.comparison) {
+  const C = D.comparison, A = C.a, B = C.b;
+  document.getElementById("comparison").hidden = false;
+  const card = document.createElement("div"); card.className = "card"; document.getElementById("cmp").appendChild(card);
+  const test = C.ks && C.mw ? `KS D ${fmt(C.ks.d)} (p ${fmt(C.ks.p_value)}), Mann–Whitney p ${fmt(C.mw.p_value)}: the distributions ${C.ks.p_value < 0.05 || C.mw.p_value < 0.05 ? "differ" : "do not detectably differ"} at 5%.` : "Too few values to test.";
+  card.innerHTML = `<h3>${esc(A.title)}</h3><p>${esc(A.hypothesis)}</p><div class="legend"><span style="--c: var(--series-1)">${esc(C.labelA)}</span><span style="--c: var(--series-2)">${esc(C.labelB)}</span></div><p>${esc(test)}</p>`;
+  const W = Math.max(320, card.clientWidth - 28), rows = [[A, C.labelA, "var(--series-1)"], [B, C.labelB, "var(--series-2)"]];
+  const xs = [A.band.lo, A.band.hi]; for (const [r] of rows) { xs.push(r.estimate); if (r.interval) xs.push(r.interval.lo, r.interval.hi); }
+  let lo = Math.min(...xs.filter(isFinite)), hi = Math.max(...xs.filter(isFinite)); const span = hi - lo || 1; lo -= span * 0.08; hi += span * 0.08;
+  const labelW = Math.min(200, W * 0.3), x = (v) => labelW + ((v - lo) / (hi - lo)) * (W - labelW - 8), H = 26 * rows.length + 24;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": `${C.labelA} ${fmt(A.estimate)} against ${C.labelB} ${fmt(B.estimate)} ${A.unit}` });
+  el("rect", { x: x(A.band.lo), y: 2, width: Math.max(2, x(A.band.hi) - x(A.band.lo)), height: 26 * rows.length, rx: 4, fill: "var(--band)" }, svg);
+  rows.forEach(([r, label, color], i) => {
+    const y = 15 + i * 26;
+    const t = el("text", { x: labelW - 8, y: y + 4, "text-anchor": "end", class: "lbl" }, svg); t.textContent = label.length > 30 ? label.slice(0, 29) + "…" : label;
+    if (r.interval) el("line", { x1: x(r.interval.lo), x2: x(r.interval.hi), y1: y, y2: y, stroke: color, "stroke-width": 2, "stroke-linecap": "round" }, svg);
+    if (isFinite(r.estimate)) {
+      const c = el("circle", { cx: x(r.estimate), cy: y, r: 5, fill: color, stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+      hover(c, `${label}: ${r.band.statistic} ${fmt(r.estimate)} ${r.unit}` + (r.interval ? `, CI ${fmt(r.interval.lo)} – ${fmt(r.interval.hi)}` : "") + `, ${r.sample.values.length} games`);
+      const v = el("text", { x: x(r.estimate) + 9, y: y - 6 }, svg); v.textContent = fmt(r.estimate);
+    }
+  });
+  for (const v of [A.band.lo, A.band.hi]) { const t = el("text", { x: x(v), y: H - 4, "text-anchor": "middle" }, svg); t.textContent = fmt(v); }
+  card.appendChild(svg);
+  if (A.band.statistic !== "proportion") {
+    // Small multiples on one x-scale so the shapes compare directly.
+    const all = [...A.sample.values, ...B.sample.values].filter(isFinite);
+    const common = { lo: Math.min(...all, A.band.lo), hi: Math.max(...all, A.band.hi) };
+    for (const [r, label, color] of rows) {
+      const h = histogram({ ...r, band: { ...r.band, lo: Math.max(r.band.lo, common.lo) } }, W, common, color);
+      if (h) { const cap = document.createElement("p"); cap.className = "muted"; cap.textContent = label; card.append(cap, h); }
+    }
+  }
+  const tw = document.createElement("div"); tw.className = "tablewrap";
+  tw.innerHTML = `<table><tr><th>Variant</th><th>Estimate</th><th>Interval</th><th>Band</th><th>Games</th><th>Verdict</th></tr>` + rows.map(([r, label]) => `<tr><td>${esc(label)}</td><td>${fmt(r.estimate)} ${esc(r.unit)}</td><td>${r.interval ? `${fmt(r.interval.lo)} – ${fmt(r.interval.hi)}` : "—"}</td><td>${fmt(r.band.lo)} – ${fmt(r.band.hi)}</td><td>${r.sample.values.length}</td><td>${r.verdict === "in_band" ? "in band" : "out of band"}</td></tr>`).join("") + `</table>`;
+  card.appendChild(tw);
 }
 
 // Sensitivity: μ* (normalised) per figure, ranked; unsourced figures flagged.
