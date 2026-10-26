@@ -571,6 +571,11 @@ impl Sim {
     }
 
     /// A frame for the UI: truth for the umpire, else what a side believes.
+    /// Why one unit would see another now, with every factor (truth: for the umpire).
+    pub fn explain_detection(&self, observer: EntityId, target: EntityId, over_s: f64) -> Option<serde_json::Value> {
+        crate::systems::explain_detection(self, observer, target, over_s)
+    }
+
     pub fn view(&self, viewer: Viewer) -> FrameView {
         crate::view::frame(self, viewer)
     }

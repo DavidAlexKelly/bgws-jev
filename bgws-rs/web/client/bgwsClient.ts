@@ -53,7 +53,8 @@ export type Inbound =
   | { kind: "branch"; t: number }
   | { kind: "save" }
   | { kind: "why"; unit: string }
-  | { kind: "review" };
+  | { kind: "review" }
+  | { kind: "detect"; observer: string; target: string };
 
 export interface ClientHandlers {
   onFrame?: (frame: FrameView, at: { t: number; live: number; scrub: boolean }) => void;
@@ -165,6 +166,10 @@ export class BgwsClient {
   /** The after-action review so far. */
   review(): void {
     this.send({ kind: "review" });
+  }
+  /** Why one unit would see another now, with every factor (umpire view only: it reads truth). */
+  detect(observer: string, target: string): void {
+    this.send({ kind: "detect", observer, target });
   }
   close(): void {
     this.ws.close();

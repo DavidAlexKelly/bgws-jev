@@ -553,6 +553,78 @@ pub fn sensing(s: &mut Sim, dt: f64) {
     }
 }
 
+/// Why `observer` would see `target` now or not, with every factor the
+/// sensing system uses (§16 detection inspector): light, each sensor's
+/// contrast, resolution and ACQUIRE terms, the line of sight through terrain
+/// and canopy, and the chance of detection over `over_s` seconds. Read-only:
+/// no dice are drawn. Truth, so for the umpire only.
+pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: f64) -> Option<serde_json::Value> {
+    use serde_json::json;
+    let now = s.ctx.now;
+    let ents = snapshot_for_sensing(s);
+    let o = ents.iter().find(|x| x.id == observer)?;
+    let t = ents.iter().find(|x| x.id == target)?;
+    let p = &s.ctx.p;
+    let range = o.pos.sub(t.pos).horizontal();
+    let (lat, lon) = (s.ctx.frame.origin.lat, s.ctx.frame.origin.lon);
+    let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
+    let lux = bgws_env::illuminance_at(&s.ctx.start.at(now), lat, lon, w.cloud_cover, &p.light).total_lux;
+    let night = lux < p.night_lux;
+    let cued = s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false);
+    let tau_mult = tau_multiplier(&o.observer, &p.observer);
+    let mut sensors = Vec::new();
+    let mut best_rate = 0.0f64;
+    for &(kind, rmax, res0, n50) in &o.sensors {
+        let in_range = range <= rmax && range <= p.sense_max_m;
+        let (contrast, mut res) = match kind {
+            CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) }, res0),
+            _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) }, res0),
+        };
+        let night_degraded = night && matches!(kind, CatSensor::Eye | CatSensor::Optic | CatSensor::Eo);
+        if night_degraded {
+            res *= p.eye_night_factor;
+        }
+        let mut ap = p.acquire.clone();
+        ap.n50 = n50;
+        let input = AcquireInput {
+            critical_dim_m: t.crit,
+            range_m: range,
+            cycles_per_mrad: res,
+            metric: Metric::Johnson,
+            atmos_mtf: 1.0,
+            contrast,
+            stage: Stage::Detect,
+            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+        };
+        let det = acquire(&input, &ap);
+        if in_range {
+            best_rate = best_rate.max(det.rate_per_s);
+        }
+        sensors.push(json!({ "sensor": format!("{kind:?}"), "maxRangeM": rmax, "inRange": in_range, "cyclesPerMrad": res, "nightDegraded": night_degraded, "contrast": contrast_json(&contrast), "acquire": det }));
+    }
+    let los = s.ctx.ground.los_batch(&[bgws_gpu::LosQuery { obs_x: o.pos.e, obs_y: o.pos.n, obs_agl: o.eye_h + o.agl, tgt_x: t.pos.e, tgt_y: t.pos.n, tgt_agl: 1.5 + t.agl }]).pop()?;
+    let p_window = los.p_visible * hazard_probability(best_rate, over_s);
+    Some(json!({
+        "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
+        "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
+        "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
+        "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
+        "lineOfSight": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m },
+        "sensors": sensors,
+        "bestRatePerS": best_rate,
+        "windowS": over_s,
+        "pDetectInWindow": p_window,
+        "alreadySeen": cued,
+    }))
+}
+
+fn contrast_json(c: &Contrast) -> serde_json::Value {
+    match c {
+        Contrast::Visual { inherent, transmission } => serde_json::json!({ "kind": "visual", "inherent": inherent, "transmission": transmission }),
+        Contrast::Thermal { delta_t_k, transmission } => serde_json::json!({ "kind": "thermal", "deltaTK": delta_t_k, "transmission": transmission }),
+    }
+}
+
 /// Deliver due contact reports into each side's track store.
 pub fn reports(s: &mut Sim) {
     let now = s.ctx.now;

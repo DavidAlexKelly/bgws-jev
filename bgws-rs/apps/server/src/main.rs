@@ -82,6 +82,8 @@ enum Inbound {
     Why { unit: String },
     /// The after-action review so far.
     Review,
+    /// Why one unit would see another now (the detection inspector; umpire only).
+    Detect { observer: String, target: String },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -135,6 +137,33 @@ fn scenario_path(s: &str) -> PathBuf {
         return p;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios").join(format!("{}.json", s.trim_end_matches(".json")))
+}
+
+/// The detection inspector's answer, in words, then every factor.
+fn detection_text(x: &serde_json::Value) -> String {
+    let f = |v: &serde_json::Value| v.as_f64().unwrap_or(f64::NAN);
+    let los = &x["lineOfSight"];
+    let mut t = format!(
+        "{} → {} at {:.0} m: P(detect within {:.0} s) = {:.2}\n\nLine of sight: terrain {} (clearance {:.1} m); clear of canopy {:.2}; overall {:.2}\nLight: {:.1} lux{}; visibility {:.0} m\nTarget: critical size {:.1} m, contrast {:.2}, ΔT {:.1} K, concealment {:.2}{}\nObserver: {}cued, search time ×{:.2}\n\nSensors:\n",
+        x["observer"].as_str().unwrap_or("?"), x["target"].as_str().unwrap_or("?"), f(&x["rangeM"]), f(&x["windowS"]), f(&x["pDetectInWindow"]),
+        if los["terrainVisible"].as_bool().unwrap_or(false) { "clear" } else { "masked" }, f(&los["clearanceM"]), f(&los["pClearOfCanopy"]), f(&los["pVisible"]),
+        f(&x["light"]["lux"]), if x["light"]["night"].as_bool().unwrap_or(false) { " (night)" } else { "" }, f(&x["visibilityM"]),
+        f(&x["target_signature"]["criticalDimM"]), f(&x["target_signature"]["contrast"]), f(&x["target_signature"]["deltaTK"]), f(&x["target_signature"]["concealment"]),
+        if x["target_signature"]["moving"].as_bool().unwrap_or(false) { ", moving" } else { "" },
+        if x["observerState"]["cued"].as_bool().unwrap_or(false) { "" } else { "not " }, f(&x["observerState"]["tauMultiplier"]),
+    );
+    for sn in x["sensors"].as_array().into_iter().flatten() {
+        let a = &sn["acquire"];
+        t.push_str(&format!(
+            "- {} (to {:.0} m{}): {:.1} cycles against N50 {:.1}, P∞ {:.2}, τ {:.1} s → {:.4}/s{}\n",
+            sn["sensor"].as_str().unwrap_or("?"), f(&sn["maxRangeM"]), if sn["inRange"].as_bool().unwrap_or(false) { "" } else { ", out of range" },
+            f(&a["cycles"]), f(&a["n50"]), f(&a["p_inf"]), f(&a["tau_s"]), f(&a["rate_per_s"]),
+            if sn["nightDegraded"].as_bool().unwrap_or(false) { ", degraded at night" } else { "" },
+        ));
+    }
+    t.push_str("\nEvery factor:\n");
+    t.push_str(&serde_json::to_string_pretty(x).unwrap_or_default());
+    t
 }
 
 /// Does this viewer see this event? The umpire sees all; a side sees its own and unsided ones.
@@ -191,6 +220,17 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                 Inbound::Review => {
                     let seen: Vec<_> = log.iter().filter(|e| visible(viewer, e)).cloned().collect();
                     send(&out, json!({ "kind": "report", "title": "After-action review", "text": bgws_run::aar::review(&seen) }));
+                }
+                Inbound::Detect { observer, target } => {
+                    let text = if viewer != Viewer::Umpire {
+                        "The detection inspector reads truth: switch to the umpire view.".to_string()
+                    } else {
+                        match (host.sim.ctx.by_name.get(&observer), host.sim.ctx.by_name.get(&target)) {
+                            (Some(o), Some(t)) => host.sim.explain_detection(*o, *t, 60.0).map(|x| detection_text(&x)).unwrap_or_else(|| "One of them is not on the board (destroyed, aggregated or not a land unit).".into()),
+                            _ => "Unknown unit.".into(),
+                        }
+                    };
+                    send(&out, json!({ "kind": "report", "title": format!("Can {observer} see {target}?"), "text": text }));
                 }
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {

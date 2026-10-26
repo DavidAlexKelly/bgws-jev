@@ -48,3 +48,30 @@ fn single_thread_matches_many() {
     let many = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap().install(run);
     assert_eq!(one, many);
 }
+
+/// The detection inspector (§16) agrees with the sensing system: the pair
+/// in the first sighting has a clear line and a positive rate when explained,
+/// and explaining draws no dice (the game is unchanged).
+#[test]
+fn detection_inspector_agrees_with_sensing() {
+    let sc = scenario("skirmish-advance-to-contact-v1");
+    let mut sim = Sim::new(&sc, Seed(3), default_figures()).unwrap();
+    let mut seen = None;
+    for step in 1..=360 {
+        sim.run_with_rules(SimTime::from_secs(step as f64 * 5.0));
+        if let Some(e) = sim.drain_events().into_iter().find(|e| e.kind == "sense.detect") {
+            seen = Some((e.entity.unwrap(), e.target.unwrap()));
+            break;
+        }
+    }
+    let (o, t) = seen.expect("someone saw someone");
+    let before = sim.fingerprint();
+    let x = sim.explain_detection(o, t, 60.0).expect("both are on the board");
+    assert_eq!(sim.fingerprint(), before);
+    eprintln!("{}", serde_json::to_string_pretty(&x).unwrap());
+    assert!(x["lineOfSight"]["pVisible"].as_f64().unwrap() > 0.0);
+    assert!(x["bestRatePerS"].as_f64().unwrap() > 0.0);
+    assert!(x["pDetectInWindow"].as_f64().unwrap() > 0.0);
+    assert_eq!(x["alreadySeen"], true);
+    assert!(!x["sensors"].as_array().unwrap().is_empty());
+}

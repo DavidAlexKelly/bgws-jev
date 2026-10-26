@@ -76,7 +76,7 @@ fallbacks decide and the log says why.
 | 7 Logistics, medical, aggregation | Done: logistics, maintenance and medical in the sim (culmination test, evacuation delays in band); level of detail with Lanchester attrition fitted against entity runs; quiet skipping. |
 | 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
 | 9 Space, cyber, kill web | Satellites and imagery, GNSS and satcom helpers, scripted space events, cyber access campaigns. |
-| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, jamming and the nets, a spectrum view, and the per-unit *Why?* inspector and after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`). The full React screens are not yet ported. |
+| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, jamming and the nets, a spectrum view, the per-unit *Why?* inspector, a detection inspector (why a unit sees another or not, with every factor) and the after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`). The full React screens are not yet ported. |
 | 11 Calibration | The vignette suite, sensitivity and the research backlog run; the campaign itself is ongoing. |
 
 ### Performance (this 4-core container, release build)

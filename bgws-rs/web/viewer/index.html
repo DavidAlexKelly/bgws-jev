@@ -348,6 +348,20 @@ function inspect(e) {
   if (!e) { el.style.display = "none"; return; }
   el.style.display = "block";
   el.textContent = JSON.stringify(e, null, 2);
+  if (e.domain !== "drone" && document.getElementById("viewer").value === "umpire" && frame) {
+    // The detection inspector: can this unit see one of the other side's?
+    const others = frame.entities.filter((x) => x.side !== e.side && x.domain !== "drone" && x.status !== "destroyed");
+    if (others.length) {
+      const row = document.createElement("div");
+      const sel = document.createElement("select");
+      sel.innerHTML = others.map((x) => `<option value="${escapeHtml(x.name)}">${escapeHtml(x.label || x.name)}</option>`).join("");
+      const go = document.createElement("button");
+      go.textContent = "Can it see?";
+      go.onclick = () => send({ kind: "detect", observer: e.name, target: sel.value });
+      row.append(sel, " ", go);
+      el.prepend(row);
+    }
+  }
   if (e.domain !== "drone") {
     const b = document.createElement("button");
     b.textContent = "Why?";
