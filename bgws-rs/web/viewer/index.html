@@ -65,6 +65,7 @@
   <label><input type="checkbox" id="lyr-sensors"> Sensor footprints</label>
   <label><input type="checkbox" id="lyr-spectrum"> Spectrum and jamming</label>
   <label><input type="checkbox" id="lyr-nets"> Nets</label>
+  <label><input type="checkbox" id="lyr-chains" checked> Kill chains</label>
 </div>
 <div id="spectrum" class="panel"><span class="muted">On the air (log frequency; jammers as bands)</span><svg id="spectrum-svg"></svg></div>
 <div id="hq" class="panel">
@@ -91,7 +92,7 @@ if (online) {
     style: { version: 8, sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } }, layers: [{ id: "osm", type: "raster", source: "osm" }] },
     center: [18.6, 54.2], zoom: 11,
   });
-  overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
+  overlay = new deck.MapboxOverlay({ interleaved: false, layers: [], getTooltip: ({ object, layer }) => (layer && layer.id === "chain-fire" && object ? `${object.kind}: ${object.stage}` : null) });
   map.addControl(overlay);
   map.on("click", (e) => picking && setObjective(e.lngLat.lng, e.lngLat.lat));
 } else {
@@ -182,7 +183,7 @@ document.getElementById("hq-issue").onclick = () => {
   document.getElementById("hq-note").textContent = `${orders.length} orders sent over the nets`;
 };
 const layerOn = (k) => document.getElementById("lyr-" + k).checked;
-for (const k of ["sensors", "spectrum", "nets"]) document.getElementById("lyr-" + k).onchange = () => frame && render(frame);
+for (const k of ["sensors", "spectrum", "nets", "chains"]) document.getElementById("lyr-" + k).onchange = () => frame && render(frame);
 // A sensor's footprint: a circle, or a wedge for a sector, as lon/lat points.
 function footprint(e, s) {
   const pts = [], mLat = 111320, mLon = 111320 * Math.cos(e.lat * Math.PI / 180);
@@ -200,7 +201,8 @@ function overlays(f) {
   const jammers = layerOn("spectrum") ? f.emitters.filter((x) => x.kind === "jammer") : [];
   const emitters = layerOn("spectrum") ? f.emitters.filter((x) => x.kind !== "jammer") : [];
   const links = layerOn("nets") ? f.links.filter((l) => byId.has(l.from) && byId.has(l.to)).map((l) => ({ ...l, a: byId.get(l.from), b: byId.get(l.to) })) : [];
-  return { sensors, jammers, emitters, links };
+  const chains = layerOn("chains") ? (f.chains || []).filter((c) => byId.has(c.shooter)).map((c) => ({ ...c, s: c.sensor != null ? byId.get(c.sensor) : null, from: byId.get(c.shooter) })) : [];
+  return { sensors, jammers, emitters, links, chains };
 }
 // The spectrum: emitters on a log-frequency axis, 1 MHz to 20 GHz; height by power.
 function spectrum(f) {
@@ -255,6 +257,9 @@ function render(f) {
     new deck.PolygonLayer({ id: "sensors", data: o.sensors, getPolygon: (s) => s.poly, filled: true, stroked: true, getFillColor: (s) => [...SIDE[s.side], 14], getLineColor: (s) => [...SIDE[s.side], 90], lineWidthMinPixels: 1 }),
     new deck.ScatterplotLayer({ id: "jammers", data: o.jammers, getPosition: (j) => [j.lon, j.lat], getRadius: (j) => j.radius_m, radiusUnits: "meters", filled: true, stroked: true, getFillColor: (j) => [...SIDE[j.side], 25], getLineColor: (j) => [...SIDE[j.side], 140], lineWidthMinPixels: 1 }),
     new deck.LineLayer({ id: "nets", data: o.links, getSourcePosition: (l) => [l.a.lon, l.a.lat], getTargetPosition: (l) => [l.b.lon, l.b.lat], getColor: (l) => (l.up ? [...SIDE[l.side], 160] : [120, 120, 110, 120]), getWidth: (l) => 1 + Math.min(4, l.traffic), widthUnits: "pixels" }),
+    new deck.LineLayer({ id: "chain-cue", data: o.chains.filter((c) => c.s), getSourcePosition: (c) => [c.s.lon, c.s.lat], getTargetPosition: (c) => [c.from.lon, c.from.lat], getColor: (c) => [...SIDE[c.side], 110], getWidth: 1, widthUnits: "pixels" }),
+    new deck.LineLayer({ id: "chain-fire", data: o.chains, pickable: true, getSourcePosition: (c) => [c.from.lon, c.from.lat], getTargetPosition: (c) => [c.aim_lon, c.aim_lat], getColor: (c) => [...SIDE[c.side], 220], getWidth: 3, widthUnits: "pixels" }),
+    new deck.ScatterplotLayer({ id: "chain-aim", data: o.chains, getPosition: (c) => [c.aim_lon, c.aim_lat], getRadius: 7, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (c) => [...SIDE[c.side], 230], lineWidthMinPixels: 2 }),
     new deck.ScatterplotLayer({ id: "emitters", data: o.emitters, getPosition: (x) => [x.lon, x.lat], getRadius: 11, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: (x) => [...SIDE[x.side], 200], lineWidthMinPixels: 2 }),
     new deck.ScatterplotLayer({ id: "objective", data: objective ? [objective] : [], getPosition: (o) => [o.lon, o.lat], getRadius: 9, radiusUnits: "pixels", filled: false, stroked: true, getLineColor: [200, 150, 0, 230], lineWidthMinPixels: 3 }),
     new deck.PolygonLayer({ id: "tracks", data: f.tracks, getPolygon: ellipse, filled: true, stroked: true, getFillColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 30], getLineColor: (t) => [...SIDE[t.owner === "blue" ? "red" : "blue"], 160], lineWidthMinPixels: 1 }),
@@ -303,6 +308,12 @@ function drawCanvas(f) {
   for (const l of o.links) {
     g.strokeStyle = l.up ? rgba(l.side, 0.6) : "rgba(120,120,110,0.5)"; g.lineWidth = 1 + Math.min(4, l.traffic);
     g.beginPath(); g.moveTo(x(l.a.lon), y(l.a.lat)); g.lineTo(x(l.b.lon), y(l.b.lat)); g.stroke();
+  }
+  g.lineWidth = 2;
+  for (const c of o.chains) {
+    if (c.s) { g.strokeStyle = rgba(c.side, 0.45); g.lineWidth = 1; g.beginPath(); g.moveTo(x(c.s.lon), y(c.s.lat)); g.lineTo(x(c.from.lon), y(c.from.lat)); g.stroke(); }
+    g.strokeStyle = rgba(c.side, 0.9); g.lineWidth = 3; g.beginPath(); g.moveTo(x(c.from.lon), y(c.from.lat)); g.lineTo(x(c.aim_lon), y(c.aim_lat)); g.stroke();
+    g.lineWidth = 2; g.beginPath(); g.arc(x(c.aim_lon), y(c.aim_lat), 7, 0, 2 * Math.PI); g.stroke();
   }
   g.lineWidth = 2;
   for (const e of o.emitters) { g.strokeStyle = rgba(e.side, 0.8); g.beginPath(); g.arc(x(e.lon), y(e.lat), 11, 0, 2 * Math.PI); g.stroke(); }

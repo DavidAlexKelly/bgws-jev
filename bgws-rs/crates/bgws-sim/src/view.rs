@@ -3,7 +3,7 @@
 
 use crate::components::*;
 use crate::sim::{Sim, Snapshot};
-use bgws_core::{EntityId, HqId, Side};
+use bgws_core::{Enu, EntityId, HqId, Side};
 use bgws_know::{Cop, OwnForceView, SideView};
 use serde::{Deserialize, Serialize};
 
@@ -113,6 +113,22 @@ pub struct FrameSensor {
     pub active: bool,
 }
 
+/// A kill chain in progress (§16): who saw it, who is shooting, and where.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameChain {
+    pub side: Side,
+    /// "fires" or "drone strike".
+    pub kind: String,
+    /// The observer that called it, if known.
+    pub sensor: Option<u32>,
+    pub shooter: u32,
+    pub aim_lat: f64,
+    pub aim_lon: f64,
+    /// "assigned", "laying", "firing", "in flight" or "terminal".
+    pub stage: String,
+}
+
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FrameView {
@@ -124,6 +140,7 @@ pub struct FrameView {
     pub emitters: Vec<FrameEmitter>,
     pub links: Vec<FrameLink>,
     pub sensors: Vec<FrameSensor>,
+    pub chains: Vec<FrameChain>,
     pub waiting: usize,
     pub over: Option<crate::sim::Outcome>,
 }
@@ -228,6 +245,7 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
     }
     let (emitters, links) = spectrum_and_nets(s, viewer);
     let sensors = sensors(s, viewer);
+    let chains = chains(s, viewer);
     FrameView {
         t: s.ctx.now.secs(),
         clock: format!("{}", s.ctx.now),
@@ -237,6 +255,7 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
         emitters,
         links,
         sensors,
+        chains,
         waiting: s.ctx.pending.values().filter(|p| !p.answered).count(),
         over: s.ctx.over.clone(),
     }
@@ -304,6 +323,40 @@ fn spectrum_and_nets(s: &Sim, viewer: Viewer) -> (Vec<FrameEmitter>, Vec<FrameLi
         }
     }
     (emitters, links)
+}
+
+/// Fire missions being fired and strike drones on their way.
+fn chains(s: &Sim, viewer: Viewer) -> Vec<FrameChain> {
+    use crate::domains::fires::indirect::MState;
+    let mut out = Vec::new();
+    let geo = |p: Enu| s.ctx.frame.enu_to_geodetic(p);
+    if let Some(fw) = s.world.get_resource::<crate::domains::fires::FiresWorld>() {
+        for m in fw.fires.missions.values().filter(|m| sees(viewer, m.side)) {
+            let stage = match m.state {
+                MState::Assigned => "assigned",
+                MState::Laying => "laying",
+                MState::Firing => "firing",
+                MState::InFlight => "in flight",
+                _ => continue,
+            };
+            let Some(shooter) = m.shooter else { continue };
+            let g = geo(m.aim);
+            out.push(FrameChain { side: m.side, kind: "fires".into(), sensor: m.observer.map(|o| o.0), shooter: shooter.0, aim_lat: g.lat, aim_lon: g.lon, stage: stage.into() });
+        }
+    }
+    if let Some(c4) = s.world.get_resource::<crate::domains::drones::C4>() {
+        use crate::domains::drones::drones::Task;
+        for f in c4.drones.flights.values().filter(|f| !f.done && sees(viewer, f.side)) {
+            let (aim, stage) = match f.task {
+                Task::Strike { aim, .. } => (aim, "in flight"),
+                Task::Terminal => (f.pos, "terminal"),
+                _ => continue,
+            };
+            let g = geo(aim);
+            out.push(FrameChain { side: f.side, kind: "drone strike".into(), sensor: None, shooter: f.team.0, aim_lat: g.lat, aim_lon: g.lon, stage: stage.into() });
+        }
+    }
+    out
 }
 
 /// Each unit's longest-reaching sensor.

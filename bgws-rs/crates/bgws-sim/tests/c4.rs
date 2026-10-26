@@ -335,3 +335,31 @@ fn frames_show_the_spectrum_the_nets_and_sensor_footprints() {
     assert!(blue.links.iter().all(|l| l.side == Side::Blue) && blue.sensors.iter().all(|s| s.side == Side::Blue));
     assert!(blue.emitters.len() < all.emitters.len());
 }
+
+#[test]
+fn frames_show_kill_chains_in_progress() {
+    let sc = scenario("m4-drone-line");
+    let mut sim = Sim::new(&sc, Seed(1), default_figures()).unwrap();
+    let mut kinds = std::collections::BTreeSet::new();
+    for m in 1..=90 {
+        sim.run_with_rules(SimTime::from_secs(m as f64 * 60.0));
+        let f = sim.view(bgws_sim::Viewer::Umpire);
+        for c in &f.chains {
+            assert!(f.entities.iter().any(|e| e.id == c.shooter), "a chain's shooter is on the map");
+            kinds.insert(c.kind.clone());
+        }
+        let blue = sim.view(bgws_sim::Viewer::Blue);
+        assert!(blue.chains.iter().all(|c| c.side == Side::Blue));
+    }
+    // Fire missions are short: sample M3's mortars every 10 s.
+    let sc = scenario("m3-battalion-attack");
+    let mut sim = Sim::new(&sc, Seed(1), default_figures()).unwrap();
+    for k in 1..=360 {
+        sim.run_with_rules(SimTime::from_secs(k as f64 * 10.0));
+        for c in sim.view(bgws_sim::Viewer::Umpire).chains {
+            kinds.insert(c.kind.clone());
+        }
+    }
+    eprintln!("chain kinds {kinds:?}");
+    assert!(kinds.contains("drone strike") && kinds.contains("fires"), "{kinds:?}");
+}
