@@ -393,6 +393,8 @@ function questions(qs) {
     const d = document.createElement("div");
     d.innerHTML = `<b>${escapeHtml(q.agent)}</b>: ${escapeHtml(q.title)}<div class="muted">${escapeHtml(q.question)}</div>`;
     for (const o of q.options) { const b = document.createElement("button"); b.textContent = o.summary || o.id; b.onclick = () => send({ kind: "answer", question: q.id, choice: o.id }); d.appendChild(b); }
+    // An HQ question is answered with orders from the HQ console, or by keeping those given.
+    if (!q.options.length) { const b = document.createElement("button"); b.textContent = "Keep current orders"; b.onclick = () => send({ kind: "answer", question: q.id, choice: "keep" }); d.appendChild(b); }
     el.appendChild(d);
   }
 }

@@ -267,7 +267,7 @@ pub fn apply(s: &mut Sim, qid: QuestionId) {
     }
     let Some(opt) = p.q.options.iter().find(|o| o.id == a.choice).cloned() else { return };
     let applied = crate::world::apply_action(s, e, id, &opt.action, &opt.params, p.about) || apply_land_action(s, e, id, &opt.action, p.about);
-    { let __text = format!("{}: {}{}", name(s, id), opt.summary, if applied { "" } else { " (nothing to do)" }); s.ctx.log.push(s.ctx.now, "decide.apply").side(p.q.side).entity(id).text(__text).data(serde_json::json!({ "question": qid.0, "action": opt.action })); }
+    { let __text = format!("{}: {}{}", name(s, id), opt.summary, if applied { "" } else { " (nothing to do)" }); s.ctx.log.push(s.ctx.now, "decide.apply").side(p.q.side).entity(id).text(__text).data(serde_json::json!({ "question": qid.0, "action": opt.action, "option": opt.id, "summary": opt.summary, "trigger": p.q.trigger, "title": p.q.title, "options": p.q.options.iter().map(|o| serde_json::json!({ "id": o.id, "summary": o.summary })).collect::<Vec<_>>(), "source": a.source, "probabilities": a.probabilities, "rationale": a.rationale })); }
 }
 
 fn point_away(s: &Sim, e: bevy_ecs::prelude::Entity, dist: f64) -> Enu {

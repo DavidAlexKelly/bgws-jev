@@ -871,7 +871,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         range,
         hits,
         kills
-    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "hits": hits, "kills": kills })); }
+    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills })); }
     if destroyed_now {
         { let __text = format!("{} is destroyed", name(s, tid)); s.ctx.log.push(now, "unit.destroyed").side(side.enemy()).entity(tid).text(__text); }
         s.world.get_mut::<Crew>(e).expect("crew").success = true;

@@ -88,6 +88,9 @@ enum Inbound {
     Messages { unit: String },
     /// What a unit sees over the terrain (the viewshed layer; own units in a side view).
     Viewshed { unit: String },
+    /// Advance the game this many simulated seconds, then reply `advanced`
+    /// (a client that runs the clock itself: the React screens' RustRunner).
+    Advance { seconds: f64 },
     /// Check an edited scenario (the editor).
     Check { scenario: serde_json::Value },
     /// Replace the game with an edited scenario, same deciders.
@@ -247,6 +250,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
     let mut keys = Keyframes { every: SimDuration::from_secs(cfg.keyframe_s), frames: Vec::new() };
     let mut scrub: Option<SimTime> = None;
     let mut last_full: Option<(Instant, Viewer, Vec<u32>)> = None;
+    // A client-driven step in progress, and whether it finished this tick.
+    let mut step_to: Option<SimTime> = None;
     // Every event so far, for the inspectors (`why`, `review`).
     let mut log: Vec<bgws_core::LogEvent> = Vec::new();
     let mut playing = false;
@@ -264,6 +269,10 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
         let started = Instant::now();
         while let Ok(m) = inbox.try_recv() {
             match m {
+                Inbound::Advance { seconds } => {
+                    step_to = Some(step_to.unwrap_or(host.sim.now()) + SimDuration::from_secs(seconds.max(0.0)));
+                    scrub = None;
+                }
                 Inbound::Play => {
                     playing = true;
                     scrub = None;
@@ -381,7 +390,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                 }
                 Inbound::Answer { question, choice } => {
                     if let Some(q) = waiting.remove(&QuestionId(question)) {
-                        if q.has_option(&choice) {
+                        // An HQ question has no options: any answer means "no new plan, keep the orders given".
+                        if q.has_option(&choice) || q.kind == bgws_core::QuestionKind::Hq {
                             held.push(Answer::simple(&q, choice, AnswerSource::Person));
                         } else {
                             waiting.insert(q.id, q);
@@ -395,18 +405,26 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                 send(&out, json!({ "kind": "status", "text": format!("answer rejected: {e}") }));
             }
         }
-        if playing && waiting.is_empty() {
-            let until = host.sim.now() + bgws_core::SimDuration::from_secs(speed * tick.as_secs_f64());
+        let mut step_done = false;
+        if (playing || step_to.is_some()) && waiting.is_empty() {
+            let until = step_to.unwrap_or_else(|| host.sim.now() + bgws_core::SimDuration::from_secs(speed * tick.as_secs_f64()));
             loop {
                 match host.sim.advance(until) {
                     Step::Advanced => break,
                     Step::Over(o) => {
                         playing = false;
+                        if step_to.take().is_some() {
+                            step_done = true;
+                        }
                         send(&out, json!({ "kind": "status", "text": format!("over: {} ({})", o.winner.map(|w| format!("{w} wins")).unwrap_or_else(|| "draw".into()), o.reason) }));
                         break;
                     }
                     Step::NeedsAnswers { at, questions } => {
-                        let (mine, theirs): (Vec<Question>, Vec<Question>) = questions.into_iter().partition(|q| Some(q.side) == person && q.options.len() > 1);
+                        // A person's questions, and the HQ questions of any side whose seat a person holds.
+                        let seats = host.sim.ctx.seats.clone();
+                        let (mine, theirs): (Vec<Question>, Vec<Question>) = questions
+                            .into_iter()
+                            .partition(|q| (Some(q.side) == person && q.options.len() > 1) || (q.kind == bgws_core::QuestionKind::Hq && seats.get(&q.side) == Some(&bgws_sim::SeatKind::Person)));
                         let mut answers = match host.decide(theirs) {
                             Ok(a) => a,
                             Err(e) => {
@@ -428,10 +446,20 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                 }
             }
         }
+        if step_to.is_some_and(|t| host.sim.now() >= t) {
+            step_to = None;
+            step_done = true;
+        }
         keys.take(&host.sim);
         let drained = host.sim.drain_events();
         log.extend(drained.iter().cloned());
-        let events: Vec<serde_json::Value> = drained.into_iter().filter(|e| visible(viewer, e)).map(|e| json!({ "clock": format!("{}", e.t), "kind": e.kind, "text": e.text })).collect();
+        let names: BTreeMap<bgws_core::EntityId, &str> = if drained.is_empty() { BTreeMap::new() } else { host.sim.ctx.by_name.iter().map(|(n, id)| (*id, n.as_str())).collect() };
+        let name = |id: Option<bgws_core::EntityId>| id.and_then(|i| names.get(&i).copied());
+        let events: Vec<serde_json::Value> = drained
+            .into_iter()
+            .filter(|e| visible(viewer, e))
+            .map(|e| json!({ "clock": format!("{}", e.t), "t": e.t.secs(), "kind": e.kind, "text": e.text, "side": e.side, "entity": name(e.entity), "target": name(e.target), "data": e.data }))
+            .collect();
         if !events.is_empty() {
             send(&out, json!({ "kind": "events", "events": events }));
         }
@@ -459,6 +487,9 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
         }
         if waiting.is_empty() {
             send(&out, json!({ "kind": "questions", "questions": [] }));
+        }
+        if step_done {
+            send(&out, json!({ "kind": "advanced", "t": host.sim.now().secs(), "over": host.sim.outcome() }));
         }
         if let Some(rest) = tick.checked_sub(started.elapsed()) {
             std::thread::sleep(rest);
