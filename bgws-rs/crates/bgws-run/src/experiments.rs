@@ -18,6 +18,25 @@ use bgws_sim::{Sim, SimOptions};
 use rand::Rng;
 use rand_chacha::ChaCha8Rng;
 
+/// Play a sim to `limit` with the batch deciders: each question's rules
+/// choice, and the heuristic planner (as the host uses) for HQ plans.
+pub fn play_with_rules(sim: &mut Sim, limit: SimTime) -> Option<bgws_sim::Outcome> {
+    let planner = bgws_decide::HeuristicPlanner::from_figures(sim.figures());
+    loop {
+        match sim.advance(limit) {
+            bgws_sim::Step::Advanced => return None,
+            bgws_sim::Step::Over(o) => return Some(o),
+            bgws_sim::Step::NeedsAnswers { questions, .. } => {
+                let answers = questions
+                    .iter()
+                    .map(|q| if q.kind == bgws_core::QuestionKind::Hq { planner.answer(q, bgws_core::AnswerSource::Rules) } else { bgws_core::Answer::simple(q, q.rules_choice.clone(), bgws_core::AnswerSource::Rules) })
+                    .collect();
+                sim.answer(answers).expect("rules answers are valid");
+            }
+        }
+    }
+}
+
 /// One replicate's value for a vignette metric (None: nothing to measure).
 pub type Value = Option<f64>;
 
@@ -196,18 +215,21 @@ pub fn casevac(f: &Figures, seed: Seed) -> Value {
     out.first().and_then(|o| o.times.reached_aid_post).map(|t| t.secs() / 60.0)
 }
 
-/// A company attack across open ground on a defended position, played in the
-/// sim on flat ground with no breakpoint: the attacker's losses when its
-/// advance stops (no manoeuvre unit still advancing for a minute) [P14].
+/// A company attack on a defended position, played in the sim on the
+/// scenario's ground (with its cover) and with no breakpoint: the attacker's
+/// losses when its advance stops (no manoeuvre unit still moving forward for
+/// a minute) [P14]. On flat open ground modern tanks destroy an exposed
+/// attack before its morale can halt it, so the halt is a property of
+/// terrain with cover, which is where P14's data come from.
 pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         let mut sc = scenario.clone();
         sc.victory.clear();
-        let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+        let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
         let mut still = 0.0;
         let mut last_loss = 0.0;
         for step in 1..=720 {
-            let out = sim.run_with_rules(SimTime::from_secs(step as f64 * 10.0));
+            let out = play_with_rules(&mut sim, SimTime::from_secs(step as f64 * 10.0));
             let (mut fit, mut start, mut advancing) = (0.0, 0.0, 0usize);
             for &e in &sim.ctx.order {
                 let (Some(i), Some(h), Some(a)) = (sim.world.get::<Ident>(e), sim.world.get::<Health>(e), sim.world.get::<Act>(e)) else { continue };
@@ -216,7 +238,8 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
                 }
                 fit += if h.destroyed { 0.0 } else { h.fit as f64 };
                 start += h.start as f64;
-                if !h.destroyed && matches!(a.activity, Activity::Move { .. } | Activity::Engage { .. }) {
+                // Advancing means moving forward; firing from a halt is not.
+                if !h.destroyed && matches!(a.activity, Activity::Move { .. }) {
                     advancing += 1;
                 }
             }
@@ -245,7 +268,7 @@ pub fn scenario_run(scenario: &ScenarioV4, limit: SimTime, opts: SimOptions) -> 
             Ok(s) => s,
             Err(e) => return RunOutcome { over: Some(format!("load error: {e}")), time: SimTime::ZERO, strength: Default::default() },
         };
-        let out = sim.run_with_rules(limit);
+        let out = play_with_rules(&mut sim, limit);
         RunOutcome {
             over: out.as_ref().map(|o| format!("{} ({})", o.winner.map(|w| format!("{w} wins")).unwrap_or_else(|| "draw".into()), o.reason)),
             time: sim.now(),

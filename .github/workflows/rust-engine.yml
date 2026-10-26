@@ -1,0 +1,44 @@
+# The Rust engine (bgws-rs/): build, tests, lint, and the benchmark
+# vignettes checked against their stored baselines (RUST_ENGINE.md §15.8, §17).
+name: rust-engine
+
+on:
+  push:
+    paths: ["bgws-rs/**", ".github/workflows/rust-engine.yml"]
+  pull_request:
+    paths: ["bgws-rs/**", ".github/workflows/rust-engine.yml"]
+
+defaults:
+  run:
+    working-directory: bgws-rs
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bgws-rs
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+      - name: GPU kernels compile (twin tests skip without an adapter)
+        run: cargo test -p bgws-gpu --features gpu
+
+  vignettes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bgws-rs
+      - name: Benchmark vignettes against their bands and baselines
+        run: |
+          cargo build --release -p bgws-run
+          target/release/bgws vignettes -n 200 --store data/regression

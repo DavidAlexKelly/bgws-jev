@@ -15,7 +15,7 @@ target/release/bgws aar events.jsonl                 # after-action review
 target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, with the figures
 target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
-target/release/bgws vignettes                        # benchmark vignettes against their bands
+target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid          # Morris + Sobol, the research backlog
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
@@ -117,10 +117,16 @@ fallbacks decide and the log says why.
   entities, so the air-defence module does not engage them. Counter-drone
   handles them instead.
 
-## Tests
+## Tests and CI
 
 ```sh
 cargo test --workspace          # unit, property, golden, determinism, vignette and integration tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p bgws-gpu --features gpu   # GPU twin tests (skip without an adapter)
+target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails on out-of-band or a shifted distribution
 ```
+
+`.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`.
+All twelve benchmark vignettes are in band at the stored baselines. Batches and
+vignettes answer with the rules and the decider crate's heuristic planner, the
+same planner the host falls back to.

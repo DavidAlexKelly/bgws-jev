@@ -8,7 +8,7 @@
 //! bgws branch <game.json> --at M [--deciders jev]   "what if": replay to minute M, then play on
 //! bgws pack <dir> --name N --lat --lon [--dem dem.tif]   build a theatre pack
 //! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
-//! bgws vignettes [--only id] [-n 200]     benchmark vignettes against their bands
+//! bgws vignettes [--only id] [-n 200] [--store dir]   benchmark vignettes; regression against a baseline
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
 //! bgws aar <events.jsonl>                the after-action review
 //! bgws why <events.jsonl> <unit>          what happened to or by a unit, and why
@@ -128,6 +128,13 @@ enum Cmd {
         seed: u64,
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Compare each distribution with the stored baseline here (§15.8): out of band
+        /// or a significant shift fails. New vignettes are stored as baselines.
+        #[arg(long)]
+        store: Option<PathBuf>,
+        /// Accept this run as the new baseline, with the reason (needs --store).
+        #[arg(long)]
+        accept: Option<String>,
     },
     /// Sensitivity analysis of one vignette over its unsourced figures.
     Sensitivity {
@@ -296,12 +303,33 @@ fn main() -> Result<()> {
                 std::fs::write(p, serde_json::to_string_pretty(&batch.replicates.iter().map(|r| &r.output).collect::<Vec<_>>())?)?;
             }
         }
-        Cmd::Vignettes { only, n, seed, json } => {
+        Cmd::Vignettes { only, n, seed, json, store, accept } => {
             let figures = default_figures();
             let attack = load_scenario(&scenario_path("skirmish-advance-to-contact-v1")).ok();
             let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), attack.as_ref());
+            let mut regressed = false;
+            if let Some(dir) = &store {
+                let st = bgws_analysis::regression::RegressionStore::open(dir).map_err(|e| anyhow!("{e}"))?;
+                let ro = bgws_analysis::regression::RegressionOptions::from_figures(&figures);
+                let mut verdicts = Vec::new();
+                for r in &results {
+                    match &accept {
+                        Some(why) => {
+                            st.accept(r, why, &ro).map_err(|e| anyhow!("{e}"))?;
+                        }
+                        None => verdicts.push(st.check_and_record(r, &ro).map_err(|e| anyhow!("{e}"))?),
+                    }
+                }
+                if !verdicts.is_empty() {
+                    regressed = verdicts.iter().any(|v| v.status.fails());
+                    println!("{}", bgws_analysis::report::regression_markdown(&verdicts));
+                }
+            }
             let suite = VignetteSuite::new(results);
             println!("{}", suite.to_markdown());
+            if regressed {
+                bail!("a vignette regressed against its baseline (accept with --accept \"why\" if intended)");
+            }
             if let Some(p) = json {
                 std::fs::write(p, serde_json::to_string_pretty(&suite)?)?;
             }
