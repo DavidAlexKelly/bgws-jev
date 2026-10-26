@@ -68,8 +68,32 @@ pub struct RecordedCommand {
     pub seat: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub side: Option<Side>,
-    /// The structured orders (C2SIM-shaped, owned by `bgws-sim`).
+    /// The structured orders (C2SIM-shaped, owned by `bgws-sim`), or the
+    /// new seat for a seat change.
     pub orders: Value,
+    #[serde(default, skip_serializing_if = "CommandKind::is_plan")]
+    pub kind: CommandKind,
+    /// Answers in the record when it was given: a replay applies it at the
+    /// same simulated time and the same point in the answers.
+    #[serde(default)]
+    pub after_answers: usize,
+}
+
+/// What a recorded command does.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommandKind {
+    /// A plan for a side, in the orders schema.
+    #[default]
+    Plan,
+    /// Who sits in a side's HQ seat (`orders` is the seat).
+    Seat,
+}
+
+impl CommandKind {
+    fn is_plan(&self) -> bool {
+        *self == CommandKind::Plan
+    }
 }
 
 /// An answer, and when it was given.
@@ -126,6 +150,22 @@ pub enum RecordError {
     Base64,
 }
 
+/// Run options that change the game, so a replay sets them the same way.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct RunSetup {
+    /// Flat open ground instead of the scenario's.
+    pub flat_ground: bool,
+    /// The HQs were asked for plans at the start.
+    pub plan_at_start: bool,
+}
+
+impl Default for RunSetup {
+    fn default() -> Self {
+        RunSetup { flat_ground: false, plan_at_start: true }
+    }
+}
+
 /// Everything needed to replay a game exactly.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -136,6 +176,9 @@ pub struct GameRecord {
     pub seed: Seed,
     pub build: BuildInfo,
     pub machine: MachineInfo,
+    /// How the run was set up beyond the scenario.
+    #[serde(default)]
+    pub run: RunSetup,
     /// Figure key → value, for every figure the run set away from its default.
     #[serde(default)]
     pub figure_overrides: BTreeMap<String, f64>,
@@ -147,6 +190,9 @@ pub struct GameRecord {
     pub answers: Vec<RecordedAnswer>,
     #[serde(default)]
     pub snapshots: Vec<RecordedSnapshot>,
+    /// Where the record stops, when the game was saved before it was over.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<SimTime>,
     /// The event-log fingerprint at the end, to check a replay against.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fingerprint: Option<Fingerprint>,
@@ -164,17 +210,26 @@ impl GameRecord {
             seed,
             build,
             machine,
+            run: RunSetup::default(),
             figure_overrides: BTreeMap::new(),
             commands: Vec::new(),
             answers: Vec::new(),
             snapshots: Vec::new(),
+            ended_at: None,
             fingerprint: None,
             outcome: None,
         }
     }
 
     pub fn push_command(&mut self, at: SimTime, seat: impl Into<String>, side: Option<Side>, orders: Value) {
-        self.commands.push(RecordedCommand { at, seat: seat.into(), side, orders });
+        let after_answers = self.answers.len();
+        self.commands.push(RecordedCommand { at, seat: seat.into(), side, orders, kind: CommandKind::Plan, after_answers });
+    }
+
+    /// A change of who sits in a side's HQ seat.
+    pub fn push_seat(&mut self, at: SimTime, side: Side, seat: Value) {
+        let after_answers = self.answers.len();
+        self.commands.push(RecordedCommand { at, seat: "seat".into(), side: Some(side), orders: seat, kind: CommandKind::Seat, after_answers });
     }
 
     pub fn push_answer(&mut self, at: SimTime, answer: Answer) {
@@ -197,6 +252,14 @@ impl GameRecord {
     /// Commands that took effect in `[from, to)`.
     pub fn commands_between(&self, from: SimTime, to: SimTime) -> impl Iterator<Item = &RecordedCommand> {
         self.commands.iter().filter(move |c| c.at >= from && c.at < to)
+    }
+
+    /// Where a replay of this record stops: where it was saved, else where
+    /// the game ended, else the scenario's time limit.
+    pub fn ends_at(&self) -> SimTime {
+        self.ended_at
+            .or_else(|| self.outcome.as_ref().and_then(|o| o.get("at")).and_then(|v| v.as_i64()).map(SimTime))
+            .unwrap_or_else(|| SimTime::from_secs(self.scenario.scope.duration_min * 60.0))
     }
 
     /// The latest snapshot at or before `t`, for scrubbing.

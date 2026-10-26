@@ -28,7 +28,7 @@ pub mod v4;
 pub mod validate;
 
 pub use convert::{convert_v3, ConvertError, ConvertOptions, Placement, TS_DEFAULT_ORIGIN};
-pub use record::{BuildInfo, GameRecord, MachineInfo, RecordError, RecordedAnswer, RecordedCommand, RecordedSnapshot, SnapshotData};
+pub use record::{BuildInfo, CommandKind, GameRecord, MachineInfo, RecordError, RecordedAnswer, RecordedCommand, RecordedSnapshot, RunSetup, SnapshotData};
 pub use scope::{effective_scope, playable, scope_errors, scope_for, type_info, DomainMode, ScenarioType, Scope, ScopeCheck, ScopeDomain, ScopeError, ScopeTime, Weather};
 pub use v3::{parse_v3, ScenarioV3};
 pub use v4::*;

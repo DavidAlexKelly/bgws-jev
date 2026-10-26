@@ -221,15 +221,13 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             eprintln!("played {} simulated in {:.1} s wall", report.ended_at, started.elapsed().as_secs_f64());
             if let Some(p) = record {
-                let mut rec = host.record.clone();
-                rec.fingerprint = Some(host.sim.fingerprint());
-                rec.save(&p).map_err(|e| anyhow!("{e}"))?;
+                host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
                 eprintln!("record written to {}", p.display());
             }
         }
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
-            let until = rec.outcome.as_ref().and_then(|o| o.get("at")).and_then(|v| v.as_i64()).map(SimTime).unwrap_or(SimTime::from_secs(rec.scenario.scope.duration_min * 60.0));
+            let until = rec.ends_at();
             let mut host = Host::replay(rec, default_figures())?;
             host.play_until(until, |_| {})?;
             host.verify_replay()?;
@@ -239,19 +237,15 @@ fn main() -> Result<()> {
         Cmd::Branch { record, at, deciders, minutes, record_out } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
             let branch_at = SimTime::from_secs(at * 60.0);
-            let mut host = Host::replay(rec.clone(), default_figures())?;
-            host.play_until(branch_at, |_| {})?;
-            eprintln!("replayed to {}; branching with {:?}", host.sim.now(), deciders);
             let opts = HostOptions { deciders, ..Default::default() };
-            host.router = bgws_run::router_for(&rec.scenario, &default_figures(), &opts);
-            host.stop_replay();
+            let router = bgws_run::router_for(&rec.scenario, &default_figures(), &opts);
+            let mut host = Host::branch(rec.clone(), default_figures(), branch_at, router)?;
+            eprintln!("replayed to {}; branching with {:?}", host.sim.now(), deciders);
             let until = SimTime::from_secs(minutes.map(|m| at + m).unwrap_or(rec.scenario.scope.duration_min) * 60.0);
             host.play_until(until, |_| {})?;
             println!("{}", serde_json::to_string_pretty(&host.report())?);
             if let Some(p) = record_out {
-                let mut r = host.record.clone();
-                r.fingerprint = Some(host.sim.fingerprint());
-                r.save(&p).map_err(|e| anyhow!("{e}"))?;
+                host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
         Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed, dem } => {

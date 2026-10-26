@@ -6,9 +6,9 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bgws_core::{Answer, Figures, LogEvent, Question, QuestionKind, Seed, Side, SimTime};
 use bgws_decide::{ClaudeConfig, ClaudeDecider, ClaudePlanner, HeuristicPlanner, JevClient, JevConfig, LocalConfig, LocalDecider, Route, Router};
-use bgws_scenario::record::{BuildInfo, GameRecord, MachineInfo};
+use bgws_scenario::record::{BuildInfo, CommandKind, GameRecord, MachineInfo, RecordedCommand, RunSetup};
 use bgws_scenario::v4::{Decider, ScenarioV4};
-use bgws_sim::{Sim, SimOptions, Step};
+use bgws_sim::{SeatKind, Sim, SimOptions, Step};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::Path;
@@ -149,6 +149,8 @@ pub struct Host {
     events_out: Option<std::io::BufWriter<std::fs::File>>,
     /// Answers from a record, for a replay: questions are answered from here only.
     replay: Option<GameRecord>,
+    /// The next recorded command a replay applies.
+    next_command: usize,
     questions: usize,
     by_source: std::collections::BTreeMap<String, usize>,
     cost: f64,
@@ -157,6 +159,8 @@ pub struct Host {
 impl Host {
     pub fn new(scenario: &ScenarioV4, seed: Seed, figures: Figures, opts: &HostOptions) -> Result<Host> {
         let router = router_for(scenario, &figures, opts);
+        let defaults = crate::default_figures();
+        let overrides = figures.iter().filter(|f| defaults.figure(&f.key).is_some_and(|d| d.value != f.value)).map(|f| (f.key.clone(), f.value)).collect();
         let mut sim_opts = opts.sim.clone();
         if sim_opts.terrain.is_none() {
             sim_opts.terrain = load_pack_terrain(scenario)?;
@@ -164,9 +168,11 @@ impl Host {
         let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;
         let mut machine = MachineInfo::compiled_for();
         machine.threads = Some(rayon::current_num_threads() as u32);
-        let record = GameRecord::new(scenario.clone(), seed, BuildInfo::this(option_env!("BGWS_BUILD_ID").unwrap_or("dev")), machine);
+        let mut record = GameRecord::new(scenario.clone(), seed, BuildInfo::this(option_env!("BGWS_BUILD_ID").unwrap_or("dev")), machine);
+        record.figure_overrides = overrides;
+        record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start };
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-        Ok(Host { sim, router, record, rt, events_out: None, replay: None, questions: 0, by_source: Default::default(), cost: 0.0 })
+        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0 })
     }
 
     /// Replay a recorded game without calling any decider.
@@ -175,14 +181,68 @@ impl Host {
         for (k, v) in &record.figure_overrides {
             f.set(k, *v).map_err(|e| anyhow!("{e}"))?;
         }
-        let mut h = Host::new(&record.scenario, record.seed, f, &HostOptions { deciders: DeciderChoice::Rules, ..Default::default() })?;
+        let sim = SimOptions { flat_ground: record.run.flat_ground, plan_at_start: record.run.plan_at_start, ..Default::default() };
+        let mut h = Host::new(&record.scenario, record.seed, f, &HostOptions { deciders: DeciderChoice::Rules, sim, ..Default::default() })?;
         h.replay = Some(record);
+        Ok(h)
+    }
+
+    /// Restart a recorded game at `at` ("what if", §12): replay the record
+    /// to that moment without calling a decider, then hand the questions to
+    /// `router`. The new host's record holds the game up to the branch.
+    pub fn branch(record: GameRecord, figures: Figures, at: SimTime, router: Router) -> Result<Host> {
+        let mut h = Host::replay(GameRecord { ended_at: None, fingerprint: None, outcome: None, ..record }, figures)?;
+        h.play_until(at, |_| {})?;
+        h.router = router;
+        h.stop_replay();
         Ok(h)
     }
 
     /// Leave replay mode: from now on the router answers (a "what if" branch).
     pub fn stop_replay(&mut self) {
         self.replay = None;
+        self.next_command = 0;
+    }
+
+    /// Is this host replaying a record?
+    pub fn replaying(&self) -> bool {
+        self.replay.is_some()
+    }
+
+    /// A plan for a side (a person's, over its HQ's nets): applied now and recorded.
+    pub fn command(&mut self, side: Side, seat: &str, plan: serde_json::Value) -> Result<()> {
+        self.sim.command(side, plan.clone()).map_err(|e| anyhow!("{e}"))?;
+        self.record.push_command(self.sim.now(), seat, Some(side), plan);
+        Ok(())
+    }
+
+    /// Who sits in a side's HQ seat, recorded so a replay makes the same change.
+    pub fn set_seat(&mut self, side: Side, seat: SeatKind) {
+        self.sim.set_seat(side, seat);
+        self.record.push_seat(self.sim.now(), side, serde_json::to_value(seat).unwrap_or_default());
+    }
+
+    /// Replaying: apply the recorded commands that are due, at the same
+    /// simulated time and the same point in the answers as when given.
+    fn apply_recorded(&mut self) -> Result<()> {
+        let Some(rec) = &self.replay else { return Ok(()) };
+        let (now, answered) = (self.sim.now(), self.record.answers.len());
+        let due: Vec<RecordedCommand> = rec.commands.iter().skip(self.next_command).take_while(|c| c.at <= now && c.after_answers <= answered).cloned().collect();
+        self.next_command += due.len();
+        for c in due {
+            let Some(side) = c.side else { bail!("a recorded command has no side") };
+            match c.kind {
+                CommandKind::Plan => self.command(side, &c.seat, c.orders).map_err(|e| anyhow!("replay diverged: a recorded plan was rejected: {e}"))?,
+                CommandKind::Seat => self.set_seat(side, serde_json::from_value(c.orders)?),
+            }
+        }
+        Ok(())
+    }
+
+    /// When the next recorded command is due, if it is after now.
+    fn next_command_at(&self) -> Option<SimTime> {
+        let c = self.replay.as_ref()?.commands.get(self.next_command)?;
+        (c.at > self.sim.now()).then_some(c.at)
     }
 
     pub fn write_events_to(&mut self, path: &Path) -> Result<()> {
@@ -222,11 +282,17 @@ impl Host {
     /// sees the sim after each stop (for a UI or progress).
     pub fn play_until(&mut self, until: SimTime, mut on_step: impl FnMut(&Sim)) -> Result<Option<bgws_sim::Outcome>> {
         loop {
-            let step = self.sim.advance(until);
+            self.apply_recorded()?;
+            let stop = self.next_command_at().filter(|t| *t < until).unwrap_or(until);
+            let step = self.sim.advance(stop);
             self.flush_events()?;
             match step {
                 Step::Advanced => {
+                    self.apply_recorded()?;
                     on_step(&self.sim);
+                    if stop < until {
+                        continue;
+                    }
                     return Ok(None);
                 }
                 Step::Over(o) => {
@@ -236,6 +302,7 @@ impl Host {
                     return Ok(Some(o));
                 }
                 Step::NeedsAnswers { at, questions } => {
+                    self.apply_recorded()?;
                     self.questions += questions.len();
                     let answers = self.answer(questions)?;
                     for a in &answers {
@@ -273,6 +340,15 @@ impl Host {
             answers_by_source: self.by_source.clone(),
             cost_usd: self.cost,
         }
+    }
+
+    /// The record as it stands, closed at the current moment: the place to
+    /// stop a replay and the fingerprint to check it against.
+    pub fn finished_record(&self) -> GameRecord {
+        let mut r = self.record.clone();
+        r.ended_at = Some(self.sim.now());
+        r.fingerprint = Some(self.sim.fingerprint());
+        r
     }
 
     /// Check a replay ended where its record did.

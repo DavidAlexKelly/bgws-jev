@@ -19,7 +19,7 @@ target/release/bgws vignettes --store data/regression   # vignettes against thei
 target/release/bgws sensitivity shahed-raid          # Morris + Sobol, the research backlog
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
-target/release/bgws-server m4-drone-line --person blue   # then open http://127.0.0.1:8765/
+target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/
 ```
 
 Deciders: `--deciders rules|jev|claude|local` (or as the scenario says).
@@ -107,8 +107,11 @@ fallbacks decide and the log says why.
 - **The React screens** from the TypeScript build are not wired to the Rust host
   yet. `web/client/bgwsClient.ts` is the typed boundary they would bind to. A
   `RunnerHandle` adapter would map frames onto the TS engine's `RtState`.
-- **Snapshots** are JSON for inspection; a game restarts from a moment by
-  replaying its record (`bgws branch`), not by restoring a snapshot.
+- **Snapshots** are JSON for inspection, not restorable state. A game
+  restarts from a moment by replaying its record there (`bgws branch`, or
+  *Branch here* on the server's timeline), which is exact: a branch played on
+  with the same deciders ends with the same fingerprint. The server scrubs
+  through keyframes of each view (`--keyframe-s`), not snapshots.
 - **Event logs** are JSONL; DuckDB is not used, because it needs a C++ build.
 - **Missile and air-defence models** work at the engagement level: kinematic
   flights, per-shot kill probabilities and kill chains. They do not model
@@ -118,6 +121,16 @@ fallbacks decide and the log says why.
   counter-drone loop engages them instead, and units with a short- or
   medium-range SAM and a radar take on fixed-wing drones out to
   `sim.drones.sam_reach_m`.
+
+## Game records
+
+A record (`--record`, or *Save* on the server) holds the scenario, seed,
+build, machine, the run setup (flat ground, start-of-game planning), every
+figure set away from its default, every model answer, and every plan and
+seat change a person made. Each command carries its position in the answers,
+so a replay applies it at the same simulated time and the same point in the
+game. A record saved mid-game says where it stops (`endedAt`).
+`bgws replay` checks the replay against the record's fingerprint.
 
 ## Tests and CI
 

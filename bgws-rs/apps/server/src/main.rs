@@ -4,8 +4,14 @@
 //! pause, speed, viewer and answers back. The same messages are what the
 //! Tauri shell's channel carries (§16).
 //!
+//! Scrubbing and "what if" (§12): the game keeps a keyframe of every view
+//! every `--keyframe-s` simulated seconds, so the timeline can be dragged
+//! back and forth; `branch` restarts the game at a moment by replaying its
+//! record there, without calling a decider, and playing on.
+//!
 //! ```text
 //! bgws-server <scenario> [--port 8765] [--person blue] [--deciders rules|jev|claude|local] [--seed N] [--flat]
+//!             [--record game.json] [--keyframe-s 30]
 //! ```
 
 use anyhow::{anyhow, Result};
@@ -14,7 +20,7 @@ use axum::extract::State;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
-use bgws_core::{Answer, AnswerSource, Question, QuestionId, Seed, Side, SimTime};
+use bgws_core::{Answer, AnswerSource, Question, QuestionId, Seed, Side, SimDuration, SimTime};
 use bgws_run::{default_figures, load_scenario, DeciderChoice, Host, HostOptions};
 use bgws_sim::{SimOptions, Step, Viewer};
 use clap::Parser;
@@ -43,6 +49,12 @@ struct Args {
     seed: Option<u64>,
     #[arg(long)]
     flat: bool,
+    /// Where `save` writes the game record.
+    #[arg(long, default_value = "bgws-game.json")]
+    record: PathBuf,
+    /// Simulated seconds between keyframes for the timeline.
+    #[arg(long, default_value_t = 30.0)]
+    keyframe_s: f64,
 }
 
 /// What the browser sends.
@@ -58,6 +70,53 @@ enum Inbound {
     Command { side: Side, plan: serde_json::Value },
     /// Who sits in a side's HQ seat.
     Seat { side: Side, seat: bgws_sim::SeatKind },
+    /// Show the keyframe at or before `t` (simulated seconds); pauses the game.
+    Seek { t: f64 },
+    /// Back to the live game.
+    Live,
+    /// Restart the game at `t` (simulated seconds) and play on from there.
+    Branch { t: f64 },
+    /// Write the game record.
+    Save,
+}
+
+/// Views of the game every few simulated seconds, for the timeline. When
+/// there are too many, every other one is dropped and the spacing doubles.
+struct Keyframes {
+    every: SimDuration,
+    frames: Vec<(SimTime, [String; 3])>,
+}
+
+const VIEWERS: [Viewer; 3] = [Viewer::Umpire, Viewer::Blue, Viewer::Red];
+const MAX_KEYFRAMES: usize = 2_000;
+
+impl Keyframes {
+    fn take(&mut self, sim: &bgws_sim::Sim) {
+        let now = sim.now();
+        if self.frames.last().is_some_and(|(t, _)| now < *t + self.every) {
+            return;
+        }
+        self.frames.push((now, VIEWERS.map(|v| serde_json::to_string(&sim.view(v)).unwrap_or_default())));
+        if self.frames.len() > MAX_KEYFRAMES {
+            self.frames = self.frames.iter().step_by(2).cloned().collect();
+            self.every = SimDuration::from_secs(self.every.secs() * 2.0);
+        }
+    }
+
+    fn at(&self, t: SimTime, viewer: Viewer) -> Option<(SimTime, &str)> {
+        let i = VIEWERS.iter().position(|v| *v == viewer)?;
+        self.frames.iter().rev().find(|(ft, _)| *ft <= t).or(self.frames.first()).map(|(ft, f)| (*ft, f[i].as_str()))
+    }
+
+    fn truncate_after(&mut self, t: SimTime) {
+        self.frames.retain(|(ft, _)| *ft <= t);
+    }
+}
+
+struct GameConfig {
+    person: Option<Side>,
+    record: PathBuf,
+    keyframe_s: f64,
 }
 
 #[derive(Clone)]
@@ -76,7 +135,10 @@ fn scenario_path(s: &str) -> PathBuf {
 
 /// The game thread: the sim never waits on the network or the UI in wall
 /// time; it waits in simulated time for answers (§3.2).
-fn game(mut host: Host, person: Option<Side>, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<String>) {
+fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<String>) {
+    let person = cfg.person;
+    let mut keys = Keyframes { every: SimDuration::from_secs(cfg.keyframe_s), frames: Vec::new() };
+    let mut scrub: Option<SimTime> = None;
     let mut playing = false;
     let mut speed = 10.0;
     let mut viewer = Viewer::Umpire;
@@ -92,18 +154,49 @@ fn game(mut host: Host, person: Option<Side>, inbox: mpsc::Receiver<Inbound>, ou
         let started = Instant::now();
         while let Ok(m) = inbox.try_recv() {
             match m {
-                Inbound::Play => playing = true,
+                Inbound::Play => {
+                    playing = true;
+                    scrub = None;
+                }
                 Inbound::Pause => playing = false,
                 Inbound::Speed { speed: s } => speed = s.clamp(0.1, 10_000.0),
                 Inbound::Viewer { viewer: v } => viewer = v,
                 Inbound::Command { side, plan } => {
-                    if let Err(e) = host.sim.command(side, plan.clone()) {
+                    if let Err(e) = host.command(side, "person", plan) {
                         send(&out, json!({ "kind": "status", "text": format!("plan rejected: {e}") }));
-                    } else {
-                        host.record.push_command(host.sim.now(), "person", Some(side), plan);
                     }
                 }
-                Inbound::Seat { side, seat } => host.sim.set_seat(side, seat),
+                Inbound::Seat { side, seat } => host.set_seat(side, seat),
+                Inbound::Seek { t } => {
+                    playing = false;
+                    scrub = Some(SimTime::from_secs(t.max(0.0)));
+                }
+                Inbound::Live => scrub = None,
+                Inbound::Save => {
+                    let text = match host.finished_record().save(&cfg.record) {
+                        Ok(()) => format!("saved {}", cfg.record.display()),
+                        Err(e) => format!("save failed: {e}"),
+                    };
+                    send(&out, json!({ "kind": "status", "text": text }));
+                }
+                Inbound::Branch { t } => {
+                    let at = SimTime::from_secs(t.max(0.0)).min(host.sim.now());
+                    send(&out, json!({ "kind": "status", "text": format!("branching at {at}…") }));
+                    match Host::branch(host.record.clone(), default_figures(), at, host.router.clone()) {
+                        Ok(mut h) => {
+                            let _ = h.sim.drain_events();
+                            host = h;
+                            playing = false;
+                            scrub = None;
+                            waiting.clear();
+                            held.clear();
+                            keys.truncate_after(at);
+                            send(&out, json!({ "kind": "branched", "t": at.secs() }));
+                            send(&out, json!({ "kind": "status", "text": format!("branched at {at}: press Play") }));
+                        }
+                        Err(e) => send(&out, json!({ "kind": "status", "text": format!("branch failed: {e}") })),
+                    }
+                }
                 Inbound::Answer { question, choice } => {
                     if let Some(q) = waiting.remove(&QuestionId(question)) {
                         if q.has_option(&choice) {
@@ -153,11 +246,20 @@ fn game(mut host: Host, person: Option<Side>, inbox: mpsc::Receiver<Inbound>, ou
                 }
             }
         }
+        keys.take(&host.sim);
         let events: Vec<serde_json::Value> = host.sim.drain_events().into_iter().filter(|e| viewer.side().map(|s| e.side.map(|es| es == s).unwrap_or(true)).unwrap_or(true)).map(|e| json!({ "clock": format!("{}", e.t), "kind": e.kind, "text": e.text })).collect();
         if !events.is_empty() {
             send(&out, json!({ "kind": "events", "events": events }));
         }
-        send(&out, json!({ "kind": "frame", "frame": host.sim.view(viewer) }));
+        let live = host.sim.now().secs();
+        match scrub {
+            Some(t) => {
+                if let Some((ft, f)) = keys.at(t, viewer) {
+                    let _ = out.send(format!(r#"{{"kind":"frame","scrub":true,"t":{},"live":{live},"frame":{f}}}"#, ft.secs()));
+                }
+            }
+            None => send(&out, json!({ "kind": "frame", "t": live, "live": live, "frame": host.sim.view(viewer) })),
+        }
         if waiting.is_empty() {
             send(&out, json!({ "kind": "questions", "questions": [] }));
         }
@@ -203,8 +305,8 @@ async fn main() -> Result<()> {
     let (out, _) = broadcast::channel(256);
     let (to_game, inbox) = mpsc::channel();
     let game_out = out.clone();
-    let person = a.person;
-    std::thread::spawn(move || game(host, person, inbox, game_out));
+    let cfg = GameConfig { person: a.person, record: a.record, keyframe_s: a.keyframe_s };
+    std::thread::spawn(move || game(host, cfg, inbox, game_out));
     let app = Router::new().route("/", get(|| async { Html(VIEWER) })).route("/ws", get(ws)).with_state(AppState { out, to_game });
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], a.port));
     eprintln!("bgws-server: open http://{addr}/");

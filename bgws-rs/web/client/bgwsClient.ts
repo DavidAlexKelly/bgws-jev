@@ -18,9 +18,22 @@ export interface FeedEvent {
   text: string;
 }
 
+/**
+ * A view of the game. `t` is the frame's simulated seconds and `live` the
+ * game's; `scrub` marks a keyframe shown while looking back.
+ */
+export interface FrameMsg {
+  kind: "frame";
+  frame: FrameView;
+  t: number;
+  live: number;
+  scrub?: boolean;
+}
+
 /** What the server sends. */
 export type Outbound =
-  | { kind: "frame"; frame: FrameView }
+  | FrameMsg
+  | { kind: "branched"; t: number }
   | { kind: "events"; events: FeedEvent[] }
   | { kind: "questions"; questions: Question[] }
   | { kind: "status"; text: string };
@@ -33,10 +46,16 @@ export type Inbound =
   | { kind: "viewer"; viewer: Viewer }
   | { kind: "answer"; question: number; choice: string }
   | { kind: "command"; side: Side; plan: unknown }
-  | { kind: "seat"; side: Side; seat: "planner" | "person" | "rules" };
+  | { kind: "seat"; side: Side; seat: "planner" | "person" | "rules" }
+  | { kind: "seek"; t: number }
+  | { kind: "live" }
+  | { kind: "branch"; t: number }
+  | { kind: "save" };
 
 export interface ClientHandlers {
-  onFrame?: (frame: FrameView) => void;
+  onFrame?: (frame: FrameView, at: { t: number; live: number; scrub: boolean }) => void;
+  /** The game restarted at `t`: drop anything shown from after it. */
+  onBranched?: (t: number) => void;
   onEvents?: (events: FeedEvent[]) => void;
   onQuestions?: (questions: Question[]) => void;
   onStatus?: (text: string) => void;
@@ -67,7 +86,10 @@ export class BgwsClient {
     switch (m.kind) {
       case "frame":
         this.frame = m.frame;
-        this.handlers.onFrame?.(m.frame);
+        this.handlers.onFrame?.(m.frame, { t: m.t, live: m.live, scrub: !!m.scrub });
+        break;
+      case "branched":
+        this.handlers.onBranched?.(m.t);
         break;
       case "events":
         this.handlers.onEvents?.(m.events);
@@ -111,6 +133,22 @@ export class BgwsClient {
   /** Who sits in a side's HQ seat. */
   seat(side: Side, seat: "planner" | "person" | "rules"): void {
     this.send({ kind: "seat", side, seat });
+  }
+  /** Look back to the keyframe at or before `t` simulated seconds (pauses the game). */
+  seek(t: number): void {
+    this.send({ kind: "seek", t });
+  }
+  /** Back to the live game. */
+  live(): void {
+    this.send({ kind: "live" });
+  }
+  /** "What if": restart the game at `t` by replaying its record there, then play on. */
+  branch(t: number): void {
+    this.send({ kind: "branch", t });
+  }
+  /** Write the game record on the server (`--record`). */
+  save(): void {
+    this.send({ kind: "save" });
   }
   close(): void {
     this.ws.close();

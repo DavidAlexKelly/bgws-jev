@@ -12,10 +12,15 @@
   @media (prefers-color-scheme: dark) { :root { --bg: #151514; --fg: #ecece8; --muted: #9a9a94; --panel: #1f1f1dee; --line: #34342f; } }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; }
   #map { position: absolute; inset: 0; }
-  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .panel { box-sizing: border-box; position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
   #controls { top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100% - 48px); }
   #controls button, #controls select { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
   #clock { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 90px; }
+  #clock.scrub { color: var(--blue); }
+  #timeline { flex: 1 1 160px; min-width: 120px; }
+  /* The controls stop short of the feed; on a narrow screen the feed drops below them. */
+  @media (min-width: 900px) { #controls { max-width: calc(100% - 420px); } }
+  @media (max-width: 899px) { #feed { top: 150px; max-height: 30vh; } }
   #feed { right: 12px; top: 12px; width: min(380px, calc(100% - 48px)); max-height: 45vh; overflow: auto; }
   #feed div { border-bottom: 1px solid var(--line); padding: 3px 0; }
   #feed .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
@@ -33,6 +38,10 @@
   <button id="play">Play</button>
   <select id="speed"><option>1</option><option>2</option><option selected>10</option><option>60</option><option>600</option></select>
   <select id="viewer"><option value="umpire">Umpire (truth)</option><option value="blue">Blue view</option><option value="red">Red view</option></select>
+  <input id="timeline" type="range" min="0" max="0" step="1" value="0" title="Drag to look back through the game">
+  <button id="live" title="Back to the live game">Live</button>
+  <button id="branch" title="Restart the game from the moment shown and play on">Branch here</button>
+  <button id="save" title="Write the game record on the server">Save</button>
   <span id="status" class="muted">connecting…</span>
 </div>
 <div id="feed" class="panel"></div>
@@ -40,7 +49,7 @@
 <div id="inspect" class="panel"></div>
 <script>
 const SIDE = { blue: [47, 111, 214], red: [200, 64, 47], neutral: [120, 120, 110] };
-let frame = null, playing = false, first = true;
+let frame = null, playing = false, first = true, shownT = 0, dragging = false;
 // MapLibre + deck.gl when they load; a plain canvas when offline.
 const online = typeof maplibregl !== "undefined" && typeof deck !== "undefined";
 let map = null, overlay = null;
@@ -61,12 +70,30 @@ ws.onopen = () => { document.getElementById("status").textContent = "connected";
 ws.onclose = () => (document.getElementById("status").textContent = "disconnected");
 ws.onmessage = (m) => {
   const msg = JSON.parse(m.data);
-  if (msg.kind === "frame") render(msg.frame);
+  if (msg.kind === "frame") { timeline(msg); render(msg.frame); }
+  else if (msg.kind === "branched") { document.getElementById("feed").innerHTML = ""; setPlaying(false); }
   else if (msg.kind === "events") feed(msg.events);
   else if (msg.kind === "questions") questions(msg.questions);
   else if (msg.kind === "status") document.getElementById("status").textContent = msg.text;
 };
-document.getElementById("play").onclick = () => { playing = !playing; document.getElementById("play").textContent = playing ? "Pause" : "Play"; send({ kind: playing ? "play" : "pause" }); };
+function setPlaying(p) { playing = p; document.getElementById("play").textContent = playing ? "Pause" : "Play"; }
+document.getElementById("play").onclick = () => { setPlaying(!playing); send({ kind: playing ? "play" : "pause" }); };
+// The timeline: drag to look back (keyframes), Live to return, Branch to play on from there.
+const tl = document.getElementById("timeline");
+tl.oninput = () => { dragging = true; setPlaying(false); send({ kind: "seek", t: Number(tl.value) }); };
+tl.onchange = () => { dragging = false; };
+document.getElementById("live").onclick = () => send({ kind: "live" });
+document.getElementById("branch").onclick = () => {
+  if (confirm(`Restart the game from ${document.getElementById("clock").textContent}? Everything after it is replaced.`)) send({ kind: "branch", t: shownT });
+};
+document.getElementById("save").onclick = () => send({ kind: "save" });
+function timeline(msg) {
+  shownT = msg.t;
+  tl.max = Math.max(1, Math.floor(msg.live));
+  if (!dragging) tl.value = Math.floor(msg.t);
+  document.getElementById("clock").classList.toggle("scrub", !!msg.scrub);
+  document.getElementById("branch").disabled = !msg.scrub;
+}
 document.getElementById("speed").onchange = (e) => send({ kind: "speed", speed: Number(e.target.value) });
 document.getElementById("viewer").onchange = (e) => send({ kind: "viewer", viewer: e.target.value });
 
