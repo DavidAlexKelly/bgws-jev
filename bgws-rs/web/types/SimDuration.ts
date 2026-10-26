@@ -3,4 +3,4 @@
 /**
  * A length of simulated time in microseconds.
  */
-export type SimDuration = bigint;
+export type SimDuration = number;

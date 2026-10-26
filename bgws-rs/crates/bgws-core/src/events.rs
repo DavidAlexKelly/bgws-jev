@@ -28,7 +28,7 @@ pub struct LogEvent {
     pub data: serde_json::Value,
 }
 
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, type = "number"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct Fingerprint(pub u64);

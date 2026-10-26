@@ -3,4 +3,4 @@
 /**
  * A point in simulated time, in microseconds since the scenario's start.
  */
-export type SimTime = bigint;
+export type SimTime = number;

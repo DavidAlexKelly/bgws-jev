@@ -7,13 +7,13 @@ use std::ops::{Add, AddAssign, Sub};
 pub const MICROS_PER_SECOND: i64 = 1_000_000;
 
 /// A point in simulated time, in microseconds since the scenario's start.
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, type = "number"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct SimTime(pub i64);
 
 /// A length of simulated time in microseconds.
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, type = "number"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct SimDuration(pub i64);

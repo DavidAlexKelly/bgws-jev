@@ -7,7 +7,7 @@ use crate::time::{SimDuration, SimTime};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, type = "number"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct QuestionId(pub u64);

@@ -54,6 +54,10 @@ enum Inbound {
     Speed { speed: f64 },
     Viewer { viewer: Viewer },
     Answer { question: u64, choice: String },
+    /// A person's plan for a side (the orders schema), sent over its HQ's nets.
+    Command { side: Side, plan: serde_json::Value },
+    /// Who sits in a side's HQ seat.
+    Seat { side: Side, seat: bgws_sim::SeatKind },
 }
 
 #[derive(Clone)]
@@ -92,6 +96,14 @@ fn game(mut host: Host, person: Option<Side>, inbox: mpsc::Receiver<Inbound>, ou
                 Inbound::Pause => playing = false,
                 Inbound::Speed { speed: s } => speed = s.clamp(0.1, 10_000.0),
                 Inbound::Viewer { viewer: v } => viewer = v,
+                Inbound::Command { side, plan } => {
+                    if let Err(e) = host.sim.command(side, plan.clone()) {
+                        send(&out, json!({ "kind": "status", "text": format!("plan rejected: {e}") }));
+                    } else {
+                        host.record.push_command(host.sim.now(), "person", Some(side), plan);
+                    }
+                }
+                Inbound::Seat { side, seat } => host.sim.set_seat(side, seat),
                 Inbound::Answer { question, choice } => {
                     if let Some(q) = waiting.remove(&QuestionId(question)) {
                         if q.has_option(&choice) {
