@@ -72,6 +72,8 @@ export interface ClientHandlers {
   onStatus?: (text: string) => void;
 }
 
+const STATUSES = ["ok", "suppressed", "pinned", "broken", "destroyed"];
+
 /** A connection to a running `bgws-server`. */
 export class BgwsClient {
   private ws: WebSocket;
@@ -86,10 +88,11 @@ export class BgwsClient {
   constructor(url: string, handlers: ClientHandlers = {}) {
     this.handlers = handlers;
     this.ws = new WebSocket(url);
+    this.ws.binaryType = "arraybuffer";
     this.ws.onopen = () => {
       for (const m of this.queue.splice(0)) this.ws.send(JSON.stringify(m));
     };
-    this.ws.onmessage = (ev) => this.receive(JSON.parse(String(ev.data)) as Outbound);
+    this.ws.onmessage = (ev) => (ev.data instanceof ArrayBuffer ? this.positions(ev.data) : this.receive(JSON.parse(String(ev.data)) as Outbound));
     this.ws.onclose = () => this.handlers.onStatus?.("disconnected");
   }
 
@@ -119,6 +122,32 @@ export class BgwsClient {
         this.handlers.onStatus?.(m.text);
         break;
     }
+  }
+
+  /**
+   * Positions between full frames, applied to the last frame: little-endian
+   * `u8 1, f64 t, u32 n`, then per entity `u32 id, f64 lat, f64 lon, f32 alt,
+   * f32 heading, u8 status`.
+   */
+  private positions(buf: ArrayBuffer): void {
+    const f = this.frame;
+    if (!f) return;
+    const v = new DataView(buf);
+    if (v.getUint8(0) !== 1) return;
+    const t = v.getFloat64(1, true);
+    const n = v.getUint32(9, true);
+    const byId = new Map(f.entities.map((e) => [e.id, e]));
+    for (let i = 0, o = 13; i < n; i++, o += 29) {
+      const e = byId.get(v.getUint32(o, true));
+      if (!e) continue;
+      e.lat = v.getFloat64(o + 4, true);
+      e.lon = v.getFloat64(o + 12, true);
+      e.alt = v.getFloat32(o + 20, true);
+      e.heading_deg = v.getFloat32(o + 24, true);
+      e.status = STATUSES[v.getUint8(o + 28)] ?? e.status;
+    }
+    f.t = t;
+    this.handlers.onFrame?.(f, { t, live: t, scrub: false });
   }
 
   private send(m: Inbound): void {

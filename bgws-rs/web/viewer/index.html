@@ -104,7 +104,28 @@ const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") +
 const send = (msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 ws.onopen = () => { document.getElementById("status").textContent = "connected"; send({ kind: "viewer", viewer: document.getElementById("viewer").value }); };
 ws.onclose = () => (document.getElementById("status").textContent = "disconnected");
+ws.binaryType = "arraybuffer";
+// Positions between full frames (u8 1, f64 t, u32 n; then u32 id, f64 lat, f64 lon, f32 alt, f32 heading, u8 status).
+const STATUS = ["ok", "suppressed", "pinned", "broken", "destroyed"];
+function clockOf(t) { const s = Math.floor(t), ms = Math.round((t - s) * 1000); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((x) => String(x).padStart(2, "0")).join(":") + "." + String(ms).padStart(3, "0"); }
+function applyPositions(buf) {
+  if (!frame) return;
+  const v = new DataView(buf);
+  if (v.getUint8(0) !== 1) return;
+  const t = v.getFloat64(1, true), n = v.getUint32(9, true), byId = new Map(frame.entities.map((e) => [e.id, e]));
+  for (let i = 0, o = 13; i < n; i++, o += 29) {
+    const e = byId.get(v.getUint32(o, true));
+    if (!e) continue;
+    e.lat = v.getFloat64(o + 4, true); e.lon = v.getFloat64(o + 12, true);
+    e.alt = v.getFloat32(o + 20, true); e.heading_deg = v.getFloat32(o + 24, true);
+    e.status = STATUS[v.getUint8(o + 28)] || e.status;
+  }
+  frame.t = t; frame.clock = clockOf(t);
+  timeline({ t, live: t, scrub: false });
+  render(frame);
+}
 ws.onmessage = (m) => {
+  if (m.data instanceof ArrayBuffer) return applyPositions(m.data);
   const msg = JSON.parse(m.data);
   if (msg.kind === "frame") { timeline(msg); render(msg.frame); }
   else if (msg.kind === "branched") { document.getElementById("feed").innerHTML = ""; setPlaying(false); }

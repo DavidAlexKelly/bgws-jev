@@ -136,7 +136,7 @@ struct GameConfig {
 
 #[derive(Clone)]
 struct AppState {
-    out: broadcast::Sender<String>,
+    out: broadcast::Sender<Out>,
     to_game: mpsc::Sender<Inbound>,
 }
 
@@ -200,6 +200,41 @@ fn detection_text(x: &serde_json::Value) -> String {
     t
 }
 
+/// What goes to the browsers: JSON messages, or binary position updates.
+#[derive(Clone, Debug)]
+enum Out {
+    Text(String),
+    Bin(Vec<u8>),
+}
+
+/// How often a full frame goes out while the units on the map stay the same.
+const FULL_FRAME_EVERY: Duration = Duration::from_secs(1);
+
+/// Positions since the last full frame, as typed arrays (§16): little-endian
+/// `u8 1, f64 t, u32 n`, then per entity `u32 id, f64 lat, f64 lon, f32 alt,
+/// f32 heading, u8 status` (0 ok, 1 suppressed, 2 pinned, 3 broken, 4 destroyed).
+fn positions(t: f64, f: &bgws_sim::FrameView) -> Vec<u8> {
+    let mut b = Vec::with_capacity(13 + 29 * f.entities.len());
+    b.push(1u8);
+    b.extend_from_slice(&t.to_le_bytes());
+    b.extend_from_slice(&(f.entities.len() as u32).to_le_bytes());
+    for e in &f.entities {
+        b.extend_from_slice(&e.id.to_le_bytes());
+        b.extend_from_slice(&e.lat.to_le_bytes());
+        b.extend_from_slice(&e.lon.to_le_bytes());
+        b.extend_from_slice(&(e.alt as f32).to_le_bytes());
+        b.extend_from_slice(&(e.heading_deg as f32).to_le_bytes());
+        b.push(match e.status.as_str() {
+            "suppressed" => 1,
+            "pinned" => 2,
+            "broken" => 3,
+            "destroyed" => 4,
+            _ => 0,
+        });
+    }
+    b
+}
+
 /// Does this viewer see this event? The umpire sees all; a side sees its own and unsided ones.
 fn visible(viewer: Viewer, e: &bgws_core::LogEvent) -> bool {
     viewer.side().is_none_or(|s| e.side.is_none_or(|es| es == s))
@@ -207,10 +242,11 @@ fn visible(viewer: Viewer, e: &bgws_core::LogEvent) -> bool {
 
 /// The game thread: the sim never waits on the network or the UI in wall
 /// time; it waits in simulated time for answers (§3.2).
-fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<String>) {
+fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<Out>) {
     let person = cfg.person;
     let mut keys = Keyframes { every: SimDuration::from_secs(cfg.keyframe_s), frames: Vec::new() };
     let mut scrub: Option<SimTime> = None;
+    let mut last_full: Option<(Instant, Viewer, Vec<u32>)> = None;
     // Every event so far, for the inspectors (`why`, `review`).
     let mut log: Vec<bgws_core::LogEvent> = Vec::new();
     let mut playing = false;
@@ -220,8 +256,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
     let mut held: Vec<Answer> = Vec::new();
     let mut held_at = SimTime::ZERO;
     let tick = Duration::from_millis(100);
-    let send = |out: &broadcast::Sender<String>, v: serde_json::Value| {
-        let _ = out.send(v.to_string());
+    let send = |out: &broadcast::Sender<Out>, v: serde_json::Value| {
+        let _ = out.send(Out::Text(v.to_string()));
     };
     send(&out, json!({ "kind": "status", "text": "ready: press Play" }));
     loop {
@@ -308,6 +344,7 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                         waiting.clear();
                         held.clear();
                         keys.frames.clear();
+                        last_full = None;
                         log.clear();
                         send(&out, json!({ "kind": "branched", "t": 0.0 }));
                         send(&out, json!({ "kind": "status", "text": format!("loaded {}: press Play", host.record.scenario.name) }));
@@ -334,6 +371,7 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                             waiting.clear();
                             held.clear();
                             keys.truncate_after(at);
+                            last_full = None;
                             log.retain(|e| e.t <= at);
                             send(&out, json!({ "kind": "branched", "t": at.secs() }));
                             send(&out, json!({ "kind": "status", "text": format!("branched at {at}: press Play") }));
@@ -401,10 +439,23 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
         match scrub {
             Some(t) => {
                 if let Some((ft, f)) = keys.at(t, viewer) {
-                    let _ = out.send(format!(r#"{{"kind":"frame","scrub":true,"t":{},"live":{live},"frame":{f}}}"#, ft.secs()));
+                    let _ = out.send(Out::Text(format!(r#"{{"kind":"frame","scrub":true,"t":{},"live":{live},"frame":{f}}}"#, ft.secs())));
+                    last_full = None;
                 }
             }
-            None => send(&out, json!({ "kind": "frame", "t": live, "live": live, "frame": host.sim.view(viewer) })),
+            None => {
+                // A full frame when the units on the map change, the viewer
+                // changes, or a second has passed; else positions only.
+                let f = host.sim.view(viewer);
+                let ids: Vec<u32> = f.entities.iter().map(|e| e.id).collect();
+                let fresh = last_full.as_ref().is_some_and(|(at, v, prev)| at.elapsed() < FULL_FRAME_EVERY && *v == viewer && *prev == ids);
+                if fresh {
+                    let _ = out.send(Out::Bin(positions(live, &f)));
+                } else {
+                    send(&out, json!({ "kind": "frame", "t": live, "live": live, "frame": f }));
+                    last_full = Some((Instant::now(), viewer, ids));
+                }
+            }
         }
         if waiting.is_empty() {
             send(&out, json!({ "kind": "questions", "questions": [] }));
@@ -433,7 +484,11 @@ async fn client(socket: WebSocket, st: AppState) {
         }
     });
     while let Ok(msg) = feed.recv().await {
-        if tx.send(Message::Text(msg)).await.is_err() {
+        let m = match msg {
+            Out::Text(t) => Message::Text(t),
+            Out::Bin(b) => Message::Binary(b),
+        };
+        if tx.send(m).await.is_err() {
             break;
         }
     }

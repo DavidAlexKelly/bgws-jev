@@ -112,7 +112,10 @@ fallbacks decide and the log says why.
 ### Known gaps
 
 - **No Tauri desktop shell:** this environment has no WebKitGTK. The host runs
-  in-process in `bgws-server` and the viewer is a web page.
+  in-process in `bgws-server` and the viewer is a web page. The channel is
+  the one §16 describes: JSON commands one way; full frames when the units on
+  the map change (or once a second) and binary position updates between
+  them (about 20× smaller) the other.
 - **The React screens** from the TypeScript build are not wired to the Rust host
   yet. `web/client/bgwsClient.ts` is the typed boundary they would bind to. A
   `RunnerHandle` adapter would map frames onto the TS engine's `RtState`.
