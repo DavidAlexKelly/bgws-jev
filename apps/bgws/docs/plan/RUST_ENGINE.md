@@ -815,5 +815,5 @@ The engine is built in `bgws-rs/` (see `bgws-rs/README.md` for commands, crates 
   - Event logs are JSONL rather than DuckDB.
   - The catalogue loads from embedded JSON rather than SQLite.
   - Missiles and air defence are modelled at the engagement level: kinematic flights, per-shot kill probabilities and kill chains, with no guidance-law or seeker models.
-  - The React screens are not yet wired to the Rust host: the server's own pages cover the views above, and the typed client (`web/client`) is the boundary the React screens would bind to. The Behaviour Manager is read-only (templates are edited as files).
+  - The React screens reach the Rust engine through `RustRunner` (a `RunnerHandle` over `bgws-server`'s WebSocket) rather than a `TauriRunner`; the server's deciders decide, and the screens' own Jev and commander do not. The Behaviour Manager page is read-only (templates are edited as files).
 

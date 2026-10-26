@@ -116,9 +116,16 @@ fallbacks decide and the log says why.
   the one §16 describes: JSON commands one way; full frames when the units on
   the map change (or once a second) and binary position updates between
   them (about 20× smaller) the other.
-- **The React screens** from the TypeScript build are not wired to the Rust host
-  yet. `web/client/bgwsClient.ts` is the typed boundary they would bind to. A
-  `RunnerHandle` adapter would map frames onto the TS engine's `RtState`.
+- **The React screens** play on the Rust engine through `RustRunner`
+  (`apps/bgws/realtime/engine/rustRunner.ts`), the screens' `RunnerHandle` over
+  `bgws-server`'s WebSocket: tick "Play in the Rust engine" under Advanced:
+  engine. The screen's scenario is loaded into the server, the screen runs the
+  clock, and frames and events are written onto its own state and log, so its
+  map, feed, overlays and HQ console work unchanged. Differences: the server's
+  deciders decide (not the screen's Jev or commander), ground is generated
+  there, Rust-only things (drones in flight, the physics views) are on the
+  server's own viewer, and an engage or wait order becomes overwatch. The
+  screen takes a side's HQ seat when it gives that side orders.
 - **Snapshots** are JSON for inspection, not restorable state. A game
   restarts from a moment by replaying its record there (`bgws branch`, or
   *Branch here* on the server's timeline), which is exact: a branch played on
