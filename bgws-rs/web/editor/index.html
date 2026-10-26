@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scenario editor</title>
+<style>
+  /* The scenario editor (RUST_ENGINE.md §16): start from a shipped scenario,
+     set the theatre, time, weather and duration, place forces from the
+     catalogue, check it and save it, or load it into the running game.
+     Served by bgws-server at /editor. */
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --border: rgba(11, 11, 11, 0.12); --blue: #2f6fd6; --red: #c8402f; --neutral: #78786e; --bad: #d03b3b; --good: #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) { color-scheme: dark; --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --line: #2c2c2a; --border: rgba(255, 255, 255, 0.12); }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --line: #2c2c2a; --border: rgba(255, 255, 255, 0.12); }
+  html, body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; height: 100vh; }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; height: auto; } #map { height: 60vh; } }
+  aside { overflow: auto; padding: 14px; border-right: 1px solid var(--line); background: var(--surface); }
+  h1 { font-size: 18px; margin: 0 0 10px; }
+  h2 { font-size: 14px; margin: 16px 0 6px; color: var(--ink-2); }
+  label { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; color: var(--ink-2); }
+  input, select, button { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--page); color: var(--ink); min-width: 0; }
+  button { cursor: pointer; background: var(--surface); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td, th { padding: 3px 4px 3px 0; border-bottom: 1px solid var(--line); text-align: left; }
+  td input, td select { width: 100%; box-sizing: border-box; }
+  tr.sel td { background: var(--line); }
+  #status { font-size: 13px; white-space: pre-wrap; margin-top: 8px; }
+  #status.bad { color: var(--bad); } #status.good { color: var(--good); }
+  #map { position: relative; min-height: 300px; }
+  #map canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  #hint { position: absolute; left: 12px; top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Scenario editor</h1>
+    <label>Start from <select id="preset"></select></label>
+    <label>Name <input id="name"></label>
+    <label>Duration (min) <input id="duration" type="number" min="5" step="5"></label>
+    <label>Start (UTC) <input id="start" type="datetime-local"></label>
+    <label>Weather <select id="weather"></select></label>
+    <label>Ground <select id="ground"><option value="generated">generated</option><option value="raster+relief">raster + relief</option><option value="raster">raster</option></select></label>
+    <label>Theatre pack <input id="pack" placeholder="none (folder under packs/)"></label>
+    <label>Origin <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input id="lat" type="number" step="0.001" aria-label="Origin latitude"><input id="lon" type="number" step="0.001" aria-label="Origin longitude"></span></label>
+    <h2>Forces</h2>
+    <div class="row"><button id="add">Add a force</button><span class="muted" style="color:var(--muted);font-size:12px">Select a row, then click the map to place it.</span></div>
+    <datalist id="platforms"></datalist>
+    <table><thead><tr><th>Id</th><th>Side</th><th>Platform</th><th>Count</th><th>Quality</th><th></th></tr></thead><tbody id="forces"></tbody></table>
+    <h2>Save</h2>
+    <div class="row"><button id="check">Check</button><button id="download">Download JSON</button><button id="load">Load into the game</button></div>
+    <div id="status"></div>
+  </aside>
+  <div id="map"><canvas id="cv"></canvas><div id="hint"></div></div>
+</div>
+<script type="application/json" id="data">__BGWS_DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const $ = (id) => document.getElementById(id);
+const COLOR = { blue: "#2f6fd6", red: "#c8402f", neutral: "#78786e" };
+let sc = null, selected = null;
+const status = (text, kind) => { $("status").textContent = text; $("status").className = kind || ""; };
+
+for (const p of D.presets) $("preset").add(new Option(p.scenario.name, p.id));
+for (const w of D.weather) $("weather").add(new Option(w, w));
+$("platforms").innerHTML = D.platforms.map((p) => `<option value="${p.id}">${p.name} (${p.domain}, ${p.role})</option>`).join("");
+const platformName = new Map(D.platforms.map((p) => [p.id, p.name]));
+
+function loadPreset(id) {
+  sc = JSON.parse(JSON.stringify(D.presets.find((p) => p.id === id).scenario));
+  sc.notes = [...(sc.notes || []), `edited from ${id}`];
+  delete sc.convertedFrom;
+  selected = null;
+  fill();
+}
+function fill() {
+  $("name").value = sc.name;
+  $("duration").value = sc.scope.durationMin;
+  $("start").value = (sc.startUtc || "").slice(0, 16);
+  $("weather").value = (sc.weather && sc.weather.weather) || "clear";
+  $("ground").value = sc.theatre.ground || "generated";
+  $("pack").value = sc.theatre.pack || "";
+  $("lat").value = sc.theatre.origin.lat; $("lon").value = sc.theatre.origin.lon;
+  table(); draw();
+}
+$("preset").onchange = (e) => loadPreset(e.target.value);
+$("name").oninput = (e) => (sc.name = e.target.value);
+$("duration").oninput = (e) => (sc.scope.durationMin = Number(e.target.value));
+$("start").oninput = (e) => (sc.startUtc = e.target.value ? new Date(e.target.value + "Z").toISOString().replace(".000", "") : sc.startUtc);
+$("weather").onchange = (e) => (sc.weather = { source: "preset", weather: e.target.value });
+$("ground").onchange = (e) => (sc.theatre.ground = e.target.value);
+$("pack").oninput = (e) => { if (e.target.value) sc.theatre.pack = e.target.value; else delete sc.theatre.pack; };
+// Moving the origin moves the theatre and every force with it.
+function moveOrigin() {
+  const lat = Number($("lat").value), lon = Number($("lon").value);
+  if (!isFinite(lat) || !isFinite(lon)) return;
+  const dLat = lat - sc.theatre.origin.lat, dLon = lon - sc.theatre.origin.lon;
+  sc.theatre.origin.lat = lat; sc.theatre.origin.lon = lon;
+  if (sc.theatre.bounds) { const b = sc.theatre.bounds; b.south += dLat; b.north += dLat; b.west += dLon; b.east += dLon; }
+  for (const f of sc.forces) { f.position.lat += dLat; f.position.lon += dLon; }
+  draw();
+}
+$("lat").onchange = moveOrigin; $("lon").onchange = moveOrigin;
+
+function table() {
+  const tb = $("forces");
+  tb.innerHTML = "";
+  sc.forces.forEach((f, i) => {
+    const tr = document.createElement("tr");
+    if (i === selected) tr.className = "sel";
+    tr.innerHTML = `<td><input value="${f.id}" data-k="id"></td>
+      <td><select data-k="side">${["blue", "red", "neutral"].map((s) => `<option ${f.side === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td><input list="platforms" value="${f.platform}" data-k="platform" title="${platformName.get(f.platform) || "unknown platform"}"></td>
+      <td><input type="number" min="1" value="${f.count}" data-k="count" style="width:4em"></td>
+      <td><select data-k="quality">${["conscript", "regular", "veteran", "elite"].map((q) => `<option ${(f.quality || "regular") === q ? "selected" : ""}>${q}</option>`).join("")}</select></td>
+      <td><button title="Remove">✕</button></td>`;
+    tr.onclick = (ev) => { if (ev.target.tagName === "BUTTON") return; selected = i; for (const r of tb.children) r.className = ""; tr.className = "sel"; hint(); draw(); };
+    for (const inp of tr.querySelectorAll("[data-k]")) inp.onchange = (ev) => {
+      const k = ev.target.dataset.k;
+      f[k] = k === "count" ? Math.max(1, Number(ev.target.value)) : ev.target.value;
+      if (k === "id") f.label = f.label && f.label !== f.id ? f.label : ev.target.value;
+      draw();
+    };
+    tr.querySelector("button").onclick = () => { sc.forces.splice(i, 1); selected = null; table(); draw(); };
+    tb.appendChild(tr);
+  });
+  hint();
+}
+$("add").onclick = () => {
+  let n = sc.forces.length + 1, id;
+  do { id = `new-${n++}`; } while (sc.forces.some((f) => f.id === id));
+  sc.forces.push({ id, label: id, side: "blue", platform: "generic/mbt", count: 1, quality: "regular", position: { lat: sc.theatre.origin.lat, lon: sc.theatre.origin.lon, h: 0 }, layer: "unit" });
+  selected = sc.forces.length - 1;
+  table(); draw();
+};
+function hint() { $("hint").textContent = selected != null && sc.forces[selected] ? `Click the map to place ${sc.forces[selected].id}` : "Select a force to place it"; }
+
+// The map: a local projection round the origin, fitted to the theatre and the forces.
+let proj = null;
+function draw() {
+  const c = $("cv"), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue("--page"); g.fillRect(0, 0, W, H);
+  const o = sc.theatre.origin, kx = 111320 * Math.cos(o.lat * Math.PI / 180), ky = 111320;
+  const pts = sc.forces.map((f) => [(f.position.lon - o.lon) * kx, (f.position.lat - o.lat) * ky]);
+  const b = sc.theatre.bounds;
+  if (b) pts.push([(b.west - o.lon) * kx, (b.south - o.lat) * ky], [(b.east - o.lon) * kx, (b.north - o.lat) * ky]);
+  pts.push([-2000, -2000], [2000, 2000]);
+  const minX = Math.min(...pts.map((p) => p[0])), maxX = Math.max(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1])), maxY = Math.max(...pts.map((p) => p[1]));
+  const k = 0.9 * Math.min(W / (maxX - minX), H / (maxY - minY)), cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const X = (e) => W / 2 + (e - cx) * k, Y = (n) => H / 2 - (n - cy) * k;
+  proj = { toGeo: (px, py) => ({ lon: o.lon + (cx + (px - W / 2) / k) / kx, lat: o.lat + (cy - (py - H / 2) / k) / ky }) };
+  // A kilometre grid.
+  g.strokeStyle = css.getPropertyValue("--line"); g.lineWidth = 1;
+  // The smallest 1-2-5 step that leaves ~80 px between lines.
+  const want = 80 / k, mag = Math.pow(10, Math.floor(Math.log10(want)));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((x) => x >= want) || 1000;
+  for (let e = Math.floor((cx - W / 2 / k) / step) * step; e < cx + W / 2 / k; e += step) { g.beginPath(); g.moveTo(X(e), 0); g.lineTo(X(e), H); g.stroke(); }
+  for (let n = Math.floor((cy - H / 2 / k) / step) * step; n < cy + H / 2 / k; n += step) { g.beginPath(); g.moveTo(0, Y(n)); g.lineTo(W, Y(n)); g.stroke(); }
+  g.fillStyle = css.getPropertyValue("--muted"); g.font = "11px system-ui"; g.fillText(`grid ${step >= 1000 ? step / 1000 + " km" : step + " m"}`, 10, H - 10);
+  if (b) { g.strokeStyle = css.getPropertyValue("--ink-2"); g.setLineDash([6, 4]); g.strokeRect(X((b.west - o.lon) * kx), Y((b.north - o.lat) * ky), ((b.east - b.west) * kx) * k, ((b.north - b.south) * ky) * k); g.setLineDash([]); }
+  g.strokeStyle = css.getPropertyValue("--muted"); g.beginPath(); g.moveTo(X(0) - 6, Y(0)); g.lineTo(X(0) + 6, Y(0)); g.moveTo(X(0), Y(0) - 6); g.lineTo(X(0), Y(0) + 6); g.stroke();
+  sc.forces.forEach((f, i) => {
+    const px = X((f.position.lon - o.lon) * kx), py = Y((f.position.lat - o.lat) * ky);
+    g.fillStyle = COLOR[f.side] || COLOR.neutral;
+    g.beginPath(); g.arc(px, py, i === selected ? 8 : 6, 0, 2 * Math.PI); g.fill();
+    if (i === selected) { g.strokeStyle = css.getPropertyValue("--ink"); g.lineWidth = 2; g.stroke(); g.lineWidth = 1; }
+    g.fillStyle = css.getPropertyValue("--ink"); g.fillText(`${f.id}${f.count > 1 ? " ×" + f.count : ""}`, px + 10, py - 6);
+  });
+}
+$("cv").onclick = (ev) => {
+  if (selected == null || !proj) return;
+  const p = proj.toGeo(ev.offsetX, ev.offsetY), f = sc.forces[selected];
+  f.position = { ...f.position, lat: p.lat, lon: p.lon };
+  draw();
+};
+addEventListener("resize", draw);
+
+// The server checks it and can load it into the running game.
+let ws = null;
+function connect() {
+  if (ws && ws.readyState <= 1) return ws;
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onmessage = (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.kind === "checked") status(msg.errors.length ? "Problems:\n- " + msg.errors.join("\n- ") : (msg.loaded ? "Loaded into the game: open the viewer and press Play." : "No problems found."), msg.errors.length ? "bad" : "good");
+  };
+  return ws;
+}
+function sendWhenOpen(o) { const w = connect(); if (w.readyState === 1) w.send(JSON.stringify(o)); else w.addEventListener("open", () => w.send(JSON.stringify(o)), { once: true }); }
+$("check").onclick = () => { status("checking…"); sendWhenOpen({ kind: "check", scenario: sc }); };
+$("load").onclick = () => { if (confirm("Replace the running game with this scenario?")) { status("loading…"); sendWhenOpen({ kind: "load", scenario: sc }); } };
+$("download").onclick = () => {
+  sc.savedAt = new Date().toISOString();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(sc, null, 2)], { type: "application/json" }));
+  a.download = (sc.name || "scenario").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".json";
+  a.click();
+};
+loadPreset(D.presets[0].id);
+</script>
+</body>
+</html>

@@ -88,6 +88,10 @@ enum Inbound {
     Messages { unit: String },
     /// What a unit sees over the terrain (the viewshed layer; own units in a side view).
     Viewshed { unit: String },
+    /// Check an edited scenario (the editor).
+    Check { scenario: serde_json::Value },
+    /// Replace the game with an edited scenario, same deciders.
+    Load { scenario: serde_json::Value },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -125,6 +129,7 @@ impl Keyframes {
 
 struct GameConfig {
     person: Option<Side>,
+    opts: HostOptions,
     record: PathBuf,
     keyframe_s: f64,
 }
@@ -291,6 +296,25 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                         _ => send(&out, json!({ "kind": "status", "text": "viewshed: not one of your units" })),
                     }
                 }
+                Inbound::Check { scenario } => {
+                    let errors = bgws_run::editor::check(scenario).err().unwrap_or_default();
+                    send(&out, json!({ "kind": "checked", "errors": errors, "loaded": false }));
+                }
+                Inbound::Load { scenario } => match bgws_run::editor::check(scenario).map_err(|e| e.join("; ")).and_then(|sc| Host::new(&sc, sc.seed, default_figures(), &cfg.opts).map_err(|e| e.to_string())) {
+                    Ok(h) => {
+                        host = h;
+                        playing = false;
+                        scrub = None;
+                        waiting.clear();
+                        held.clear();
+                        keys.frames.clear();
+                        log.clear();
+                        send(&out, json!({ "kind": "branched", "t": 0.0 }));
+                        send(&out, json!({ "kind": "status", "text": format!("loaded {}: press Play", host.record.scenario.name) }));
+                        send(&out, json!({ "kind": "checked", "errors": [], "loaded": true }));
+                    }
+                    Err(e) => send(&out, json!({ "kind": "checked", "errors": [e], "loaded": false })),
+                },
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {
                         Ok(()) => format!("saved {}", cfg.record.display()),
@@ -423,16 +447,19 @@ async fn main() -> Result<()> {
     let seed = Seed(a.seed.unwrap_or(sc.seed.0));
     let opts = HostOptions { deciders: a.deciders, sim: SimOptions { flat_ground: a.flat, ..Default::default() }, ..Default::default() };
     // The host owns its own runtime for model calls, so build it off this one.
-    let host = std::thread::spawn(move || Host::new(&sc, seed, default_figures(), &opts)).join().map_err(|_| anyhow!("host setup panicked"))??;
+    let host_opts = opts.clone();
+    let host = std::thread::spawn(move || Host::new(&sc, seed, default_figures(), &host_opts)).join().map_err(|_| anyhow!("host setup panicked"))??;
     let (out, _) = broadcast::channel(256);
     let (to_game, inbox) = mpsc::channel();
     let game_out = out.clone();
-    let cfg = GameConfig { person: a.person, record: a.record, keyframe_s: a.keyframe_s };
+    let cfg = GameConfig { person: a.person, opts: opts.clone(), record: a.record, keyframe_s: a.keyframe_s };
     std::thread::spawn(move || game(host, cfg, inbox, game_out));
     let behaviour = bgws_run::behaviour::builtin_html()?;
+    let editor = bgws_run::editor::html(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios"))?;
     let app = Router::new()
         .route("/", get(|| async { Html(VIEWER) }))
         .route("/behaviour", get(move || async move { Html(behaviour) }))
+        .route("/editor", get(move || async move { Html(editor) }))
         .route("/ws", get(ws))
         .with_state(AppState { out, to_game });
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], a.port));

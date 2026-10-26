@@ -22,7 +22,7 @@ target/release/bgws behaviour --html behaviour.html   # the Behaviour Manager: e
 target/release/bgws compare breach-time --set engineers.breach.rate_mph.line_charge=1000 --html cmp.html   # A/B a figure change
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
-target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/
+target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/ (/editor, /behaviour)
 ```
 
 Deciders: `--deciders rules|jev|claude|local` (or as the scenario says).
@@ -79,7 +79,7 @@ fallbacks decide and the log says why.
 | 7 Logistics, medical, aggregation | Done: logistics, maintenance and medical in the sim (culmination test, evacuation delays in band); level of detail with Lanchester attrition fitted against entity runs; quiet skipping. |
 | 8 Naval and undersea | Done: ships and submarines, radar and sonar, layered defence with magazines, damage control, mines, reload and UNREP. Red Sea vignette in band. |
 | 9 Space, cyber, kill web | Satellites and imagery, GNSS and satcom helpers, scripted space events, cyber access campaigns. |
-| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains in progress, a spectrum view, the per-unit *Why?* inspector, a detection inspector (why a unit sees another or not, with every factor), a link-budget inspector (each message hop by hop: queueing, airtime, attempts, SINR, fallbacks) and the after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`). The full React screens are not yet ported. |
+| 10 People and tools | A person's HQ seat and plans (server); the viewer's timeline scrubber and "what if" branch, layers for sensor footprints, viewsheds, jamming, the nets and kill chains in progress, a spectrum view, the per-unit *Why?* inspector, a detection inspector (why a unit sees another or not, with every factor), a link-budget inspector (each message hop by hop: queueing, airtime, attempts, SINR, fallbacks) and the after-action review (also `bgws aar`, `bgws why`, `bgws branch`); theatre packs (`bgws pack`); a scenario editor (`/editor`: theatre, time, weather, forces from the catalogue placed on a map, checked, saved or loaded into the game); the Behaviour Manager's graph view (`/behaviour`); the analysis workbench (`--html`, `bgws compare`). The full React screens are not yet ported. |
 | 11 Calibration | The vignette suite, sensitivity and the research backlog run; the campaign itself is ongoing. |
 
 ### Performance (this 4-core container, release build)

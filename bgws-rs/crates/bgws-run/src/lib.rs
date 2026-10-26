@@ -9,6 +9,7 @@ pub mod experiments;
 pub mod geotiff;
 pub mod host;
 pub mod behaviour;
+pub mod editor;
 pub mod workbench;
 
 pub use host::{load_scenario, router_for, DeciderChoice, Host, HostOptions, PlayReport};
