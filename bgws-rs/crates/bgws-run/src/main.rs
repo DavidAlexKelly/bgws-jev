@@ -6,7 +6,7 @@
 //!           [--record game.json] [--events events.jsonl] [--flat]
 //! bgws replay <game.json>                 replay a record without calling any model
 //! bgws branch <game.json> --at M [--deciders jev]   "what if": replay to minute M, then play on
-//! bgws pack <dir> --name N --lat --lon      build a theatre pack of synthetic ground
+//! bgws pack <dir> --name N --lat --lon [--dem dem.tif]   build a theatre pack
 //! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
 //! bgws vignettes [--only id] [-n 200]     benchmark vignettes against their bands
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
@@ -99,6 +99,9 @@ enum Cmd {
         cell_m: f64,
         #[arg(long, default_value_t = 1)]
         seed: u64,
+        /// A GeoTIFF DEM (lat/lon grid, e.g. Copernicus GLO-30) for real elevation; land cover stays synthetic.
+        #[arg(long)]
+        dem: Option<PathBuf>,
     },
     /// Play many seeded games with the rules deciders.
     Batch {
@@ -244,12 +247,25 @@ fn main() -> Result<()> {
                 r.save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
-        Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed } => {
+        Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed, dem } => {
             let f = default_figures();
             let n = ((size_km * 1000.0 / cell_m).ceil() as usize + 1).max(16);
             let mut p = bgws_env::SynthParams::new(seed, n, n, cell_m, &f);
             p.frame_origin = bgws_core::Geodetic::new(lat, lon, 0.0);
-            let world = bgws_env::generate(&p, &f);
+            let mut world = bgws_env::generate(&p, &f);
+            // Centre the grid on the frame origin, as generated ground is in the sim.
+            let shift = cell_m * (n as f64 - 1.0) / 2.0;
+            world.terrain.spec.origin_e -= shift;
+            world.terrain.spec.origin_n -= shift;
+            for r in [&mut world.terrain.elevation.spec, &mut world.terrain.land_cover.spec, &mut world.terrain.soil.spec, &mut world.terrain.wetness.spec, &mut world.terrain.obstacle_gap.spec] {
+                r.origin_e = world.terrain.spec.origin_e;
+                r.origin_n = world.terrain.spec.origin_n;
+            }
+            if let Some(path) = dem {
+                let d = bgws_run::geotiff::Dem::read(&path)?;
+                let set = bgws_run::geotiff::apply_dem(&mut world.terrain, &d);
+                eprintln!("DEM {}: {} of {} nodes from the DEM", path.display(), set, n * n);
+            }
             let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
             eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
         }
