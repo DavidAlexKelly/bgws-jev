@@ -160,7 +160,8 @@ pub fn read_tile(bytes: &[u8]) -> Result<Terrain, TileError> {
         Ok(raw)
     };
     let f32s = |name: &str| -> Result<Vec<f32>, TileError> {
-        Ok(layer(name, "f32")?.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect())
+        let b = layer(name, "f32")?;
+        Ok((0..b.len() / 4).map(|i| f32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]])).collect())
     };
     let lc = layer("land_cover", "u8")?
         .into_iter()
