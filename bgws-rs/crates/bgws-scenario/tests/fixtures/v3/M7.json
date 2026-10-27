@@ -1,0 +1,820 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "M7 — Littoral: holding the strait",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "m7-littoral",
+ "ground": {
+  "choice": "generated",
+  "seed": "m7-littoral-ground"
+ },
+ "scope": {
+  "type": "maritime",
+  "durationMin": 1440,
+  "area": {
+   "widthKm": 600,
+   "depthKm": 400
+  },
+  "echelons": {
+   "highest": "component",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "simulated",
+   "fires": "off",
+   "ew": "simulated",
+   "air": "simulated",
+   "airDefence": "simulated",
+   "naval": "simulated",
+   "space": "abstracted",
+   "cyber": "off",
+   "logistics": "abstracted",
+   "medical": "off"
+  },
+  "planners": [
+   "overall",
+   "maritime",
+   "air"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": false,
+   "jev": "nearContact"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "r-asm-1",
+   "label": "Red coastal battery north",
+   "side": "red",
+   "platform": "generic/coastalAsm",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.1101688825009,
+    "lng": 20.90352864848893
+   }
+  },
+  {
+   "id": "r-asm-2",
+   "label": "Red coastal battery south",
+   "side": "red",
+   "platform": "generic/coastalAsm",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.42457779374776,
+    "lng": 20.90352864848893
+   }
+  },
+  {
+   "id": "r-hq",
+   "label": "Red coastal command",
+   "side": "red",
+   "platform": "generic/cp-brigade",
+   "platformCount": 5,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.2,
+    "lng": 21.210665801620785
+   },
+   "commandRating": 3
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "world": {
+  "entities": [
+   {
+    "id": "b-ddg",
+    "owner": "blue",
+    "archetype": "generic/destroyer",
+    "at": {
+     "lat": 54.2,
+     "lng": 18.6
+    },
+    "label": "Blue destroyer",
+    "parent": "b-port",
+    "task": {
+     "kind": "station",
+     "at": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "radiusM": 10000
+    }
+   },
+   {
+    "id": "b-ffg",
+    "owner": "blue",
+    "archetype": "generic/frigate",
+    "at": {
+     "lat": 54.226949335249735,
+     "lng": 18.676784288282967
+    },
+    "label": "Blue frigate",
+    "parent": "b-port",
+    "task": {
+     "kind": "station",
+     "at": {
+      "lat": 54.226949335249735,
+      "lng": 18.676784288282967
+     },
+     "radiusM": 10000
+    }
+   },
+   {
+    "id": "b-port",
+    "owner": "blue",
+    "archetype": "generic/port",
+    "at": {
+     "lat": 54.2,
+     "lng": 16.296471351511073
+    },
+    "label": "Blue naval base"
+   },
+   {
+    "id": "r-uav",
+    "owner": "red",
+    "archetype": "generic/male",
+    "at": {
+     "lat": 54.2,
+     "lng": 19.060705729697787
+    },
+    "altM": 5000,
+    "label": "Red surveillance drone",
+    "task": {
+     "kind": "orbit",
+     "at": {
+      "lat": 54.2,
+      "lng": 18.90713715313186
+     },
+     "radiusM": 5000,
+     "altM": 5000
+    }
+   },
+   {
+    "id": "m-1",
+    "owner": "neutral",
+    "archetype": "generic/merchant",
+    "at": {
+     "lat": 54.46949335249731,
+     "lng": 16.75717708120886
+    },
+    "label": "Bulk carrier",
+    "lane": [
+     {
+      "lat": 54.46949335249731,
+      "lng": 16.75717708120886
+     },
+     {
+      "lat": 54.46949335249731,
+      "lng": 20.135685765659286
+     }
+    ]
+   },
+   {
+    "id": "m-2",
+    "owner": "neutral",
+    "archetype": "generic/merchant",
+    "at": {
+     "lat": 53.930506647502696,
+     "lng": 20.135685765659286
+    },
+    "label": "Container ship",
+    "lane": [
+     {
+      "lat": 53.930506647502696,
+      "lng": 20.135685765659286
+     },
+     {
+      "lat": 53.930506647502696,
+      "lng": 16.75717708120886
+     }
+    ]
+   },
+   {
+    "id": "r-owa-1",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 53.930506647502696,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 1",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-2",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 53.95296442687747,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 2",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-3",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 53.97542220625225,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 3",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-4",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 53.99787998562702,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 4",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-5",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.0203377650018,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 5",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-6",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.042795544376574,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 6",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-7",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.06525332375135,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 7",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-8",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 54.087711103126125,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 8",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-9",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.1101688825009,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 9",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-10",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.132626661875676,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 10",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-11",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.15508444125045,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 11",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-12",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 54.17754222062523,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 12",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-13",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.2,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 13",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-14",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.22245777937478,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 14",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-15",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.244915558749554,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 15",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-16",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 54.26737333812433,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 16",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-17",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.289831117499105,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 17",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-18",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.31228889687388,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 18",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-19",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.334746676248656,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 19",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-20",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 54.35720445562343,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 20",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-21",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.37966223499821,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 21",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-22",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.40212001437298,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 22",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-23",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 54.42457779374776,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Drone 23",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-owa-24",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 54.447035573122534,
+     "lng": 20.826744360205964
+    },
+    "altM": 500,
+    "label": "Decoy 24",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ddg",
+     "aimAt": {
+      "lat": 54.2,
+      "lng": 18.6
+     },
+     "altM": 500
+    }
+   },
+   {
+    "id": "r-usv-1",
+    "owner": "red",
+    "archetype": "generic/usv",
+    "at": {
+     "lat": 54.14610132950054,
+     "lng": 20.442822918791144
+    },
+    "label": "USV 1",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.226949335249735,
+      "lng": 18.676784288282967
+     }
+    }
+   },
+   {
+    "id": "r-usv-2",
+    "owner": "red",
+    "archetype": "generic/usv",
+    "at": {
+     "lat": 54.182033776500184,
+     "lng": 20.442822918791144
+    },
+    "label": "USV 2",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.226949335249735,
+      "lng": 18.676784288282967
+     }
+    }
+   },
+   {
+    "id": "r-usv-3",
+    "owner": "red",
+    "archetype": "generic/usv",
+    "at": {
+     "lat": 54.21796622349982,
+     "lng": 20.442822918791144
+    },
+    "label": "USV 3",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.226949335249735,
+      "lng": 18.676784288282967
+     }
+    }
+   },
+   {
+    "id": "r-usv-4",
+    "owner": "red",
+    "archetype": "generic/usv",
+    "at": {
+     "lat": 54.25389867049947,
+     "lng": 20.442822918791144
+    },
+    "label": "USV 4",
+    "task": {
+     "kind": "strike",
+     "targetId": "b-ffg",
+     "aimAt": {
+      "lat": 54.226949335249735,
+      "lng": 18.676784288282967
+     }
+    }
+   }
+  ],
+  "obstacles": [
+   {
+    "owner": "red",
+    "kind": "seaMines",
+    "at": {
+     "lat": 54.738986704994616,
+     "lng": 20.289254342225213
+    },
+    "widthM": 20000,
+    "depthM": 10000,
+    "bearingDeg": 0,
+    "density": 0.6
+   }
+  ],
+  "sea": {
+   "waters": [
+    [
+     {
+      "lat": 52.40337765001797,
+      "lng": 12.457256937362864
+     },
+     {
+      "lat": 52.40337765001797,
+      "lng": 20.59639149535707
+     },
+     {
+      "lat": 55.99662234998203,
+      "lng": 20.59639149535707
+     },
+     {
+      "lat": 55.99662234998203,
+      "lng": 12.457256937362864
+     }
+    ]
+   ]
+  },
+  "environment": {
+   "startHour": 6,
+   "seaState": 2
+  },
+  "victory": [
+   {
+    "kind": "through",
+    "side": "blue",
+    "ids": [
+     "m-1",
+     "m-2"
+    ],
+    "at": {
+     "lat": 54.46949335249731,
+     "lng": 20.135685765659286
+    },
+    "radiusM": 5000,
+    "count": 1,
+    "label": "Shipping through the strait"
+   }
+  ]
+ }
+}

@@ -1,0 +1,23 @@
+[package]
+name = "bgws-domains"
+description = "Physical models for the joint domains: air and missiles, air defence and weapon-target assignment, naval and undersea, space."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
+petgraph.workspace = true
+pathfinding.workspace = true
+sgp4.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+approx.workspace = true
+rand_chacha.workspace = true

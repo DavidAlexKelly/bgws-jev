@@ -97,6 +97,7 @@ import {
   type Wreck,
 } from "./overlays";
 import { InThreadRunner, spawnWorkerRunner, type HandleOptions, type RunnerHandle } from "./engine/runnerHandle";
+import { RustRunner } from "./engine/rustRunner";
 import { clock, PINNED_AT, SUPPRESSED_AT } from "./engine/timing";
 import type { RtConfig, RtState } from "./engine/types";
 import { configFromSpec, type RtConfigSpec, type RtGroundSpec } from "./engine/configSpec";
@@ -658,6 +659,22 @@ function WorldComponents({ state, id }: { state: RtState; id: string }) {
   );
 }
 
+/** A per-browser setting; storage can be missing or blocked, so it never throws. */
+function readPref(key: string, fallback: string): string {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Not remembered; the setting still holds for this visit.
+  }
+}
+
 export default function RealtimePlay() {
   const [, setParams] = useSearchParams();
   const [phase, setPhase] = useState<Phase>("setup");
@@ -710,6 +727,17 @@ export default function RealtimePlay() {
   const [streamLog, setStreamLog] = useState(true);
   /** Run the engine in a Web Worker (WORKER_AND_SCHEDULER.md step 2). Off by default while it is new. */
   const [useWorker, setUseWorker] = useState(false);
+  /** Play in the Rust engine (bgws-rs) through a running bgws-server, and where it is. Remembered in this browser. */
+  const [useRust, setUseRustState] = useState(() => readPref("bgws.rust", "") === "1");
+  const [rustUrl, setRustUrlState] = useState(() => readPref("bgws.rustUrl", "ws://127.0.0.1:8765/ws"));
+  const setUseRust = (on: boolean) => {
+    setUseRustState(on);
+    writePref("bgws.rust", on ? "1" : "");
+  };
+  const setRustUrl = (url: string) => {
+    setRustUrlState(url);
+    writePref("bgws.rustUrl", url);
+  };
   const [model, setModel] = useState<CommanderModelName>(COMMANDER_MODELS[0]);
   const [blueDirective, setBlueDirective] = useState("");
   const [redDirective, setRedDirective] = useState("");
@@ -851,11 +879,10 @@ export default function RealtimePlay() {
   );
 
   // ── Scenario files ────────────────────────────────────────────────────────
-  const saveScenario = () => {
-    const name = window.prompt("Name this scenario", scenarioBehaviour?.name ?? "My scenario")?.trim();
-    if (!name) return;
+  /** The setup as a scenario file: what Save writes, and what the Rust engine plays. */
+  const currentScenario = (name: string): RealtimeScenario => {
     const { behaviours, behaviourTemplates } = gameBehaviours();
-    const scenario: RealtimeScenario = {
+    return {
       format: SCENARIO_FORMAT,
       version: SCENARIO_VERSION,
       name,
@@ -870,6 +897,14 @@ export default function RealtimePlay() {
       behaviourTemplates: referencedTemplates(behaviours, behaviourTemplates),
       ...(scenarioWorld ? { world: scenarioWorld } : {}),
     };
+  };
+  // start() is a callback: it reads the setup through this, as it is now.
+  const currentScenarioRef = useRef(currentScenario);
+  currentScenarioRef.current = currentScenario;
+  const saveScenario = () => {
+    const name = window.prompt("Name this scenario", scenarioBehaviour?.name ?? "My scenario")?.trim();
+    if (!name) return;
+    const scenario = currentScenario(name);
     const url = URL.createObjectURL(new Blob([JSON.stringify(scenario, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -1155,7 +1190,16 @@ export default function RealtimePlay() {
         }
       : undefined;
     runnerRef.current?.dispose();
-    const runner: RunnerHandle = useWorker
+    let runner: RunnerHandle;
+    if (useRust) {
+      // The game runs in bgws-server; its deciders decide (the Jev and commander settings here do not apply).
+      const rust = new RustRunner(rustUrl, initial, config, currentScenarioRef.current(scenarioBehaviour?.name ?? `game ${gameSeed}`), { onEntry });
+      rust.ready.catch((thrown: unknown) => {
+        setError(thrown instanceof Error ? thrown.message : String(thrown));
+        setPlaying(false);
+      });
+      runner = rust;
+    } else runner = useWorker
       ? spawnWorkerRunner(
           { spec, raster: rasterUsable && raster ? raster.exportGrid() : null, initial, config },
           { deciders, worldDeciders, planners, onEntry },
@@ -1167,7 +1211,7 @@ export default function RealtimePlay() {
     setDraft([]);
     setPhase("running");
     setPlaying(true);
-  }, [makeSpec, rasterUsable, raster, useWorker, useJev, useCommander, model, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
+  }, [makeSpec, rasterUsable, raster, useWorker, useRust, rustUrl, useJev, useCommander, model, jevCall, blueDirective, redDirective, streamLog, gameSeed, stopStream, scenarioBehaviour]);
 
   const reset = useCallback(() => {
     stopStream();
@@ -2062,7 +2106,18 @@ export default function RealtimePlay() {
                 </SideCard>
               ))}
 
-              <Disclosure summary="Advanced: engine" meta={useWorker ? "background thread" : "main thread"}>
+              <Disclosure summary="Advanced: engine" meta={useRust ? "Rust (bgws-server)" : useWorker ? "background thread" : "main thread"}>
+                <Switch
+                  checked={useRust}
+                  onChange={setUseRust}
+                  label="Play in the Rust engine (bgws-server)"
+                  description="The game runs in the Rust engine (bgws-rs) on a bgws-server you have started, with its physics, its nets and its deciders (bgws-server --deciders); this page shows it and sends your orders. Ground is generated there. Drones in flight and the physics views are on the server's own viewer."
+                />
+                {useRust && (
+                  <Field label="Server" hint="Start one with: bgws-server <any scenario> --deciders rules">
+                    <input className="su-input" value={rustUrl} onChange={(e) => setRustUrl(e.target.value)} aria-label="bgws-server WebSocket address" />
+                  </Field>
+                )}
                 <Switch
                   checked={useWorker}
                   onChange={setUseWorker}

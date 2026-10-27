@@ -1,0 +1,1525 @@
+{
+ "$comment": "Munitions (weapons.ts, split into mount and munition, plus the rounds the force lists name). Penetration in mm RHA against range in m; Carleton bx/by in m.",
+ "munitions": [
+  {
+   "id": "apfsds120",
+   "name": "120 mm APFSDS",
+   "kind": "ke",
+   "family": "tank120",
+   "guidance": "none",
+   "flight": "none",
+   "speedMs": 1650,
+   "minRangeM": 0,
+   "maxRangeM": 3000,
+   "pk": 0.6,
+   "cepM": 0,
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 680
+    },
+    {
+     "rangeM": 2000,
+     "mm": 600
+    },
+    {
+     "rangeM": 4000,
+     "mm": 520
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 8000,
+   "structuralHits": 0.03,
+   "decoy": false,
+   "source": "synthetic; TS tankGun 600 mm"
+  },
+  {
+   "id": "atgmTandem",
+   "name": "Tandem ATGM (Javelin/Kornet class)",
+   "kind": "atgm",
+   "family": "atgm",
+   "guidance": "ir",
+   "seeker": {
+    "kind": "iir",
+    "acquisitionM": 4000,
+    "fovDeg": 4
+   },
+   "flight": "pursuit",
+   "speedMs": 180,
+   "minRangeM": 65,
+   "maxRangeM": 4000,
+   "pk": 0.7,
+   "cepM": 1,
+   "warheadKg": 9,
+   "lethalRadiusM": 3,
+   "carleton": {
+    "bxM": 3,
+    "byM": 3
+   },
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 800
+    }
+   ],
+   "topAttack": true,
+   "tandem": true,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 180000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "synthetic; ranges R4.1"
+  },
+  {
+   "id": "he120Mortar",
+   "name": "120 mm mortar bomb, HE",
+   "kind": "mortar",
+   "family": "mortar120",
+   "guidance": "none",
+   "flight": "ballistic",
+   "speedMs": 200,
+   "minRangeM": 500,
+   "maxRangeM": 7000,
+   "pk": 0.3,
+   "cepM": 60,
+   "warheadKg": 2.2,
+   "lethalRadiusM": 40,
+   "carleton": {
+    "bxM": 25,
+    "byM": 35
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 1500,
+   "structuralHits": 0.03,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "he155",
+   "name": "155 mm HE shell",
+   "kind": "shell",
+   "family": "artillery155",
+   "guidance": "none",
+   "flight": "ballistic",
+   "speedMs": 450,
+   "minRangeM": 3000,
+   "maxRangeM": 24000,
+   "pk": 0.35,
+   "cepM": 120,
+   "warheadKg": 10.8,
+   "lethalRadiusM": 50,
+   "carleton": {
+    "bxM": 30,
+    "byM": 45
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 3000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "synthetic; P12 for consumption"
+  },
+  {
+   "id": "pgm155",
+   "name": "155 mm GNSS-guided shell (Excalibur class)",
+   "kind": "shell",
+   "family": "artillery155",
+   "guidance": "gnss",
+   "flight": "glide",
+   "speedMs": 400,
+   "minRangeM": 6000,
+   "maxRangeM": 40000,
+   "pk": 0.6,
+   "cepM": 4,
+   "warheadKg": 10,
+   "lethalRadiusM": 50,
+   "carleton": {
+    "bxM": 30,
+    "byM": 45
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 100000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "P15 (Pk falls under jamming)"
+  },
+  {
+   "id": "gmlrs",
+   "name": "GMLRS-class guided rocket",
+   "kind": "rocket",
+   "family": "rocket",
+   "guidance": "gnss",
+   "flight": "ballistic",
+   "speedMs": 900,
+   "minRangeM": 15000,
+   "maxRangeM": 80000,
+   "pk": 0.7,
+   "cepM": 5,
+   "warheadKg": 90,
+   "lethalRadiusM": 60,
+   "carleton": {
+    "bxM": 40,
+    "byM": 55
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 160000,
+   "structuralHits": 0.15,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "samLong",
+   "name": "Long-range SAM (PAC-3/SM-6 class)",
+   "kind": "sam",
+   "family": "samLong",
+   "guidance": "activeRadar",
+   "seeker": {
+    "kind": "activeRadar",
+    "acquisitionM": 20000,
+    "fovDeg": 30
+   },
+   "flight": "pursuit",
+   "speedMs": 1500,
+   "minRangeM": 3000,
+   "maxRangeM": 160000,
+   "pk": 0.65,
+   "cepM": 0,
+   "warheadKg": 73,
+   "lethalRadiusM": 20,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 4200000,
+   "structuralHits": 0.1,
+   "decoy": false,
+   "source": "P11 (cost), P29 (Pk)"
+  },
+  {
+   "id": "samMedium",
+   "name": "Medium-range SAM (SM-2/NASAMS class)",
+   "kind": "sam",
+   "family": "samMedium",
+   "guidance": "radar",
+   "seeker": {
+    "kind": "radar",
+    "acquisitionM": 15000,
+    "fovDeg": 30
+   },
+   "flight": "pursuit",
+   "speedMs": 1000,
+   "minRangeM": 1500,
+   "maxRangeM": 40000,
+   "pk": 0.6,
+   "cepM": 0,
+   "warheadKg": 62,
+   "lethalRadiusM": 15,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 1000000,
+   "structuralHits": 0.08,
+   "decoy": false,
+   "source": "P11"
+  },
+  {
+   "id": "samShort",
+   "name": "Short-range IR SAM (Stinger/Igla/Verba class)",
+   "kind": "sam",
+   "family": "samShort",
+   "guidance": "ir",
+   "seeker": {
+    "kind": "ir",
+    "acquisitionM": 6000,
+    "fovDeg": 10
+   },
+   "flight": "pursuit",
+   "speedMs": 700,
+   "minRangeM": 300,
+   "maxRangeM": 8000,
+   "pk": 0.5,
+   "cepM": 0,
+   "warheadKg": 3,
+   "lethalRadiusM": 5,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 150000,
+   "structuralHits": 0.04,
+   "decoy": false,
+   "source": "R4.1 (4–6 km)"
+  },
+  {
+   "id": "adShell30",
+   "name": "30–35 mm air-defence round, proximity/AHEAD",
+   "kind": "shell",
+   "family": "cannon30",
+   "guidance": "radar",
+   "flight": "none",
+   "speedMs": 0,
+   "minRangeM": 0,
+   "maxRangeM": 3000,
+   "pk": 0.25,
+   "cepM": 0,
+   "warheadKg": 0.5,
+   "lethalRadiusM": 2,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 2000,
+   "structuralHits": 0.01,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "shot12g",
+   "name": "12-gauge shot against drones",
+   "kind": "smallArms",
+   "family": "smallArms",
+   "guidance": "none",
+   "flight": "none",
+   "speedMs": 0,
+   "minRangeM": 0,
+   "maxRangeM": 60,
+   "pk": 0.2,
+   "cepM": 0,
+   "warheadKg": 0,
+   "lethalRadiusM": 1,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air"
+   ],
+   "costUsd": 5,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "interceptorDrone",
+   "name": "Interceptor drone",
+   "kind": "interceptor",
+   "family": "drone",
+   "guidance": "operator",
+   "seeker": {
+    "kind": "eo",
+    "acquisitionM": 1000,
+    "fovDeg": 30
+   },
+   "flight": "pursuit",
+   "speedMs": 70,
+   "minRangeM": 0,
+   "maxRangeM": 15000,
+   "pk": 0.55,
+   "cepM": 0,
+   "warheadKg": 0.5,
+   "lethalRadiusM": 3,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 6000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "P11 ($1.4–16k)"
+  },
+  {
+   "id": "aamBvr",
+   "name": "Active-radar BVR AAM (AIM-120 class)",
+   "kind": "aam",
+   "family": "aam",
+   "guidance": "activeRadar",
+   "seeker": {
+    "kind": "activeRadar",
+    "acquisitionM": 20000,
+    "fovDeg": 30
+   },
+   "flight": "pursuit",
+   "speedMs": 1200,
+   "minRangeM": 1000,
+   "maxRangeM": 100000,
+   "pk": 0.55,
+   "cepM": 0,
+   "warheadKg": 20,
+   "lethalRadiusM": 12,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air"
+   ],
+   "costUsd": 1100000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "R6.4 (Pk 0.4–0.6)"
+  },
+  {
+   "id": "aamWvr",
+   "name": "IR dogfight AAM (AIM-9X class)",
+   "kind": "aam",
+   "family": "aam",
+   "guidance": "ir",
+   "seeker": {
+    "kind": "ir",
+    "acquisitionM": 15000,
+    "fovDeg": 40
+   },
+   "flight": "pursuit",
+   "speedMs": 900,
+   "minRangeM": 300,
+   "maxRangeM": 15000,
+   "pk": 0.65,
+   "cepM": 0,
+   "warheadKg": 9,
+   "lethalRadiusM": 8,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air"
+   ],
+   "costUsd": 450000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "agm",
+   "name": "Laser-guided AGM (Hellfire class)",
+   "kind": "agm",
+   "family": "agm",
+   "guidance": "laser",
+   "seeker": {
+    "kind": "laser",
+    "acquisitionM": 8000,
+    "fovDeg": 10
+   },
+   "flight": "pursuit",
+   "speedMs": 400,
+   "minRangeM": 500,
+   "maxRangeM": 8000,
+   "pk": 0.75,
+   "cepM": 1,
+   "warheadKg": 9,
+   "lethalRadiusM": 5,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 1000
+    }
+   ],
+   "topAttack": true,
+   "tandem": true,
+   "targets": [
+    "land",
+    "surface"
+   ],
+   "costUsd": 150000,
+   "structuralHits": 0.25,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "glideBomb",
+   "name": "GNSS glide bomb (UMPK/JDAM-ER class)",
+   "kind": "glideBomb",
+   "family": "bomb",
+   "guidance": "gnss",
+   "flight": "glide",
+   "speedMs": 250,
+   "minRangeM": 10000,
+   "maxRangeM": 70000,
+   "pk": 0.6,
+   "cepM": 10,
+   "warheadKg": 250,
+   "lethalRadiusM": 80,
+   "carleton": {
+    "bxM": 60,
+    "byM": 60
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 30000,
+   "structuralHits": 1.2,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "arm",
+   "name": "Anti-radiation missile (HARM class)",
+   "kind": "arm",
+   "family": "missile",
+   "guidance": "antiRadiation",
+   "seeker": {
+    "kind": "antiRadiation",
+    "acquisitionM": 100000,
+    "fovDeg": 30
+   },
+   "flight": "pursuit",
+   "speedMs": 900,
+   "minRangeM": 5000,
+   "maxRangeM": 120000,
+   "pk": 0.6,
+   "cepM": 5,
+   "warheadKg": 66,
+   "lethalRadiusM": 15,
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land",
+    "surface"
+   ],
+   "costUsd": 900000,
+   "structuralHits": 0.3,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "cruiseLand",
+   "name": "Land-attack cruise missile",
+   "kind": "cruise",
+   "family": "missile",
+   "guidance": "gnss",
+   "flight": "cruise",
+   "speedMs": 240,
+   "minRangeM": 20000,
+   "maxRangeM": 1600000,
+   "pk": 0.8,
+   "cepM": 5,
+   "warheadKg": 450,
+   "lethalRadiusM": 40,
+   "carleton": {
+    "bxM": 35,
+    "byM": 35
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land",
+    "surface"
+   ],
+   "costUsd": 2000000,
+   "structuralHits": 1.2,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "srbm",
+   "name": "Short-range ballistic missile",
+   "kind": "ballistic",
+   "family": "missile",
+   "guidance": "inertial",
+   "flight": "ballistic",
+   "speedMs": 1700,
+   "minRangeM": 50000,
+   "maxRangeM": 500000,
+   "pk": 0.7,
+   "cepM": 30,
+   "warheadKg": 480,
+   "lethalRadiusM": 70,
+   "carleton": {
+    "bxM": 45,
+    "byM": 45
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land",
+    "surface"
+   ],
+   "costUsd": 3000000,
+   "structuralHits": 1.5,
+   "decoy": false,
+   "source": "P20, P29"
+  },
+  {
+   "id": "owaWarhead",
+   "name": "One-way attack drone warhead (Shahed class)",
+   "kind": "owa",
+   "family": "drone",
+   "guidance": "gnss",
+   "flight": "cruise",
+   "speedMs": 50,
+   "minRangeM": 20000,
+   "maxRangeM": 1500000,
+   "pk": 0.5,
+   "cepM": 15,
+   "warheadKg": 50,
+   "lethalRadiusM": 25,
+   "carleton": {
+    "bxM": 15,
+    "byM": 15
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 40000,
+   "structuralHits": 0.3,
+   "decoy": false,
+   "source": "P10, P11"
+  },
+  {
+   "id": "fpvHeat",
+   "name": "FPV drone, RPG-warhead (radio link)",
+   "kind": "fpv",
+   "family": "drone",
+   "guidance": "operator",
+   "flight": "pursuit",
+   "speedMs": 30,
+   "minRangeM": 0,
+   "maxRangeM": 15000,
+   "pk": 0.65,
+   "cepM": 0,
+   "warheadKg": 1.5,
+   "lethalRadiusM": 4,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 300
+    }
+   ],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 500,
+   "structuralHits": 0.02,
+   "decoy": false,
+   "source": "P9 (30–50% hit, 60–80% fail to destroy)"
+  },
+  {
+   "id": "loiterHeat",
+   "name": "Loitering munition (Lancet class)",
+   "kind": "loitering",
+   "family": "drone",
+   "guidance": "operator",
+   "seeker": {
+    "kind": "eo",
+    "acquisitionM": 4000,
+    "fovDeg": 20
+   },
+   "flight": "cruise",
+   "speedMs": 30,
+   "minRangeM": 0,
+   "maxRangeM": 40000,
+   "pk": 0.6,
+   "cepM": 0,
+   "warheadKg": 3,
+   "lethalRadiusM": 6,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 500
+    }
+   ],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 35000,
+   "structuralHits": 0.06,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "ascm",
+   "name": "Sea-skimming anti-ship missile",
+   "kind": "asm",
+   "family": "antiShip",
+   "guidance": "activeRadar",
+   "seeker": {
+    "kind": "activeRadar",
+    "acquisitionM": 30000,
+    "fovDeg": 40
+   },
+   "flight": "seaSkim",
+   "speedMs": 280,
+   "minRangeM": 5000,
+   "maxRangeM": 250000,
+   "pk": 0.7,
+   "cepM": 0,
+   "warheadKg": 200,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "surface"
+   ],
+   "costUsd": 1500000,
+   "structuralHits": 1,
+   "decoy": false,
+   "source": "R6.1"
+  },
+  {
+   "id": "heavyTorpedo",
+   "name": "Heavyweight torpedo (Mk 48 class)",
+   "kind": "torpedo",
+   "family": "torpedo",
+   "guidance": "acoustic",
+   "seeker": {
+    "kind": "acoustic",
+    "acquisitionM": 2000,
+    "fovDeg": 60
+   },
+   "flight": "underwater",
+   "speedMs": 25,
+   "minRangeM": 500,
+   "maxRangeM": 40000,
+   "pk": 0.7,
+   "cepM": 0,
+   "warheadKg": 300,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "surface",
+    "subsurface"
+   ],
+   "costUsd": 3500000,
+   "structuralHits": 2,
+   "decoy": false,
+   "source": "R6.3 (38–50 km Mk 48)"
+  },
+  {
+   "id": "ciws20",
+   "name": "20 mm CIWS burst",
+   "kind": "shell",
+   "family": "ciws",
+   "guidance": "radar",
+   "flight": "none",
+   "speedMs": 0,
+   "minRangeM": 0,
+   "maxRangeM": 2000,
+   "pk": 0.35,
+   "cepM": 0,
+   "warheadKg": 0,
+   "lethalRadiusM": 1,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "targets": [
+    "air",
+    "munition"
+   ],
+   "costUsd": 10000,
+   "structuralHits": 0.01,
+   "decoy": false,
+   "source": "P28 (1.5–2 km layer)"
+  },
+  {
+   "id": "he127",
+   "name": "127 mm naval HE shell",
+   "kind": "shell",
+   "family": "artillery155",
+   "guidance": "none",
+   "flight": "ballistic",
+   "speedMs": 700,
+   "minRangeM": 1000,
+   "maxRangeM": 24000,
+   "pk": 0.3,
+   "cepM": 80,
+   "warheadKg": 3.6,
+   "lethalRadiusM": 30,
+   "carleton": {
+    "bxM": 25,
+    "byM": 35
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land",
+    "surface",
+    "air"
+   ],
+   "costUsd": 2000,
+   "structuralHits": 0.05,
+   "decoy": false,
+   "source": "synthetic"
+  },
+  {
+   "id": "fpvFibre",
+   "name": "FPV drone on a fibre spool",
+   "kind": "fpv",
+   "family": "drone",
+   "guidance": "fibre",
+   "flight": "pursuit",
+   "speedMs": 30,
+   "minRangeM": 0,
+   "maxRangeM": 20000,
+   "pk": 0.65,
+   "cepM": 0,
+   "warheadKg": 1.5,
+   "lethalRadiusM": 4,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 300
+    }
+   ],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 500,
+   "structuralHits": 0.02,
+   "decoy": false,
+   "source": "P8 (spools ≤20 km typical, 41 km record)"
+  },
+  {
+   "warheadKg": 1.5,
+   "lethalRadiusM": 8,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 480
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "heat120",
+   "name": "120 mm HEAT-MP",
+   "kind": "heat",
+   "family": "tank120",
+   "speedMs": 1140,
+   "maxRangeM": 3000,
+   "pk": 0.5,
+   "carleton": {
+    "bxM": 6,
+    "byM": 6
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 5000,
+   "source": "synthetic"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 480
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "apfsdsSrc480",
+   "name": "Main gun round (L6 profile: templated 480 mm)",
+   "kind": "ke",
+   "family": "tank120",
+   "speedMs": 1600,
+   "maxRangeM": 3000,
+   "pk": 0.6,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 8000,
+   "source": "[SIM] L6 bgws_capability_profile best_pen_mm_1000m, read 2026-09-13; templated across most rows"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 700
+    },
+    {
+     "rangeM": 1000,
+     "mm": 657
+    },
+    {
+     "rangeM": 2000,
+     "mm": 615
+    },
+    {
+     "rangeM": 3000,
+     "mm": 575
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "charm3",
+   "name": "120 mm L27A1 APFSDS (CHARM 3 class)",
+   "kind": "ke",
+   "family": "tank120",
+   "speedMs": 1650,
+   "maxRangeM": 3000,
+   "pk": 0.6,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 9000,
+   "source": "curated L7 protection table via forceList var_11_default (657 mm)"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 880
+    },
+    {
+     "rangeM": 1000,
+     "mm": 848
+    },
+    {
+     "rangeM": 2000,
+     "mm": 810
+    },
+    {
+     "rangeM": 3000,
+     "mm": 770
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "m829",
+   "name": "120 mm M829A3/A4 APFSDS",
+   "kind": "ke",
+   "family": "tank120",
+   "speedMs": 1550,
+   "maxRangeM": 3000,
+   "pk": 0.6,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 10000,
+   "source": "curated via forceList var_1_default (848 mm)"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 800
+    },
+    {
+     "rangeM": 1000,
+     "mm": 750
+    },
+    {
+     "rangeM": 2000,
+     "mm": 638
+    },
+    {
+     "rangeM": 3000,
+     "mm": 550
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "apfsds125",
+   "name": "125 mm APFSDS (3BM60 class)",
+   "kind": "ke",
+   "family": "tank125",
+   "speedMs": 1660,
+   "maxRangeM": 3000,
+   "pk": 0.6,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 7000,
+   "source": "curated via forceList var_22_1/var_23_1 (750 mm at 1 km, 638 at 2 km)"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 420
+    },
+    {
+     "rangeM": 1000,
+     "mm": 390
+    },
+    {
+     "rangeM": 2000,
+     "mm": 360
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "apfsds100",
+   "name": "100 mm APFSDS (T-55)",
+   "kind": "ke",
+   "family": "tank100",
+   "speedMs": 1500,
+   "maxRangeM": 3000,
+   "pk": 0.5,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 3000,
+   "source": "curated via forceList var_20_default (390 mm)"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 60
+    },
+    {
+     "rangeM": 1500,
+     "mm": 50
+    },
+    {
+     "rangeM": 3000,
+     "mm": 40
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "apds30Rarden",
+   "name": "30 mm Rarden APDS",
+   "kind": "ke",
+   "family": "cannon30",
+   "speedMs": 1175,
+   "maxRangeM": 3000,
+   "pk": 0.3,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 200,
+   "source": "curated via forceList var_27_default (50 mm)"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 120
+    },
+    {
+     "rangeM": 1000,
+     "mm": 100
+    },
+    {
+     "rangeM": 2000,
+     "mm": 80
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "apfsds30",
+   "name": "30 mm APFSDS",
+   "kind": "ke",
+   "family": "cannon30",
+   "speedMs": 1400,
+   "maxRangeM": 2000,
+   "pk": 0.3,
+   "targets": [
+    "land",
+    "air"
+   ],
+   "costUsd": 300,
+   "source": "synthetic; TS snapshots.ts cannon30 90 mm"
+  },
+  {
+   "warheadKg": 0.05,
+   "lethalRadiusM": 4,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "he30",
+   "name": "30 mm HE",
+   "kind": "he",
+   "family": "cannon30",
+   "speedMs": 1000,
+   "maxRangeM": 4000,
+   "pk": 0.2,
+   "carleton": {
+    "bxM": 4,
+    "byM": 4
+   },
+   "targets": [
+    "land",
+    "air"
+   ],
+   "costUsd": 100,
+   "source": "synthetic"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "ball556",
+   "name": "5.56 mm ball",
+   "kind": "smallArms",
+   "family": "smallArms",
+   "speedMs": 900,
+   "maxRangeM": 600,
+   "pk": 0.02,
+   "targets": [
+    "land",
+    "air"
+   ],
+   "costUsd": 0.5,
+   "source": "synthetic; TS snapshots.ts apers 600 m on foot"
+  },
+  {
+   "warheadKg": 0,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "ball762",
+   "name": "7.62 mm ball (MG)",
+   "kind": "smallArms",
+   "family": "smallArms",
+   "speedMs": 830,
+   "maxRangeM": 1800,
+   "pk": 0.03,
+   "targets": [
+    "land",
+    "air"
+   ],
+   "costUsd": 1,
+   "source": "synthetic; sustained-fire 1,800 m (forceList sec_uk_gpmg_sf)"
+  },
+  {
+   "warheadKg": 1.5,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 500
+    }
+   ],
+   "topAttack": false,
+   "tandem": true,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "heatRpg",
+   "name": "RPG-7 tandem HEAT (PG-7VR class)",
+   "kind": "heat",
+   "family": "lightAt",
+   "speedMs": 120,
+   "maxRangeM": 500,
+   "pk": 0.5,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 500,
+   "source": "R4.1 (RPG-7 200–300 m effective); curated forceList 500 mm"
+  },
+  {
+   "warheadKg": 1.8,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 420
+    }
+   ],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 0,
+   "flight": "none",
+   "guidance": "none",
+   "id": "heat84",
+   "name": "84 mm recoilless HEAT (AT4/Carl Gustaf class)",
+   "kind": "heat",
+   "family": "lightAt",
+   "speedMs": 255,
+   "maxRangeM": 300,
+   "pk": 0.5,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 1500,
+   "source": "curated forceList sec_us_mech_sqd (300 m, 420 mm)"
+  },
+  {
+   "warheadKg": 1.8,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 500
+    }
+   ],
+   "topAttack": true,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 0,
+   "minRangeM": 20,
+   "flight": "pursuit",
+   "guidance": "inertial",
+   "id": "nlaw",
+   "name": "NLAW (top attack, PLOS)",
+   "kind": "atgm",
+   "family": "atgm",
+   "speedMs": 200,
+   "maxRangeM": 800,
+   "pk": 0.65,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 40000,
+   "source": "R4.1 (NLAW ~800 m); curated forceList sec_uk_armd_inf"
+  },
+  {
+   "seeker": {
+    "kind": "iir",
+    "acquisitionM": 2500,
+    "fovDeg": 4
+   },
+   "warheadKg": 8.4,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 750
+    }
+   ],
+   "topAttack": true,
+   "tandem": true,
+   "decoy": false,
+   "structuralHits": 0.05,
+   "cepM": 0,
+   "minRangeM": 65,
+   "flight": "pursuit",
+   "guidance": "ir",
+   "id": "javelin",
+   "name": "Javelin (top attack, IIR)",
+   "kind": "atgm",
+   "family": "atgm",
+   "speedMs": 140,
+   "maxRangeM": 2500,
+   "pk": 0.75,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 200000,
+   "source": "R4.1 (2.5–4 km); curated forceList sec_uk_javelin (750 mm)"
+  },
+  {
+   "warheadKg": 7,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 1200
+    }
+   ],
+   "topAttack": false,
+   "tandem": true,
+   "decoy": false,
+   "structuralHits": 0.05,
+   "cepM": 0,
+   "minRangeM": 100,
+   "flight": "pursuit",
+   "guidance": "laser",
+   "id": "kornet",
+   "name": "Kornet (laser beam-riding)",
+   "kind": "atgm",
+   "family": "atgm",
+   "speedMs": 250,
+   "maxRangeM": 5500,
+   "pk": 0.7,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 30000,
+   "source": "R4.1 (5.5–8 km); curated forceList sec_ru_at (1,200 mm)"
+  },
+  {
+   "warheadKg": 6,
+   "lethalRadiusM": 0,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 800
+    }
+   ],
+   "topAttack": false,
+   "tandem": true,
+   "decoy": false,
+   "structuralHits": 0.05,
+   "cepM": 0,
+   "minRangeM": 65,
+   "flight": "pursuit",
+   "guidance": "wire",
+   "id": "atgmTow",
+   "name": "TOW-class wire-guided ATGM",
+   "kind": "atgm",
+   "family": "atgm",
+   "speedMs": 280,
+   "maxRangeM": 2000,
+   "pk": 0.7,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 90000,
+   "source": "[SIM] L6 profile tankmodels/sw_pvrbv_551 (2,000 m, 800 mm)"
+  },
+  {
+   "warheadKg": 0.7,
+   "lethalRadiusM": 25,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 50,
+   "minRangeM": 100,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "he81Mortar",
+   "name": "81 mm mortar bomb, HE",
+   "kind": "mortar",
+   "family": "mortar81",
+   "speedMs": 180,
+   "maxRangeM": 5650,
+   "pk": 0.25,
+   "carleton": {
+    "bxM": 15,
+    "byM": 20
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 800,
+   "source": "curated forceList sec_uk_mortar (5,650 m)"
+  },
+  {
+   "warheadKg": 0.4,
+   "lethalRadiusM": 20,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.03,
+   "cepM": 55,
+   "minRangeM": 100,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "he82Mortar",
+   "name": "82 mm mortar bomb, HE",
+   "kind": "mortar",
+   "family": "mortar81",
+   "speedMs": 170,
+   "maxRangeM": 4000,
+   "pk": 0.25,
+   "carleton": {
+    "bxM": 15,
+    "byM": 18
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 500,
+   "source": "curated forceList sec_ru_mortar (4,000 m)"
+  },
+  {
+   "warheadKg": 0.5,
+   "lethalRadiusM": 5,
+   "penetration": [
+    {
+     "rangeM": 0,
+     "mm": 100
+    }
+   ],
+   "topAttack": true,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0.01,
+   "cepM": 2,
+   "minRangeM": 0,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "droneGrenade",
+   "name": "Drone-dropped grenade/bomblet (VOG/PG-7 based)",
+   "kind": "droneDrop",
+   "family": "drone",
+   "speedMs": 40,
+   "maxRangeM": 10000,
+   "pk": 0.3,
+   "carleton": {
+    "bxM": 3,
+    "byM": 3
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 100,
+   "source": "synthetic"
+  },
+  {
+   "warheadKg": 250,
+   "lethalRadiusM": 80,
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 1.2,
+   "cepM": 30,
+   "minRangeM": 0,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "bomb500",
+   "name": "500 kg general-purpose bomb",
+   "kind": "bomb",
+   "family": "bomb",
+   "speedMs": 250,
+   "maxRangeM": 10000,
+   "pk": 0.5,
+   "carleton": {
+    "bxM": 60,
+    "byM": 60
+   },
+   "targets": [
+    "land",
+    "surface"
+   ],
+   "costUsd": 5000,
+   "source": "synthetic"
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "core/infantry",
+  "version": 1,
+  "name": "Infantry",
+  "archetype": "foot",
+  "parent": "core/default",
+  "doctrine": "Infantry fights from cover and concealment. It holds ground, works with the units around it, and avoids being caught in the open by armour or indirect fire."
+}

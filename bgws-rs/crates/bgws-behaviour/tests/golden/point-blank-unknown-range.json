@@ -1,0 +1,63 @@
+{
+  "scene": {
+    "name": "point-blank-unknown-range",
+    "candidates": [
+      "custom/point-blank"
+    ],
+    "trigger": "D1",
+    "facts": {
+      "enemy.rangeM": null,
+      "self.class": "armoured_vehicle"
+    }
+  },
+  "template": "custom/point-blank",
+  "lineage": [
+    "custom/point-blank",
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D1",
+    "title": "New contact",
+    "question": "It has found an enemy it did not know about. What now?",
+    "doctrine": [],
+    "options": [
+      {
+        "id": "keep",
+        "action": "land.carryOn",
+        "bias": 0
+      },
+      {
+        "id": "wait",
+        "action": "land.waitFor",
+        "bias": 0
+      },
+      {
+        "id": "better",
+        "action": "land.betterPosition",
+        "bias": 0
+      },
+      {
+        "id": "observe",
+        "action": "land.observe",
+        "bias": 0
+      },
+      {
+        "id": "pullBack",
+        "action": "land.pullBackToFriends",
+        "bias": 0
+      }
+    ],
+    "fallback": "keep",
+    "dropped": [
+      {
+        "id": "engage",
+        "action": "land.engageNow",
+        "why": "condition"
+      }
+    ],
+    "path": [
+      "D1"
+    ]
+  }
+}

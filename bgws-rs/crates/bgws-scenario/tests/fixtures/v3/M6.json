@@ -1,0 +1,815 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "M6 — Sustained offensive",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "m6-sustained",
+ "ground": {
+  "choice": "generated",
+  "seed": "m6-sustained-ground"
+ },
+ "scope": {
+  "type": "sustainedOffensive",
+  "durationMin": 4320,
+  "area": {
+   "widthKm": 60,
+   "depthKm": 200
+  },
+  "echelons": {
+   "highest": "division",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "simulated",
+   "fires": "simulated",
+   "ew": "simulated",
+   "air": "abstracted",
+   "airDefence": "simulated",
+   "naval": "off",
+   "space": "abstracted",
+   "cyber": "off",
+   "logistics": "simulated",
+   "medical": "simulated"
+  },
+  "planners": [
+   "overall",
+   "land",
+   "sustainment"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": true,
+   "jev": "nearContact"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "b-div",
+   "label": "Division main HQ",
+   "side": "blue",
+   "platform": "generic/cp-division",
+   "platformCount": 8,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.91254042400288,
+    "lng": 18.6
+   },
+   "commandRating": 4
+  },
+  {
+   "id": "b-bde-1",
+   "label": "1 Brigade HQ",
+   "side": "blue",
+   "platform": "generic/cp-brigade",
+   "platformCount": 5,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.96643909450234,
+    "lng": 18.507858854060444
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-1a-hq",
+   "label": "1A Battalion HQ",
+   "side": "blue",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.00237154150198,
+    "lng": 18.46946670991896
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-1a-1",
+   "label": "1A tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.45718122379369
+   }
+  },
+  {
+   "id": "b-1a-2",
+   "label": "1A mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.481752196044237
+   }
+  },
+  {
+   "id": "b-1a-3",
+   "label": "1A mech reserve",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.01135465325189,
+    "lng": 18.46946670991896
+   }
+  },
+  {
+   "id": "b-1b-hq",
+   "label": "1B Battalion HQ",
+   "side": "blue",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.00237154150198,
+    "lng": 18.546250998201927
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-1b-1",
+   "label": "1B tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.53396551207665
+   }
+  },
+  {
+   "id": "b-1b-2",
+   "label": "1B mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.558536484327202
+   }
+  },
+  {
+   "id": "b-1b-3",
+   "label": "1B mech reserve",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.01135465325189,
+    "lng": 18.546250998201927
+   }
+  },
+  {
+   "id": "b-1-guns",
+   "label": "1 Brigade artillery",
+   "side": "blue",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.930506647502696,
+    "lng": 18.507858854060444
+   }
+  },
+  {
+   "id": "b-1-shorad",
+   "label": "1 Brigade SHORAD",
+   "side": "blue",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.98440531800216,
+    "lng": 18.507858854060444
+   }
+  },
+  {
+   "id": "b-1-isr",
+   "label": "1 Brigade ISR",
+   "side": "blue",
+   "platform": "generic/droneIsrTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.02932087675171,
+    "lng": 18.507858854060444
+   }
+  },
+  {
+   "id": "b-bde-2",
+   "label": "2 Brigade HQ",
+   "side": "blue",
+   "platform": "generic/cp-brigade",
+   "platformCount": 5,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.96643909450234,
+    "lng": 18.69214114593956
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-2a-hq",
+   "label": "2A Battalion HQ",
+   "side": "blue",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.00237154150198,
+    "lng": 18.653749001798076
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-2a-1",
+   "label": "2A tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.6414635156728
+   }
+  },
+  {
+   "id": "b-2a-2",
+   "label": "2A mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.66603448792335
+   }
+  },
+  {
+   "id": "b-2a-3",
+   "label": "2A mech reserve",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.01135465325189,
+    "lng": 18.653749001798076
+   }
+  },
+  {
+   "id": "b-2b-hq",
+   "label": "2B Battalion HQ",
+   "side": "blue",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.00237154150198,
+    "lng": 18.73053329008104
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "b-2b-1",
+   "label": "2B tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.718247803955766
+   }
+  },
+  {
+   "id": "b-2b-2",
+   "label": "2B mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.0203377650018,
+    "lng": 18.742818776206313
+   }
+  },
+  {
+   "id": "b-2b-3",
+   "label": "2B mech reserve",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.01135465325189,
+    "lng": 18.73053329008104
+   }
+  },
+  {
+   "id": "b-2-guns",
+   "label": "2 Brigade artillery",
+   "side": "blue",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.930506647502696,
+    "lng": 18.69214114593956
+   }
+  },
+  {
+   "id": "b-2-shorad",
+   "label": "2 Brigade SHORAD",
+   "side": "blue",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.98440531800216,
+    "lng": 18.69214114593956
+   }
+  },
+  {
+   "id": "b-2-isr",
+   "label": "2 Brigade ISR",
+   "side": "blue",
+   "platform": "generic/droneIsrTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.02932087675171,
+    "lng": 18.69214114593956
+   }
+  },
+  {
+   "id": "b-convoy-1",
+   "label": "Divisional transport 1",
+   "side": "blue",
+   "platform": "generic/convoyTruck",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.804743083003956,
+    "lng": 18.58464314234341
+   }
+  },
+  {
+   "id": "b-convoy-2",
+   "label": "Divisional transport 2",
+   "side": "blue",
+   "platform": "generic/convoyTruck",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.804743083003956,
+    "lng": 18.615356857656593
+   }
+  },
+  {
+   "id": "b-amb-1",
+   "label": "Divisional ambulances",
+   "side": "blue",
+   "platform": "generic/medevac",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.81372619475387,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-bde",
+   "label": "Red brigade HQ",
+   "side": "red",
+   "platform": "generic/cp-brigade",
+   "platformCount": 5,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.46949335249731,
+    "lng": 18.6
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "r-x-hq",
+   "label": "Red X Battalion HQ",
+   "side": "red",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.34372978799856,
+    "lng": 18.492501996403853
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "r-x-1",
+   "label": "Red X1 platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.46946670991896
+   }
+  },
+  {
+   "id": "r-x-2",
+   "label": "Red X2 platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.51553728288874
+   }
+  },
+  {
+   "id": "r-x-at",
+   "label": "Red X ATGM",
+   "side": "red",
+   "platform": "generic/atgmTeam",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.28084800574919,
+    "lng": 18.492501996403853
+   }
+  },
+  {
+   "id": "r-x-tanks",
+   "label": "Red X counter-attack",
+   "side": "red",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.31678045274884,
+    "lng": 18.492501996403853
+   }
+  },
+  {
+   "id": "r-y-hq",
+   "label": "Red Y Battalion HQ",
+   "side": "red",
+   "platform": "generic/cp-battalion",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.34372978799856,
+    "lng": 18.70749800359615
+   },
+   "commandRating": 3
+  },
+  {
+   "id": "r-y-1",
+   "label": "Red Y1 platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.684462717111263
+   }
+  },
+  {
+   "id": "r-y-2",
+   "label": "Red Y2 platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.73053329008104
+   }
+  },
+  {
+   "id": "r-y-at",
+   "label": "Red Y ATGM",
+   "side": "red",
+   "platform": "generic/atgmTeam",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.28084800574919,
+    "lng": 18.70749800359615
+   }
+  },
+  {
+   "id": "r-y-tanks",
+   "label": "Red Y counter-attack",
+   "side": "red",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.31678045274884,
+    "lng": 18.70749800359615
+   }
+  },
+  {
+   "id": "r-guns",
+   "label": "Red artillery",
+   "side": "red",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.415594681997845,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-fpv",
+   "label": "Red FPV team",
+   "side": "red",
+   "platform": "generic/fpvTeamRf",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.307797340998924,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-convoy",
+   "label": "Red transport",
+   "side": "red",
+   "platform": "generic/convoyTruck",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.61322314049587,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-amb",
+   "label": "Red ambulances",
+   "side": "red",
+   "platform": "generic/medevac",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.60424002874596,
+    "lng": 18.6
+   }
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "world": {
+  "hqs": [
+   {
+    "id": "blue-div",
+    "side": "blue",
+    "echelon": "division",
+    "postId": "b-div",
+    "subordinates": [
+     "blue-bde-1",
+     "blue-bde-2"
+    ],
+    "planner": "land",
+    "seat": "heuristic"
+   },
+   {
+    "id": "blue-bde-1",
+    "side": "blue",
+    "echelon": "brigade",
+    "postId": "b-bde-1",
+    "parent": "blue-div",
+    "subordinates": [
+     "blue-1a",
+     "blue-1b",
+     "b-1-guns",
+     "b-1-shorad",
+     "b-1-isr"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-div"
+   },
+   {
+    "id": "blue-1a",
+    "side": "blue",
+    "echelon": "battalion",
+    "postId": "b-1a-hq",
+    "parent": "blue-bde-1",
+    "subordinates": [
+     "b-1a-1",
+     "b-1a-2",
+     "b-1a-3"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-bde-1"
+   },
+   {
+    "id": "blue-1b",
+    "side": "blue",
+    "echelon": "battalion",
+    "postId": "b-1b-hq",
+    "parent": "blue-bde-1",
+    "subordinates": [
+     "b-1b-1",
+     "b-1b-2",
+     "b-1b-3"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-bde-1"
+   },
+   {
+    "id": "blue-bde-2",
+    "side": "blue",
+    "echelon": "brigade",
+    "postId": "b-bde-2",
+    "parent": "blue-div",
+    "subordinates": [
+     "blue-2a",
+     "blue-2b",
+     "b-2-guns",
+     "b-2-shorad",
+     "b-2-isr"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-div"
+   },
+   {
+    "id": "blue-2a",
+    "side": "blue",
+    "echelon": "battalion",
+    "postId": "b-2a-hq",
+    "parent": "blue-bde-2",
+    "subordinates": [
+     "b-2a-1",
+     "b-2a-2",
+     "b-2a-3"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-bde-2"
+   },
+   {
+    "id": "blue-2b",
+    "side": "blue",
+    "echelon": "battalion",
+    "postId": "b-2b-hq",
+    "parent": "blue-bde-2",
+    "subordinates": [
+     "b-2b-1",
+     "b-2b-2",
+     "b-2b-3"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "blue-bde-2"
+   },
+   {
+    "id": "red-bde",
+    "side": "red",
+    "echelon": "brigade",
+    "postId": "r-bde",
+    "subordinates": [
+     "red-x",
+     "red-y",
+     "r-guns",
+     "r-fpv"
+    ],
+    "planner": "land",
+    "seat": "heuristic"
+   },
+   {
+    "id": "red-x",
+    "side": "red",
+    "echelon": "battalion",
+    "postId": "r-x-hq",
+    "parent": "red-bde",
+    "subordinates": [
+     "r-x-1",
+     "r-x-2",
+     "r-x-at",
+     "r-x-tanks"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "red-bde"
+   },
+   {
+    "id": "red-y",
+    "side": "red",
+    "echelon": "battalion",
+    "postId": "r-y-hq",
+    "parent": "red-bde",
+    "subordinates": [
+     "r-y-1",
+     "r-y-2",
+     "r-y-at",
+     "r-y-tanks"
+    ],
+    "planner": "land",
+    "seat": "heuristic",
+    "alternate": "red-bde"
+   }
+  ],
+  "entities": [
+   {
+    "id": "b-depot",
+    "owner": "blue",
+    "archetype": "generic/depot",
+    "at": {
+     "lat": 53.79575997125404,
+     "lng": 18.6
+    },
+    "label": "Blue divisional depot"
+   },
+   {
+    "id": "b-rail",
+    "owner": "blue",
+    "archetype": "generic/railhead",
+    "at": {
+     "lat": 53.03219547251168,
+     "lng": 18.6
+    },
+    "label": "Blue railhead"
+   },
+   {
+    "id": "r-depot",
+    "owner": "red",
+    "archetype": "generic/depot",
+    "at": {
+     "lat": 54.63118936399569,
+     "lng": 18.6
+    },
+    "label": "Red brigade depot"
+   },
+   {
+    "id": "r-rail",
+    "owner": "red",
+    "archetype": "generic/railhead",
+    "at": {
+     "lat": 55.45763564498743,
+     "lng": 18.6
+    },
+    "label": "Red railhead"
+   }
+  ],
+  "obstacles": [
+   {
+    "owner": "red",
+    "kind": "minefield",
+    "at": {
+     "lat": 54.25389867049947,
+     "lng": 18.492501996403853
+    },
+    "widthM": 5000,
+    "depthM": 300,
+    "bearingDeg": 0,
+    "density": 0.4
+   },
+   {
+    "owner": "red",
+    "kind": "minefield",
+    "at": {
+     "lat": 54.25389867049947,
+     "lng": 18.70749800359615
+    },
+    "widthM": 5000,
+    "depthM": 300,
+    "bearingDeg": 0,
+    "density": 0.4
+   }
+  ],
+  "environment": {
+   "startHour": 5
+  }
+ }
+}

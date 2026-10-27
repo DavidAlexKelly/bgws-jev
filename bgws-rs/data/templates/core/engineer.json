@@ -1,0 +1,10 @@
+{
+  "id": "core/engineer",
+  "version": 1,
+  "name": "Combat engineers",
+  "parent": "core/default",
+  "doctrine": "Engineers breach obstacles for the force and lay them against the enemy. They work under cover of the force's fire.",
+  "bias": {
+    "breach": 2
+  }
+}

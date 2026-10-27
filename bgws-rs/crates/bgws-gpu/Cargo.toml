@@ -1,0 +1,27 @@
+[package]
+name = "bgws-gpu"
+description = "wgpu device, WGSL kernels, CPU twins of each, the kernel test harness."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+rayon.workspace = true
+bytemuck.workspace = true
+libm.workspace = true
+wgpu = { workspace = true, optional = true }
+pollster = { workspace = true, optional = true }
+
+[features]
+default = []
+gpu = ["dep:wgpu", "dep:pollster"]
+
+[dev-dependencies]
+proptest.workspace = true
+approx.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

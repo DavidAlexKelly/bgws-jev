@@ -1,0 +1,18 @@
+[package]
+name = "bgws-scenario"
+description = "Scenario, scope, game record and template formats; the v3 converter."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+bgws-catalogue.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+approx.workspace = true

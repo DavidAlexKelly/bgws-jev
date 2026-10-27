@@ -1,0 +1,54 @@
+{
+  "scene": {
+    "name": "branchy-steady-strong",
+    "candidates": [
+      "custom/branchy"
+    ],
+    "trigger": "D2",
+    "facts": {
+      "self.cohesion": "steady",
+      "self.strength": 0.9
+    }
+  },
+  "template": "custom/branchy",
+  "lineage": [
+    "custom/branchy"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "fight",
+    "title": "Fired on",
+    "question": "Answer the fire?",
+    "doctrine": [
+      "Hold on or hold out."
+    ],
+    "options": [
+      {
+        "id": "returnFire",
+        "action": "land.returnFire",
+        "bias": 1
+      },
+      {
+        "id": "assault",
+        "action": "land.assault",
+        "when": {
+          "fact": "self.strength",
+          "op": ">",
+          "value": 0.8
+        },
+        "bias": 0
+      },
+      {
+        "id": "pullBack",
+        "action": "land.outOfSight",
+        "bias": 0
+      }
+    ],
+    "fallback": "returnFire",
+    "dropped": [],
+    "path": [
+      "fired",
+      "fight"
+    ]
+  }
+}

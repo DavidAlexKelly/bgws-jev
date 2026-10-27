@@ -1,0 +1,7 @@
+{
+  "id": "core/recce",
+  "version": 1,
+  "name": "Reconnaissance",
+  "parent": "core/default",
+  "doctrine": "Reconnaissance finds the enemy and reports it without being found. It fights only to get away."
+}

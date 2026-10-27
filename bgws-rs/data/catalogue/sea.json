@@ -1,0 +1,985 @@
+{
+ "$comment": "Ships and submarines (generic.ts SEA); the destroyer's missiles are in a VLS mount. Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/corvette",
+   "name": "Missile corvette",
+   "class": "warship",
+   "domain": "surface",
+   "role": "Littoral strike and patrol.",
+   "sidc": "SFSPCLFF",
+   "template": "core/warship",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "surface",
+    "maxKmh": 56,
+    "cruiseKmh": 30.800000000000004,
+    "fuelCapacityL": 150000,
+    "burnMovingLph": 2500,
+    "burnIdleLph": 400
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 60,
+    "stayingPower": 1.5,
+    "massT": 1500,
+    "lengthM": 80,
+    "widthM": 11,
+    "heightM": 20
+   },
+   "signatures": {
+    "index": {
+     "visual": 1.5,
+     "ir": 1.5
+    },
+    "rcs": {
+     "x": {
+      "front": 800
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 130
+      },
+      {
+       "kmh": 30.800000000000004,
+       "db": 145
+      },
+      {
+       "kmh": 56,
+       "db": 160
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "x",
+     "rangeMaxM": 80000,
+     "scanS": 3,
+     "heightM": 15,
+     "radar": {
+      "gainDb": 34,
+      "pulsesIntegrated": 100
+     }
+    },
+    {
+     "kind": "esm",
+     "band": "s",
+     "rangeMaxM": 150000,
+     "heightM": 15,
+     "esm": {
+      "freqMinHz": 500000000,
+      "freqMaxHz": 18000000000,
+      "sensitivityDbm": -65,
+      "dfRmsDeg": 3
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 15000,
+     "heightM": 15
+    }
+   ],
+   "mounts": [
+    {
+     "id": "samShort",
+     "kind": "samShort",
+     "munitions": [
+      "samShort"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 6
+    },
+    {
+     "id": "ciws",
+     "kind": "ciws",
+     "munitions": [
+      "ciws20"
+     ],
+     "salvo": 1,
+     "magazine": 30,
+     "reloadS": 2
+    },
+    {
+     "id": "ascm",
+     "kind": "ascm",
+     "munitions": [
+      "ascm"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 20
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "uhf"
+    },
+    {
+     "bearer": "tdl"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "x",
+     "erpW": 100000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samShort": 16,
+     "ciws20": 1000,
+     "ascm": 8
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 200000000,
+   "rationale": "Small, fast, short on defence.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/destroyer",
+   "name": "Air-defence destroyer",
+   "class": "warship",
+   "domain": "surface",
+   "role": "Area air and missile defence for a task group.",
+   "sidc": "SFSPCLDD",
+   "template": "core/warship",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "surface",
+    "maxKmh": 56,
+    "cruiseKmh": 30.800000000000004,
+    "fuelCapacityL": 1500000,
+    "burnMovingLph": 15000,
+    "burnIdleLph": 2000
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 300,
+    "stayingPower": 4,
+    "massT": 9000,
+    "lengthM": 155,
+    "widthM": 20,
+    "heightM": 35
+   },
+   "signatures": {
+    "index": {
+     "visual": 3,
+     "ir": 3
+    },
+    "rcs": {
+     "x": {
+      "front": 5000
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 145
+      },
+      {
+       "kmh": 30.800000000000004,
+       "db": 160
+      },
+      {
+       "kmh": 56,
+       "db": 175
+      }
+     ]
+    },
+    "visual": {
+     "criticalDimM": 26
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "s",
+     "rangeMaxM": 300000,
+     "scanS": 3,
+     "heightM": 25,
+     "radar": {
+      "gainDb": 42,
+      "pulsesIntegrated": 32,
+      "beamwidthDeg": 1.7
+     }
+    },
+    {
+     "kind": "esm",
+     "band": "s",
+     "rangeMaxM": 400000,
+     "heightM": 30,
+     "esm": {
+      "freqMinHz": 500000000,
+      "freqMaxHz": 18000000000,
+      "sensitivityDbm": -70,
+      "dfRmsDeg": 2
+     }
+    },
+    {
+     "kind": "sonarActive",
+     "rangeMaxM": 20000
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 20000,
+     "heightM": 25
+    }
+   ],
+   "mounts": [
+    {
+     "id": "vls",
+     "kind": "vls",
+     "munitions": [
+      "samLong",
+      "samMedium",
+      "cruiseLand"
+     ],
+     "salvo": 2,
+     "magazine": 96,
+     "reloadS": 5
+    },
+    {
+     "id": "ascm",
+     "kind": "ascm",
+     "munitions": [
+      "ascm"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 20
+    },
+    {
+     "id": "ciws",
+     "kind": "ciws",
+     "munitions": [
+      "ciws20"
+     ],
+     "salvo": 1,
+     "magazine": 30,
+     "reloadS": 2
+    },
+    {
+     "id": "navalGun",
+     "kind": "howitzer",
+     "munitions": [
+      "he127"
+     ],
+     "salvo": 2,
+     "magazine": 300,
+     "reloadS": 4
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "uhf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "s",
+     "erpW": 4000000,
+     "dutyCycle": 1
+    },
+    {
+     "kind": "datalink",
+     "band": "l",
+     "erpW": 500,
+     "dutyCycle": 0.5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samLong": 40,
+     "samMedium": 32,
+     "cruiseLand": 24,
+     "ascm": 8,
+     "ciws20": 1500,
+     "he127": 600
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {
+    "aircraft": {
+     "archetype": "generic/transportHelo",
+     "count": 1
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 2000000000,
+   "rationale": "Ninety-odd cells, reloaded only in port; defence layers at 100–240, about 50, 9 and 2 km.",
+   "source": "R6.2, P28 (default)",
+   "provenance": "synthetic",
+   "sources": {
+    "weapons": {
+     "kind": "reference",
+     "ref": "R6.2, P28 (default)"
+    }
+   }
+  },
+  {
+   "id": "generic/frigate",
+   "name": "Frigate",
+   "class": "warship",
+   "domain": "surface",
+   "role": "Escort and anti-submarine warfare.",
+   "sidc": "SFSPCLFF",
+   "template": "core/warship",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "surface",
+    "maxKmh": 52,
+    "cruiseKmh": 28.6,
+    "fuelCapacityL": 800000,
+    "burnMovingLph": 9000,
+    "burnIdleLph": 1500
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 180,
+    "stayingPower": 3,
+    "massT": 5000,
+    "lengthM": 135,
+    "widthM": 17,
+    "heightM": 30
+   },
+   "signatures": {
+    "index": {
+     "visual": 2.5,
+     "ir": 2.5
+    },
+    "rcs": {
+     "x": {
+      "front": 3000
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 135
+      },
+      {
+       "kmh": 28.6,
+       "db": 150
+      },
+      {
+       "kmh": 52,
+       "db": 165
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "s",
+     "rangeMaxM": 200000,
+     "scanS": 3,
+     "heightM": 22,
+     "radar": {
+      "gainDb": 38,
+      "pulsesIntegrated": 24
+     }
+    },
+    {
+     "kind": "esm",
+     "band": "s",
+     "rangeMaxM": 300000,
+     "heightM": 25,
+     "esm": {
+      "freqMinHz": 500000000,
+      "freqMaxHz": 18000000000,
+      "sensitivityDbm": -70,
+      "dfRmsDeg": 2
+     }
+    },
+    {
+     "kind": "sonarActive",
+     "rangeMaxM": 30000
+    },
+    {
+     "kind": "sonarPassive",
+     "rangeMaxM": 60000,
+     "sonar": {
+      "diDb": 25,
+      "towed": true,
+      "freqHz": 500,
+      "selfNoiseDb": 55
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 20000,
+     "heightM": 22
+    }
+   ],
+   "mounts": [
+    {
+     "id": "samMedium",
+     "kind": "samMedium",
+     "munitions": [
+      "samMedium"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 8
+    },
+    {
+     "id": "ciws",
+     "kind": "ciws",
+     "munitions": [
+      "ciws20"
+     ],
+     "salvo": 1,
+     "magazine": 30,
+     "reloadS": 2
+    },
+    {
+     "id": "ascm",
+     "kind": "ascm",
+     "munitions": [
+      "ascm"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 20
+    },
+    {
+     "id": "torpedo",
+     "kind": "torpedo",
+     "munitions": [
+      "heavyTorpedo"
+     ],
+     "salvo": 1,
+     "magazine": 12,
+     "reloadS": 120
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "uhf"
+    },
+    {
+     "bearer": "tdl"
+    },
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    },
+    {
+     "kind": "radar",
+     "band": "s",
+     "erpW": 1000000,
+     "dutyCycle": 1
+    },
+    {
+     "kind": "datalink",
+     "band": "l",
+     "erpW": 300,
+     "dutyCycle": 0.5
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samMedium": 32,
+     "ciws20": 1500,
+     "ascm": 8,
+     "heavyTorpedo": 12
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 900000000,
+   "rationale": "A towed array makes it the better submarine hunter.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/merchant",
+   "name": "Merchant ship",
+   "class": "merchantShip",
+   "domain": "surface",
+   "role": "Neutral traffic: what ROE protects.",
+   "sidc": "SNSPXM",
+   "template": "core/neutral",
+   "mover": {
+    "kind": "surface",
+    "maxKmh": 30,
+    "cruiseKmh": 16.5,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 20,
+    "stayingPower": 2
+   },
+   "signatures": {
+    "index": {
+     "visual": 4,
+     "ir": 3
+    },
+    "rcs": {
+     "x": {
+      "front": 10000
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 155
+      },
+      {
+       "kmh": 16.5,
+       "db": 170
+      },
+      {
+       "kmh": 30,
+       "db": 185
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "x",
+     "rangeMaxM": 40000,
+     "scanS": 3,
+     "heightM": 30,
+     "seesAir": false,
+     "radar": {
+      "gainDb": 30,
+      "pulsesIntegrated": 30
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 15000,
+     "heightM": 30
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "satcomLeo"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radar",
+     "band": "x",
+     "erpW": 25000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 50000000,
+   "rationale": "A bulk carrier at 15 knots.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/ssk",
+   "name": "Diesel-electric submarine",
+   "class": "submarine",
+   "domain": "subsurface",
+   "role": "Quiet ambush in coastal waters.",
+   "sidc": "SFUPSC",
+   "template": "core/submarine",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "sub",
+    "maxKmh": 37,
+    "cruiseKmh": 9,
+    "maxDepthM": 300,
+    "fuelCapacityL": 100000,
+    "burnMovingLph": 200,
+    "burnIdleLph": 50,
+    "batteryWh": 5000000,
+    "batteryDrawW": 200000
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 50,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.1,
+     "ir": 0.1
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 95
+      },
+      {
+       "kmh": 9,
+       "db": 105
+      },
+      {
+       "kmh": 37,
+       "db": 135
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "sonarPassive",
+     "rangeMaxM": 40000,
+     "forDeg": 300,
+     "classifies": "type",
+     "sonar": {
+      "diDb": 22,
+      "freqHz": 800,
+      "selfNoiseDb": 50
+     }
+    }
+   ],
+   "mounts": [
+    {
+     "id": "torpedo",
+     "kind": "torpedo",
+     "munitions": [
+      "heavyTorpedo"
+     ],
+     "salvo": 1,
+     "magazine": 12,
+     "reloadS": 120
+    },
+    {
+     "id": "ascm",
+     "kind": "ascm",
+     "munitions": [
+      "ascm"
+     ],
+     "salvo": 2,
+     "magazine": 8,
+     "reloadS": 20
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {
+     "heavyTorpedo": 18,
+     "ascm": 4
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 500000000,
+   "rationale": "Quietest on batteries; noise rises with speed.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/ssn",
+   "name": "Nuclear attack submarine",
+   "class": "submarine",
+   "domain": "subsurface",
+   "role": "Hunts ships and submarines in open ocean.",
+   "sidc": "SFUPSN",
+   "template": "core/submarine",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "sub",
+    "maxKmh": 55,
+    "cruiseKmh": 20,
+    "maxDepthM": 450,
+    "fuelCapacityL": 0,
+    "burnMovingLph": 0,
+    "burnIdleLph": 0,
+    "enduranceH": 2160
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 130,
+    "stayingPower": 1.5,
+    "massT": 7800,
+    "lengthM": 110,
+    "widthM": 10,
+    "heightM": 12
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.1,
+     "ir": 0.1
+    },
+    "rcs": {
+     "x": {
+      "front": 1
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 100
+      },
+      {
+       "kmh": 20,
+       "db": 115
+      },
+      {
+       "kmh": 55,
+       "db": 145
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "sonarPassive",
+     "rangeMaxM": 60000,
+     "classifies": "type",
+     "sonar": {
+      "diDb": 28,
+      "towed": true,
+      "freqHz": 500,
+      "selfNoiseDb": 50
+     }
+    },
+    {
+     "kind": "sonarActive",
+     "rangeMaxM": 20000
+    }
+   ],
+   "mounts": [
+    {
+     "id": "torpedo",
+     "kind": "torpedo",
+     "munitions": [
+      "heavyTorpedo"
+     ],
+     "salvo": 1,
+     "magazine": 12,
+     "reloadS": 120
+    },
+    {
+     "id": "cruise",
+     "kind": "cruise",
+     "munitions": [
+      "cruiseLand"
+     ],
+     "salvo": 1,
+     "magazine": 8,
+     "reloadS": 30
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "hf"
+    },
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {
+     "heavyTorpedo": 25,
+     "cruiseLand": 12
+    },
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 3000000000,
+   "rationale": "Unlimited endurance; a towed array.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/usv",
+   "name": "Explosive uncrewed surface vessel",
+   "class": "smallCraft",
+   "domain": "surface",
+   "role": "One-way attack on ships and ports.",
+   "sidc": "SFSPCU",
+   "template": "core/drone",
+   "mover": {
+    "kind": "surface",
+    "maxKmh": 80,
+    "cruiseKmh": 44,
+    "fuelCapacityL": 600,
+    "burnMovingLph": 60,
+    "burnIdleLph": 5
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "ship",
+    "crew": 0,
+    "stayingPower": 0.3
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.2,
+     "ir": 0.3
+    },
+    "rcs": {
+     "x": {
+      "front": 2
+     }
+    },
+    "acoustic": {
+     "waterDb": [
+      {
+       "kmh": 0,
+       "db": 125
+      },
+      {
+       "kmh": 44,
+       "db": 140
+      },
+      {
+       "kmh": 80,
+       "db": 155
+      }
+     ]
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eo",
+     "rangeMaxM": 5000,
+     "forDeg": 180,
+     "scanS": 1,
+     "classifies": "class",
+     "seesAir": false,
+     "heightM": 1
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "satcomLeo"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 20,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 250000,
+   "rationale": "Magura-like: 300 kg of explosive, steered over LEO SATCOM.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  }
+ ]
+}

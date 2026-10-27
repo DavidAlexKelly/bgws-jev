@@ -1,0 +1,365 @@
+{
+ "$comment": "Satellites (generic.ts SPACE, plus a LEO SATCOM constellation). Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/gnss",
+   "name": "GNSS constellation",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Position, navigation and timing for the whole side.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 20200,
+    "inclinationDeg": 55
+   },
+   "body": {
+    "count": 24,
+    "vulnerability": "satellite",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0,
+     "ir": 0
+    },
+    "rcs": {
+     "x": {
+      "front": 10
+     }
+    }
+   },
+   "sensors": [],
+   "mounts": [],
+   "radios": [],
+   "emitters": [
+    {
+     "kind": "satcom",
+     "band": "gnss",
+     "erpW": 50,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 10000000000,
+   "rationale": "Modelled as one service; jamming lowers it by area.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/missileWarning",
+   "name": "Missile-warning satellite",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Sees ballistic launches and cues defences.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 35786,
+    "inclinationDeg": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "satellite",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0,
+     "ir": 0
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "missileWarning",
+     "rangeMaxM": 10000000,
+     "forDeg": 360,
+     "scanS": 5,
+     "classifies": "class",
+     "seesAir": true,
+     "heightM": 35786000
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1500000000,
+   "rationale": "Warning in the first minute of a boost.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/satcomGeo",
+   "name": "GEO military SATCOM",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Beyond-line-of-sight bearer for HQs and drones.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 35786,
+    "inclinationDeg": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "satellite",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0,
+     "ir": 0
+    },
+    "rcs": {
+     "x": {
+      "front": 20
+     }
+    }
+   },
+   "sensors": [],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "satcomMil"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 2000,
+     "dutyCycle": 1
+    }
+   ],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1000000000,
+   "rationale": "One footprint covers the theatre.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/satcomLeo",
+   "name": "LEO SATCOM constellation",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Low-latency beyond-line-of-sight data for terminals and drones.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 550,
+    "inclinationDeg": 53
+   },
+   "body": {
+    "count": 1000,
+    "vulnerability": "satellite",
+    "crew": 0
+   },
+   "signatures": {
+    "rcs": {
+     "x": {
+      "front": 2
+     }
+    }
+   },
+   "emitters": [
+    {
+     "kind": "satcom",
+     "band": "ku",
+     "erpW": 100,
+     "dutyCycle": 1
+    }
+   ],
+   "radios": [
+    {
+     "bearer": "satcomLeo"
+    }
+   ],
+   "costUsd": 10000000000,
+   "rationale": "Starlink-like: 25–100 ms, ~10 Mbps a terminal when crowded [P7]; modelled as one service.",
+   "source": "P7",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/satEo",
+   "name": "LEO electro-optical imaging satellite",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Imagery of named areas, blocked by cloud.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 500,
+    "inclinationDeg": 97
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "satellite",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0,
+     "ir": 0
+    },
+    "rcs": {
+     "x": {
+      "front": 2
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eoSat",
+     "rangeMaxM": 300000,
+     "forDeg": 30,
+     "scanS": 0,
+     "classifies": "class",
+     "seesAir": false,
+     "heightM": 500000
+    }
+   ],
+   "mounts": [],
+   "radios": [],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 300000000,
+   "rationale": "Sun-synchronous at 500 km; a swath a few hundred km wide.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/satSar",
+   "name": "LEO radar imaging satellite",
+   "class": "satellite",
+   "domain": "space",
+   "role": "Imagery through cloud and at night.",
+   "sidc": "SFPPS",
+   "template": "core/satellite",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "orbit",
+    "maxKmh": 27000,
+    "cruiseKmh": 27000,
+    "orbitAltKm": 550,
+    "inclinationDeg": 97
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "satellite",
+    "crew": 0,
+    "stayingPower": 1
+   },
+   "signatures": {
+    "index": {
+     "visual": 0,
+     "ir": 0
+    },
+    "rcs": {
+     "x": {
+      "front": 2
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "sar",
+     "rangeMaxM": 300000,
+     "forDeg": 30,
+     "scanS": 0,
+     "heightM": 550000,
+     "band": "x",
+     "radar": {
+      "pulsesIntegrated": 50000
+     }
+    }
+   ],
+   "mounts": [],
+   "radios": [],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 200000000,
+   "rationale": "Sees through weather; coarser identity.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  }
+ ]
+}

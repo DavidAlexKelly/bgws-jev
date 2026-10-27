@@ -1,0 +1,22 @@
+[package]
+name = "bgws-env"
+description = "Terrain tiles, land cover, soil, networks, bathymetry, sea state, weather fields, sun and moon, atmospheric transmission."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+petgraph = { workspace = true, features = ["serde-1"] }
+libm.workspace = true
+lz4_flex = { version = "0.11", default-features = false, features = ["safe-encode", "safe-decode"] }
+
+[dev-dependencies]
+proptest.workspace = true
+approx.workspace = true
+rand_chacha.workspace = true

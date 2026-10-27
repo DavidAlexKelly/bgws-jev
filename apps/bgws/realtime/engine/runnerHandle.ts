@@ -29,7 +29,7 @@ import type { PlanAnswer } from "../world/types";
 
 export interface RunnerHandle {
   /** Where the game runs, for the status line. */
-  readonly where: "main thread" | "worker";
+  readonly where: "main thread" | "worker" | "bgws-server";
   /** The game as it last stood. From a worker: as of its last reply. */
   readonly state: RtState;
   /** The live config on this thread: for the commander and the deciders. */

@@ -1,0 +1,23 @@
+{
+  "scene": {
+    "name": "drill-fire-d4",
+    "candidates": [
+      "custom/drill-fire"
+    ],
+    "trigger": "D4",
+    "facts": {}
+  },
+  "template": "custom/drill-fire",
+  "lineage": [
+    "custom/drill-fire"
+  ],
+  "walk": {
+    "kind": "do",
+    "nodeId": "fire",
+    "action": "land.fireNow",
+    "params": {},
+    "path": [
+      "fire"
+    ]
+  }
+}

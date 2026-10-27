@@ -1,0 +1,737 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "M5 — Air over the battle",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "m5-air",
+ "ground": {
+  "choice": "generated",
+  "seed": "m5-air-ground"
+ },
+ "scope": {
+  "type": "airCampaign",
+  "durationMin": 360,
+  "area": {
+   "widthKm": 100,
+   "depthKm": 200
+  },
+  "echelons": {
+   "highest": "component",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "simulated",
+   "fires": "simulated",
+   "ew": "simulated",
+   "air": "simulated",
+   "airDefence": "simulated",
+   "naval": "off",
+   "space": "abstracted",
+   "cyber": "off",
+   "logistics": "abstracted",
+   "medical": "off"
+  },
+  "planners": [
+   "overall",
+   "air",
+   "land"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": false,
+   "jev": "nearContact"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "b-hq",
+   "label": "Blue company HQ",
+   "side": "blue",
+   "platform": "generic/cp-company",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.14610132950054,
+    "lng": 18.6
+   },
+   "commandRating": 2
+  },
+  {
+   "id": "b-tanks",
+   "label": "Blue tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.18652533237514,
+    "lng": 18.587714513874726
+   }
+  },
+  {
+   "id": "b-ifv",
+   "label": "Blue mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.18652533237514,
+    "lng": 18.612285486125277
+   }
+  },
+  {
+   "id": "b-guns",
+   "label": "Blue artillery",
+   "side": "blue",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.07423643550126,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "b-esm-1",
+   "label": "Blue SIGINT west",
+   "side": "blue",
+   "platform": "generic/esmTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.15508444125045,
+    "lng": 18.415717708120887
+   }
+  },
+  {
+   "id": "b-esm-2",
+   "label": "Blue SIGINT east",
+   "side": "blue",
+   "platform": "generic/esmTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.15508444125045,
+    "lng": 18.784282291879116
+   }
+  },
+  {
+   "id": "r-hq",
+   "label": "Red company HQ",
+   "side": "red",
+   "platform": "generic/cp-company",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.307797340998924,
+    "lng": 18.6
+   },
+   "commandRating": 2
+  },
+  {
+   "id": "r-inf-1",
+   "label": "Red 1 Platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.244915558749554,
+    "lng": 18.576964713515114
+   }
+  },
+  {
+   "id": "r-inf-2",
+   "label": "Red 2 Platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.244915558749554,
+    "lng": 18.62303528648489
+   }
+  },
+  {
+   "id": "r-shorad",
+   "label": "Red SHORAD",
+   "side": "red",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-sam",
+   "label": "Red SAM battery",
+   "side": "red",
+   "platform": "generic/samMedium",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.55932446999641,
+    "lng": 18.66142743062637
+   }
+  },
+  {
+   "id": "b-sam",
+   "label": "Blue SAM battery",
+   "side": "blue",
+   "platform": "generic/samMedium",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.73287818900467,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "b-shorad-1",
+   "label": "Blue SHORAD west",
+   "side": "blue",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.678979518505216,
+    "lng": 18.569286284686815
+   }
+  },
+  {
+   "id": "b-shorad-2",
+   "label": "Blue SHORAD east",
+   "side": "blue",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 53.678979518505216,
+    "lng": 18.63071371531319
+   }
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "world": {
+  "entities": [
+   {
+    "id": "b-base",
+    "owner": "blue",
+    "archetype": "generic/airbase",
+    "at": {
+     "lat": 53.66101329500539,
+     "lng": 18.6
+    },
+    "label": "Blue airbase"
+   },
+   {
+    "id": "r-base",
+    "owner": "red",
+    "archetype": "generic/airbase",
+    "at": {
+     "lat": 55.63729787998563,
+     "lng": 18.6
+    },
+    "label": "Red airbase"
+   },
+   {
+    "id": "r-owa-1",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.21607855858518
+    },
+    "altM": 1500,
+    "label": "Shahed 1",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-2",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.246792273898365
+    },
+    "altM": 1500,
+    "label": "Shahed 2",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-3",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.27750598921155
+    },
+    "altM": 1500,
+    "label": "Shahed 3",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-4",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.30821970452474
+    },
+    "altM": 1500,
+    "label": "Decoy 4",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-5",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.33893341983792
+    },
+    "altM": 1500,
+    "label": "Decoy 5",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-6",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.36964713515111
+    },
+    "altM": 1500,
+    "label": "Shahed 6",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-7",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.400360850464295
+    },
+    "altM": 1500,
+    "label": "Shahed 7",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-8",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.43107456577748
+    },
+    "altM": 1500,
+    "label": "Shahed 8",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-9",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.461788281090666
+    },
+    "altM": 1500,
+    "label": "Decoy 9",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-10",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.492501996403853
+    },
+    "altM": 1500,
+    "label": "Decoy 10",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-11",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.523215711717036
+    },
+    "altM": 1500,
+    "label": "Shahed 11",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-12",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.553929427030223
+    },
+    "altM": 1500,
+    "label": "Shahed 12",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-13",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.58464314234341
+    },
+    "altM": 1500,
+    "label": "Shahed 13",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-14",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.615356857656593
+    },
+    "altM": 1500,
+    "label": "Decoy 14",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-15",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.64607057296978
+    },
+    "altM": 1500,
+    "label": "Decoy 15",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-16",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.676784288282967
+    },
+    "altM": 1500,
+    "label": "Shahed 16",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-17",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.70749800359615
+    },
+    "altM": 1500,
+    "label": "Shahed 17",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-18",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.738211718909337
+    },
+    "altM": 1500,
+    "label": "Shahed 18",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-19",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.768925434222524
+    },
+    "altM": 1500,
+    "label": "Decoy 19",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-20",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.799639149535707
+    },
+    "altM": 1500,
+    "label": "Decoy 20",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-21",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.830352864848894
+    },
+    "altM": 1500,
+    "label": "Shahed 21",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-22",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.008480057491916,
+     "lng": 18.86106658016208
+    },
+    "altM": 1500,
+    "label": "Shahed 22",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.599078588540607
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-23",
+    "owner": "red",
+    "archetype": "generic/owaDrone",
+    "at": {
+     "lat": 55.03542939274165,
+     "lng": 18.891780295475264
+    },
+    "altM": 1500,
+    "label": "Shahed 23",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.66101329500539,
+      "lng": 18.6
+     },
+     "altM": 1500
+    }
+   },
+   {
+    "id": "r-owa-24",
+    "owner": "red",
+    "archetype": "generic/owaDecoy",
+    "at": {
+     "lat": 55.06237872799138,
+     "lng": 18.92249401078845
+    },
+    "altM": 1500,
+    "label": "Decoy 24",
+    "task": {
+     "kind": "strike",
+     "aimAt": {
+      "lat": 53.661552281710385,
+      "lng": 18.600921411459396
+     },
+     "altM": 1500
+    }
+   }
+  ],
+  "environment": {
+   "startHour": 6
+  },
+  "victory": [
+   {
+    "kind": "airSuperiority",
+    "side": "blue",
+    "at": {
+     "lat": 54.46949335249731,
+     "lng": 18.6
+    },
+    "radiusM": 25000,
+    "holdS": 1800,
+    "label": "Air superiority over the front"
+   },
+   {
+    "kind": "targetSet",
+    "side": "red",
+    "targets": [
+     "b-base"
+    ],
+    "share": 1,
+    "label": "The blue airbase out of action"
+   }
+  ]
+ }
+}

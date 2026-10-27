@@ -1,0 +1,57 @@
+{
+  "scene": {
+    "name": "jammer-emcon-silent",
+    "candidates": [
+      "core/ewJammer"
+    ],
+    "trigger": "jammingOrder",
+    "facts": {}
+  },
+  "template": "core/ewJammer",
+  "lineage": [
+    "core/ewJammer",
+    "core/default",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.jammingOrder",
+    "title": "Jamming",
+    "question": "Where does the jammer work now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "A jammer denies the enemy his radios, drone links and GNSS where the force needs it, accepting that it jams its own side's too, and moves before it is found by its own emissions."
+    ],
+    "options": [
+      {
+        "id": "silent",
+        "action": "ew.goSilent",
+        "bias": 0
+      }
+    ],
+    "fallback": "silent",
+    "dropped": [
+      {
+        "id": "jamSector",
+        "action": "ew.jamSector",
+        "why": "gate:emcon"
+      },
+      {
+        "id": "protectAdvance",
+        "action": "ew.protectAdvance",
+        "why": "gate:emcon"
+      }
+    ],
+    "path": [
+      "w.jammingOrder"
+    ]
+  },
+  "gates": {
+    "roe": "always",
+    "fired_upon": false,
+    "weapon_release": "free",
+    "target_identified": false,
+    "emcon": "silent",
+    "cohesion": "steady"
+  }
+}

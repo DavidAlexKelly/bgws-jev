@@ -1,0 +1,29 @@
+{
+  "scene": {
+    "name": "drill-blocked-by-roe",
+    "candidates": [
+      "custom/drill-fire"
+    ],
+    "trigger": "D4",
+    "facts": {}
+  },
+  "template": "custom/drill-fire",
+  "lineage": [
+    "custom/drill-fire"
+  ],
+  "walk": {
+    "kind": "none",
+    "path": [
+      "fire"
+    ],
+    "blocked": "gate:roe"
+  },
+  "gates": {
+    "roe": "never",
+    "fired_upon": false,
+    "weapon_release": "free",
+    "target_identified": false,
+    "emcon": "unrestricted",
+    "cohesion": "steady"
+  }
+}

@@ -1,0 +1,484 @@
+//! `bgws`: the command-line host (§3.3, §16).
+//!
+//! ```text
+//! bgws scenarios                          list the shipped scenarios
+//! bgws play <scenario> [--deciders rules|jev|claude|local] [--seed N] [--minutes M]
+//!           [--record game.json] [--events events.jsonl] [--flat]
+//! bgws replay <game.json>                 replay a record without calling any model
+//! bgws branch <game.json> --at M [--deciders jev]   "what if": replay to minute M, then play on
+//! bgws pack <dir> --name N --lat --lon [--dem dem.tif]   build a theatre pack
+//! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
+//! bgws vignettes [--only id] [-n 200] [--store dir]   benchmark vignettes; regression against a baseline
+//! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
+//! bgws aar <events.jsonl>                the after-action review
+//! bgws events <events.duckdb> [--sql Q]  SQL over a game's events (needs --features duckdb)
+//! bgws why <events.jsonl> <unit>          what happened to or by a unit, and why
+//! bgws figures [--markdown]               the figures registry report
+//! bgws platform <id>                      a resolved catalogue record and its munitions
+//! bgws convert <v3.json> <out.json>       convert a TypeScript v3 scenario to v4
+//! bgws bench <scenario> [--seconds S]     time the simulation
+//! ```
+//! API keys come from the environment (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`), never from files.
+
+use anyhow::{anyhow, bail, Result};
+use bgws_analysis::report::VignetteSuite;
+use bgws_analysis::CheckOptions;
+use bgws_core::{Seed, SimTime};
+use bgws_run::experiments;
+use bgws_run::{load_scenario, DeciderChoice, Host, HostOptions};
+use bgws_scenario::record::GameRecord;
+use bgws_run::default_figures;
+use bgws_sim::SimOptions;
+use clap::{Parser, Subcommand};
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+#[derive(Parser)]
+#[command(name = "bgws", version, about = "BGWS: a local, physics-first simulation with Jev and Claude as decision makers")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// List the shipped scenarios.
+    Scenarios,
+    /// Play a scenario to the end (or a time limit).
+    Play {
+        scenario: String,
+        #[arg(long, default_value = "scenario")]
+        deciders: DeciderChoice,
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Stop after this many simulated minutes (default: the scenario's limit).
+        #[arg(long)]
+        minutes: Option<f64>,
+        #[arg(long)]
+        record: Option<PathBuf>,
+        #[arg(long)]
+        events: Option<PathBuf>,
+        /// Flat open ground instead of the scenario's.
+        #[arg(long)]
+        flat: bool,
+        #[arg(long, default_value = "http://127.0.0.1:8080")]
+        local_url: String,
+        #[arg(long, default_value = "local")]
+        local_model: String,
+        #[arg(long)]
+        claude_model: Option<String>,
+    },
+    /// Replay a game record exactly, without calling any decider.
+    Replay { record: PathBuf },
+    /// "What if": replay a record to a moment, then play on with other deciders (§12).
+    Branch {
+        record: PathBuf,
+        /// Simulated minutes to replay before branching.
+        #[arg(long)]
+        at: f64,
+        #[arg(long, default_value = "rules")]
+        deciders: DeciderChoice,
+        /// Play this many minutes after the branch point (default: to the scenario's limit).
+        #[arg(long)]
+        minutes: Option<f64>,
+        #[arg(long)]
+        record_out: Option<PathBuf>,
+    },
+    /// Build a theatre pack (§14.2): synthetic ground for an area, tiled, for scenarios to name.
+    Pack {
+        out: PathBuf,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        lat: f64,
+        #[arg(long)]
+        lon: f64,
+        /// Side of the square area, km.
+        #[arg(long, default_value_t = 40.0)]
+        size_km: f64,
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// A GeoTIFF DEM (lat/lon grid, e.g. Copernicus GLO-30) for real elevation; land cover stays synthetic.
+        #[arg(long)]
+        dem: Option<PathBuf>,
+    },
+    /// Play many seeded games with the rules deciders.
+    Batch {
+        scenario: String,
+        #[arg(short, default_value_t = 100)]
+        n: usize,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        #[arg(long)]
+        minutes: Option<f64>,
+        #[arg(long)]
+        flat: bool,
+        /// Write the batch summary as JSON here.
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
+    /// Check the benchmark vignettes against their bands.
+    Vignettes {
+        #[arg(long)]
+        only: Option<String>,
+        #[arg(short, default_value_t = 200)]
+        n: usize,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        #[arg(long)]
+        json: Option<PathBuf>,
+        /// Compare each distribution with the stored baseline here (§15.8): out of band
+        /// or a significant shift fails. New vignettes are stored as baselines.
+        #[arg(long)]
+        store: Option<PathBuf>,
+        /// Accept this run as the new baseline, with the reason (needs --store).
+        #[arg(long)]
+        accept: Option<String>,
+        /// Vignettes on the calibration backlog (README): run and reported,
+        /// but being out of band does not fail the run.
+        #[arg(long, value_delimiter = ',')]
+        backlog: Vec<String>,
+        /// Also write the workbench page (charts of each vignette against its band and baseline).
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
+    /// Sensitivity analysis of one vignette over its unsourced figures.
+    Sensitivity {
+        vignette: String,
+        #[arg(long, default_value_t = 40)]
+        replicates: usize,
+        /// Only figures whose key starts with this.
+        #[arg(long)]
+        prefix: Option<String>,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Also write the workbench page (figures ranked by influence).
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
+    /// The Behaviour Manager page: every template's decision graphs and the action library.
+    Behaviour {
+        #[arg(long, default_value = "behaviour.html")]
+        html: PathBuf,
+    },
+    /// Run a vignette as shipped and with figures changed, and compare (§16 workbench).
+    Compare {
+        vignette: String,
+        /// Figures for the variant: key=value, comma-separated.
+        #[arg(long, value_delimiter = ',', required = true)]
+        set: Vec<String>,
+        #[arg(short, default_value_t = 100)]
+        n: usize,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Also write the workbench page with the two side by side.
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
+    /// SQL over a game's event log (table `events`); with no query, events by kind.
+    Events {
+        log: PathBuf,
+        #[arg(long)]
+        sql: Option<String>,
+    },
+    /// The after-action review of a game's event log (`play --events`).
+    Aar { events: PathBuf },
+    /// Everything that happened to or by one force, with the figures behind each event.
+    Why { events: PathBuf, who: String },
+    /// The figures registry as a report.
+    Figures {
+        #[arg(long)]
+        markdown: bool,
+    },
+    /// Print a catalogue record, resolved (class defaults, parent, derivations).
+    Platform { id: String },
+    /// Convert a TypeScript v3 scenario to v4.
+    Convert { input: PathBuf, output: PathBuf },
+    /// Time the simulation on a scenario.
+    Bench {
+        scenario: String,
+        #[arg(long, default_value_t = 600.0)]
+        seconds: f64,
+        #[arg(long)]
+        flat: bool,
+    },
+}
+
+fn data_dir() -> PathBuf {
+    std::env::var_os("BGWS_DATA").map(PathBuf::from).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+}
+
+/// The scenarios the sim-played vignettes run on, from the shipped presets.
+fn vignette_scenarios() -> experiments::VignetteScenarios {
+    let load = |name: &str| load_scenario(&scenario_path(name)).ok();
+    experiments::VignetteScenarios {
+        attack: load("skirmish-advance-to-contact-v1"),
+        drone_line: load("m4-drone-line"),
+        counter_battery: load("m2-mech-company-hasty-attack").and_then(|b| experiments::counter_battery_scene(&b).ok()),
+    }
+}
+
+/// A scenario by path, or by the name of a shipped one.
+fn scenario_path(s: &str) -> PathBuf {
+    let p = PathBuf::from(s);
+    if p.exists() {
+        return p;
+    }
+    let named = data_dir().join("scenarios").join(if s.ends_with(".json") { s.to_string() } else { format!("{s}.json") });
+    if named.exists() {
+        named
+    } else {
+        p
+    }
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.cmd {
+        Cmd::Scenarios => {
+            let mut names: Vec<_> = std::fs::read_dir(data_dir().join("scenarios"))?.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().map(|x| x == "json").unwrap_or(false)).collect();
+            names.sort();
+            for p in names {
+                let sc = load_scenario(&p)?;
+                println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
+            }
+        }
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let seed = Seed(seed.unwrap_or(sc.seed.0));
+            let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
+            let mut host = Host::new(&sc, seed, default_figures(), &opts)?;
+            if let Some(p) = &events {
+                host.write_events_to(p)?;
+            }
+            let until = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
+            let started = Instant::now();
+            let mut last_print = Instant::now();
+            host.play_until(until, |sim| {
+                if last_print.elapsed().as_secs_f64() > 2.0 {
+                    let s = sim.strength();
+                    eprintln!("  {}  blue {:.0}%  red {:.0}%", sim.now(), s.get(&bgws_core::Side::Blue).unwrap_or(&0.0) * 100.0, s.get(&bgws_core::Side::Red).unwrap_or(&0.0) * 100.0);
+                    last_print = Instant::now();
+                }
+            })?;
+            let report = host.report();
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            eprintln!("played {} simulated in {:.1} s wall", report.ended_at, started.elapsed().as_secs_f64());
+            if let Some(p) = record {
+                host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
+                eprintln!("record written to {}", p.display());
+            }
+        }
+        Cmd::Replay { record } => {
+            let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
+            let until = rec.ends_at();
+            let mut host = Host::replay(rec, default_figures())?;
+            host.play_until(until, |_| {})?;
+            host.verify_replay()?;
+            println!("{}", serde_json::to_string_pretty(&host.report())?);
+            eprintln!("replay matches the record");
+        }
+        Cmd::Branch { record, at, deciders, minutes, record_out } => {
+            let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
+            let branch_at = SimTime::from_secs(at * 60.0);
+            let opts = HostOptions { deciders, ..Default::default() };
+            let router = bgws_run::router_for(&rec.scenario, &default_figures(), &opts);
+            let mut host = Host::branch(rec.clone(), default_figures(), branch_at, router)?;
+            eprintln!("replayed to {}; branching with {:?}", host.sim.now(), deciders);
+            let until = SimTime::from_secs(minutes.map(|m| at + m).unwrap_or(rec.scenario.scope.duration_min) * 60.0);
+            host.play_until(until, |_| {})?;
+            println!("{}", serde_json::to_string_pretty(&host.report())?);
+            if let Some(p) = record_out {
+                host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
+            }
+        }
+        Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed, dem } => {
+            let f = default_figures();
+            let n = ((size_km * 1000.0 / cell_m).ceil() as usize + 1).max(16);
+            let mut p = bgws_env::SynthParams::new(seed, n, n, cell_m, &f);
+            p.frame_origin = bgws_core::Geodetic::new(lat, lon, 0.0);
+            let mut world = bgws_env::generate(&p, &f);
+            // Centre the grid on the frame origin, as generated ground is in the sim.
+            let shift = cell_m * (n as f64 - 1.0) / 2.0;
+            world.terrain.spec.origin_e -= shift;
+            world.terrain.spec.origin_n -= shift;
+            for r in [&mut world.terrain.elevation.spec, &mut world.terrain.land_cover.spec, &mut world.terrain.soil.spec, &mut world.terrain.wetness.spec, &mut world.terrain.obstacle_gap.spec] {
+                r.origin_e = world.terrain.spec.origin_e;
+                r.origin_n = world.terrain.spec.origin_n;
+            }
+            if let Some(path) = dem {
+                let d = bgws_run::geotiff::Dem::read(&path)?;
+                let set = bgws_run::geotiff::apply_dem(&mut world.terrain, &d);
+                eprintln!("DEM {}: {} of {} nodes from the DEM", path.display(), set, n * n);
+            }
+            let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
+            eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
+        }
+        Cmd::Batch { scenario, n, seed, minutes, flat, json } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let limit = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
+            let exp = experiments::scenario_run(&sc, limit, SimOptions { flat_ground: flat, ..Default::default() });
+            let figures = default_figures();
+            let started = Instant::now();
+            let batch = bgws_analysis::batch::run_batch(&exp, &figures, bgws_analysis::batch::BatchConfig::new(n, Seed(seed)));
+            let wall = started.elapsed().as_secs_f64();
+            let mut outcomes: std::collections::BTreeMap<String, usize> = Default::default();
+            for r in &batch.replicates {
+                *outcomes.entry(r.output.over.clone().unwrap_or_else(|| "unfinished".into())).or_default() += 1;
+            }
+            let mut md = format!("# Batch: {} × {n}\n\n{wall:.1} s wall ({:.2} s per game)\n\n| Outcome | Games |\n|---|---|\n", sc.name, wall / n as f64);
+            for (k, v) in &outcomes {
+                md.push_str(&format!("| {k} | {v} |\n"));
+            }
+            for side in bgws_core::Side::PLAYERS {
+                let m = bgws_analysis::report::strength_metric(side);
+                let sample = batch.sample(&m);
+                md.push('\n');
+                md.push_str(&bgws_analysis::report::batch_markdown(&bgws_analysis::batch::BatchSummary::new(format!("{side} strength left"), batch.config, &sample, 0.95, 10)));
+            }
+            println!("{md}");
+            if let Some(p) = json {
+                std::fs::write(p, serde_json::to_string_pretty(&batch.replicates.iter().map(|r| &r.output).collect::<Vec<_>>())?)?;
+            }
+        }
+        Cmd::Vignettes { only, n, seed, json, store, accept, backlog, html } => {
+            let on_backlog = |id: &str| backlog.iter().any(|b| b == id);
+            let figures = default_figures();
+            let scenarios = vignette_scenarios();
+            let results = experiments::run_vignettes(&figures, Seed(seed), &CheckOptions { level: 0.95, replicates: Some(n) }, only.as_deref(), &scenarios);
+            let mut regressed = false;
+            let mut regression = Vec::new();
+            if let Some(dir) = &store {
+                let st = bgws_analysis::regression::RegressionStore::open(dir).map_err(|e| anyhow!("{e}"))?;
+                let ro = bgws_analysis::regression::RegressionOptions::from_figures(&figures);
+                let mut verdicts = Vec::new();
+                for r in &results {
+                    match &accept {
+                        Some(why) => {
+                            st.accept(r, why, &ro).map_err(|e| anyhow!("{e}"))?;
+                        }
+                        None => verdicts.push(st.check_and_record(r, &ro).map_err(|e| anyhow!("{e}"))?),
+                    }
+                }
+                regression = verdicts.clone();
+                if !verdicts.is_empty() {
+                    regressed = verdicts.iter().any(|v| v.status.fails() && !(on_backlog(&v.id) && v.status == bgws_analysis::regression::RegressionStatus::OutOfBand));
+                    println!("{}", bgws_analysis::report::regression_markdown(&verdicts));
+                }
+            }
+            let suite = VignetteSuite::new(results);
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": "Benchmark vignettes", "generated": format!("{n} games each, seed {seed}"), "vignettes": suite.results, "regression": regression, "backlog": backlog });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
+            }
+            println!("{}", suite.to_markdown());
+            if regressed {
+                bail!("a vignette regressed against its baseline (accept with --accept \"why\" if intended)");
+            }
+            if let Some(p) = json {
+                std::fs::write(p, serde_json::to_string_pretty(&suite)?)?;
+            }
+            let failing: Vec<&str> = suite.results.iter().filter(|r| !matches!(r.verdict, bgws_analysis::Verdict::InBand) && !on_backlog(&r.id)).map(|r| r.id.as_str()).collect();
+            let waived: Vec<&str> = suite.results.iter().filter(|r| !matches!(r.verdict, bgws_analysis::Verdict::InBand) && on_backlog(&r.id)).map(|r| r.id.as_str()).collect();
+            if !waived.is_empty() {
+                eprintln!("out of band, on the calibration backlog: {}", waived.join(", "));
+            }
+            if !failing.is_empty() {
+                bail!("out of band: {}", failing.join(", "));
+            }
+        }
+        Cmd::Events { log, sql } => {
+            let t = bgws_run::eventlog::query(&log, sql.as_deref().unwrap_or(bgws_run::eventlog::SUMMARY_SQL))?;
+            print!("{}", t.markdown());
+        }
+        Cmd::Behaviour { html } => {
+            std::fs::write(&html, bgws_run::behaviour::builtin_html()?)?;
+            eprintln!("Behaviour Manager written to {}", html.display());
+        }
+        Cmd::Compare { vignette, set, n, seed, html } => {
+            let a_fig = default_figures();
+            let mut b_fig = default_figures();
+            for kv in &set {
+                let (k, v) = kv.split_once('=').ok_or_else(|| anyhow!("--set wants key=value, got `{kv}`"))?;
+                let v: f64 = v.trim().parse().map_err(|_| anyhow!("`{v}` is not a number"))?;
+                let old = b_fig.try_get(k.trim()).ok_or_else(|| anyhow!("no figure `{k}`"))?;
+                b_fig.set(k.trim(), v).map_err(|e| anyhow!("{e}"))?;
+                eprintln!("{k}: {old} → {v}");
+            }
+            let scenarios = vignette_scenarios();
+            let opts = CheckOptions { level: 0.95, replicates: Some(n) };
+            let pick = |f: &bgws_core::Figures| experiments::run_vignettes(f, Seed(seed), &opts, Some(&vignette), &scenarios).into_iter().find(|r| r.id == vignette);
+            let a = pick(&a_fig).ok_or_else(|| anyhow!("no vignette `{vignette}` with an experiment"))?;
+            let b = pick(&b_fig).expect("the same vignette");
+            let ks = bgws_analysis::compare::ks_two_sample(&a.sample.values, &b.sample.values);
+            let mw = bgws_analysis::compare::mann_whitney(&a.sample.values, &b.sample.values);
+            let label_b = set.join(", ");
+            let ci = |r: &bgws_analysis::VignetteResult| r.interval.as_ref().map(|i| format!("{:.3} – {:.3}", i.lo, i.hi)).unwrap_or_else(|| "—".into());
+            println!("## {}: as shipped vs {label_b}\n", a.title);
+            println!("| Variant | Estimate | Interval | Band | Games | Verdict |\n|---|---|---|---|---|---|");
+            for (name, r) in [("as shipped", &a), (label_b.as_str(), &b)] {
+                println!("| {name} | {:.3} {} | {} | {:.3} – {:.3} | {} | {:?} |", r.estimate, r.unit, ci(r), r.band.lo, r.band.hi, r.sample.values.len(), r.verdict);
+            }
+            match (&ks, &mw) {
+                (Some(k), Some(m)) => println!("\nKS D {:.3}, p {:.3}; Mann–Whitney p {:.3}: the two {} at 5%.", k.d, k.p_value, m.p_value, if k.p_value < 0.05 || m.p_value < 0.05 { "differ" } else { "do not detectably differ" }),
+                _ => println!("\nToo few values to test."),
+            }
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": format!("Compare: {}", a.title), "generated": format!("{n} games each, seed {seed}"),
+                    "comparison": { "a": a, "b": b, "labelA": "as shipped", "labelB": label_b, "ks": ks, "mw": mw } });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
+            }
+        }
+        Cmd::Sensitivity { vignette, replicates, prefix, seed, html } => {
+            let report = bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed))?;
+            println!("{}", bgws_analysis::report::sensitivity_markdown(&report));
+            if let Some(p) = &html {
+                let data = serde_json::json!({ "title": format!("Sensitivity: {vignette}"), "generated": format!("{replicates} replicates, seed {seed}"), "sensitivity": [report] });
+                std::fs::write(p, bgws_run::workbench::html(&data))?;
+                eprintln!("workbench written to {}", p.display());
+            }
+        }
+        Cmd::Aar { events } => println!("{}", bgws_run::aar::review(&bgws_run::aar::read_log(&events)?)),
+        Cmd::Why { events, who } => println!("{}", bgws_run::aar::why(&bgws_run::aar::read_log(&events)?, &who)),
+        Cmd::Figures { markdown } => {
+            let f = default_figures();
+            if markdown {
+                println!("{}", f.report_markdown());
+            } else {
+                let defaults = f.iter().filter(|x| x.is_default()).count();
+                println!("{} figures, {} sourced, {} [default]", f.len(), f.len() - defaults, defaults);
+                println!("(--markdown for the full report)");
+            }
+        }
+        Cmd::Platform { id } => {
+            let cat = bgws_catalogue::Catalogue::builtin_with(&default_figures()).map_err(|e| anyhow!("{e:?}"))?;
+            let p = cat.platform(&id).ok_or_else(|| anyhow!("no platform `{id}`"))?;
+            println!("{}", serde_json::to_string_pretty(p)?);
+            for m in &p.mounts {
+                for mu in &m.munitions {
+                    if let Some(x) = cat.munition(mu) {
+                        println!("munition {}: {}", mu, serde_json::to_string(x)?);
+                    }
+                }
+            }
+        }
+        Cmd::Convert { input, output } => {
+            let sc = load_scenario(&input)?;
+            std::fs::write(&output, serde_json::to_string_pretty(&sc)?)?;
+            eprintln!("wrote {}", output.display());
+        }
+        Cmd::Bench { scenario, seconds, flat } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let mut sim = bgws_sim::Sim::with_options(&sc, sc.seed, default_figures(), SimOptions { flat_ground: flat, ..Default::default() }).map_err(|e| anyhow!("{e}"))?;
+            let started = Instant::now();
+            sim.run_with_rules(SimTime::from_secs(seconds));
+            let wall = started.elapsed().as_secs_f64();
+            println!("{} entities, {:.0} simulated s in {:.3} s wall: ×{:.1} real time, {:.2} ms per simulated second", sc.forces.len(), sim.now().secs(), wall, sim.now().secs() / wall, wall * 1000.0 / sim.now().secs().max(1.0));
+        }
+    }
+    Ok(())
+}

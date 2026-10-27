@@ -1,0 +1,21 @@
+[package]
+name = "bgws-desktop"
+description = "The desktop shell (RUST_ENGINE.md §16): the host and the game in-process, the viewer, editor and Behaviour Manager in a native window."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "bgws-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+bgws-server = { path = "../server" }
+anyhow.workspace = true
+clap.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tauri = { version = "2", features = [] }

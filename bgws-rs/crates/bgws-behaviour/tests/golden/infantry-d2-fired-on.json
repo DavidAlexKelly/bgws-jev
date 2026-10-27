@@ -1,0 +1,61 @@
+{
+  "scene": {
+    "name": "infantry-d2-fired-on",
+    "candidates": [
+      "core/infantry"
+    ],
+    "trigger": "D2",
+    "facts": {}
+  },
+  "template": "core/infantry",
+  "lineage": [
+    "core/infantry",
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D2",
+    "title": "Fired on, shooter located",
+    "question": "It is under fire and can see who is firing. How does it answer?",
+    "doctrine": [
+      "Infantry fights from cover and concealment. It holds ground, works with the units around it, and avoids being caught in the open by armour or indirect fire."
+    ],
+    "options": [
+      {
+        "id": "returnFire",
+        "action": "land.returnFire",
+        "bias": 0
+      },
+      {
+        "id": "hullDown",
+        "action": "land.hullDownThenFire",
+        "bias": 0
+      },
+      {
+        "id": "pullBack",
+        "action": "land.outOfSight",
+        "bias": 0
+      },
+      {
+        "id": "askFriend",
+        "action": "land.askFriendForHelp",
+        "bias": 0
+      },
+      {
+        "id": "assault",
+        "action": "land.assault",
+        "bias": 0
+      },
+      {
+        "id": "quiet",
+        "action": "land.goQuietInCover",
+        "bias": 0
+      }
+    ],
+    "fallback": "returnFire",
+    "dropped": [],
+    "path": [
+      "D2"
+    ]
+  }
+}

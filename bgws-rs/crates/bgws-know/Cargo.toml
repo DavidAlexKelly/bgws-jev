@@ -1,0 +1,21 @@
+[package]
+name = "bgws-know"
+description = "Tracks, Kalman filters, association, classification, fusion, the side views."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+nalgebra.workspace = true
+pathfinding.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+approx.workspace = true
+rand_chacha.workspace = true

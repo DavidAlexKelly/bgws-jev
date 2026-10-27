@@ -1,0 +1,322 @@
+{
+ "format": "bgws.realtime.scenario",
+ "version": 3,
+ "name": "M4 — Drone line",
+ "savedAt": "2026-10-24T00:00:00.000Z",
+ "seed": "m4-drone-line",
+ "ground": {
+  "choice": "generated",
+  "seed": "m4-drone-line-ground"
+ },
+ "scope": {
+  "type": "droneLine",
+  "durationMin": 360,
+  "area": {
+   "widthKm": 30,
+   "depthKm": 15
+  },
+  "echelons": {
+   "highest": "company",
+   "lowest": "platoon"
+  },
+  "domains": {
+   "land": "simulated",
+   "drones": "simulated",
+   "fires": "simulated",
+   "ew": "simulated",
+   "air": "abstracted",
+   "airDefence": "off",
+   "naval": "off",
+   "space": "abstracted",
+   "cyber": "off",
+   "logistics": "abstracted",
+   "medical": "off"
+  },
+  "planners": [
+   "tactical"
+  ],
+  "detail": {
+   "aggregateAwayFromContact": false,
+   "jev": "all"
+  }
+ },
+ "rules": {
+  "comms": "radio",
+  "breakpointPct": 50
+ },
+ "command": {
+  "useCommander": false,
+  "model": "claude-sonnet-5-5",
+  "useJev": false,
+  "directives": {
+   "blue": "",
+   "red": ""
+  }
+ },
+ "forces": [
+  {
+   "id": "b-hq",
+   "label": "Blue company HQ",
+   "side": "blue",
+   "platform": "generic/cp-company",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.15508444125045,
+    "lng": 18.6
+   },
+   "commandRating": 2
+  },
+  {
+   "id": "b-tanks",
+   "label": "Blue tanks",
+   "side": "blue",
+   "platform": "generic/mbt",
+   "platformCount": 4,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.19101688825009,
+    "lng": 18.587714513874726
+   }
+  },
+  {
+   "id": "b-ifv",
+   "label": "Blue mech",
+   "side": "blue",
+   "platform": "generic/ifv",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.19101688825009,
+    "lng": 18.612285486125277
+   }
+  },
+  {
+   "id": "b-isr",
+   "label": "Blue ISR team",
+   "side": "blue",
+   "platform": "generic/droneIsrTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.168559108875314,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "b-fpv",
+   "label": "Blue FPV team",
+   "side": "blue",
+   "platform": "generic/fpvTeamRf",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.17305066475027,
+    "lng": 18.576964713515114
+   }
+  },
+  {
+   "id": "b-fibre",
+   "label": "Blue fibre FPV team",
+   "side": "blue",
+   "platform": "generic/fpvTeamFibre",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.17305066475027,
+    "lng": 18.62303528648489
+   }
+  },
+  {
+   "id": "b-int",
+   "label": "Blue interceptor team",
+   "side": "blue",
+   "platform": "generic/interceptorTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.17754222062523,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "b-jam",
+   "label": "Blue EW",
+   "side": "blue",
+   "platform": "generic/ewJammer",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.182033776500184,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "b-esm",
+   "label": "Blue SIGINT",
+   "side": "blue",
+   "platform": "generic/esmTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.164067553000365,
+    "lng": 18.64607057296978
+   }
+  },
+  {
+   "id": "b-guns",
+   "label": "Blue artillery",
+   "side": "blue",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.119151994250814,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-hq",
+   "label": "Red company HQ",
+   "side": "red",
+   "platform": "generic/cp-company",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.29881422924902,
+    "lng": 18.6
+   },
+   "commandRating": 2
+  },
+  {
+   "id": "r-inf-1",
+   "label": "Red 1 Platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.25389867049947,
+    "lng": 18.576964713515114
+   }
+  },
+  {
+   "id": "r-inf-2",
+   "label": "Red 2 Platoon",
+   "side": "red",
+   "platform": "generic/infantrySection",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.25389867049947,
+    "lng": 18.62303528648489
+   }
+  },
+  {
+   "id": "r-isr",
+   "label": "Red ISR team",
+   "side": "red",
+   "platform": "generic/droneIsrTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.28084800574919,
+    "lng": 18.569286284686815
+   }
+  },
+  {
+   "id": "r-fpv-1",
+   "label": "Red FPV team 1",
+   "side": "red",
+   "platform": "generic/fpvTeamRf",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.28533956162415,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-fpv-2",
+   "label": "Red FPV team 2",
+   "side": "red",
+   "platform": "generic/fpvTeamRf",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.28084800574919,
+    "lng": 18.638392144141484
+   }
+  },
+  {
+   "id": "r-loiter",
+   "label": "Red loitering munitions",
+   "side": "red",
+   "platform": "generic/loiterTeam",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.31678045274884,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-jam",
+   "label": "Red EW",
+   "side": "red",
+   "platform": "generic/ewJammer",
+   "platformCount": 1,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.271864893999286,
+    "lng": 18.6
+   }
+  },
+  {
+   "id": "r-shorad",
+   "label": "Red SHORAD",
+   "side": "red",
+   "platform": "generic/shorad",
+   "platformCount": 2,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.27635644987424,
+    "lng": 18.615356857656593
+   }
+  },
+  {
+   "id": "r-guns",
+   "label": "Red artillery",
+   "side": "red",
+   "platform": "generic/sph155",
+   "platformCount": 3,
+   "troopQuality": "regular",
+   "position": {
+    "lat": 54.334746676248656,
+    "lng": 18.6
+   }
+  }
+ ],
+ "behaviours": {},
+ "behaviourTemplates": [],
+ "world": {
+  "obstacles": [
+   {
+    "owner": "red",
+    "kind": "minefield",
+    "at": {
+     "lat": 54.2404240028746,
+     "lng": 18.6
+    },
+    "widthM": 5000,
+    "depthM": 300,
+    "bearingDeg": 0,
+    "density": 0.4
+   }
+  ],
+  "environment": {
+   "startHour": 5,
+   "windMs": 5
+  }
+ }
+}

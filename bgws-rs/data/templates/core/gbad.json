@@ -1,0 +1,10 @@
+{
+  "id": "core/gbad",
+  "version": 1,
+  "name": "Ground-based air defence",
+  "parent": "core/default",
+  "doctrine": "Air defence protects the force from the air. It uses the cheapest interceptor that will do, keeps its radar off until it is needed, and moves after it has fired.",
+  "bias": {
+    "cheapest": 1
+  }
+}

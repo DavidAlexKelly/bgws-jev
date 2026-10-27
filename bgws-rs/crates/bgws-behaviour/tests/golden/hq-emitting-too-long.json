@@ -1,0 +1,48 @@
+{
+  "scene": {
+    "name": "hq-emitting-too-long",
+    "candidates": [
+      "core/hq"
+    ],
+    "trigger": "emittingTooLong",
+    "facts": {}
+  },
+  "template": "core/hq",
+  "lineage": [
+    "core/hq",
+    "core/default",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.emittingTooLong",
+    "title": "Emitting too long",
+    "question": "The command post has been on the air long enough to be found. What now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "A command post plans, fuses the reports it receives and passes orders. It stays hidden: it limits its time on the air and moves when it may have been found."
+    ],
+    "options": [
+      {
+        "id": "displace",
+        "action": "c2.displacePost",
+        "bias": 1
+      },
+      {
+        "id": "alternate",
+        "action": "c2.alternateBearer",
+        "bias": 0
+      },
+      {
+        "id": "accept",
+        "action": "c2.acceptRisk",
+        "bias": 0
+      }
+    ],
+    "fallback": "alternate",
+    "dropped": [],
+    "path": [
+      "w.emittingTooLong"
+    ]
+  }
+}

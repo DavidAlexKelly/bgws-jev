@@ -1,0 +1,1037 @@
+{
+  "id": "core/world",
+  "version": 1,
+  "name": "Default world behaviour",
+  "doctrine": "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+  "triggers": {
+    "fireRequestReceived": "w.fireRequestReceived",
+    "counterBatteryThreat": "w.counterBatteryThreat",
+    "obstacleEncountered": "w.obstacleEncountered",
+    "minefieldStruck": "w.minefieldStruck",
+    "dismountPoint": "w.dismountPoint",
+    "remountPoint": "w.remountPoint",
+    "stocksLow": "w.stocksLow",
+    "settledInPosition": "w.settledInPosition",
+    "outOfComms": "w.outOfComms",
+    "fireRequestsCompeting": "w.fireRequestsCompeting",
+    "commitReserve": "w.commitReserve",
+    "subordinateIneffective": "w.subordinateIneffective",
+    "emittingTooLong": "w.emittingTooLong",
+    "targetFound": "w.targetFound",
+    "linkDegraded": "w.linkDegraded",
+    "batteryLow": "w.batteryLow",
+    "jammedHeavily": "w.jammedHeavily",
+    "operatorLocated": "w.operatorLocated",
+    "droneOverhead": "w.droneOverhead",
+    "interceptTasked": "w.interceptTasked",
+    "emitterDetected": "w.emitterDetected",
+    "ownEmissionsExposed": "w.ownEmissionsExposed",
+    "jammingOrder": "w.jammingOrder",
+    "pntDegraded": "w.pntDegraded",
+    "missileWarning": "w.missileWarning",
+    "targetInWez": "w.targetInWez",
+    "bingoFuel": "w.bingoFuel",
+    "threatRingAhead": "w.threatRingAhead",
+    "trackAppears": "w.trackAppears",
+    "radarTargetedByArm": "w.radarTargetedByArm",
+    "nineLineReceived": "w.nineLineReceived",
+    "vampireInbound": "w.vampireInbound",
+    "magazineLow": "w.magazineLow",
+    "surfaceContact": "w.surfaceContact",
+    "sonarContact": "w.sonarContact",
+    "counterDetected": "w.counterDetected",
+    "usvSwarm": "w.usvSwarm",
+    "spaceTasking": "w.spaceTasking",
+    "cyberWindowOpen": "w.cyberWindowOpen",
+    "resupplyRequests": "w.resupplyRequests",
+    "routeThreatened": "w.routeThreatened",
+    "droneAttackOnConvoy": "w.droneAttackOnConvoy",
+    "casualtiesWaiting": "w.casualtiesWaiting",
+    "nodeStruck": "w.nodeStruck",
+    "nomination": "w.nomination",
+    "bdaUnclear": "w.bdaUnclear",
+    "airspaceConflict": "w.airspaceConflict"
+  },
+  "nodes": {
+    "w.fireRequestReceived": {
+      "kind": "choose",
+      "title": "Fire request",
+      "question": "A call for fire has come in. How does the section answer it?",
+      "options": [
+        {
+          "id": "fireNow",
+          "action": "fires.fireNow"
+        },
+        {
+          "id": "fireWhenLaid",
+          "action": "fires.fireWhenLaid"
+        },
+        {
+          "id": "fireThenScoot",
+          "action": "fires.fireThenScoot"
+        },
+        {
+          "id": "refuse",
+          "action": "fires.refuse"
+        }
+      ],
+      "fallback": "fireNow"
+    },
+    "w.counterBatteryThreat": {
+      "kind": "choose",
+      "title": "Counter-battery threat",
+      "question": "Its position may have been located by the enemy's radar. Move?",
+      "options": [
+        {
+          "id": "displaceNow",
+          "action": "fires.displaceNow"
+        },
+        {
+          "id": "finishThenDisplace",
+          "action": "fires.finishThenDisplace"
+        },
+        {
+          "id": "stay",
+          "action": "fires.stay"
+        }
+      ],
+      "fallback": "finishThenDisplace"
+    },
+    "w.obstacleEncountered": {
+      "kind": "choose",
+      "title": "Obstacle ahead",
+      "question": "An obstacle blocks the way. What now?",
+      "options": [
+        {
+          "id": "breach",
+          "action": "land.breach"
+        },
+        {
+          "id": "bypass",
+          "action": "land.bypass"
+        },
+        {
+          "id": "callEngineers",
+          "action": "land.callEngineers"
+        },
+        {
+          "id": "wait",
+          "action": "land.waitAtObstacle"
+        }
+      ],
+      "fallback": "callEngineers"
+    },
+    "w.minefieldStruck": {
+      "kind": "choose",
+      "title": "Minefield struck",
+      "question": "It has run onto mines. What now?",
+      "options": [
+        {
+          "id": "callEngineers",
+          "action": "land.callEngineers"
+        },
+        {
+          "id": "pushThroughLane",
+          "action": "land.pushThroughLane"
+        },
+        {
+          "id": "reverseOut",
+          "action": "land.reverseOut"
+        }
+      ],
+      "fallback": "reverseOut"
+    },
+    "w.dismountPoint": {
+      "kind": "choose",
+      "title": "Dismount?",
+      "question": "It is close to the enemy with infantry on board. Dismount?",
+      "options": [
+        {
+          "id": "dismountHere",
+          "action": "land.dismountHere"
+        },
+        {
+          "id": "dismountInCover",
+          "action": "land.dismountInCover"
+        },
+        {
+          "id": "stayMounted",
+          "action": "land.stayMounted"
+        }
+      ],
+      "fallback": "dismountInCover"
+    },
+    "w.remountPoint": {
+      "kind": "choose",
+      "title": "Remount?",
+      "question": "Its infantry are out and the fight here is over. Remount?",
+      "options": [
+        {
+          "id": "remount",
+          "action": "land.remount"
+        },
+        {
+          "id": "stayMounted",
+          "action": "land.stayMounted"
+        }
+      ],
+      "fallback": "remount"
+    },
+    "w.stocksLow": {
+      "kind": "choose",
+      "title": "Stocks low",
+      "question": "It is running low on ammunition or fuel. What now?",
+      "options": [
+        {
+          "id": "requestResupply",
+          "action": "land.requestResupply"
+        },
+        {
+          "id": "conserve",
+          "action": "land.conserve"
+        },
+        {
+          "id": "withdraw",
+          "action": "land.withdrawToResupply"
+        }
+      ],
+      "fallback": "requestResupply"
+    },
+    "w.settledInPosition": {
+      "kind": "choose",
+      "title": "Dig in?",
+      "question": "It has been holding the same ground for a while. Dig in?",
+      "options": [
+        {
+          "id": "digIn",
+          "action": "land.digIn"
+        },
+        {
+          "id": "carryOn",
+          "action": "c2.carryOn"
+        }
+      ],
+      "fallback": "digIn"
+    },
+    "w.outOfComms": {
+      "kind": "choose",
+      "title": "Out of comms",
+      "question": "It has heard nothing from its HQ for a while. What now?",
+      "options": [
+        {
+          "id": "carryOn",
+          "action": "c2.carryOnPhase"
+        },
+        {
+          "id": "actOnIntent",
+          "action": "c2.actOnIntent"
+        },
+        {
+          "id": "hold",
+          "action": "c2.holdAndReestablish"
+        },
+        {
+          "id": "regain",
+          "action": "c2.moveToRegainComms"
+        }
+      ],
+      "fallback": "carryOn"
+    },
+    "w.fireRequestsCompeting": {
+      "kind": "choose",
+      "title": "Fire requests competing",
+      "question": "More fire requests than shooters. Which first?",
+      "options": [
+        {
+          "id": "first",
+          "action": "c2.fireFirstRequest"
+        }
+      ],
+      "fallback": "first"
+    },
+    "w.commitReserve": {
+      "kind": "choose",
+      "title": "Commit the reserve?",
+      "question": "The plan's trigger for the reserve may have come. Commit it?",
+      "options": [
+        {
+          "id": "commit",
+          "action": "c2.commitReserve"
+        },
+        {
+          "id": "hold",
+          "action": "c2.holdReserve"
+        }
+      ],
+      "fallback": "hold"
+    },
+    "w.subordinateIneffective": {
+      "kind": "choose",
+      "title": "Subordinate ineffective",
+      "question": "One of its units can no longer fight as it should. What now?",
+      "options": [
+        {
+          "id": "reinforce",
+          "action": "c2.reinforce"
+        },
+        {
+          "id": "swap",
+          "action": "c2.swapWithReserve"
+        },
+        {
+          "id": "withdraw",
+          "action": "c2.withdrawIt"
+        },
+        {
+          "id": "carryOn",
+          "action": "c2.carryOn"
+        }
+      ],
+      "fallback": "withdraw"
+    },
+    "w.emittingTooLong": {
+      "kind": "choose",
+      "title": "Emitting too long",
+      "question": "The command post has been on the air long enough to be found. What now?",
+      "options": [
+        {
+          "id": "displace",
+          "action": "c2.displacePost"
+        },
+        {
+          "id": "alternate",
+          "action": "c2.alternateBearer"
+        },
+        {
+          "id": "accept",
+          "action": "c2.acceptRisk"
+        }
+      ],
+      "fallback": "alternate"
+    },
+    "w.targetFound": {
+      "kind": "choose",
+      "title": "Target found",
+      "question": "The drone has found a target. What does the team do?",
+      "options": [
+        {
+          "id": "report",
+          "action": "drones.reportAndWatch"
+        },
+        {
+          "id": "callFire",
+          "action": "drones.callFire"
+        },
+        {
+          "id": "handOff",
+          "action": "drones.handOff"
+        },
+        {
+          "id": "strike",
+          "action": "drones.strike"
+        }
+      ],
+      "fallback": "report"
+    },
+    "w.linkDegraded": {
+      "kind": "choose",
+      "title": "Link degraded",
+      "question": "The drone's control link is breaking up. What now?",
+      "options": [
+        {
+          "id": "pushOn",
+          "action": "drones.pushOn"
+        },
+        {
+          "id": "climb",
+          "action": "drones.climbForLink"
+        },
+        {
+          "id": "return",
+          "action": "drones.returnHome"
+        },
+        {
+          "id": "autonomous",
+          "action": "drones.goAutonomous"
+        }
+      ],
+      "fallback": "climb"
+    },
+    "w.batteryLow": {
+      "kind": "choose",
+      "title": "Battery low",
+      "question": "The drone is low on battery. What now?",
+      "options": [
+        {
+          "id": "return",
+          "action": "drones.returnHome"
+        },
+        {
+          "id": "onePass",
+          "action": "drones.onePass"
+        },
+        {
+          "id": "ditch",
+          "action": "drones.ditchOnTarget"
+        }
+      ],
+      "fallback": "return"
+    },
+    "w.jammedHeavily": {
+      "kind": "choose",
+      "title": "Jammed heavily",
+      "question": "The team keeps losing drones to jamming. What now?",
+      "options": [
+        {
+          "id": "fibre",
+          "action": "drones.switchToFibre"
+        },
+        {
+          "id": "relocate",
+          "action": "drones.relocate"
+        },
+        {
+          "id": "callFire",
+          "action": "drones.callFireOnJammer"
+        },
+        {
+          "id": "wait",
+          "action": "drones.wait"
+        }
+      ],
+      "fallback": "relocate"
+    },
+    "w.operatorLocated": {
+      "kind": "choose",
+      "title": "Operator may be located",
+      "question": "The team has been transmitting long enough to be found. What now?",
+      "options": [
+        {
+          "id": "relocate",
+          "action": "drones.relocate"
+        },
+        {
+          "id": "finishThenRelocate",
+          "action": "drones.finishThenRelocate"
+        },
+        {
+          "id": "stay",
+          "action": "drones.stay"
+        }
+      ],
+      "fallback": "finishThenRelocate"
+    },
+    "w.droneOverhead": {
+      "kind": "choose",
+      "title": "Drone overhead",
+      "question": "An enemy drone is overhead. What does the unit do?",
+      "options": [
+        {
+          "id": "freeze",
+          "action": "drones.freezeAndHide"
+        },
+        {
+          "id": "shoot",
+          "action": "drones.shootItDown"
+        },
+        {
+          "id": "scatter",
+          "action": "drones.scatter"
+        },
+        {
+          "id": "cover",
+          "action": "drones.moveToCover"
+        },
+        {
+          "id": "callCounterDrone",
+          "action": "drones.callCounterDrone"
+        }
+      ],
+      "fallback": "freeze"
+    },
+    "w.interceptTasked": {
+      "kind": "choose",
+      "title": "Intercept tasked",
+      "question": "Enemy drones are inbound. Which does the interceptor team go for?",
+      "options": [
+        {
+          "id": "engage",
+          "action": "drones.engageTarget"
+        },
+        {
+          "id": "hold",
+          "action": "drones.holdForBetter"
+        }
+      ],
+      "fallback": "engage"
+    },
+    "w.emitterDetected": {
+      "kind": "choose",
+      "title": "Emitter detected",
+      "question": "An enemy emitter is on the air. What does the EW team do?",
+      "options": [
+        {
+          "id": "locate",
+          "action": "ew.locate"
+        },
+        {
+          "id": "jam",
+          "action": "ew.jam"
+        },
+        {
+          "id": "report",
+          "action": "ew.reportForStrike"
+        },
+        {
+          "id": "ignore",
+          "action": "ew.ignore"
+        }
+      ],
+      "fallback": "locate"
+    },
+    "w.ownEmissionsExposed": {
+      "kind": "choose",
+      "title": "Own emissions exposed",
+      "question": "It has been on the air long enough to be found. What now?",
+      "options": [
+        {
+          "id": "silent",
+          "action": "ew.goSilent"
+        },
+        {
+          "id": "relocateAfter",
+          "action": "ew.relocateAfter"
+        },
+        {
+          "id": "carryOn",
+          "action": "ew.carryOn"
+        },
+        {
+          "id": "switchBearer",
+          "action": "ew.switchBearer"
+        }
+      ],
+      "fallback": "relocateAfter"
+    },
+    "w.jammingOrder": {
+      "kind": "choose",
+      "title": "Jamming",
+      "question": "Where does the jammer work now?",
+      "options": [
+        {
+          "id": "jamSector",
+          "action": "ew.jamSector"
+        },
+        {
+          "id": "protectAdvance",
+          "action": "ew.protectAdvance"
+        },
+        {
+          "id": "silent",
+          "action": "ew.goSilent"
+        }
+      ],
+      "fallback": "jamSector"
+    },
+    "w.pntDegraded": {
+      "kind": "choose",
+      "title": "GNSS degraded",
+      "question": "GNSS is jammed where it would fire. What now?",
+      "options": [
+        {
+          "id": "fireAnyway",
+          "action": "ew.fireAnyway"
+        },
+        {
+          "id": "switchMunition",
+          "action": "ew.switchMunition"
+        },
+        {
+          "id": "wait",
+          "action": "ew.waitForPnt"
+        },
+        {
+          "id": "droneGuidance",
+          "action": "ew.requestDroneGuidance"
+        }
+      ],
+      "fallback": "switchMunition"
+    },
+    "w.missileWarning": {
+      "kind": "choose",
+      "title": "Missile warning",
+      "question": "A missile is coming for the aircraft. What now?",
+      "options": [
+        {
+          "id": "defend",
+          "action": "air.defend"
+        },
+        {
+          "id": "press",
+          "action": "air.pressAttack"
+        },
+        {
+          "id": "abort",
+          "action": "air.abort"
+        }
+      ],
+      "fallback": "defend"
+    },
+    "w.targetInWez": {
+      "kind": "choose",
+      "title": "Target in the envelope",
+      "question": "An enemy aircraft is inside its missiles' envelope. Shoot?",
+      "options": [
+        {
+          "id": "shoot",
+          "action": "air.shootNow"
+        },
+        {
+          "id": "close",
+          "action": "air.closeForPk"
+        },
+        {
+          "id": "hold",
+          "action": "air.holdFire"
+        }
+      ],
+      "fallback": "shoot"
+    },
+    "w.bingoFuel": {
+      "kind": "choose",
+      "title": "Bingo fuel",
+      "question": "It is at bingo fuel or out of weapons. What now?",
+      "options": [
+        {
+          "id": "rtb",
+          "action": "air.rtb"
+        },
+        {
+          "id": "tanker",
+          "action": "air.tanker"
+        },
+        {
+          "id": "onePass",
+          "action": "air.onePass"
+        }
+      ],
+      "fallback": "rtb"
+    },
+    "w.threatRingAhead": {
+      "kind": "choose",
+      "title": "Threat ring ahead",
+      "question": "Its route crosses a known air-defence ring. What now?",
+      "options": [
+        {
+          "id": "around",
+          "action": "air.goAround"
+        },
+        {
+          "id": "low",
+          "action": "air.goLow"
+        },
+        {
+          "id": "sead",
+          "action": "air.requestSead"
+        },
+        {
+          "id": "abort",
+          "action": "air.abort"
+        }
+      ],
+      "fallback": "around"
+    },
+    "w.trackAppears": {
+      "kind": "choose",
+      "title": "Air track",
+      "question": "An air track is inside its engagement zone. Engage?",
+      "options": [
+        {
+          "id": "cheapest",
+          "action": "air.engageCheapest"
+        },
+        {
+          "id": "surest",
+          "action": "air.engageSurest"
+        },
+        {
+          "id": "hold",
+          "action": "air.holdTight"
+        },
+        {
+          "id": "letPass",
+          "action": "air.goSilentLetPass"
+        }
+      ],
+      "fallback": "cheapest"
+    },
+    "w.radarTargetedByArm": {
+      "kind": "choose",
+      "title": "Anti-radiation missile",
+      "question": "An anti-radiation missile is homing on its radar. What now?",
+      "options": [
+        {
+          "id": "shutDown",
+          "action": "air.shutDown"
+        },
+        {
+          "id": "stayUp",
+          "action": "air.stayUp"
+        },
+        {
+          "id": "relocate",
+          "action": "air.relocateRadar"
+        }
+      ],
+      "fallback": "shutDown"
+    },
+    "w.nineLineReceived": {
+      "kind": "choose",
+      "title": "9-line received",
+      "question": "A ground controller has asked for close air support. Accept?",
+      "options": [
+        {
+          "id": "accept",
+          "action": "air.acceptNineLine"
+        },
+        {
+          "id": "delay",
+          "action": "air.acceptWithDelay"
+        },
+        {
+          "id": "decline",
+          "action": "air.declineNineLine"
+        }
+      ],
+      "fallback": "accept"
+    },
+    "w.vampireInbound": {
+      "kind": "choose",
+      "title": "Missiles inbound",
+      "question": "Anti-ship missiles are inbound. How does the ship defend?",
+      "options": [
+        {
+          "id": "long",
+          "action": "sea.engageLong"
+        },
+        {
+          "id": "medium",
+          "action": "sea.engageMedium"
+        },
+        {
+          "id": "short",
+          "action": "sea.engageShort"
+        },
+        {
+          "id": "decoy",
+          "action": "sea.decoyManoeuvre"
+        },
+        {
+          "id": "unmask",
+          "action": "sea.unmask"
+        }
+      ],
+      "fallback": "medium"
+    },
+    "w.magazineLow": {
+      "kind": "choose",
+      "title": "Magazine low",
+      "question": "Its cells are running low and cannot be reloaded at sea. What now?",
+      "options": [
+        {
+          "id": "reload",
+          "action": "sea.leaveToReload"
+        },
+        {
+          "id": "conserve",
+          "action": "sea.conserve"
+        },
+        {
+          "id": "escort",
+          "action": "sea.requestEscort"
+        }
+      ],
+      "fallback": "conserve"
+    },
+    "w.surfaceContact": {
+      "kind": "choose",
+      "title": "Surface contact",
+      "question": "A surface contact. What does the ship do?",
+      "options": [
+        {
+          "id": "engage",
+          "action": "sea.engageBeyondHorizon"
+        },
+        {
+          "id": "identify",
+          "action": "sea.closeToIdentify"
+        },
+        {
+          "id": "shadow",
+          "action": "sea.shadow"
+        },
+        {
+          "id": "avoid",
+          "action": "sea.avoid"
+        }
+      ],
+      "fallback": "identify"
+    },
+    "w.sonarContact": {
+      "kind": "choose",
+      "title": "Sonar contact",
+      "question": "A sonar contact. What now?",
+      "options": [
+        {
+          "id": "attack",
+          "action": "sea.attack"
+        },
+        {
+          "id": "track",
+          "action": "sea.track"
+        },
+        {
+          "id": "evade",
+          "action": "sea.evade"
+        }
+      ],
+      "fallback": "track"
+    },
+    "w.counterDetected": {
+      "kind": "choose",
+      "title": "Counter-detected",
+      "question": "The submarine may have been detected. What now?",
+      "options": [
+        {
+          "id": "evade",
+          "action": "sea.evade"
+        },
+        {
+          "id": "attack",
+          "action": "sea.attack"
+        },
+        {
+          "id": "silent",
+          "action": "sea.goSilent"
+        }
+      ],
+      "fallback": "evade"
+    },
+    "w.usvSwarm": {
+      "kind": "choose",
+      "title": "Drone boats",
+      "question": "Explosive drone boats are closing. What now?",
+      "options": [
+        {
+          "id": "guns",
+          "action": "sea.gunsAndHelo"
+        },
+        {
+          "id": "withdraw",
+          "action": "sea.withdraw"
+        }
+      ],
+      "fallback": "guns"
+    },
+    "w.spaceTasking": {
+      "kind": "choose",
+      "title": "Satellite pass",
+      "question": "A satellite pass is coming. Which area does it image?",
+      "options": [
+        {
+          "id": "image",
+          "action": "space.imageArea"
+        },
+        {
+          "id": "skip",
+          "action": "space.skipPass"
+        }
+      ],
+      "fallback": "image"
+    },
+    "w.cyberWindowOpen": {
+      "kind": "choose",
+      "title": "Cyber window",
+      "question": "An authorised cyber access is ready. When?",
+      "options": [
+        {
+          "id": "execute",
+          "action": "cyber.executeNow"
+        },
+        {
+          "id": "hold",
+          "action": "cyber.holdForMoment"
+        },
+        {
+          "id": "abandon",
+          "action": "cyber.abandon"
+        }
+      ],
+      "fallback": "execute"
+    },
+    "w.resupplyRequests": {
+      "kind": "choose",
+      "title": "Resupply requests",
+      "question": "A unit has asked for resupply. How does it go?",
+      "options": [
+        {
+          "id": "convoy",
+          "action": "logistics.convoy"
+        },
+        {
+          "id": "ugv",
+          "action": "logistics.ugv"
+        },
+        {
+          "id": "drone",
+          "action": "logistics.drone"
+        },
+        {
+          "id": "dark",
+          "action": "logistics.waitForDark"
+        }
+      ],
+      "fallback": "convoy"
+    },
+    "w.routeThreatened": {
+      "kind": "choose",
+      "title": "Route threatened",
+      "question": "The convoy's route is threatened. What now?",
+      "options": [
+        {
+          "id": "pushOn",
+          "action": "logistics.pushOn"
+        },
+        {
+          "id": "alternate",
+          "action": "logistics.alternateRoute"
+        },
+        {
+          "id": "dark",
+          "action": "logistics.waitForDark"
+        },
+        {
+          "id": "scatter",
+          "action": "logistics.scatter"
+        }
+      ],
+      "fallback": "alternate"
+    },
+    "w.droneAttackOnConvoy": {
+      "kind": "choose",
+      "title": "Drone attack on the convoy",
+      "question": "A drone is attacking the convoy. What now?",
+      "options": [
+        {
+          "id": "scatter",
+          "action": "logistics.scatter"
+        },
+        {
+          "id": "cover",
+          "action": "logistics.takeCover"
+        },
+        {
+          "id": "pushOn",
+          "action": "logistics.pushOn"
+        }
+      ],
+      "fallback": "scatter"
+    },
+    "w.casualtiesWaiting": {
+      "kind": "choose",
+      "title": "Casualties waiting",
+      "question": "It has wounded waiting for evacuation. What now?",
+      "options": [
+        {
+          "id": "now",
+          "action": "medical.evacuateNow"
+        },
+        {
+          "id": "dark",
+          "action": "medical.waitForDark"
+        },
+        {
+          "id": "ugv",
+          "action": "medical.requestUgv"
+        }
+      ],
+      "fallback": "now"
+    },
+    "w.nodeStruck": {
+      "kind": "choose",
+      "title": "Node struck",
+      "question": "A supply node has been struck. What now?",
+      "options": [
+        {
+          "id": "relocate",
+          "action": "logistics.relocateNode"
+        },
+        {
+          "id": "disperse",
+          "action": "logistics.disperseStocks"
+        },
+        {
+          "id": "repair",
+          "action": "logistics.repairAndStay"
+        }
+      ],
+      "fallback": "disperse"
+    },
+    "w.nomination": {
+      "kind": "choose",
+      "title": "Target nominated",
+      "question": "A target in the picture meets the target list. Which shooter, or defer?",
+      "options": [
+        {
+          "id": "shooter",
+          "action": "killweb.useShooter"
+        },
+        {
+          "id": "defer",
+          "action": "killweb.defer"
+        }
+      ],
+      "fallback": "shooter"
+    },
+    "w.bdaUnclear": {
+      "kind": "choose",
+      "title": "Damage unclear",
+      "question": "The strike's result is not known. What now?",
+      "options": [
+        {
+          "id": "restrike",
+          "action": "killweb.restrike"
+        },
+        {
+          "id": "look",
+          "action": "killweb.lookAgain"
+        },
+        {
+          "id": "moveOn",
+          "action": "killweb.moveOn"
+        }
+      ],
+      "fallback": "look"
+    },
+    "w.airspaceConflict": {
+      "kind": "choose",
+      "title": "Airspace conflict",
+      "question": "Guns and aircraft would share the same airspace. What now?",
+      "options": [
+        {
+          "id": "holdGuns",
+          "action": "killweb.holdGuns"
+        },
+        {
+          "id": "shiftAircraft",
+          "action": "killweb.shiftAircraft"
+        },
+        {
+          "id": "accept",
+          "action": "killweb.acceptRisk"
+        }
+      ],
+      "fallback": "holdGuns"
+    }
+  }
+}

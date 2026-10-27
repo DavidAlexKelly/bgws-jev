@@ -1,0 +1,66 @@
+{
+  "scene": {
+    "name": "drone-no-autonomy",
+    "candidates": [
+      "core/drone"
+    ],
+    "trigger": "linkDegraded",
+    "facts": {}
+  },
+  "template": "core/drone",
+  "lineage": [
+    "core/drone",
+    "core/world"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "w.linkDegraded",
+    "title": "Link degraded",
+    "question": "The drone's control link is breaking up. What now?",
+    "doctrine": [
+      "Every unit acts on its own picture, inside its orders and the rules of engagement; it keeps itself able to carry out the intent.",
+      "A drone is cheap and expendable; the team behind it is not."
+    ],
+    "options": [
+      {
+        "id": "pushOn",
+        "action": "drones.pushOn",
+        "bias": 0
+      },
+      {
+        "id": "climb",
+        "action": "drones.climbForLink",
+        "bias": 0
+      },
+      {
+        "id": "return",
+        "action": "drones.returnHome",
+        "bias": 0
+      }
+    ],
+    "fallback": "climb",
+    "dropped": [
+      {
+        "id": "autonomous",
+        "action": "drones.goAutonomous",
+        "why": "gate:capability"
+      }
+    ],
+    "path": [
+      "w.linkDegraded"
+    ]
+  },
+  "gates": {
+    "roe": "always",
+    "fired_upon": false,
+    "weapon_release": "free",
+    "target_identified": false,
+    "emcon": "unrestricted",
+    "capabilities": [
+      "mobility",
+      "radio",
+      "drones"
+    ],
+    "cohesion": "steady"
+  }
+}

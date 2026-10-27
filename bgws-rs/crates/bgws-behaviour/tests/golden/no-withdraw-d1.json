@@ -1,0 +1,60 @@
+{
+  "scene": {
+    "name": "no-withdraw-d1",
+    "candidates": [
+      "custom/no-withdraw"
+    ],
+    "trigger": "D1",
+    "facts": {}
+  },
+  "template": "custom/no-withdraw",
+  "lineage": [
+    "custom/no-withdraw",
+    "core/default"
+  ],
+  "walk": {
+    "kind": "choose",
+    "nodeId": "D1",
+    "title": "New contact",
+    "question": "It has found an enemy it did not know about. What now?",
+    "doctrine": [],
+    "options": [
+      {
+        "id": "keep",
+        "action": "land.carryOn",
+        "bias": 0
+      },
+      {
+        "id": "engage",
+        "action": "land.engageNow",
+        "bias": 0
+      },
+      {
+        "id": "wait",
+        "action": "land.waitFor",
+        "bias": 0
+      },
+      {
+        "id": "better",
+        "action": "land.betterPosition",
+        "bias": 0
+      },
+      {
+        "id": "observe",
+        "action": "land.observe",
+        "bias": 0
+      }
+    ],
+    "fallback": "keep",
+    "dropped": [
+      {
+        "id": "pullBack",
+        "action": "land.pullBackToFriends",
+        "why": "removed"
+      }
+    ],
+    "path": [
+      "D1"
+    ]
+  }
+}

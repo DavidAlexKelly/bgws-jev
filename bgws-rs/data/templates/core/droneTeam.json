@@ -1,0 +1,7 @@
+{
+  "id": "core/droneTeam",
+  "version": 1,
+  "name": "Drone team",
+  "parent": "core/default",
+  "doctrine": "A drone team finds targets and strikes them or calls fire on them, from a hidden position it leaves when its emissions may have given it away."
+}

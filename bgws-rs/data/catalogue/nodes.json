@@ -1,0 +1,412 @@
+{
+ "$comment": "Installations and cyber (generic.ts NODES). Synthetic and open-source-anchored; each record's `source` and `rationale` say how.",
+ "platforms": [
+  {
+   "id": "generic/airbase",
+   "name": "Airbase",
+   "class": "installation",
+   "domain": "node",
+   "role": "Generates sorties; its runway can be cut.",
+   "sidc": "SFGPIBA",
+   "template": "core/node",
+   "plannedBy": "air",
+   "mover": {
+    "kind": "static",
+    "maxKmh": 0,
+    "cruiseKmh": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 2000,
+    "stayingPower": 12
+   },
+   "signatures": {
+    "index": {
+     "visual": 5,
+     "ir": 3
+    },
+    "rcs": {
+     "x": {
+      "front": 10000
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "s",
+     "rangeMaxM": 200000,
+     "scanS": 6,
+     "heightM": 30,
+     "radar": {
+      "gainDb": 38,
+      "pulsesIntegrated": 20
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 5000,
+     "heightM": 10
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "aamBvr": 200,
+     "glideBomb": 300,
+     "cruiseLand": 60,
+     "agm": 200
+    },
+    "medical": 0,
+    "spares": 500,
+    "fuelL": 5000000,
+    "batteryWh": 0
+   },
+   "carried": {
+    "aircraft": {
+     "archetype": "generic/fighter4",
+     "count": 12
+    }
+   },
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 1000000000,
+   "rationale": "Attacking an airbase cut sortie output by 35–40% in an illustrative study.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/cyberCell",
+   "name": "Cyber operations cell",
+   "class": "cyberUnit",
+   "domain": "node",
+   "role": "Holds prepared accesses to the enemy's networks.",
+   "sidc": "SFGPUUMSC",
+   "template": "core/cyber",
+   "plannedBy": "spaceCyber",
+   "mover": {
+    "kind": "static",
+    "maxKmh": 0,
+    "cruiseKmh": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 30,
+    "stayingPower": 2
+   },
+   "signatures": {
+    "index": {
+     "visual": 0.5,
+     "ir": 0.5
+    },
+    "rcs": {
+     "x": {
+      "front": 100
+     }
+    }
+   },
+   "sensors": [],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "fibre"
+    }
+   ],
+   "emitters": [],
+   "stores": {
+    "ammo": {},
+    "medical": 0,
+    "spares": 0,
+    "fuelL": 0,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 10000000,
+   "rationale": "An access takes 6–8 months to build; an effect lasts 2–3 days.",
+   "source": "R5.5, P21",
+   "provenance": "synthetic",
+   "sources": {
+    "role": {
+     "kind": "reference",
+     "ref": "R5.5, P21"
+    }
+   }
+  },
+  {
+   "id": "generic/depot",
+   "name": "Supply depot",
+   "class": "installation",
+   "domain": "node",
+   "role": "Holds a formation's stocks, well back.",
+   "sidc": "SFGPIB",
+   "template": "core/node",
+   "plannedBy": "sustainment",
+   "mover": {
+    "kind": "static",
+    "maxKmh": 0,
+    "cruiseKmh": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 50,
+    "stayingPower": 6
+   },
+   "signatures": {
+    "index": {
+     "visual": 3,
+     "ir": 2
+    },
+    "rcs": {
+     "x": {
+      "front": 1000
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 1000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "apfsds120": 4000,
+     "apfsds30": 30000,
+     "atgmTandem": 300,
+     "he120Mortar": 4000,
+     "he155": 8000,
+     "gmlrs": 120,
+     "samShort": 100,
+     "samMedium": 40,
+     "fpvHeat": 1000,
+     "ball556": 500000
+    },
+    "medical": 500,
+    "spares": 300,
+    "fuelL": 500000,
+    "batteryWh": 1000000
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 20000000,
+   "rationale": "Placed about 120 km back where the threat dictates.",
+   "source": "R7, P18",
+   "provenance": "synthetic",
+   "sources": {
+    "role": {
+     "kind": "reference",
+     "ref": "R7, P18"
+    }
+   }
+  },
+  {
+   "id": "generic/port",
+   "name": "Naval port",
+   "class": "installation",
+   "domain": "node",
+   "role": "Where warships reload their cells.",
+   "sidc": "SFGPIBN",
+   "template": "core/node",
+   "plannedBy": "maritime",
+   "mover": {
+    "kind": "static",
+    "maxKmh": 0,
+    "cruiseKmh": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 500,
+    "stayingPower": 15
+   },
+   "signatures": {
+    "index": {
+     "visual": 5,
+     "ir": 3
+    },
+    "rcs": {
+     "x": {
+      "front": 10000
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "radar",
+     "band": "x",
+     "rangeMaxM": 60000,
+     "scanS": 4,
+     "heightM": 30,
+     "radar": {
+      "gainDb": 32,
+      "pulsesIntegrated": 50
+     }
+    },
+    {
+     "kind": "eye",
+     "rangeMaxM": 10000,
+     "heightM": 20
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "samLong": 200,
+     "samMedium": 200,
+     "ascm": 100,
+     "heavyTorpedo": 100,
+     "ciws20": 20000
+    },
+    "medical": 0,
+    "spares": 0,
+    "fuelL": 20000000,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 2000000000,
+   "rationale": "Sevastopol's lesson: a port within reach is a port lost.",
+   "source": "synthetic",
+   "provenance": "synthetic"
+  },
+  {
+   "id": "generic/railhead",
+   "name": "Railhead",
+   "class": "installation",
+   "domain": "node",
+   "role": "Where the strategic supply line ends.",
+   "sidc": "SFGPIRR",
+   "template": "core/node",
+   "plannedBy": "sustainment",
+   "mover": {
+    "kind": "static",
+    "maxKmh": 0,
+    "cruiseKmh": 0
+   },
+   "body": {
+    "count": 1,
+    "vulnerability": "structure",
+    "crew": 40,
+    "stayingPower": 8
+   },
+   "signatures": {
+    "index": {
+     "visual": 4,
+     "ir": 2
+    },
+    "rcs": {
+     "x": {
+      "front": 3000
+     }
+    }
+   },
+   "sensors": [
+    {
+     "kind": "eye",
+     "rangeMaxM": 1000,
+     "forDeg": 360,
+     "scanS": 2,
+     "classifies": "type",
+     "seesAir": true,
+     "heightM": 2
+    }
+   ],
+   "mounts": [],
+   "radios": [
+    {
+     "bearer": "vhf"
+    }
+   ],
+   "emitters": [
+    {
+     "kind": "radio",
+     "band": "vhf",
+     "erpW": 50,
+     "dutyCycle": 0.1
+    }
+   ],
+   "stores": {
+    "ammo": {
+     "he155": 30000,
+     "apfsds120": 10000,
+     "ball556": 2000000,
+     "fpvHeat": 5000
+    },
+    "medical": 2000,
+    "spares": 1000,
+    "fuelL": 2000000,
+    "batteryWh": 0
+   },
+   "carried": {},
+   "crew": {
+    "quality": 4
+   },
+   "costUsd": 50000000,
+   "rationale": "Trucks reach about 90–120 miles from it.",
+   "source": "R7, P18",
+   "provenance": "synthetic",
+   "sources": {
+    "role": {
+     "kind": "reference",
+     "ref": "R7, P18"
+    }
+   }
+  }
+ ]
+}

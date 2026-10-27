@@ -1,0 +1,103 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/bgws-core",
+  "crates/bgws-catalogue",
+  "crates/bgws-env",
+  "crates/bgws-prop",
+  "crates/bgws-gpu",
+  "crates/bgws-know",
+  "crates/bgws-behaviour",
+  "crates/bgws-scenario",
+  "crates/bgws-models",
+  "crates/bgws-domains",
+  "crates/bgws-ops",
+  "crates/bgws-sim",
+  "crates/bgws-decide",
+  "crates/bgws-analysis",
+  "crates/bgws-run",
+  "apps/server",
+  "apps/desktop",
+]
+# The desktop shell needs WebKitGTK (libwebkit2gtk-4.1-dev); build it with -p bgws-desktop.
+default-members = [
+  "crates/bgws-core",
+  "crates/bgws-catalogue",
+  "crates/bgws-env",
+  "crates/bgws-prop",
+  "crates/bgws-gpu",
+  "crates/bgws-know",
+  "crates/bgws-behaviour",
+  "crates/bgws-scenario",
+  "crates/bgws-models",
+  "crates/bgws-domains",
+  "crates/bgws-ops",
+  "crates/bgws-sim",
+  "crates/bgws-decide",
+  "crates/bgws-analysis",
+  "crates/bgws-run",
+  "apps/server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+bgws-core = { path = "crates/bgws-core" }
+bgws-catalogue = { path = "crates/bgws-catalogue" }
+bgws-env = { path = "crates/bgws-env" }
+bgws-prop = { path = "crates/bgws-prop" }
+bgws-gpu = { path = "crates/bgws-gpu" }
+bgws-know = { path = "crates/bgws-know" }
+bgws-behaviour = { path = "crates/bgws-behaviour" }
+bgws-scenario = { path = "crates/bgws-scenario" }
+bgws-models = { path = "crates/bgws-models" }
+bgws-domains = { path = "crates/bgws-domains" }
+bgws-ops = { path = "crates/bgws-ops" }
+bgws-sim = { path = "crates/bgws-sim" }
+bgws-decide = { path = "crates/bgws-decide" }
+bgws-analysis = { path = "crates/bgws-analysis" }
+bgws-run = { path = "crates/bgws-run" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+thiserror = "1"
+anyhow = "1"
+rand = "0.8"
+rand_chacha = "0.3"
+rand_distr = "0.4"
+statrs = "0.17"
+libm = "0.2"
+glam = { version = "0.29", features = ["serde"] }
+nalgebra = { version = "0.33", features = ["serde-serialize"] }
+petgraph = "0.6"
+pathfinding = "4"
+rayon = "1"
+bevy_ecs = { version = "0.14", default-features = false, features = ["multi_threaded"] }
+sgp4 = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+wgpu = "22"
+pollster = "0.3"
+bytemuck = { version = "1", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
+proptest = "1"
+approx = "0.5"
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.release]
+debug = "line-tables-only"
+
+# DuckDB (the `duckdb` feature) compiles from C++; without debug info its objects are a fraction of the size.
+[profile.release.package.libduckdb-sys]
+debug = false
