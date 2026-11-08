@@ -316,15 +316,52 @@ fn nearest_friend(s: &Sim, e: bevy_ecs::prelude::Entity) -> Option<(EntityId, En
         .min_by(|a, b| a.1.sub(pos).horizontal().total_cmp(&b.1.sub(pos).horizontal()).then(a.0.cmp(&b.0)))
 }
 
-/// A route for a unit to `to` over the ground, by its vehicle class.
-pub(crate) fn route_for(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu) -> Vec<Enu> {
+/// A route for a unit to `to` over the ground: by its vehicle, for what the
+/// move is for, and around the enemy its side believes in (never the truth).
+/// A unit whose job is to find the enemy (recce, a screen, observers) keeps
+/// to cover but does not steer away from it.
+pub(crate) fn route_for(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS) -> Vec<Enu> {
+    let seeks = seeks_contact(s, e, None);
+    plan_route(s, e, to, mode, seeks)
+}
+
+/// Is this unit out to find the enemy: by its orders (when given), its mission, or its role?
+pub(crate) fn seeks_contact(s: &Sim, e: bevy_ecs::prelude::Entity, order: Option<&crate::hq::UnitOrder>) -> bool {
+    const WORDS: [&str; 6] = ["recce", "recon", "screen", "observ", "scout", "guard"];
+    let has = |t: &str| {
+        let t = t.to_lowercase();
+        WORDS.iter().any(|w| t.contains(w))
+    };
+    if let Some(o) = order {
+        return o.on_contact.as_deref() == Some("observe") || has(&o.task);
+    }
+    s.world.get::<Act>(e).is_some_and(|a| has(&a.mission.purpose)) || s.world.get::<Ident>(e).is_some_and(|i| has(&i.platform.role) || has(&i.platform.class))
+}
+
+fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, seeks: bool) -> Vec<Enu> {
     let k = s.world.get::<Kin>(e).expect("k");
-    let class = match s.world.get::<Ident>(e).expect("i").platform.mover.kind {
+    let i = s.world.get::<Ident>(e).expect("i");
+    let class = match i.platform.mover.kind {
         bgws_catalogue::MoverKind::Tracked => bgws_env::VehicleClass::Tracked,
         bgws_catalogue::MoverKind::Foot => bgws_env::VehicleClass::Foot,
         _ => bgws_env::VehicleClass::Wheeled,
     };
-    s.ctx.ground.route(k.pos, to, class)
+    let threats = if seeks { Vec::new() } else { believed_threats(s, i.side) };
+    let m = &i.platform.mover;
+    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats };
+    s.ctx.ground.plan(&r, &s.ctx.ground.route_params).waypoints
+}
+
+/// Where a side believes the enemy is: its confirmed tracks and its units' own sightings.
+pub(crate) fn believed_threats(s: &Sim, side: bgws_core::Side) -> Vec<(f64, f64)> {
+    let mut v: Vec<(f64, f64)> = s.ctx.tracks.get(&side).map(|t| t.confirmed(&s.ctx.p.know).iter().map(|t| (t.position.e, t.position.n)).collect()).unwrap_or_default();
+    for &o in &s.ctx.order {
+        let (Some(oi), Some(aw)) = (s.world.get::<Ident>(o), s.world.get::<Aware>(o)) else { continue };
+        if oi.side == side && alive(s, o) {
+            v.extend(aw.seen.values().map(|x| (x.at.e, x.at.n)));
+        }
+    }
+    v
 }
 
 /// The land action library (`actions/land.ts`), as activities.
@@ -364,7 +401,7 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         "betterPosition" | "hullDownThenFire" | "goQuietInCoverMove" => Some(Activity::Move { route: vec![better_spot(s, e)], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) }),
         "pullBackToFriends" | "joinNearestFriends" | "rejoin" => {
             let to = nearest_friend(s, e).map(|f| f.1).unwrap_or_else(|| point_away(s, e, withdraw_m));
-            Some(Activity::Withdraw { route: route_for(s, e, to), then: Some(Box::new(Activity::Overwatch)) })
+            Some(Activity::Withdraw { route: route_for(s, e, to, MoveModeS::Tactical), then: Some(Box::new(Activity::Overwatch)) })
         }
         "outOfSight" | "pullBackFromBearing" | "breakContactFirst" | "slipAway" | "outOfTargetSight" => Some(Activity::Withdraw { route: vec![point_away(s, e, withdraw_m)], then: Some(Box::new(Activity::Overwatch)) }),
         "askFriendForHelp" => {
@@ -375,7 +412,7 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         }
         "helpFriend" | "moveToSupport" => {
             let to = about.and_then(|f| s.world.get::<Kin>(s.ctx.entity(f)).map(|k| k.pos)).or_else(|| nearest_friend(s, e).map(|f| f.1));
-            to.map(|p| Activity::Move { route: route_for(s, e, p), mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })
+            to.map(|p| Activity::Move { route: route_for(s, e, p, MoveModeS::Tactical), mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })
         }
         "assault" => target.and_then(|t| s.world.get::<Aware>(e).and_then(|a| a.seen.get(&t).map(|v| v.at))).map(|p| Activity::Move { route: vec![p], mode: MoveModeS::Assault, then: Some(Box::new(Activity::Overwatch)) }),
         "searchBearing" => {
@@ -416,6 +453,7 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
         return false;
     }
     let own = s.ctx.frame.enu_to_geodetic(s.world.get::<Kin>(e).expect("k").pos);
+    let seeks = seeks_contact(s, e, Some(o)) || seeks_contact(s, e, None);
     let phases: Vec<Activity> = o
         .phases
         .iter()
@@ -428,8 +466,8 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
                 _ => MoveModeS::Tactical,
             };
             match (ph.action.as_str(), to) {
-                ("move", Some(p)) => Activity::Move { route: route_for(s, e, p), mode, then: None },
-                ("withdraw", Some(p)) => Activity::Withdraw { route: route_for(s, e, p), then: None },
+                ("move", Some(p)) => Activity::Move { route: plan_route(s, e, p, mode, seeks), mode, then: None },
+                ("withdraw", Some(p)) => Activity::Withdraw { route: plan_route(s, e, p, MoveModeS::Tactical, false), then: None },
                 ("observe", _) => Activity::Observe,
                 ("hold", _) => Activity::Hold,
                 _ => Activity::Overwatch,

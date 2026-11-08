@@ -1464,7 +1464,7 @@ pub fn relocate(s: &mut Sim, id: EntityId) {
     }
     let dist = s.world.get_resource::<C4>().map(|c| c.p.relocate_m).unwrap_or(1500.0);
     let to = super::ew::point_away(s, id, dist);
-    let route = crate::decide::route_for(s, e, to);
+    let route = crate::decide::route_for(s, e, to, MoveModeS::March);
     if let Some(mut a) = s.world.get_mut::<Act>(e) {
         a.activity = Activity::Move { route, mode: MoveModeS::March, then: Some(Box::new(Activity::Hold)) };
     }
@@ -1669,7 +1669,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
     };
     super::put(s, c4);
     if let Some((to, mode)) = move_to {
-        let route = crate::decide::route_for(s, e, to);
+        let route = crate::decide::route_for(s, e, to, mode);
         if let Some(mut a) = s.world.get_mut::<Act>(e) {
             a.activity = Activity::Move { route, mode, then: Some(Box::new(Activity::Hold)) };
         }

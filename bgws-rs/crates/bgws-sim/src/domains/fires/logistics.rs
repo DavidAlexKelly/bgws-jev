@@ -321,7 +321,7 @@ fn convoys(s: &mut Sim, st: &mut FiresWorld) {
         let moving = s.world.get::<Act>(te).map(|a| a.activity.moving()).unwrap_or(false);
         let stale = (now - job.issued).secs() >= 60.0 && job.leg == Leg::ToUnit;
         if !moving || stale {
-            let mut route = crate::decide::route_for(s, te, dest);
+            let mut route = crate::decide::route_for(s, te, dest, MoveModeS::March);
             if job.detour {
                 let mid = tpos.add(dest).scale(0.5);
                 let d = dest.sub(tpos);

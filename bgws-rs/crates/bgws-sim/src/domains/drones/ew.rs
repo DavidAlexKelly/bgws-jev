@@ -574,7 +574,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
     };
     super::put(s, c4);
     if let Some((to, mode)) = move_to {
-        let route = crate::decide::route_for(s, e, to);
+        let route = crate::decide::route_for(s, e, to, mode);
         if let Some(mut a) = s.world.get_mut::<Act>(e) {
             a.activity = Activity::Move { route, mode, then: Some(Box::new(Activity::Hold)) };
         }

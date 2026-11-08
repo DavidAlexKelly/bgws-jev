@@ -233,8 +233,40 @@ and the editor's *Move onto the pack* does the same. On a pack's roads a
 vehicle moves at the road's speed for its class, and route planning prefers
 roads where they are quicker. Moving vehicles in a shipped scenario on the
 Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
-ground. Generated ground has no road layer, so the shipped scenarios and the
-calibration baselines are unchanged.
+ground. Generated ground has no road layer.
+
+### Moving on roads and across country
+
+One planner (`bgws_sim::routing`) searches roads and open ground together.
+It works on the terrain grid at its own resolution (30 m), in a corridor round
+the move. Very long moves use a coarser grid, and a wider corridor when
+nothing joins the ends. A cell's cost is its travel time (the road's speed for
+the vehicle, or what the going allows), plus exposure, plus a verge's time to
+get on or off a road. What the move is for decides the weights:
+
+| Mode | Weighs |
+|---|---|
+| March | time; wheeled vehicles keep to roads (a strong preference), tracked ones cut across fields when that is quicker (a soft one) |
+| Tactical | time, open ground by the land cover's concealment, more so near the enemy the side believes in; roads near that enemy cost more, the nearer the more |
+| Assault | time only: straight at it |
+| Stealth | concealment everywhere; roads are watched |
+
+Exposure counts the time spent in the open: troops on foot are exposed for
+as long as they take to cross, and a fast vehicle at least at a reference
+pace. Threats are the side's confirmed tracks and its units' own sightings,
+never the truth. Recce, screens and observers keep to cover but do not steer
+away from the enemy they are looking for. Orders set the mode per phase
+(`march`, `assault`, `bound` for stealth, otherwise tactical).
+
+Every weight is a figure (`sim.route.*`, [default] until calibrated). On the
+Kaliningrad pack, moving vehicles spend 74% of their time on roads, which
+cover 23% of the ground. A 20 km move plans in about 50 ms.
+
+Next steps:
+- exposure from believed threats' viewsheds;
+- mines, craters and blown bridges cutting the road graph;
+- columns on roads and formations off them;
+- calibration of road march rates and of where units leave the road.
 
 Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
 cover derived from it are derived databases). Mapterhorn asks for

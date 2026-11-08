@@ -567,7 +567,7 @@ pub fn apply(
                 .map(|i| i.domain == bgws_catalogue::Domain::Land)
                 .unwrap_or(false)
             {
-                let route = crate::decide::route_for(s, e, to);
+                let route = crate::decide::route_for(s, e, to, MoveModeS::March);
                 s.world.get_mut::<Act>(e).expect("a").activity = Activity::Move {
                     route,
                     mode: MoveModeS::March,

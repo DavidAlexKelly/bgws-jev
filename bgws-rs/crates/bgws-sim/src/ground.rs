@@ -13,9 +13,8 @@ use bgws_env::synth::{generate, SynthParams};
 use bgws_env::{LandCover, LandCoverTable, RoadClass, RoadLine, RoadSpeeds, Terrain};
 use bgws_gpu::{Backend, HeightGrid, LosQuery};
 use bgws_prop::los::{optical_los, optical_los_batch, OpticalLos, OpticalParams, TerrainGrid};
-use bgws_env::{cost_astar, GridSpec, Raster};
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use bgws_env::Raster;
+use std::sync::Arc;
 
 pub struct Ground {
     pub terrain: Terrain,
@@ -27,9 +26,11 @@ pub struct Ground {
     pub backend: Backend,
     /// The best road class in each cell (class + 1; 0 none), when there are roads.
     pub roads: Option<Arc<Raster<u8>>>,
+    /// The road lines the layer was drawn from, for the viewer.
+    pub road_lines: Option<Arc<Vec<RoadLine>>>,
     pub road_speeds: RoadSpeeds,
-    /// Route-planning cost rasters by vehicle class, built on first use.
-    costs: Mutex<BTreeMap<u8, Arc<Raster<f64>>>>,
+    /// The route planner's weights.
+    pub route_params: crate::routing::RouteParams,
 }
 
 impl std::fmt::Debug for Ground {
@@ -78,8 +79,9 @@ impl Ground {
             micro_seed,
             backend: Backend::cpu(),
             roads: None,
+            road_lines: None,
             road_speeds: RoadSpeeds::from_figures(figures),
-            costs: Mutex::new(BTreeMap::new()),
+            route_params: crate::routing::RouteParams::from_figures(figures),
         }
     }
 
@@ -105,7 +107,7 @@ impl Ground {
             }
         }
         self.roads = Some(Arc::new(r));
-        self.costs = Mutex::new(BTreeMap::new());
+        self.road_lines = Some(Arc::new(lines.to_vec()));
         self
     }
 
@@ -173,63 +175,16 @@ impl Ground {
         optical_los_batch(&self.backend, &self.grid(), queries, &self.optical)
     }
 
-    /// Seconds per metre over a coarse grid for one vehicle class.
-    fn cost_raster(&self, class: EnvVehicle) -> Arc<Raster<f64>> {
-        let key = class as u8;
-        if let Some(r) = self.costs.lock().expect("cost cache").get(&key) {
-            return r.clone();
-        }
-        let t = self.terrain.spec;
-        let factor = (90.0 / t.cell).round().max(1.0) as usize;
-        let spec = GridSpec::new(t.width.div_ceil(factor), t.height.div_ceil(factor), t.cell * factor as f64, t.origin_e, t.origin_n);
-        let r = Arc::new(Raster::from_fn(spec, |i, j| {
-            let (e, n) = spec.pos(i, j);
-            // The best road anywhere in the coarse cell counts: routes find roads.
-            let mut road_kmh: f64 = 0.0;
-            if self.roads.is_some() {
-                for di in 0..factor {
-                    for dj in 0..factor {
-                        let (fe, fn_) = (e + (di as f64 - (factor / 2) as f64) * t.cell, n + (dj as f64 - (factor / 2) as f64) * t.cell);
-                        road_kmh = road_kmh.max(self.road_kmh(fe, fn_, class).unwrap_or(0.0));
-                    }
-                }
-            }
-            let v = self.going(e, n, class).speed_kmh.max(road_kmh) / 3.6;
-            if v < 0.3 {
-                f64::INFINITY
-            } else {
-                1.0 / v
-            }
-        }));
-        self.costs.lock().expect("cost cache").insert(key, r.clone());
-        r
-    }
-
-    /// A route from `a` to `b` that avoids bad going (§8.1: the cost raster
-    /// for tactical movement), as waypoints every few hundred metres.
+    /// A tactical route at a vehicle class's typical speeds, with no threats
+    /// known (tests and tools; units plan through `decide::route_for`).
     pub fn route(&self, a: Enu, b: Enu, class: EnvVehicle) -> Vec<Enu> {
-        let straight = vec![b];
-        if a.sub(b).horizontal() < 400.0 {
-            return straight;
-        }
-        let cost = self.cost_raster(class);
-        let s = cost.spec;
-        let (Some(start), Some(goal)) = (s.nearest(a.e, a.n), s.nearest(b.e, b.n)) else { return straight };
-        let Some(path) = cost_astar(&cost, None, s.idx(start.0, start.1), s.idx(goal.0, goal.1)) else { return straight };
-        let mut out: Vec<Enu> = path
-            .cells
-            .iter()
-            .enumerate()
-            // Closer waypoints on roads, so a unit keeps to the bends.
-            .filter(|(i, _)| if self.roads.is_some() { i % 2 == 1 } else { i % 4 == 3 })
-            .map(|(_, &k)| {
-                let (i, j) = s.ij(k);
-                let (e, n) = s.pos(i, j);
-                Enu::new(e, n, 0.0)
-            })
-            .collect();
-        out.push(b);
-        out
+        let (road_kmh, cross_kmh) = match class {
+            EnvVehicle::Tracked => (60.0, 40.0),
+            EnvVehicle::Wheeled => (90.0, 40.0),
+            EnvVehicle::Foot => (5.0, 4.0),
+        };
+        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[] };
+        self.plan(&r, &self.route_params).waypoints
     }
 
     /// Does `p` lie on the grid?
@@ -242,6 +197,7 @@ impl Ground {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bgws_env::GridSpec;
 
     #[test]
     fn routes_through_woods_take_the_road_round() {
