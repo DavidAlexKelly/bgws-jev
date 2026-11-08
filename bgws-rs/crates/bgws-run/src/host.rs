@@ -109,12 +109,15 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     r
 }
 
+/// A pack's ground for a scenario: terrain, road lines and rivers in its frame.
+pub type PackGround = (bgws_env::Terrain, Vec<bgws_env::RoadLine>, Vec<bgws_env::River>);
+
 /// The scenario's theatre pack, if it names one: terrain assembled over the
 /// area its positions cover (with a margin), and the pack's roads there.
 /// The host does the disk, the sim stays pure. A pack built around another
 /// origin (a box's centre) is re-sampled into the scenario's frame through
 /// latitude and longitude, so positions and ground agree.
-pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<(bgws_env::Terrain, Vec<bgws_env::RoadLine>)>> {
+pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
     let Some(dir) = &scenario.theatre.pack else { return Ok(None) };
     let path = crate::resolve_pack(dir);
     let mut pack = bgws_env::TheatrePack::open(&path).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
@@ -145,15 +148,30 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<(bgws_env::Terrain, Vec
         }
     };
     let terrain = if same { terrain } else { reframe(&terrain, &pack_frame, &frame) };
+    let inside = |p: &[f64; 2]| p[0] >= aoi.min_e && p[0] <= aoi.max_e && p[1] >= aoi.min_n && p[1] <= aoi.max_n;
     let mut roads = Vec::new();
     if let Some(rg) = &pack.meta.road_graph {
         let g = bgws_geodata::roads::RoadGraph::read(&path.join(rg)).map_err(|e| anyhow!("theatre pack {dir} roads: {e}"))?;
-        let inside = |p: &[f64; 2]| p[0] >= aoi.min_e && p[0] <= aoi.max_e && p[1] >= aoi.min_n && p[1] <= aoi.max_n;
-        for e in g.edges.iter().filter(|e| e.geom.iter().any(inside)) {
-            roads.push(bgws_env::RoadLine { class: e.class, bridge: e.bridge, line: e.geom.iter().map(|p| to_scenario(p[0], p[1])).collect() });
+        for (k, e) in g.edges.iter().enumerate().filter(|(_, e)| e.geom.iter().any(inside)) {
+            roads.push(bgws_env::RoadLine {
+                class: e.class,
+                bridge: e.bridge,
+                tunnel: e.tunnel,
+                edge: k as u32,
+                from: e.from,
+                to: e.to,
+                line: e.geom.iter().map(|p| to_scenario(p[0], p[1])).collect(),
+            });
         }
     }
-    Ok(Some((terrain, roads)))
+    let mut rivers = Vec::new();
+    if let Some(rf) = &pack.meta.rivers {
+        let all: Vec<bgws_env::River> = std::fs::read(path.join(rf)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        for r in all.into_iter().filter(|r| r.line.iter().any(|p| inside(&[p.0, p.1]))) {
+            rivers.push(bgws_env::River { line: r.line.iter().map(|p| to_scenario(p.0, p.1)).collect(), ..r });
+        }
+    }
+    Ok(Some((terrain, roads, rivers)))
 }
 
 /// A terrain grid in another ENU frame, sampled through latitude and longitude.
@@ -221,9 +239,10 @@ impl Host {
         let overrides = figures.iter().filter(|f| defaults.figure(&f.key).is_some_and(|d| d.value != f.value)).map(|f| (f.key.clone(), f.value)).collect();
         let mut sim_opts = opts.sim.clone();
         if sim_opts.terrain.is_none() {
-            if let Some((terrain, roads)) = load_pack(scenario)? {
+            if let Some((terrain, roads, rivers)) = load_pack(scenario)? {
                 sim_opts.terrain = Some(terrain);
                 sim_opts.roads = Some(roads);
+                sim_opts.rivers = Some(rivers);
             }
         }
         let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;

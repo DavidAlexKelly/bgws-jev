@@ -193,6 +193,29 @@ pub fn point_away(s: &Sim, id: EntityId, dist: f64) -> Enu {
     me.add(dir.scale(dist))
 }
 
+/// A new site `dist` metres to one side (across the line to the enemy), for
+/// a displacement: towards where the unit started, so repeated moves swing
+/// about its first site rather than ratchet it out of its area, and back to
+/// its first depth by up to half the step.
+pub fn point_aside(s: &Sim, id: EntityId, dist: f64) -> Enu {
+    let me = pos_of(s, id).unwrap_or_default();
+    let back = point_away(s, id, 1.0).sub(me);
+    let across = Enu::new(-back.n, back.e, 0.0);
+    let start = s
+        .ctx
+        .order
+        .get(id.index())
+        .and_then(|&e| s.world.get::<crate::components::Ident>(e))
+        .and_then(|i| s.ctx.scenario.force(&i.name))
+        .map(|f| s.ctx.frame.geodetic_to_enu(f.position))
+        .unwrap_or(me);
+    let off = start.sub(me);
+    let lateral = off.e * across.e + off.n * across.n;
+    let sign = if lateral.abs() > dist * 0.25 { lateral.signum() } else if id.0.is_multiple_of(2) { 1.0 } else { -1.0 };
+    let depth = (off.e * back.e + off.n * back.n).clamp(-dist * 0.5, dist * 0.5);
+    me.add(across.scale(sign * dist)).add(back.scale(depth))
+}
+
 fn gauss(rng: &mut impl Rng) -> f64 {
     let u1: f64 = rng.gen::<f64>().max(1e-12);
     let u2: f64 = rng.gen();
@@ -539,7 +562,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
         }
         "relocateAfter" => {
             c4.on_air.insert(id, 0.0);
-            move_to = Some((point_away(s, id, c4.p.relocate_m), MoveModeS::March));
+            move_to = Some((point_aside(s, id, c4.p.relocate_m), MoveModeS::March));
             true
         }
         "protectAdvance" => {

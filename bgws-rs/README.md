@@ -254,13 +254,38 @@ get on or off a road. What the move is for decides the weights:
 Exposure counts the time spent in the open: troops on foot are exposed for
 as long as they take to cross, and a fast vehicle at least at a reference
 pace. Threats are the side's confirmed tracks and its units' own sightings,
-never the truth. Recce, screens and observers keep to cover but do not steer
-away from the enemy they are looking for. Orders set the mode per phase
+never the truth. The enemy at the destination is what the move closes with,
+so only threats elsewhere are steered round. Recce, screens and observers
+keep to cover but do not steer away from the enemy they are looking for.
+An urgent move (orders `now`, or fire support getting into range) weighs
+exposure only near a believed threat. Orders set the mode per phase
 (`march`, `assault`, `bound` for stealth, otherwise tactical).
 
+**Rivers and bridges.** A pack's rivers are drawn onto the grid with their
+depth. Across country, a vehicle crosses one only where it is shallower than
+the vehicle can ford (`env.ford.*`: tracked 1.2 m, wheeled 0.75 m, on foot
+0.9 m), at the cost of a ford's time. A road on the ground crosses what it
+crosses (culverts, causeways). Bridges and tunnels sit on a second level of
+the grid: a unit gets on and off them only along their road, from an edge
+that joins them at a node, or onto open ground at their ends. So an
+overpass is not a junction with the road beneath it.
+
+`Ground::blow_bridge(edge)` drops a bridge, leaving whatever is under it.
+`Ground::cut_road(edge)` takes a road's speed and any deck away. Routes
+re-plan round both.
+
+**Unreachable destinations.** When a destination cannot be reached (ground
+the vehicle cannot enter, or water with no way over), the route goes as near
+as it can (the wood's edge, the near bank) rather than in a straight line.
+
 Every weight is a figure (`sim.route.*`, [default] until calibrated). On the
-Kaliningrad pack, moving vehicles spend 74% of their time on roads, which
-cover 23% of the ground. A 20 km move plans in about 50 ms.
+Kaliningrad pack, about half of moving vehicles' time is on roads, which
+cover 23% of the ground. No plan there falls back to a straight line (an
+ignored test, given a pack). A 20 km move plans in about 50 ms.
+
+EW, drone-team and HQ displacements now move a unit to one side (across the
+line to the enemy), swinging about its first site. Before, each one moved it
+1.5 km further back, so over a few hours they drifted out of their area.
 
 Next steps:
 - exposure from believed threats' viewsheds;

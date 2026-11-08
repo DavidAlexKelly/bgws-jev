@@ -92,11 +92,13 @@ pub struct SimOptions {
     pub terrain: Option<bgws_env::Terrain>,
     /// The pack's roads, in the scenario's frame: units move at road speed on them.
     pub roads: Option<Vec<bgws_env::RoadLine>>,
+    /// The pack's rivers, in the scenario's frame: crossed at bridges or where shallow enough to ford.
+    pub rivers: Option<Vec<bgws_env::River>>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None }
     }
 }
 
@@ -199,11 +201,14 @@ impl Sim {
             half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
         }
         let ground = if let Some(t) = opts.terrain.clone() {
-            let g = Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures);
-            match &opts.roads {
-                Some(r) => g.with_roads(r),
-                None => g,
+            let mut g = Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures);
+            if let Some(r) = &opts.roads {
+                g = g.with_roads(r);
             }
+            if let Some(r) = &opts.rivers {
+                g = g.with_rivers(r);
+            }
+            g
         } else if opts.flat_ground || scenario.theatre.ground == "flat" {
             Ground::flat(origin, half, &figures)
         } else {

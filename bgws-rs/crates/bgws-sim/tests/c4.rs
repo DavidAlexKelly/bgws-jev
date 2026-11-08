@@ -95,19 +95,28 @@ fn m3_battalion_attack_runs_on_its_nets() {
 
 #[test]
 fn m4_drone_line_plays_the_drone_and_ew_fight() {
-    let (sim, ev) = play("m4-drone-line", 2, 120.0);
-    let k = kinds(&ev);
+    // Five games: what happens in a drone fight varies game to game (who is
+    // where when a sortie or a fix comes), so each kind of event must turn
+    // up in the drone line, not in every game.
+    let games: Vec<(Sim, Vec<LogEvent>)> = (2..=6).map(|seed| play("m4-drone-line", seed, 120.0)).collect();
+    let mut k: std::collections::BTreeMap<String, usize> = Default::default();
+    for (_, ev) in &games {
+        for (kind, n) in kinds(ev) {
+            *k.entry(kind).or_default() += n;
+        }
+    }
     eprintln!("{k:?}");
     for kind in ["drones.launch", "drones.found", "drones.strike", "drones.link_lost", "drones.shot_down", "ew.intercept", "ew.fix", "pnt.lost"] {
-        assert!(k.get(kind).copied().unwrap_or(0) > 0, "no {kind} events");
+        assert!(k.get(kind).copied().unwrap_or(0) > 0, "no {kind} events in five games");
     }
     // Strikes changed the world: a strike event carries its odds.
-    let strike = ev.iter().find(|e| e.kind == "drones.strike").unwrap();
+    let strike = games.iter().flat_map(|(_, ev)| ev.iter()).find(|e| e.kind == "drones.strike").unwrap();
     assert!(strike.data["pHit"].as_f64().unwrap() > 0.0);
     // ESM fixes went over the nets into the side picture.
-    let fixes = ew::fixes(&sim, Side::Blue).len() + ew::fixes(&sim, Side::Red).len();
+    let (sim, _) = games.iter().find(|(_, ev)| ev.iter().any(|e| e.kind == "ew.fix")).unwrap();
+    let fixes = ew::fixes(sim, Side::Blue).len() + ew::fixes(sim, Side::Red).len();
     assert!(fixes > 0);
-    let es = ew::stats(&sim).unwrap();
+    let es = ew::stats(sim).unwrap();
     assert!(es.intercepts > 0 && !es.time_to_fix_s.is_empty());
 }
 

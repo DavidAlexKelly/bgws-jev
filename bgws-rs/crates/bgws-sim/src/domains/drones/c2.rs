@@ -1036,7 +1036,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
             true
         }
         "displacePost" => {
-            let away = super::ew::point_away(s, id, c4.p.relocate_m);
+            let away = super::ew::point_aside(s, id, c4.p.relocate_m);
             if let Some(h) = c4.c2.post_of(id) {
                 c4.c2.hqs[h].relocating_until = Some(now + SimDuration::from_secs(c4.p.relocation_s));
             }

@@ -26,6 +26,7 @@
 use crate::components::MoveModeS;
 use crate::ground::Ground;
 use bgws_core::{figure, Enu, Figure, Figures};
+use bgws_env::RoadClass;
 use bgws_env::soil::VehicleClass;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -55,6 +56,8 @@ pub struct RouteParams {
     pub exposure_ref_kmh: f64,
     /// Time to get on or off a road across a verge or ditch, s.
     pub verge_s: f64,
+    /// Time to ford a river the vehicle can cross, s.
+    pub ford_s: f64,
     /// The corridor round a move: at least this far either side, m.
     pub corridor_min_m: f64,
     /// And this fraction of the move's length.
@@ -86,6 +89,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.objective_frac", 0.5, "ratio", 0.0, 2.0, "default", Default, "believed threats within this share of the threat radius of a move's destination are its objective, not steered round"),
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
+        figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
         figure!("sim.route.corridor_min_m", 1_500.0, "m", 200.0, 20_000.0, "default", Default, "least corridor either side of a planned move"),
         figure!("sim.route.corridor_frac", 0.35, "ratio", 0.05, 2.0, "default", Default, "corridor either side of a planned move, as a fraction of its length"),
         figure!("sim.route.max_cells", 400_000.0, "cells", 10_000.0, 20_000_000.0, "default", Default, "largest search grid before it is thinned"),
@@ -107,6 +111,7 @@ impl RouteParams {
             exposure_ref_kmh: g("exposure_ref_kmh"),
             objective_frac: g("objective_frac"),
             verge_s: g("verge_s"),
+            ford_s: g("ford_s"),
             corridor_min_m: g("corridor_min_m"),
             corridor_frac: g("corridor_frac"),
             max_cells: g("max_cells") as usize,
@@ -170,18 +175,24 @@ impl Ground {
             return straight(0.0);
         }
         // A wider corridor when nothing joins the ends in a narrow one (a river
-        // whose bridge lies outside it).
+        // whose bridge lies outside it). When none does (the end is in ground
+        // the vehicle cannot enter, or across water with no way over), the
+        // route goes as near as it can: the wood's edge, the near bank.
         let mut margin = p.corridor_min_m.max(p.corridor_frac * dist);
+        let mut closest: Option<Plan> = None;
         for _ in 0..3 {
-            if let Some(plan) = self.plan_in(r, p, margin) {
-                return plan;
+            match self.plan_in(r, p, margin) {
+                Some((plan, true)) => return plan,
+                Some((plan, false)) => closest = Some(plan),
+                None => {}
             }
             margin *= 3.0;
         }
-        straight(0.0)
+        closest.unwrap_or_else(|| straight(0.0))
     }
 
-    fn plan_in(&self, r: &RouteRequest, p: &RouteParams, margin: f64) -> Option<Plan> {
+    /// The plan in one corridor, and whether it reaches the destination.
+    fn plan_in(&self, r: &RouteRequest, p: &RouteParams, margin: f64) -> Option<(Plan, bool)> {
         let ts = self.terrain.spec;
         // The corridor, in terrain cells, thinned if it would be too big.
         let lo = (r.from.e.min(r.to.e) - margin, r.from.n.min(r.to.n) - margin);
@@ -191,6 +202,7 @@ impl Ground {
         let cells = (i1 - i0 + 1) * (j1 - j0 + 1);
         let stride = ((cells as f64 / p.max_cells.max(1) as f64).sqrt().ceil() as usize).max(1);
         let (w, h) = ((i1 - i0) / stride + 1, (j1 - j0) / stride + 1);
+        let n_cells = w * h;
         let step = ts.cell * stride as f64;
         let pos = |k: usize| {
             let (i, j) = (k % w, k / w);
@@ -201,8 +213,45 @@ impl Ground {
             let j = (((n - ts.origin_n) / ts.cell).round() as isize - j0 as isize).div_euclid(stride as isize).clamp(0, h as isize - 1) as usize;
             j * w + i
         };
+        let layer = self.road_layer.as_deref();
+        let rivers = self.rivers.as_deref();
 
-        // Seconds per metre in each cell, and whether it is road.
+        // What each search cell holds, over its block of terrain cells: the
+        // best ground road and structure, and the deepest river.
+        let mut g_road: Vec<Option<(RoadClass, u32)>> = vec![None; n_cells];
+        let mut d_road: Vec<Option<(RoadClass, u32)>> = vec![None; n_cells];
+        let mut river = vec![0.0f32; n_cells];
+        let mut d_end = vec![false; n_cells];
+        for k in 0..n_cells {
+            let (bi, bj) = (i0 + (k % w) * stride, j0 + (k / w) * stride);
+            for dj in 0..stride {
+                for di in 0..stride {
+                    let (ti, tj) = (bi + di, bj + dj);
+                    if ti >= ts.width || tj >= ts.height {
+                        continue;
+                    }
+                    let tk = ts.idx(ti, tj);
+                    if let Some(l) = layer {
+                        if let Some(g) = l.ground(tk) {
+                            if g_road[k].is_none_or(|c| (g.0 as u8) < (c.0 as u8)) {
+                                g_road[k] = Some(g);
+                            }
+                        }
+                        d_end[k] |= l.deck_end[tk];
+                        if let Some(d) = l.deck(tk) {
+                            if d_road[k].is_none_or(|c| (d.0 as u8) < (c.0 as u8)) {
+                                d_road[k] = Some(d);
+                            }
+                        }
+                    }
+                    if let Some(rv) = rivers {
+                        river[k] = river[k].max(rv.data[tk]);
+                    }
+                }
+            }
+        }
+
+        // Seconds per metre on each level, and whether the ground cell is taken by road.
         let (mi, ci) = (mode_ix(r.mode), class_ix(r.class));
         // The enemy at the destination is what the move closes with: only
         // threats elsewhere (a flank, a position on the way) are steered round.
@@ -210,12 +259,23 @@ impl Ground {
         let threats: Vec<(f64, f64)> = r.threats.iter().copied().filter(|t| (t.0 - r.to.e).hypot(t.1 - r.to.n) > keep_clear).collect();
         let march = r.mode == MoveModeS::March;
         let r2 = p.threat_radius_m * p.threat_radius_m;
-        let mut spm = vec![f64::INFINITY; w * h];
-        let mut on_road = vec![false; w * h];
-        let mut best_spm = f64::INFINITY;
+        let ford_limit = self.ford.depth_m[ci] as f32;
         // Exposure as seconds per metre at the reference pace.
         let per_m = 3.6 / p.exposure_ref_kmh.max(0.1);
-        for (k, (cost, is_road)) in spm.iter_mut().zip(on_road.iter_mut()).enumerate() {
+        let mut g_spm = vec![f64::INFINITY; n_cells];
+        let mut d_spm = vec![f64::INFINITY; n_cells];
+        let mut on_road = vec![false; n_cells];
+        let mut best_spm = f64::INFINITY;
+        let road_cost = |class: RoadClass, near: f64, exposure: f64| -> Option<f64> {
+            let v = self.road_speeds.speed(r.class, class).min(r.road_kmh);
+            (v >= 1.0).then(|| {
+                let m = p.road_mult[mi] * if march { p.march_road[ci] } else { 1.0 };
+                let t = 3.6 / v;
+                // A road is open ground (no concealment), and predictable near the enemy.
+                t * m + (exposure + p.threat_road[mi] * near) * t.max(per_m)
+            })
+        };
+        for k in 0..n_cells {
             let (e, n) = pos(k);
             // How near the nearest believed threat is: 0 outside its radius, 1 on it.
             let near = if threats.is_empty() {
@@ -232,8 +292,8 @@ impl Ground {
             let base = if r.urgent { 0.0 } else { p.exposure_baseline[mi] };
             let exposure = p.exposure[mi] * (base + (1.0 - base) * near);
             let off = self.going(e, n, r.class).speed_kmh.min(r.cross_kmh);
-            let road_kmh = self.road_kmh(e, n, r.class).map(|v| v.min(r.road_kmh));
-            let open = if off >= 1.0 {
+            // Across country, a river deeper than the vehicle fords stops it.
+            let open = if off >= 1.0 && river[k] <= ford_limit {
                 let conceal = self.cover.props[self.land_cover(e, n) as usize].conceal_mean;
                 let m = if march { p.march_open[ci] } else { 1.0 };
                 let t = 3.6 / off;
@@ -241,44 +301,76 @@ impl Ground {
             } else {
                 None
             };
-            let road = road_kmh.filter(|v| *v >= 1.0).map(|v| {
-                let m = p.road_mult[mi] * if march { p.march_road[ci] } else { 1.0 };
-                let t = 3.6 / v;
-                // A road is open ground (no concealment), and predictable near the enemy.
-                t * m + (exposure + p.threat_road[mi] * near) * t.max(per_m)
-            });
+            // A road on the ground crosses what it crosses (culverts, causeways, fords).
+            let road = g_road[k].and_then(|(c, _)| road_cost(c, near, exposure));
             match (road, open) {
-                (Some(rv), Some(ov)) if ov < rv => *cost = ov,
+                (Some(rv), Some(ov)) if ov < rv => g_spm[k] = ov,
                 (Some(rv), _) => {
-                    *cost = rv;
-                    *is_road = true;
+                    g_spm[k] = rv;
+                    on_road[k] = true;
                 }
-                (None, Some(ov)) => *cost = ov,
+                (None, Some(ov)) => g_spm[k] = ov,
                 (None, None) => {}
             }
-            best_spm = best_spm.min(*cost);
+            if let Some(dv) = d_road[k].and_then(|(c, _)| road_cost(c, near, exposure)) {
+                d_spm[k] = dv;
+            }
+            best_spm = best_spm.min(g_spm[k]).min(d_spm[k]);
         }
         let (start, goal) = (cell_of(r.from.e, r.from.n), cell_of(r.to.e, r.to.n));
         // Where the ends sit in water or a wall, let them out.
-        spm[start] = spm[start].min(1e3);
-        spm[goal] = spm[goal].min(1e3);
+        g_spm[start] = g_spm[start].min(1e3);
+        g_spm[goal] = g_spm[goal].min(1e3);
         if !best_spm.is_finite() {
             return None;
         }
 
-        // A* over eight neighbours; a step costs the mean of its two cells,
-        // plus the verge when it joins or leaves a road.
+        // A* over two levels: state k is the ground of cell k, n_cells + k its
+        // bridge or tunnel. A step costs the mean of its two cells, plus the
+        // verge when it joins or leaves a road on the ground, plus a ford.
+        // A structure is entered and left only along its road: from an edge
+        // that joins it, never from the side.
         const DIRS: [(isize, isize); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+        let joined = |a: u32, b: u32| layer.is_some_and(|l| l.joined(a, b));
         let (gx, gy) = ((goal % w) as f64, (goal / w) as f64);
         let heur = |k: usize| ((k % w) as f64 - gx).hypot((k / w) as f64 - gy) * step * best_spm;
-        let mut g = vec![f64::INFINITY; w * h];
-        let mut came = vec![u32::MAX; w * h];
+        let mut g = vec![f64::INFINITY; 2 * n_cells];
+        let mut came = vec![u32::MAX; 2 * n_cells];
         let mut heap = BinaryHeap::new();
+        let push = |heap: &mut BinaryHeap<Reverse<(u64, usize)>>, g: &mut Vec<f64>, came: &mut Vec<u32>, from: usize, to: usize, c: f64| {
+            if c < g[to] {
+                g[to] = c;
+                came[to] = from as u32;
+                heap.push(Reverse(((c + heur(to % n_cells)).to_bits(), to)));
+            }
+        };
         g[start] = 0.0;
         heap.push(Reverse((heur(start).to_bits(), start)));
-        while let Some(Reverse((_, k))) = heap.pop() {
+        if d_spm[start].is_finite() {
+            g[n_cells + start] = 0.0;
+            heap.push(Reverse((heur(start).to_bits(), n_cells + start)));
+        }
+        let mut reached = None;
+        // The nearest the search came, for when the destination cannot be reached.
+        let mut nearest = (heur(start), start);
+        while let Some(Reverse((_, st))) = heap.pop() {
+            let (deck, k) = (st >= n_cells, st % n_cells);
+            let gst = g[st];
             if k == goal {
+                reached = Some(st);
                 break;
+            }
+            let hk = heur(k);
+            if hk < nearest.0 {
+                nearest = (hk, st);
+            }
+            // Between the levels in the same cell: where the ground road joins the
+            // structure, or there is no road on the ground (an abutment).
+            if let Some((_, de)) = d_road[k] {
+                if d_spm[k].is_finite() && g_spm[k].is_finite() && g_road[k].is_none_or(|(_, ge)| joined(ge, de)) && (d_end[k] || g_road[k].is_some()) {
+                    let other = if deck { k } else { n_cells + k };
+                    push(&mut heap, &mut g, &mut came, st, other, gst);
+                }
             }
             let (x, y) = ((k % w) as isize, (k / w) as isize);
             for (d, &(dx, dy)) in DIRS.iter().enumerate() {
@@ -287,87 +379,135 @@ impl Ground {
                     continue;
                 }
                 let nk = ny as usize * w + nx as usize;
-                if !spm[nk].is_finite() {
+                let len = if d >= 4 { step * std::f64::consts::SQRT_2 } else { step };
+                let here = if deck { d_spm[k] } else { g_spm[k] };
+                if deck {
+                    let de = d_road[k].map(|x| x.1).unwrap_or(u32::MAX);
+                    // Along the structure.
+                    if d_spm[nk].is_finite() && d_road[nk].is_some_and(|(_, e2)| joined(de, e2)) {
+                        push(&mut heap, &mut g, &mut came, st, n_cells + nk, gst + len * 0.5 * (here + d_spm[nk]));
+                    }
+                    // Off it onto a road that joins it, or onto open ground at its ends.
+                    if g_spm[nk].is_finite() && (g_road[nk].is_some_and(|(_, e2)| joined(de, e2)) || (g_road[nk].is_none() && d_end[k])) {
+                        push(&mut heap, &mut g, &mut came, st, nk, gst + len * 0.5 * (here + g_spm[nk]));
+                    }
+                    continue;
+                }
+                // On to a structure from a road that joins it, or from open ground at its ends.
+                if d_spm[nk].is_finite() {
+                    if let Some((_, de)) = d_road[nk] {
+                        let from_road = on_road[k] && g_road[k].is_some_and(|(_, ge)| joined(ge, de));
+                        if from_road || (g_road[k].is_none() && d_end[nk]) {
+                            push(&mut heap, &mut g, &mut came, st, n_cells + nk, gst + len * 0.5 * (here + d_spm[nk]));
+                        }
+                    }
+                }
+                if !g_spm[nk].is_finite() {
                     continue;
                 }
                 // No cutting the corner of water or a wall.
-                if d >= 4 && (!spm[y as usize * w + nx as usize].is_finite() || !spm[ny as usize * w + x as usize].is_finite()) {
+                if d >= 4 && (!g_spm[y as usize * w + nx as usize].is_finite() || !g_spm[ny as usize * w + x as usize].is_finite()) {
                     continue;
                 }
-                let len = if d >= 4 { step * std::f64::consts::SQRT_2 } else { step };
-                let mut c = g[k] + len * 0.5 * (spm[k] + spm[nk]);
+                let mut c = gst + len * 0.5 * (here + g_spm[nk]);
                 if on_road[k] != on_road[nk] {
                     c += p.verge_s;
                 }
-                if c < g[nk] {
-                    g[nk] = c;
-                    came[nk] = k as u32;
-                    heap.push(Reverse(((c + heur(nk)).to_bits(), nk)));
+                if !on_road[nk] && river[nk] > 0.0 && river[k] == 0.0 {
+                    c += p.ford_s;
                 }
+                push(&mut heap, &mut g, &mut came, st, nk, c);
             }
         }
-        if !g[goal].is_finite() {
-            return None;
-        }
-        let mut cells_path = vec![goal];
-        while let Some(&k) = cells_path.last() {
-            if k == start {
+        let arrived = reached.is_some();
+        let end = match reached {
+            Some(st) => st,
+            // Nowhere nearer than where it stands: no plan.
+            None if nearest.1 == start => return None,
+            None => nearest.1,
+        };
+        let mut states = vec![end];
+        while let Some(&st) = states.last() {
+            if st % n_cells == start && came[st] == u32::MAX {
                 break;
             }
-            cells_path.push(came[k] as usize);
+            let prev = came[st];
+            if prev == u32::MAX {
+                break;
+            }
+            states.push(prev as usize);
         }
-        cells_path.reverse();
+        states.reverse();
 
-        // Waypoints: corners and road joins, with straight runs merged; then
-        // the time and the mix at the vehicle's own speeds.
-        let pts: Vec<(f64, f64, bool)> = cells_path.iter().map(|&k| {
-            let (e, n) = pos(k);
-            (e, n, on_road[k])
-        })
-        .collect();
+        // Waypoints: corners, road joins and level changes, straight runs
+        // merged where the straight line stays on passable ground; then the
+        // time and the mix at the vehicle's own speeds.
+        let pts: Vec<(f64, f64, u8)> = states
+            .iter()
+            .map(|&st| {
+                let k = st % n_cells;
+                let (e, n) = pos(k);
+                (e, n, if st >= n_cells { 2 } else { u8::from(on_road[k]) })
+            })
+            .collect();
         let mut keep = vec![false; pts.len()];
         keep[0] = true;
         *keep.last_mut().expect("a path") = true;
         for i in 1..pts.len() - 1 {
             keep[i] = pts[i].2 != pts[i - 1].2 || pts[i].2 != pts[i + 1].2;
         }
-        // Off the road a straight line is as good as the staircase: simplify
-        // each run between kept points, keeping road bends to within a cell.
+        // A straight line across country is as good as the staircase, if it crosses nothing impassable.
+        let clear = |a: (f64, f64), b: (f64, f64)| {
+            let n = ((b.0 - a.0).hypot(b.1 - a.1) / (step * 0.5)).ceil().max(1.0) as usize;
+            (0..=n).all(|q| {
+                let t = q as f64 / n as f64;
+                g_spm[cell_of(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)].is_finite()
+            })
+        };
         let mut out: Vec<usize> = Vec::new();
         let mut a = 0;
         for b in 1..pts.len() {
             if keep[b] {
-                simplify(&pts, a, b, if pts[a].2 && pts[b].2 { ts.cell * 0.5 } else { step * 1.5 }, &mut out);
+                let tol = if pts[a].2 > 0 && pts[b].2 > 0 { ts.cell * 0.5 } else { step * 1.5 };
+                simplify(&pts, a, b, tol, &|x, y| pts[x].2 > 0 || clear((pts[x].0, pts[x].1), (pts[y].0, pts[y].1)), &mut out);
                 a = b;
             }
         }
         out.push(pts.len() - 1);
         out.dedup();
         let mut waypoints: Vec<Enu> = out.iter().skip(1).map(|&i| Enu::new(pts[i].0, pts[i].1, 0.0)).collect();
-        if let Some(last) = waypoints.last_mut() {
-            *last = r.to;
+        if arrived {
+            if let Some(last) = waypoints.last_mut() {
+                *last = r.to;
+            }
         }
         let (mut road_m, mut open_m, mut time_s) = (0.0, 0.0, 0.0);
-        for wnd in cells_path.windows(2) {
-            let (pa, pb) = (pos(wnd[0]), pos(wnd[1]));
+        for wnd in states.windows(2) {
+            let (pa, pb) = (pos(wnd[0] % n_cells), pos(wnd[1] % n_cells));
             let len = (pa.0 - pb.0).hypot(pa.1 - pb.1);
             let (e, n) = ((pa.0 + pb.0) / 2.0, (pa.1 + pb.1) / 2.0);
             let off = self.going(e, n, r.class).speed_kmh.min(r.cross_kmh).max(1.0);
-            let kmh = if on_road[wnd[1]] {
-                road_m += len;
-                self.road_kmh(pb.0, pb.1, r.class).map(|v| v.min(r.road_kmh)).unwrap_or(off).max(off)
-            } else {
-                open_m += len;
-                off
+            let kb = wnd[1] % n_cells;
+            let on = if wnd[1] >= n_cells { d_road[kb] } else if on_road[kb] { g_road[kb] } else { None };
+            let kmh = match on {
+                Some((c, _)) => {
+                    road_m += len;
+                    self.road_speeds.speed(r.class, c).min(r.road_kmh).max(off)
+                }
+                None => {
+                    open_m += len;
+                    off
+                }
             };
             time_s += len / (kmh / 3.6);
         }
-        Some(Plan { waypoints, time_s, road_m, open_m })
+        Some((Plan { waypoints, time_s, road_m, open_m }, arrived))
     }
 }
 
-/// Ramer–Douglas–Peucker between `a` and `b`, pushing the kept indices (from `a`).
-fn simplify(pts: &[(f64, f64, bool)], a: usize, b: usize, tol: f64, out: &mut Vec<usize>) {
+/// Ramer–Douglas–Peucker between `a` and `b`, pushing the kept indices
+/// (from `a`); a run whose straight line is not `valid` is split too.
+fn simplify(pts: &[(f64, f64, u8)], a: usize, b: usize, tol: f64, valid: &dyn Fn(usize, usize) -> bool, out: &mut Vec<usize>) {
     out.push(a);
     if b <= a + 1 {
         return;
@@ -375,7 +515,7 @@ fn simplify(pts: &[(f64, f64, bool)], a: usize, b: usize, tol: f64, out: &mut Ve
     let (ax, ay, bx, by) = (pts[a].0, pts[a].1, pts[b].0, pts[b].1);
     let (dx, dy) = (bx - ax, by - ay);
     let len = dx.hypot(dy).max(1e-9);
-    let (mut far, mut at) = (0.0, a);
+    let (mut far, mut at) = (0.0, a + (b - a) / 2);
     for (i, p) in pts.iter().enumerate().take(b).skip(a + 1) {
         let d = ((p.0 - ax) * dy - (p.1 - ay) * dx).abs() / len;
         if d > far {
@@ -383,9 +523,9 @@ fn simplify(pts: &[(f64, f64, bool)], a: usize, b: usize, tol: f64, out: &mut Ve
             at = i;
         }
     }
-    if far > tol {
-        simplify(pts, a, at, tol, out);
-        simplify(pts, at, b, tol, out);
+    if far > tol || !valid(a, b) {
+        simplify(pts, a, at, tol, valid, out);
+        simplify(pts, at, b, tol, valid, out);
     }
 }
 
@@ -400,7 +540,7 @@ mod tests {
         let f = crate::params::default_figures();
         let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
         let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
-        let road = RoadLine { class: RoadClass::Primary, bridge: false, line: vec![(-4_400.0, -3_000.0), (4_000.0, -3_000.0), (4_000.0, 4_400.0)] };
+        let road = RoadLine::new(RoadClass::Primary, vec![(-4_400.0, -3_000.0), (4_000.0, -3_000.0), (4_000.0, 4_400.0)]);
         Ground::from_terrain(t, 1, &f).with_roads(&[road])
     }
 
@@ -409,7 +549,7 @@ mod tests {
         let f = crate::params::default_figures();
         let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
         let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
-        let road = RoadLine { class: RoadClass::Primary, bridge: false, line: vec![(-4_000.0, -3_000.0), (-2_200.0, -3_000.0), (-2_200.0, 3_000.0), (-4_000.0, 3_000.0)] };
+        let road = RoadLine::new(RoadClass::Primary, vec![(-4_000.0, -3_000.0), (-2_200.0, -3_000.0), (-2_200.0, 3_000.0), (-4_000.0, 3_000.0)]);
         Ground::from_terrain(t, 1, &f).with_roads(&[road])
     }
 
@@ -506,6 +646,95 @@ mod tests {
         let length = assault.road_m + assault.open_m;
         assert!(length < 11_000.0 * 1.1, "the assault is near straight: {length:.0} m");
         assert!(woods(&tactical) < woods(&stealth), "tactical weighs cover less than stealth");
+    }
+
+    /// Fields cut east–west by a deep river (40 m wide, 2.5 m deep) with two road
+    /// bridges, at e = −3 km and e = +3 km, and a shallow stream further south.
+    fn river_ground() -> Ground {
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        let road = |edge: u32, from: u32, to: u32, bridge: bool, e: f64, n0: f64, n1: f64| RoadLine { class: RoadClass::Secondary, bridge, tunnel: false, edge, from, to, line: vec![(e, n0), (e, n1)] };
+        let roads = vec![
+            road(0, 0, 1, false, -3_000.0, -4_400.0, -60.0),
+            road(1, 1, 2, true, -3_000.0, -60.0, 60.0),
+            road(2, 2, 3, false, -3_000.0, 60.0, 4_400.0),
+            road(3, 4, 5, false, 3_000.0, -4_400.0, -60.0),
+            road(4, 5, 6, true, 3_000.0, -60.0, 60.0),
+            road(5, 6, 7, false, 3_000.0, 60.0, 4_400.0),
+        ];
+        let river = bgws_env::River { name: "deep".into(), line: vec![(-4_500.0, 0.0), (4_500.0, 0.0)], width_m: 40.0, depth_m: 2.5, current_m_s: 0.5 };
+        let stream = bgws_env::River { name: "stream".into(), line: vec![(-4_500.0, -2_500.0), (4_500.0, -2_500.0)], width_m: 3.0, depth_m: 0.6, current_m_s: 0.3 };
+        Ground::from_terrain(t, 1, &f).with_roads(&roads).with_rivers(&[river, stream])
+    }
+
+    /// Where a route crosses n = 0, if it does.
+    fn crossing(p: &Plan, from: (f64, f64)) -> Option<f64> {
+        let mut a = Enu::new(from.0, from.1, 0.0);
+        for w in &p.waypoints {
+            if (a.n < 0.0) != (w.n < 0.0) {
+                let t = -a.n / (w.n - a.n);
+                return Some(a.e + (w.e - a.e) * t);
+            }
+            a = *w;
+        }
+        None
+    }
+
+    #[test]
+    fn a_deep_river_is_crossed_at_a_bridge_and_a_blown_one_is_not() {
+        let mut g = river_ground();
+        let (a, b) = ((-1_000.0, -2_000.0), (-1_000.0, 2_000.0));
+        let p = plan_from(&g, a, b, VehicleClass::Tracked, MoveModeS::Assault, &[]);
+        let x = crossing(&p, a).expect("it crosses");
+        assert!((x + 3_000.0).abs() < 100.0, "by the western bridge, nearest: crossed at e = {x:.0}");
+        g.blow_bridge(1);
+        let p = plan_from(&g, a, b, VehicleClass::Tracked, MoveModeS::Assault, &[]);
+        let x = crossing(&p, a).expect("it still crosses");
+        assert!((x - 3_000.0).abs() < 100.0, "by the eastern bridge once the western one is down: e = {x:.0}");
+        g.blow_bridge(4);
+        let p = plan_from(&g, a, b, VehicleClass::Tracked, MoveModeS::Assault, &[]);
+        let end = p.waypoints.last().unwrap();
+        assert!(crossing(&p, a).is_none() && end.n < 0.0 && end.n > -150.0, "no way over: it goes to the near bank and stops, at {end:?}");
+    }
+
+    #[test]
+    fn a_shallow_stream_is_forded_where_the_river_is_not() {
+        let g = river_ground();
+        // South of the river, across the stream (0.6 m): every class fords it, straight on.
+        let (a, b) = ((0.0, -3_500.0), (0.0, -1_500.0));
+        for class in [VehicleClass::Tracked, VehicleClass::Wheeled, VehicleClass::Foot] {
+            let p = plan_from(&g, a, b, class, MoveModeS::Assault, &[]);
+            let length = p.road_m + p.open_m;
+            assert!(length < 2_300.0, "{class:?} fords the stream: {length:.0} m");
+        }
+        assert!(g.river_depth(0.0, -2_500.0) > 0.5 && g.river_depth(0.0, 0.0) > 2.0 && g.river_depth(0.0, -1_000.0) == 0.0);
+    }
+
+    #[test]
+    fn an_overpass_is_not_a_junction() {
+        // Water everywhere but the roads: a motorway east–west on the ground, and
+        // a minor road north–south crossing over it on a bridge.
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        t.land_cover.data.iter_mut().for_each(|c| *c = LandCover::Water);
+        let road = |class, edge, from, to, bridge, line: Vec<(f64, f64)>| RoadLine { class, bridge, tunnel: false, edge, from, to, line };
+        let g = Ground::from_terrain(t, 1, &f).with_roads(&[
+            road(RoadClass::Motorway, 0, 0, 1, false, vec![(-4_000.0, 0.0), (4_000.0, 0.0)]),
+            road(RoadClass::Secondary, 1, 10, 11, false, vec![(0.0, -4_000.0), (0.0, -90.0)]),
+            road(RoadClass::Secondary, 2, 11, 12, true, vec![(0.0, -90.0), (0.0, 90.0)]),
+            road(RoadClass::Secondary, 3, 12, 13, false, vec![(0.0, 90.0), (0.0, 4_000.0)]),
+        ]);
+        // Along the minor road, over the bridge: fine.
+        let p = plan_from(&g, (0.0, -3_800.0), (0.0, 3_800.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
+        assert!(p.road_m > 7_000.0 && p.waypoints.len() > 1, "{p:?}");
+        // From the motorway onto the minor road: they do not meet.
+        let p = plan_from(&g, (-3_800.0, 0.0), (0.0, 3_800.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
+        assert!(p.waypoints.iter().all(|w| w.n.abs() < 100.0), "no junction at the overpass: it stays on the motorway, {p:?}");
+        // Along the motorway under the bridge: fine.
+        let p = plan_from(&g, (-3_800.0, 0.0), (3_800.0, 0.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
+        assert!(p.road_m > 7_000.0, "{p:?}");
     }
 
     #[test]

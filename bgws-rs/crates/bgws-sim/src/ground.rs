@@ -10,7 +10,9 @@ use bgws_core::rng::fnv1a;
 use bgws_core::{Enu, Figures, Geodetic};
 use bgws_env::soil::{trafficability, TrafficParams, VehicleClass as EnvVehicle};
 use bgws_env::synth::{generate, SynthParams};
-use bgws_env::{LandCover, LandCoverTable, RoadClass, RoadLine, RoadSpeeds, Terrain};
+use bgws_env::network::FordLimits;
+use bgws_env::{GridSpec, LandCover, LandCoverTable, River, RoadClass, RoadLine, RoadSpeeds, Terrain};
+use std::collections::BTreeSet;
 use bgws_gpu::{Backend, HeightGrid, LosQuery};
 use bgws_prop::los::{optical_los, optical_los_batch, OpticalLos, OpticalParams, TerrainGrid};
 use bgws_env::Raster;
@@ -28,6 +30,11 @@ pub struct Ground {
     pub roads: Option<Arc<Raster<u8>>>,
     /// The road lines the layer was drawn from, for the viewer.
     pub road_lines: Option<Arc<Vec<RoadLine>>>,
+    /// Roads by level (on the ground; on bridges and in tunnels), with their edges.
+    pub road_layer: Option<Arc<RoadLayer>>,
+    /// River depth in each cell a river crosses, m (0 none).
+    pub rivers: Option<Arc<Raster<f32>>>,
+    pub ford: FordLimits,
     pub road_speeds: RoadSpeeds,
     /// The route planner's weights.
     pub route_params: crate::routing::RouteParams,
@@ -80,6 +87,9 @@ impl Ground {
             backend: Backend::cpu(),
             roads: None,
             road_lines: None,
+            road_layer: None,
+            rivers: None,
+            ford: FordLimits::from_figures(figures),
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
         }
@@ -87,36 +97,72 @@ impl Ground {
 
     /// The ground with roads drawn onto it (lines in this ground's ENU frame).
     pub fn with_roads(mut self, lines: &[RoadLine]) -> Ground {
+        let layer = RoadLayer::draw(self.terrain.spec, lines);
+        self.roads = Some(Arc::new(Raster { spec: self.terrain.spec, data: layer.best_class() }));
+        self.road_layer = Some(Arc::new(layer));
+        self.road_lines = Some(Arc::new(lines.to_vec()));
+        self
+    }
+
+    /// The ground with rivers on it: their depth in every cell they cross.
+    pub fn with_rivers(mut self, rivers: &[River]) -> Ground {
         let spec = self.terrain.spec;
-        let mut r = Raster::filled(spec, 0u8);
-        for l in lines {
-            let v = l.class as u8 + 1;
-            for seg in l.line.windows(2) {
+        let mut d = Raster::filled(spec, 0.0f32);
+        for r in rivers {
+            let half = r.width_m / 2.0;
+            for seg in r.line.windows(2) {
                 let (a, b) = (seg[0], seg[1]);
                 let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.5)).ceil().max(1.0) as usize;
                 for k in 0..=steps {
                     let t = k as f64 / steps as f64;
-                    if let Some((i, j)) = spec.nearest(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t) {
-                        let c = &mut r.data[spec.idx(i, j)];
-                        // Lower classes are faster roads: keep the best in the cell.
-                        if *c == 0 || v < *c {
-                            *c = v;
+                    let (e, n) = (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+                    // The centre cell always; wider rivers every cell within half their width.
+                    let reach = (half / spec.cell).floor() as i64;
+                    for di in -reach..=reach {
+                        for dj in -reach..=reach {
+                            let (pe, pn) = (e + di as f64 * spec.cell, n + dj as f64 * spec.cell);
+                            if (di != 0 || dj != 0) && (pe - e).hypot(pn - n) > half {
+                                continue;
+                            }
+                            if let Some((i, j)) = spec.nearest(pe, pn) {
+                                let c = &mut d.data[spec.idx(i, j)];
+                                *c = c.max(r.depth_m as f32);
+                            }
                         }
                     }
                 }
             }
         }
-        self.roads = Some(Arc::new(r));
-        self.road_lines = Some(Arc::new(lines.to_vec()));
+        self.rivers = Some(Arc::new(d));
         self
     }
 
-    /// The road under a point, if any.
+    /// Drop a bridge (the edge's structure cells): what is under it, a river or a road, is what is left.
+    pub fn blow_bridge(&mut self, edge: u32) {
+        if let Some(l) = self.road_layer.as_mut() {
+            Arc::make_mut(l).blown.insert(edge);
+        }
+    }
+
+    /// Crater or block a road edge: it loses its road speed, and a bridge on it its deck.
+    pub fn cut_road(&mut self, edge: u32) {
+        if let Some(l) = self.road_layer.as_mut() {
+            Arc::make_mut(l).cut.insert(edge);
+        }
+    }
+
+    /// River depth under a point, m (0 where there is none).
+    pub fn river_depth(&self, e: f64, n: f64) -> f64 {
+        let Some(r) = self.rivers.as_ref() else { return 0.0 };
+        r.spec.nearest(e, n).map(|(i, j)| r.data[r.spec.idx(i, j)] as f64).unwrap_or(0.0)
+    }
+
+    /// The road under a point, if any (a structure where there is one, else the ground road).
     pub fn road_at(&self, e: f64, n: f64) -> Option<RoadClass> {
-        let r = self.roads.as_ref()?;
-        let (i, j) = r.spec.nearest(e, n)?;
-        let v = r.data[r.spec.idx(i, j)];
-        (v > 0).then(|| RoadClass::ALL[(v - 1) as usize])
+        let l = self.road_layer.as_ref()?;
+        let (i, j) = l.spec.nearest(e, n)?;
+        let k = l.spec.idx(i, j);
+        l.deck(k).or_else(|| l.ground(k)).map(|(c, _)| c)
     }
 
     /// Speed on the road under a point for a vehicle class, km/h, if there is one.
@@ -194,6 +240,109 @@ impl Ground {
     }
 }
 
+/// Roads drawn onto the grid by level. A cell can hold a road on the ground
+/// and a structure (a bridge or tunnel) at once: an overpass. Each keeps its
+/// best class and the edge it came from; edges join where they share a node.
+#[derive(Clone, Debug)]
+pub struct RoadLayer {
+    pub spec: GridSpec,
+    /// Class + 1 (0 none) and edge, on the ground.
+    pub ground_class: Vec<u8>,
+    pub ground_edge: Vec<u32>,
+    /// Class + 1 (0 none) and edge, on a bridge or in a tunnel.
+    pub deck_class: Vec<u8>,
+    pub deck_edge: Vec<u32>,
+    /// Cells at a structure's ends (its abutments), where it is got on and off.
+    pub deck_end: Vec<bool>,
+    /// Per edge: its end nodes and whether it is a structure.
+    pub ends: Vec<(u32, u32)>,
+    pub cut: BTreeSet<u32>,
+    pub blown: BTreeSet<u32>,
+}
+
+impl RoadLayer {
+    pub fn draw(spec: GridSpec, lines: &[RoadLine]) -> RoadLayer {
+        let n = spec.len();
+        let mut l = RoadLayer {
+            spec,
+            ground_class: vec![0; n],
+            ground_edge: vec![u32::MAX; n],
+            deck_class: vec![0; n],
+            deck_edge: vec![u32::MAX; n],
+            deck_end: vec![false; n],
+            ends: Vec::new(),
+            cut: BTreeSet::new(),
+            blown: BTreeSet::new(),
+        };
+        let max_edge = lines.iter().map(|x| x.edge).max().unwrap_or(0) as usize;
+        l.ends = vec![(u32::MAX, u32::MAX); max_edge + 1];
+        for line in lines {
+            l.ends[line.edge as usize] = (line.from, line.to);
+            let v = line.class as u8 + 1;
+            let deck = line.bridge || line.tunnel;
+            if deck {
+                for p in [line.line.first(), line.line.last()].into_iter().flatten() {
+                    if let Some((i, j)) = spec.nearest(p.0, p.1) {
+                        l.deck_end[spec.idx(i, j)] = true;
+                    }
+                }
+            }
+            for seg in line.line.windows(2) {
+                let (a, b) = (seg[0], seg[1]);
+                let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.5)).ceil().max(1.0) as usize;
+                for k in 0..=steps {
+                    let t = k as f64 / steps as f64;
+                    let Some((i, j)) = spec.nearest(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t) else { continue };
+                    let c = spec.idx(i, j);
+                    let (cls, edge) = if deck { (&mut l.deck_class[c], &mut l.deck_edge[c]) } else { (&mut l.ground_class[c], &mut l.ground_edge[c]) };
+                    // Lower classes are faster roads: keep the best in the cell.
+                    if *cls == 0 || v < *cls {
+                        *cls = v;
+                        *edge = line.edge;
+                    }
+                }
+            }
+        }
+        l
+    }
+
+    /// The ground road in a cell, if it is open.
+    pub fn ground(&self, k: usize) -> Option<(RoadClass, u32)> {
+        let v = self.ground_class[k];
+        let e = self.ground_edge[k];
+        (v > 0 && !self.cut.contains(&e)).then(|| (RoadClass::ALL[(v - 1) as usize], e))
+    }
+
+    /// The bridge or tunnel in a cell, if it stands and is open.
+    pub fn deck(&self, k: usize) -> Option<(RoadClass, u32)> {
+        let v = self.deck_class[k];
+        let e = self.deck_edge[k];
+        (v > 0 && !self.cut.contains(&e) && !self.blown.contains(&e)).then(|| (RoadClass::ALL[(v - 1) as usize], e))
+    }
+
+    /// Do two edges join (the same edge, or a shared node)?
+    pub fn joined(&self, a: u32, b: u32) -> bool {
+        if a == b {
+            return true;
+        }
+        let (Some(&(a0, a1)), Some(&(b0, b1))) = (self.ends.get(a as usize), self.ends.get(b as usize)) else { return false };
+        a0 == b0 || a0 == b1 || a1 == b0 || a1 == b1
+    }
+
+    /// The best class in each cell on either level (class + 1; 0 none), for drawing and statistics.
+    pub fn best_class(&self) -> Vec<u8> {
+        self.ground_class
+            .iter()
+            .zip(&self.deck_class)
+            .map(|(&g, &d)| match (g, d) {
+                (0, d) => d,
+                (g, 0) => g,
+                (g, d) => g.min(d),
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,7 +355,7 @@ mod tests {
         let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
         t.land_cover.data.iter_mut().for_each(|c| *c = LandCover::ForestDense);
         // An L of road: east along n = −3000, then north along e = 4000.
-        let road = RoadLine { class: RoadClass::Primary, bridge: false, line: vec![(-4_400.0, -3_000.0), (4_000.0, -3_000.0), (4_000.0, 4_400.0)] };
+        let road = RoadLine::new(RoadClass::Primary, vec![(-4_400.0, -3_000.0), (4_000.0, -3_000.0), (4_000.0, 4_400.0)]);
         let woods = Ground::from_terrain(t.clone(), 1, &f);
         let roads = Ground::from_terrain(t, 1, &f).with_roads(std::slice::from_ref(&road));
         assert_eq!(roads.road_at(0.0, -3_000.0), Some(RoadClass::Primary));
