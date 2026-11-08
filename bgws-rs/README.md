@@ -299,6 +299,10 @@ rounds (155 mm, 122 mm rockets) crater the cell they land in. Two craters
 the going across it (`sim.route.crater_slow`). Both movement and the planner
 see the craters.
 
+**Columns.** On a road, a unit within `sim.route.column_gap_m` (100 m) of a
+friendly unit moving the same way ahead of it follows at that unit's pace: a
+column does not drive through itself. Off the road, units pass each other.
+
 **Long moves.** A move longer than `sim.route.long_m` (20 km) goes by the
 pack's road graph: Dijkstra over its nodes and edges, by the same weights.
 It gets on at a node within `sim.route.access_m` (3 km) of the start, gets

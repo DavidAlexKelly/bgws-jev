@@ -203,21 +203,20 @@ impl Sim {
             let v = frame.geodetic_to_enu(g);
             half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
         }
-        let ground = if let Some(t) = opts.terrain.clone() {
-            let mut g = Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures);
-            if let Some(r) = &opts.roads {
-                g = g.with_roads(r);
-            }
-            if let Some(r) = &opts.rivers {
-                g = g.with_rivers(r);
-            }
-            g
+        let mut ground = if let Some(t) = opts.terrain.clone() {
+            Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures)
         } else if opts.flat_ground || scenario.theatre.ground == "flat" {
             Ground::flat(origin, half, &figures)
         } else {
             let seed_text = if scenario.theatre.ground_seed.is_empty() { scenario.name.clone() } else { scenario.theatre.ground_seed.clone() };
             Ground::generated(origin, &seed_text, half, &figures)
         };
+        if let Some(r) = &opts.roads {
+            ground = ground.with_roads(r);
+        }
+        if let Some(r) = &opts.rivers {
+            ground = ground.with_rivers(r);
+        }
         let start = UtcDateTime::parse(&scenario.start_utc).map_err(|e| LoadError::StartTime(format!("{e:?}")))?;
         let wspec = bgws_env::GridSpec::new(4, 4, half * 2.0 / 3.0, -half, -half);
         let weather = opts.weather.clone().unwrap_or_else(|| match &scenario.weather {

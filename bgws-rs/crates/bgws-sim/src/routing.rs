@@ -69,6 +69,9 @@ pub struct RouteParams {
     pub crawl_kmh: f64,
     /// How far from its start a route may crawl, m (out of a wood the vehicle stands in).
     pub escape_m: f64,
+    /// On a road, a unit closes no nearer than this behind a friendly unit
+    /// moving ahead of it on the same road, and goes no faster than it, m.
+    pub column_gap_m: f64,
     /// Moves longer than this go by the road graph between grid legs at each end, m.
     pub long_m: f64,
     /// How far from each end a long move looks for a road node to get on at, m.
@@ -114,6 +117,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
         figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace pushing through ground it cannot otherwise cross (dense wood; never water)"),
         figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from its start a route may crawl through such ground (out of a wood the vehicle stands in)"),
+        figure!("sim.route.column_gap_m", 100.0, "m", 10.0, 1_000.0, "default", Default, "on a road, a unit within this of a friendly unit moving ahead of it on the road follows at its speed (no overtaking)"),
         figure!("sim.route.long_m", 20_000.0, "m", 2_000.0, 1_000_000.0, "default", Default, "moves longer than this go by the road graph, with a grid leg on and off it at each end"),
         figure!("sim.route.access_m", 3_000.0, "m", 200.0, 20_000.0, "default", Default, "how far from each end of a long move it looks for a road node to get on or off at"),
         figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),
@@ -144,6 +148,7 @@ impl RouteParams {
             obstacle_s: g("obstacle_s"),
             crawl_kmh: g("crawl_kmh"),
             escape_m: g("escape_m"),
+            column_gap_m: g("column_gap_m"),
             long_m: g("long_m"),
             access_m: g("access_m"),
             masked: g("masked"),
