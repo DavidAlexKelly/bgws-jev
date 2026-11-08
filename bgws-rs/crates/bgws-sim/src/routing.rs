@@ -101,7 +101,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
         figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
-        figure!("sim.route.masked", 0.25, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground behind a crest or ridge)"),
+        figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
         figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),

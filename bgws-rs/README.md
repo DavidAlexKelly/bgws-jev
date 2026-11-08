@@ -260,8 +260,8 @@ keep to cover but do not steer away from the enemy they are looking for.
 An urgent move (orders `now`, or fire support getting into range) weighs
 exposure only near a believed threat. A threat weighs fully only on ground
 it can see: its sight is worked out over the terrain (`sim.route.sight_*`),
-and in its dead ground, behind a crest or a ridge, a quarter of its weight
-applies (`sim.route.masked`). So a move round an enemy takes the side it
+and in its dead ground, behind a crest or a ridge, half its weight
+applies (`sim.route.masked`: dead ground hides a unit from direct fire, not from drones or indirect fire). So a move round an enemy takes the side it
 cannot see. Orders set the mode per phase
 (`march`, `assault`, `bound` for stealth, otherwise tactical).
 
