@@ -194,9 +194,21 @@ TS real-time screen:
 Only the map tiles come from the internet. `/classic` is the earlier
 single-file viewer.
 
+**The world map.** The viewer's *terrain* basemap and the scenario editor
+(`/editor`) draw a world overview: coastlines, land cover, water, borders,
+main roads and place names. It comes from the Protomaps planet at zoom 9 and
+below, and maps over-zoom it beyond that. `bgws-server` proxies it at
+`/world.pmtiles`. It fetches each byte range once and keeps it in the cache
+(`$BGWS_CACHE`). It pins one daily build (`world.url` in the cache), so a
+place looked at once draws offline later. `$BGWS_WORLD` names another
+archive. A scenario's pack draws over its box in full detail, and the
+editor outlines every pack. In the editor, drag a force to move it, or
+select it and click the map.
+
 To change the viewer: `cd web/app && npm install`. Then `npm run dev` serves
 it at http://localhost:5173 against a running `bgws-server` (port 8765).
-`npm run build` writes `web/app/dist`, which the server embeds; commit it. CI
+`npm run build` writes `web/app/dist` (the viewer's `app.js` and the
+editor's map, `map.js`), which the server embeds; commit it. CI
 fails if it is stale.
 
 ## Real ground: theatre packs from PMTiles
@@ -248,6 +260,15 @@ vehicle moves at the road's speed for its class, and route planning prefers
 roads where they are quicker. Moving vehicles in a shipped scenario on the
 Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
 ground. Generated ground has no road layer.
+
+Moving a scenario onto a pack (New game's *Ground*, or the editor's *Move
+onto the pack*) centres its forces on the pack and moves everything in it
+with them: tasks, lanes, obstacles, measures, areas and victory conditions
+(`ScenarioV4::translate`). The pack must hold the forces. The skirmishes and
+M2 fit a 16 × 12 km box. M3 and the M4 drone line need about 22 × 33 km
+(`--bbox 20.30,54.55,20.65,54.85`). M5–M8 span hundreds of kilometres and
+play on generated ground. A scenario that names a pack it is not on fails
+with a message saying where each is and how to move it.
 
 CI builds a pack with no network: `crates/bgws-geodata/tests/offline.rs`
 writes a small vector archive (two roads meeting at a junction, a wood, a

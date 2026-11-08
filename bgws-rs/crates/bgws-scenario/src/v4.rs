@@ -688,6 +688,38 @@ impl ScenarioV4 {
         })
     }
     /// Every position in the scenario, with what it belongs to.
+    /// Move the whole scenario by `dlat`, `dlon` degrees: its origin, its
+    /// bounds and every position in it (forces, tasks, lanes, obstacles,
+    /// measures, areas, victory conditions, sea), keeping its layout.
+    pub fn translate(&mut self, dlat: f64, dlon: f64) {
+        fn walk(v: &mut Value, dlat: f64, dlon: f64) {
+            match v {
+                Value::Object(m) => {
+                    if let (Some(lat), Some(lon)) = (m.get("lat").and_then(Value::as_f64), m.get("lon").and_then(Value::as_f64)) {
+                        m.insert("lat".into(), (lat + dlat).into());
+                        m.insert("lon".into(), (lon + dlon).into());
+                    }
+                    for x in m.values_mut() {
+                        walk(x, dlat, dlon);
+                    }
+                }
+                Value::Array(a) => a.iter_mut().for_each(|x| walk(x, dlat, dlon)),
+                _ => {}
+            }
+        }
+        let Ok(mut v) = serde_json::to_value(&*self) else { return };
+        walk(&mut v, dlat, dlon);
+        if let Ok(moved) = serde_json::from_value::<ScenarioV4>(v) {
+            *self = moved;
+        }
+        if let Some(b) = &mut self.theatre.bounds {
+            b.south += dlat;
+            b.north += dlat;
+            b.west += dlon;
+            b.east += dlon;
+        }
+    }
+
     pub fn positions(&self) -> Vec<(String, Geodetic)> {
         let mut v = Vec::new();
         for f in &self.forces {

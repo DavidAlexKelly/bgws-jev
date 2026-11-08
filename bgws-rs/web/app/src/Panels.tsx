@@ -186,8 +186,8 @@ export function ViewPanel(props: {
         ))}
       </div>
       <div className="chips fill">
-        {((props.hasPackMap ? ["terrain", "dark", "streets", "satellite"] : ["dark", "streets", "satellite"]) as Basemap[]).map((b) => (
-          <button key={b} className={`chip${props.basemap === b ? " on" : ""}`} onClick={() => props.onBasemap(b)} title={b === "terrain" ? "The theatre pack's own map and hillshade: no internet needed" : undefined}>
+        {(["terrain", "dark", "streets", "satellite"] as Basemap[]).map((b) => (
+          <button key={b} className={`chip${props.basemap === b ? " on" : ""}`} onClick={() => props.onBasemap(b)} title={b === "terrain" ? "The world overview (cached by the server), and the theatre pack's own map and hillshade over its box" : undefined}>
             {b}
           </button>
         ))}

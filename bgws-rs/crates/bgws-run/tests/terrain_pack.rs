@@ -142,3 +142,15 @@ fn long_moves_by_the_road_graph_are_as_good_as_the_grid() {
     println!("{n} moves: by graph {:.0} min ({:.0} ms each), on the grid {:.0} min ({:.0} ms each)", t_graph / 60.0, ms_graph / n as f64, t_grid / 60.0, ms_grid / n as f64);
     assert!(t_graph < t_grid * 1.25, "the graph's routes are not much slower to drive");
 }
+
+#[test]
+#[ignore = "needs a theatre pack: BGWS_TEST_PACK=<dir> cargo test --release -p bgws-run --test terrain_pack -- --ignored"]
+/// A scenario that names a pack but was never moved onto it says so, and how to fix it.
+fn a_scenario_off_its_pack_is_told_how_to_fix_it() {
+    let pack = std::env::var("BGWS_TEST_PACK").expect("BGWS_TEST_PACK: a pack over Kaliningrad");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sc = load_scenario(&root.join("data/scenarios/m4-drone-line.json")).unwrap();
+    sc.theatre.pack = Some(pack);
+    let e = bgws_run::host::load_pack(&sc).map(|_| ()).expect_err("an error").to_string();
+    assert!(e.contains("none of the scenario's forces are on it") && e.contains("Move onto the pack"), "{e}");
+}

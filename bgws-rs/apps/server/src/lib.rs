@@ -39,6 +39,8 @@ const CLASSIC: &str = include_str!("../../../web/viewer/index.html");
 const APP_HTML: &str = include_str!("../../../web/app/dist/index.html");
 const APP_JS: &str = include_str!("../../../web/app/dist/app.js");
 const APP_CSS: &str = include_str!("../../../web/app/dist/app.css");
+const MAP_JS: &str = include_str!("../../../web/app/dist/map.js");
+const MAP_CSS: &str = include_str!("../../../web/app/dist/map.css");
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "bgws-server")]
@@ -366,14 +368,11 @@ fn onto_pack(mut sc: bgws_scenario::ScenarioV4, pack: &str) -> Result<bgws_scena
         lon1 = lon1.max(f.position.lon);
     }
     let (mid_lat, mid_lon) = if sc.forces.is_empty() { (sc.theatre.origin.lat, sc.theatre.origin.lon) } else { ((lat0 + lat1) / 2.0, (lon0 + lon1) / 2.0) };
-    let (dlat, dlon) = ((s + n) / 2.0 - mid_lat, (w + e) / 2.0 - mid_lon);
-    let shift = |g: bgws_core::Geodetic| bgws_core::Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
-    sc.theatre.origin = shift(sc.theatre.origin);
+    // Everything moves together: forces, their tasks and lanes, obstacles,
+    // measures, areas and victory conditions.
+    sc.translate((s + n) / 2.0 - mid_lat, (w + e) / 2.0 - mid_lon);
     sc.theatre.bounds = None;
     sc.theatre.pack = Some(pack.to_string());
-    for f in &mut sc.forces {
-        f.position = shift(f.position);
-    }
     let outside = sc.forces.iter().filter(|f| f.position.lat < s || f.position.lat > n || f.position.lon < w || f.position.lon > e).count();
     if outside > 0 {
         return Err(format!("{outside} of the scenario's forces fall outside pack {pack}: build a bigger box"));
@@ -486,6 +485,78 @@ async fn pack_file(UrlPath((pack, file)): UrlPath<(String, String)>, headers: ax
             Ok(bytes) => ([(header::CONTENT_TYPE, kind.to_string()), (header::ACCEPT_RANGES, "bytes".to_string())], bytes).into_response(),
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         },
+    }
+}
+
+/// The world overview's zooms: the proxy reports this as the archive's
+/// deepest, so maps over-zoom it and detail comes only from packs.
+const WORLD_MAX_ZOOM: u8 = 9;
+
+/// The Protomaps planet the world overview reads, pinned in the cache folder
+/// (`world.url`) so its cached ranges stay valid from day to day.
+static WORLD: std::sync::Mutex<Option<std::sync::Arc<dyn bgws_geodata::source::RangeSource>>> = std::sync::Mutex::new(None);
+
+fn world_source(fresh: bool) -> Result<std::sync::Arc<dyn bgws_geodata::source::RangeSource>, String> {
+    let mut w = WORLD.lock().map_err(|e| e.to_string())?;
+    if let (Some(src), false) = (w.as_ref(), fresh) {
+        return Ok(src.clone());
+    }
+    let cache = bgws_geodata::build::default_cache();
+    let pinned = cache.as_ref().map(|c| c.join("world.url"));
+    let saved = pinned.as_ref().and_then(|p| std::fs::read_to_string(p).ok()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let url = match (std::env::var("BGWS_WORLD").ok(), saved, fresh) {
+        (Some(u), _, _) => u,
+        (None, Some(u), false) => u,
+        (None, saved, _) => match bgws_geodata::build::latest_planet() {
+            Ok(u) => {
+                if let Some(p) = &pinned {
+                    let _ = std::fs::create_dir_all(p.parent().unwrap_or(std::path::Path::new(".")));
+                    let _ = std::fs::write(p, &u);
+                }
+                u
+            }
+            // Offline: the build cached last.
+            Err(e) => saved.ok_or_else(|| format!("world map: {e}"))?,
+        },
+    };
+    let src: std::sync::Arc<dyn bgws_geodata::source::RangeSource> = std::sync::Arc::from(bgws_geodata::source::open_source(&url, cache.as_deref()).map_err(|e| e.to_string())?);
+    *w = Some(src.clone());
+    Ok(src)
+}
+
+/// The world overview for the maps: byte ranges of the Protomaps planet,
+/// fetched once and kept in the cache (`$BGWS_CACHE`), with the header's
+/// deepest zoom capped at `WORLD_MAX_ZOOM`.
+async fn world_file(headers: axum::http::HeaderMap) -> axum::response::Response {
+    use axum::http::{header, StatusCode};
+    let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("bytes=")).and_then(|r| {
+        let (a, b) = r.split_once('-')?;
+        let a: u64 = a.parse().ok()?;
+        let b: u64 = b.parse().ok()?;
+        (a <= b && b - a < 64 << 20).then_some((a, b))
+    });
+    let Some((a, b)) = range else { return (StatusCode::RANGE_NOT_SATISFIABLE, "byte ranges only").into_response() };
+    let read = tokio::task::spawn_blocking(move || {
+        let first = world_source(false).and_then(|s| s.read(a, b - a + 1).map_err(|e| e.to_string()));
+        // A pinned build that has gone: find the latest and try once more.
+        first.or_else(|_| world_source(true).and_then(|s| s.read(a, b - a + 1).map_err(|e| e.to_string())))
+    })
+    .await;
+    match read {
+        Ok(Ok(mut bytes)) => {
+            // The header (byte 101 is its deepest zoom).
+            if a == 0 && bytes.len() > 101 && bytes.starts_with(b"PMTiles") {
+                bytes[101] = bytes[101].min(WORLD_MAX_ZOOM);
+            }
+            (
+                StatusCode::PARTIAL_CONTENT,
+                [(header::CONTENT_TYPE, "application/octet-stream".to_string()), (header::CONTENT_RANGE, format!("bytes {a}-{}/*", a + bytes.len() as u64 - 1)), (header::ACCEPT_RANGES, "bytes".to_string()), (header::CACHE_CONTROL, "max-age=86400".to_string())],
+                bytes,
+            )
+                .into_response()
+        }
+        Ok(Err(e)) => (StatusCode::BAD_GATEWAY, e).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -891,6 +962,9 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
         .route("/app.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], APP_CSS) }))
         .route("/classic", get(|| async { Html(CLASSIC) }))
         .route("/packs/:pack/*file", get(pack_file))
+        .route("/map.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")], MAP_JS) }))
+        .route("/map.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], MAP_CSS) }))
+        .route("/world.pmtiles", get(world_file))
         .route("/behaviour", get(behaviour_page))
         .route("/api/behaviour", get(behaviour_data))
         .route("/api/templates", post(save_template))

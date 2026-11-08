@@ -32,7 +32,7 @@ export function App() {
     const saved = readPref<string>("layers", "");
     return new Set((saved ? saved.split(",") : DEFAULT_LAYERS) as LayerKey[]);
   });
-  const [basemap, setBasemap] = useState<Basemap>(() => readPref<Basemap>("basemap", "dark"));
+  const [basemap, setBasemap] = useState<Basemap>(() => readPref<Basemap>("basemap", "terrain"));
   const [hqOpen, setHqOpen] = useState(false);
   const [objective, setObjective] = useState<{ lat: number; lon: number } | null>(null);
   const [picking, setPicking] = useState(false);
@@ -42,10 +42,10 @@ export function App() {
   const pickedAt = useRef(0);
   const [view, setView] = useState<[number, number, number, number] | null>(null);
   const hasPackMap = !!s.game?.pack?.basemap;
-  // A game on a theatre pack shows the pack's own map; without one, "terrain" falls back to dark.
+  // A game on a theatre pack shows the pack's own map. "terrain" works
+  // without one too: the world overview, served (and cached) by bgws-server.
   useEffect(() => {
     if (hasPackMap) setBasemap("terrain");
-    else setBasemap((b) => (b === "terrain" ? "dark" : b));
   }, [hasPackMap, s.game?.name]);
 
   useEffect(() => writePref("layers", [...layers].join(",")), [layers]);

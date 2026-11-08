@@ -135,6 +135,22 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
         lo = (s.origin_e, s.origin_n);
         hi = (s.origin_e + s.cell * (s.width - 1) as f64, s.origin_n + s.cell * (s.height - 1) as f64);
     }
+    // A scenario somewhere else (a pack named but the scenario not moved
+    // onto it) has no ground under it: say so, and how to fix it.
+    let s = pack.meta.spec;
+    let on_pack = |g: bgws_core::Geodetic| {
+        let v = pack_frame.geodetic_to_enu(g);
+        v.e >= s.origin_e && v.n >= s.origin_n && v.e <= s.origin_e + s.cell * (s.width - 1) as f64 && v.n <= s.origin_n + s.cell * (s.height - 1) as f64
+    };
+    if !scenario.forces.is_empty() && !scenario.forces.iter().any(|f| on_pack(f.position)) {
+        let (lat, lon) = scenario.forces.iter().fold((0.0, 0.0), |a, f| (a.0 + f.position.lat, a.1 + f.position.lon));
+        let k = scenario.forces.len() as f64;
+        let o = pack.meta.frame_origin;
+        return Err(anyhow!(
+            "theatre pack {dir} is around {:.3}, {:.3}, but none of the scenario's forces are on it (they are around {:.3}, {:.3}). Move the scenario onto the pack: the editor's \"Move onto the pack\", or the viewer's New game with Ground set to the pack",
+            o.lat, o.lon, lat / k, lon / k
+        ));
+    }
     let m = 5_000.0;
     let aoi = bgws_env::Aoi { min_e: lo.0 - m, min_n: lo.1 - m, max_e: hi.0 + m, max_n: hi.1 + m };
     let terrain = pack.assemble(&aoi).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
