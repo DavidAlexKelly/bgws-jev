@@ -90,11 +90,13 @@ pub struct SimOptions {
     pub weather: Option<WeatherField>,
     /// Terrain loaded by the host from the scenario's theatre pack (§14.2).
     pub terrain: Option<bgws_env::Terrain>,
+    /// The pack's roads, in the scenario's frame: units move at road speed on them.
+    pub roads: Option<Vec<bgws_env::RoadLine>>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None }
     }
 }
 
@@ -197,7 +199,11 @@ impl Sim {
             half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
         }
         let ground = if let Some(t) = opts.terrain.clone() {
-            Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures)
+            let g = Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures);
+            match &opts.roads {
+                Some(r) => g.with_roads(r),
+                None => g,
+            }
         } else if opts.flat_ground || scenario.theatre.ground == "flat" {
             Ground::flat(origin, half, &figures)
         } else {

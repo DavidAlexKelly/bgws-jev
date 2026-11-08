@@ -113,8 +113,11 @@ pub fn movement(s: &mut Sim, dt: f64) {
         let k = *s.world.get::<Kin>(e).expect("kin");
         let going = s.ctx.ground.going(k.pos.e, k.pos.n, class);
         let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(0.0));
+        // On a road (a theatre pack's): the road's speed, up to the vehicle's own.
+        let on_road = s.ctx.ground.road_kmh(k.pos.e, k.pos.n, class).map(|r| r.min(platform.mover.road_kmh)).unwrap_or(0.0);
+        let base = off_road.max(on_road);
         let cap = platform.mover.road_kmh.max(platform.mover.cross_country_kmh) * bgws_models::ground::mode_cap(mode.into(), &s.ctx.p.ground);
-        let speed_kmh = if withdrawing { off_road } else { off_road.min(cap) } * supp_mult;
+        let speed_kmh = if withdrawing { base } else { base.min(cap) } * supp_mult;
         let v = speed_kmh / 3.6;
         let d = Enu::new(wp.e - k.pos.e, wp.n - k.pos.n, 0.0);
         let dist = d.horizontal();

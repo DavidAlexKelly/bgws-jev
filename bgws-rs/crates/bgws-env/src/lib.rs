@@ -26,7 +26,7 @@ pub mod weather;
 pub use change::{Change, ChangeKind, ChangeLayer, ChangeParams, ObstacleKind};
 pub use landcover::{CoverProps, LandCover, LandCoverTable, MicroTerrain};
 pub use light::{illuminance, illuminance_at, moon_position, sun_position, Illuminance, LightParams, MoonPosition, SunPosition, TwilightPhase, UtcDateTime};
-pub use network::{cost_astar, Bridge, GridPath, PowerLine, River, RoadClass, RoadNetwork, RoadSpeeds, RoadUser, Route};
+pub use network::{cost_astar, Bridge, GridPath, PowerLine, River, RoadClass, RoadLine, RoadNetwork, RoadSpeeds, RoadUser, Route};
 pub use optics::{band_extinction, extinction_from_visibility, rain_attenuation_db_per_km, transmission, AtmosParams, OpticalBand, Polarisation};
 pub use raster::{GridSpec, Raster};
 pub use sea::{Bathymetry, OceanRegion, SeaStateField, Season, SoundSpeedProfile, WaterColumn};

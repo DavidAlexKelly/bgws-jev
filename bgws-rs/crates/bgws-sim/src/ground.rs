@@ -2,13 +2,15 @@
 //! (generated from the scenario's seed when there is no theatre pack), its
 //! land-cover table, trafficability, micro-terrain cover, and optical line of
 //! sight through `bgws-prop` on the kernel layer (GPU when present, else the
-//! CPU twin, §11).
+//! CPU twin, §11). A theatre pack's roads are drawn onto a layer at the
+//! terrain's resolution: on a road a unit moves at the road's speed, and
+//! route planning prefers roads where they are quicker.
 
 use bgws_core::rng::fnv1a;
 use bgws_core::{Enu, Figures, Geodetic};
 use bgws_env::soil::{trafficability, TrafficParams, VehicleClass as EnvVehicle};
 use bgws_env::synth::{generate, SynthParams};
-use bgws_env::{LandCover, LandCoverTable, Terrain};
+use bgws_env::{LandCover, LandCoverTable, RoadClass, RoadLine, RoadSpeeds, Terrain};
 use bgws_gpu::{Backend, HeightGrid, LosQuery};
 use bgws_prop::los::{optical_los, optical_los_batch, OpticalLos, OpticalParams, TerrainGrid};
 use bgws_env::{cost_astar, GridSpec, Raster};
@@ -23,6 +25,9 @@ pub struct Ground {
     pub optical: OpticalParams,
     pub micro_seed: u64,
     pub backend: Backend,
+    /// The best road class in each cell (class + 1; 0 none), when there are roads.
+    pub roads: Option<Arc<Raster<u8>>>,
+    pub road_speeds: RoadSpeeds,
     /// Route-planning cost rasters by vehicle class, built on first use.
     costs: Mutex<BTreeMap<u8, Arc<Raster<f64>>>>,
 }
@@ -72,8 +77,49 @@ impl Ground {
             optical: OpticalParams::from_figures(figures),
             micro_seed,
             backend: Backend::cpu(),
+            roads: None,
+            road_speeds: RoadSpeeds::from_figures(figures),
             costs: Mutex::new(BTreeMap::new()),
         }
+    }
+
+    /// The ground with roads drawn onto it (lines in this ground's ENU frame).
+    pub fn with_roads(mut self, lines: &[RoadLine]) -> Ground {
+        let spec = self.terrain.spec;
+        let mut r = Raster::filled(spec, 0u8);
+        for l in lines {
+            let v = l.class as u8 + 1;
+            for seg in l.line.windows(2) {
+                let (a, b) = (seg[0], seg[1]);
+                let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.5)).ceil().max(1.0) as usize;
+                for k in 0..=steps {
+                    let t = k as f64 / steps as f64;
+                    if let Some((i, j)) = spec.nearest(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t) {
+                        let c = &mut r.data[spec.idx(i, j)];
+                        // Lower classes are faster roads: keep the best in the cell.
+                        if *c == 0 || v < *c {
+                            *c = v;
+                        }
+                    }
+                }
+            }
+        }
+        self.roads = Some(Arc::new(r));
+        self.costs = Mutex::new(BTreeMap::new());
+        self
+    }
+
+    /// The road under a point, if any.
+    pub fn road_at(&self, e: f64, n: f64) -> Option<RoadClass> {
+        let r = self.roads.as_ref()?;
+        let (i, j) = r.spec.nearest(e, n)?;
+        let v = r.data[r.spec.idx(i, j)];
+        (v > 0).then(|| RoadClass::ALL[(v - 1) as usize])
+    }
+
+    /// Speed on the road under a point for a vehicle class, km/h, if there is one.
+    pub fn road_kmh(&self, e: f64, n: f64, class: EnvVehicle) -> Option<f64> {
+        self.road_at(e, n).map(|rc| self.road_speeds.speed(class, rc))
     }
 
     pub fn height(&self, e: f64, n: f64) -> f64 {
@@ -138,7 +184,17 @@ impl Ground {
         let spec = GridSpec::new(t.width.div_ceil(factor), t.height.div_ceil(factor), t.cell * factor as f64, t.origin_e, t.origin_n);
         let r = Arc::new(Raster::from_fn(spec, |i, j| {
             let (e, n) = spec.pos(i, j);
-            let v = self.going(e, n, class).speed_kmh / 3.6;
+            // The best road anywhere in the coarse cell counts: routes find roads.
+            let mut road_kmh: f64 = 0.0;
+            if self.roads.is_some() {
+                for di in 0..factor {
+                    for dj in 0..factor {
+                        let (fe, fn_) = (e + (di as f64 - (factor / 2) as f64) * t.cell, n + (dj as f64 - (factor / 2) as f64) * t.cell);
+                        road_kmh = road_kmh.max(self.road_kmh(fe, fn_, class).unwrap_or(0.0));
+                    }
+                }
+            }
+            let v = self.going(e, n, class).speed_kmh.max(road_kmh) / 3.6;
             if v < 0.3 {
                 f64::INFINITY
             } else {
@@ -164,7 +220,8 @@ impl Ground {
             .cells
             .iter()
             .enumerate()
-            .filter(|(i, _)| i % 4 == 3)
+            // Closer waypoints on roads, so a unit keeps to the bends.
+            .filter(|(i, _)| if self.roads.is_some() { i % 2 == 1 } else { i % 4 == 3 })
             .map(|(_, &k)| {
                 let (i, j) = s.ij(k);
                 let (e, n) = s.pos(i, j);
@@ -179,5 +236,33 @@ impl Ground {
     pub fn contains(&self, p: Enu) -> bool {
         let s = self.terrain.spec;
         p.e >= s.origin_e && p.n >= s.origin_n && p.e <= s.origin_e + s.cell * (s.width as f64 - 1.0) && p.n <= s.origin_n + s.cell * (s.height as f64 - 1.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn routes_through_woods_take_the_road_round() {
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        t.land_cover.data.iter_mut().for_each(|c| *c = LandCover::ForestDense);
+        // An L of road: east along n = −3000, then north along e = 4000.
+        let road = RoadLine { class: RoadClass::Primary, bridge: false, line: vec![(-4_400.0, -3_000.0), (4_000.0, -3_000.0), (4_000.0, 4_400.0)] };
+        let woods = Ground::from_terrain(t.clone(), 1, &f);
+        let roads = Ground::from_terrain(t, 1, &f).with_roads(std::slice::from_ref(&road));
+        assert_eq!(roads.road_at(0.0, -3_000.0), Some(RoadClass::Primary));
+        assert_eq!(roads.road_at(0.0, 0.0), None);
+        let tracked = EnvVehicle::Tracked;
+        assert!(roads.road_kmh(0.0, -3_000.0, tracked).unwrap() > roads.going(0.0, 0.0, tracked).speed_kmh);
+        let (a, b) = (Enu::new(-4_000.0, -3_000.0, 0.0), Enu::new(4_000.0, 3_800.0, 0.0));
+        let near_road = |p: &Enu| (p.n + 3_000.0).abs() < 100.0 || (p.e - 4_000.0).abs() < 100.0;
+        let on = |r: &[Enu]| r.iter().filter(|p| near_road(p)).count() as f64 / r.len() as f64;
+        let with = roads.route(a, b, tracked);
+        let without = woods.route(a, b, tracked);
+        assert!(on(&with) > 0.8, "the route keeps to the road: {:.2}", on(&with));
+        assert!(on(&without) < 0.5, "without roads it cuts through the woods: {:.2}", on(&without));
     }
 }

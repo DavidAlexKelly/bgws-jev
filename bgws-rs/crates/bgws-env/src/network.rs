@@ -62,6 +62,14 @@ pub struct RoadEdge {
     pub blocked: bool,
 }
 
+/// A road as a line on the ground (ENU metres), for drawing it onto a grid.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RoadLine {
+    pub class: RoadClass,
+    pub bridge: bool,
+    pub line: Vec<(f64, f64)>,
+}
+
 /// The road network.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RoadNetwork {
