@@ -60,6 +60,11 @@ pub struct RouteParams {
     pub ford_s: f64,
     /// What crossing a known obstacle costs a move without a lane (about a breach), s.
     pub obstacle_s: f64,
+    /// The share of a believed threat's weight that applies where it cannot see (dead ground).
+    pub masked: f64,
+    /// A threat's eye above the ground, m, and the cell its sight is worked out on.
+    pub sight_agl_m: f64,
+    pub sight_cell_m: f64,
     /// Heavy-shell craters in a cell that cut the road through it.
     pub crater_cut: u8,
     /// Off-road speed lost per crater in a cell: speed / (1 + this × craters).
@@ -96,6 +101,9 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
         figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
+        figure!("sim.route.masked", 0.25, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground behind a crest or ridge)"),
+        figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
+        figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
         figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),
         figure!("sim.route.crater_cut", 2.0, "craters", 1.0, 50.0, "default", Default, "heavy-shell (155 mm, 122 mm rocket) craters in a 30 m stretch of road that cut it"),
         figure!("sim.route.crater_slow", 0.1, "ratio", 0.0, 2.0, "default", Default, "cross-country speed lost per heavy-shell crater in a cell: speed / (1 + this × craters)"),
@@ -122,6 +130,9 @@ impl RouteParams {
             verge_s: g("verge_s"),
             ford_s: g("ford_s"),
             obstacle_s: g("obstacle_s"),
+            masked: g("masked"),
+            sight_agl_m: g("sight_agl_m"),
+            sight_cell_m: g("sight_cell_m"),
             crater_cut: g("crater_cut").round().clamp(1.0, 255.0) as u8,
             crater_slow: g("crater_slow"),
             corridor_min_m: g("corridor_min_m"),
@@ -299,6 +310,19 @@ impl Ground {
         // threats elsewhere (a flank, a position on the way) are steered round.
         let keep_clear = p.threat_radius_m * p.objective_frac;
         let threats: Vec<(f64, f64)> = r.threats.iter().copied().filter(|t| (t.0 - r.to.e).hypot(t.1 - r.to.n) > keep_clear).collect();
+        // What each of them can see: only threats whose reach touches the corridor.
+        let reach = p.threat_radius_m;
+        let sights: Vec<Option<std::sync::Arc<crate::ground::Sight>>> = threats
+            .iter()
+            .map(|t| {
+                let touches = t.0 > lo.0 - reach && t.0 < hi.0 + reach && t.1 > lo.1 - reach && t.1 < hi.1 + reach;
+                if touches && p.masked < 1.0 {
+                    self.sight(t.0, t.1, reach)
+                } else {
+                    None
+                }
+            })
+            .collect();
         let march = r.mode == MoveModeS::March;
         let r2 = p.threat_radius_m * p.threat_radius_m;
         let ford_limit = self.ford.depth_m[ci] as f32;
@@ -319,17 +343,24 @@ impl Ground {
         };
         for k in 0..n_cells {
             let (e, n) = pos(k);
-            // How near the nearest believed threat is: 0 outside its radius, 1 on it.
-            let near = if threats.is_empty() {
-                0.0
-            } else {
-                let d2 = threats.iter().map(|t| (t.0 - e).powi(2) + (t.1 - n).powi(2)).fold(f64::INFINITY, f64::min);
-                if d2 < r2 {
-                    1.0 - d2.sqrt() / p.threat_radius_m
-                } else {
-                    0.0
-                }
-            };
+            // How near the nearest believed threat is: 0 outside its radius, 1 on
+            // it; less in its dead ground.
+            let near = threats
+                .iter()
+                .zip(&sights)
+                .map(|(t, sight)| {
+                    let d2 = (t.0 - e).powi(2) + (t.1 - n).powi(2);
+                    if d2 >= r2 {
+                        return 0.0;
+                    }
+                    let near = 1.0 - d2.sqrt() / p.threat_radius_m;
+                    if sight.as_ref().is_some_and(|v| !v.sees(e, n)) {
+                        near * p.masked
+                    } else {
+                        near
+                    }
+                })
+                .fold(0.0, f64::max);
             // Exposure weight here, per second spent in the open.
             let base = if r.urgent { 0.0 } else { p.exposure_baseline[mi] };
             let exposure = p.exposure[mi] * (base + (1.0 - base) * near);
@@ -854,6 +885,47 @@ mod tests {
         // A wheeled march along it still goes, round the cut.
         let p = plan_from(&g, (-4_000.0, -3_000.0), (3_500.0, -3_000.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
         assert!(p.road_m > 6_500.0 && p.open_m > 0.0, "{p:?}");
+    }
+
+    /// Where a route crosses e = 0, if it does.
+    fn crossing_e(p: &Plan, from: (f64, f64)) -> Option<f64> {
+        let mut a = Enu::new(from.0, from.1, 0.0);
+        for w in &p.waypoints {
+            if (a.e < 0.0) != (w.e < 0.0) {
+                let t = -a.e / (w.e - a.e);
+                return Some(a.n + (w.n - a.n) * t);
+            }
+            a = *w;
+        }
+        None
+    }
+
+    #[test]
+    fn a_move_round_a_threat_takes_the_side_it_cannot_see() {
+        // Open fields with a believed enemy in the middle; a low ridge (40 m)
+        // 700 m north of it hides the ground beyond from it.
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        for k in 0..spec.len() {
+            let (e, n) = spec.pos(spec.ij(k).0, spec.ij(k).1);
+            if e.abs() < 3_000.0 {
+                t.elevation.data[k] = (40.0 * (1.0 - (n - 700.0).abs() / 300.0)).max(0.0) as f32;
+            }
+        }
+        let g = Ground::from_terrain(t, 1, &f);
+        let threat = [(0.0, 0.0)];
+        let from = (-4_000.0, 0.0);
+        let p = plan_from(&g, from, (4_000.0, 0.0), VehicleClass::Tracked, MoveModeS::Tactical, &threat);
+        let n = crossing_e(&p, from).expect("crosses");
+        assert!(n > 800.0, "goes behind the ridge: crosses at n = {n:.0}");
+        let mut blind = g.route_params.clone();
+        blind.masked = 1.0;
+        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(4_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &threat, obstacles: &[], urgent: false };
+        let n_blind = crossing_e(&g.plan(&r, &blind), from).expect("crosses");
+        assert!(n_blind < 800.0, "without sight it has no reason to: {n_blind:.0}");
+        let sight = g.sight(0.0, 0.0, 4_000.0).expect("a sight");
+        assert!(sight.sees(0.0, -1_500.0) && !sight.sees(0.0, 1_500.0));
     }
 
     #[test]

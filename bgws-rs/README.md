@@ -258,7 +258,11 @@ never the truth. The enemy at the destination is what the move closes with,
 so only threats elsewhere are steered round. Recce, screens and observers
 keep to cover but do not steer away from the enemy they are looking for.
 An urgent move (orders `now`, or fire support getting into range) weighs
-exposure only near a believed threat. Orders set the mode per phase
+exposure only near a believed threat. A threat weighs fully only on ground
+it can see: its sight is worked out over the terrain (`sim.route.sight_*`),
+and in its dead ground, behind a crest or a ridge, a quarter of its weight
+applies (`sim.route.masked`). So a move round an enemy takes the side it
+cannot see. Orders set the mode per phase
 (`march`, `assault`, `bound` for stealth, otherwise tactical).
 
 **Rivers and bridges.** A pack's rivers are drawn onto the grid with their
