@@ -8,6 +8,7 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { terrainLayers, worldLayers } from "./basemap";
 
 export type Basemap = "terrain" | "dark" | "streets" | "satellite";
 
@@ -16,54 +17,6 @@ function registerPmtiles() {
   if (pmtilesProtocol) return;
   maplibregl.addProtocol("pmtiles", new Protocol().tile);
   pmtilesProtocol = true;
-}
-
-/** Protomaps' OpenStreetMap layers, drawn dark like the screens around them. */
-function terrainLayers(): maplibregl.LayerSpecification[] {
-  const kind = (k: string[]) => ["in", ["get", "kind"], ["literal", k]] as maplibregl.ExpressionSpecification;
-  return [
-    { id: "base-earth", type: "fill", source: "base", "source-layer": "earth", paint: { "fill-color": "#141c2b" } },
-    {
-      id: "base-landuse",
-      type: "fill",
-      source: "base",
-      "source-layer": "landuse",
-      paint: {
-        "fill-color": [
-          "match",
-          ["get", "kind"],
-          ["wood", "forest", "nature_reserve"],
-          "#1b3224",
-          ["farmland", "farmyard", "orchard", "vineyard", "allotments"],
-          "#232a1c",
-          ["grass", "grassland", "meadow", "park", "garden", "pitch", "golf_course", "cemetery", "recreation_ground", "village_green"],
-          "#1b2820",
-          ["scrub", "heath"],
-          "#1e2a1e",
-          ["wetland", "marsh", "swamp", "bog", "reedbed"],
-          "#16292b",
-          ["residential", "suburb", "neighbourhood"],
-          "#1d2130",
-          ["industrial", "commercial", "retail", "railway", "military", "parking"],
-          "#202233",
-          ["sand", "beach", "bare_rock", "quarry", "landfill"],
-          "#2a2820",
-          "#171f2d",
-        ],
-      },
-    },
-    { id: "base-water", type: "fill", source: "base", "source-layer": "water", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#0e2740" } },
-    { id: "base-waterway", type: "line", source: "base", "source-layer": "water", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#1d4a72", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 15, 2] } },
-    { id: "base-hillshade", type: "hillshade", source: "base-dem", paint: { "hillshade-shadow-color": "#05080f", "hillshade-highlight-color": "#3a4a66", "hillshade-exaggeration": 0.6 } },
-    { id: "base-buildings", type: "fill", source: "base", "source-layer": "buildings", minzoom: 13, paint: { "fill-color": "#2a3044", "fill-opacity": 0.8 } },
-    { id: "base-rail", type: "line", source: "base", "source-layer": "roads", filter: kind(["rail"]), paint: { "line-color": "#4a4f60", "line-width": 1, "line-dasharray": [3, 2] } },
-    { id: "base-paths", type: "line", source: "base", "source-layer": "roads", minzoom: 13, filter: kind(["path"]), paint: { "line-color": "#353b4c", "line-width": 0.6 } },
-    { id: "base-minor", type: "line", source: "base", "source-layer": "roads", filter: kind(["minor_road", "other"]), paint: { "line-color": "#454c60", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 16, 2.5] } },
-    { id: "base-major", type: "line", source: "base", "source-layer": "roads", filter: kind(["major_road"]), paint: { "line-color": "#8b7d52", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 16, 4] } },
-    { id: "base-highway", type: "line", source: "base", "source-layer": "roads", filter: kind(["highway"]), paint: { "line-color": "#c08a3a", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 16, 5] } },
-    { id: "base-bridges", type: "line", source: "base", "source-layer": "roads", filter: ["==", ["get", "is_bridge"], true], paint: { "line-color": "#d7dbe6", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1, 16, 4], "line-opacity": 0.7 } },
-    { id: "base-boundaries", type: "line", source: "base", "source-layer": "boundaries", paint: { "line-color": "#6a7292", "line-width": 1, "line-dasharray": [4, 3] } },
-  ];
 }
 
 const BASEMAPS: Record<Exclude<Basemap, "terrain">, { tiles: string[]; attribution: string; paint?: Record<string, number> }> = {
@@ -156,17 +109,21 @@ export function MapView(props: {
     const m = map.current;
     if (!m) return;
     const apply = () => {
-      for (const l of m.getStyle().layers ?? []) if (l.id.startsWith("base")) m.removeLayer(l.id);
-      for (const id of ["base", "base-dem"]) if (m.getSource(id)) m.removeSource(id);
-      if (props.basemap === "terrain" && packBasemap) {
+      for (const l of m.getStyle().layers ?? []) if (l.id.startsWith("base") || l.id.startsWith("world")) m.removeLayer(l.id);
+      for (const id of ["base", "base-dem", "world"]) if (m.getSource(id)) m.removeSource(id);
+      if (props.basemap === "terrain") {
         registerPmtiles();
         const abs = (u: string) => `pmtiles://${location.origin}${u}`;
+        // The world at low zooms (bgws-server proxies and caches it), the pack's own map over it.
+        m.addSource("world", { type: "vector", url: abs("/world.pmtiles"), maxzoom: 9, attribution: "© OpenStreetMap contributors · Protomaps" });
+        for (const l of worldLayers()) m.addLayer(l);
+        if (!packBasemap) return;
         m.addSource("base", { type: "vector", url: abs(packBasemap), attribution: "© OpenStreetMap contributors · Protomaps" });
         if (packDem) m.addSource("base-dem", { type: "raster-dem", url: abs(packDem), encoding: "terrarium", tileSize: 512, attribution: "© Mapterhorn" });
         for (const l of terrainLayers()) if (l.id !== "base-hillshade" || packDem) m.addLayer(l);
         return;
       }
-      const b = BASEMAPS[props.basemap === "terrain" ? "dark" : props.basemap];
+      const b = BASEMAPS[props.basemap];
       m.addSource("base", { type: "raster", tiles: b.tiles, tileSize: 256, attribution: b.attribution, maxzoom: 19 });
       m.addLayer({ id: "base", type: "raster", source: "base", paint: b.paint ?? {} });
     };

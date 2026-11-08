@@ -194,9 +194,21 @@ TS real-time screen:
 Only the map tiles come from the internet. `/classic` is the earlier
 single-file viewer.
 
+**The world map.** The viewer's *terrain* basemap and the scenario editor
+(`/editor`) draw a world overview: coastlines, land cover, water, borders,
+main roads and place names. It comes from the Protomaps planet at zoom 9 and
+below, and maps over-zoom it beyond that. `bgws-server` proxies it at
+`/world.pmtiles`. It fetches each byte range once and keeps it in the cache
+(`$BGWS_CACHE`). It pins one daily build (`world.url` in the cache), so a
+place looked at once draws offline later. `$BGWS_WORLD` names another
+archive. A scenario's pack draws over its box in full detail, and the
+editor outlines every pack. In the editor, drag a force to move it, or
+select it and click the map.
+
 To change the viewer: `cd web/app && npm install`. Then `npm run dev` serves
 it at http://localhost:5173 against a running `bgws-server` (port 8765).
-`npm run build` writes `web/app/dist`, which the server embeds; commit it. CI
+`npm run build` writes `web/app/dist` (the viewer's `app.js` and the
+editor's map, `map.js`), which the server embeds; commit it. CI
 fails if it is stale.
 
 ## Real ground: theatre packs from PMTiles

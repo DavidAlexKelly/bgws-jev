@@ -34,7 +34,9 @@ pub fn data(scenarios_dir: &Path) -> Result<Value> {
             d.flatten()
                 .filter_map(|e| {
                     let meta: bgws_env::PackMeta = serde_json::from_slice(&std::fs::read(e.path().join("pack.json")).ok()?).ok()?;
-                    Some(json!({ "name": e.file_name().to_string_lossy(), "bbox": meta.bbox, "origin": meta.frame_origin }))
+                    let name = e.file_name().to_string_lossy().into_owned();
+                    let url = |f: &Option<String>| f.as_ref().map(|f| format!("/packs/{name}/{f}"));
+                    Some(json!({ "name": name, "bbox": meta.bbox, "origin": meta.frame_origin, "basemap": url(&meta.basemap), "dem": url(&meta.dem) }))
                 })
                 .collect()
         })

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scenario editor</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="/map.css">
+<script src="/map.js"></script>
 <style>
   /* The scenario editor (RUST_ENGINE.md §16): start from a shipped scenario,
      set the theatre, time, weather and duration, place forces from the
@@ -36,8 +38,13 @@
   #status { font-size: 13px; white-space: pre-wrap; margin-top: 8px; }
   #status.bad { color: var(--bad); } #status.good { color: var(--good); }
   #map { position: relative; min-height: 300px; }
-  #map canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
-  #hint { position: absolute; left: 12px; top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--ink-2); }
+  #mapgl { position: absolute; inset: 0; }
+  #mapgl .maplibregl-canvas { cursor: crosshair; }
+  #labels { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .force { display: flex; align-items: center; gap: 4px; cursor: grab; font: 600 12px system-ui, sans-serif; color: #f0efec; text-shadow: 0 0 3px #000, 0 0 2px #000; white-space: nowrap; }
+  .force i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.6); box-sizing: border-box; }
+  .force.sel i { width: 16px; height: 16px; border: 2px solid #fff; }
+  #hint { position: absolute; left: 12px; top: 12px; z-index: 2; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--ink-2); }
 </style>
 </head>
 <body>
@@ -62,7 +69,7 @@
     <div class="row"><button id="check">Check</button><button id="download">Download JSON</button><button id="load">Load into the game</button></div>
     <div id="status"></div>
   </aside>
-  <div id="map"><canvas id="cv"></canvas><div id="hint"></div></div>
+  <div id="map"><div id="mapgl"></div><canvas id="labels"></canvas><div id="hint"></div></div>
 </div>
 <script type="application/json" id="data">__BGWS_DATA__</script>
 <script>
@@ -101,6 +108,7 @@ function loadPreset(id) {
   delete sc.convertedFrom;
   selected = null;
   fill();
+  fit();
 }
 function fill() {
   $("name").value = sc.name;
@@ -118,7 +126,7 @@ $("duration").oninput = (e) => (sc.scope.durationMin = Number(e.target.value));
 $("start").oninput = (e) => (sc.startUtc = e.target.value ? new Date(e.target.value + "Z").toISOString().replace(".000", "") : sc.startUtc);
 $("weather").onchange = (e) => (sc.weather = { source: "preset", weather: e.target.value });
 $("ground").onchange = (e) => (sc.theatre.ground = e.target.value);
-$("pack").oninput = (e) => { if (e.target.value) sc.theatre.pack = e.target.value; else delete sc.theatre.pack; };
+$("pack").oninput = (e) => { if (e.target.value) sc.theatre.pack = e.target.value; else delete sc.theatre.pack; draw(); };
 // Packs built by `bgws terrain` or the viewer's "Generate ground".
 $("pack-list").innerHTML = (D.packs || []).map((p) => `<option value="${p.name}"></option>`).join("");
 $("pack-centre").onclick = () => {
@@ -134,6 +142,7 @@ $("pack-centre").onclick = () => {
   const out = sc.forces.filter((f) => f.position.lat < so || f.position.lat > n || f.position.lon < w || f.position.lon > e).length;
   if (out) status(`${out} of the forces fall outside pack ${p.name}: build a bigger box.`, "bad");
   fill();
+  fit();
 };
 // Every position in the scenario (origin, forces, tasks, lanes, obstacles,
 // measures, areas, victory conditions) moves by the same amount.
@@ -153,6 +162,7 @@ function moveOrigin() {
   if (!isFinite(lat) || !isFinite(lon)) return;
   shiftAll(lat - sc.theatre.origin.lat, lon - sc.theatre.origin.lon);
   draw();
+  fit();
 }
 $("lat").onchange = moveOrigin; $("lon").onchange = moveOrigin;
 
@@ -194,48 +204,129 @@ $("add").onclick = () => {
 };
 function hint() { $("hint").textContent = selected != null && sc.forces[selected] ? `Click the map to place ${sc.forces[selected].id}` : "Select a force to place it"; }
 
-// The map: a local projection round the origin, fitted to the theatre and the forces.
-let proj = null;
-function draw() {
-  const c = $("cv"), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+// The map: MapLibre over the world overview (the Protomaps planet's low
+// zooms, proxied and cached by bgws-server), the scenario's pack in full
+// detail over its box, every pack's outline, and the forces as markers to
+// drag or place.
+const { maplibregl, terrainLayers, worldLayers } = window.BgwsMap;
+const abs = (u) => `pmtiles://${location.origin}${u}`;
+const map = new maplibregl.Map({
+  container: "mapgl",
+  style: {
+    version: 8,
+    sources: { world: { type: "vector", url: abs("/world.pmtiles"), attribution: "© OpenStreetMap contributors · Protomaps" } },
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#0b1220" } }, ...worldLayers("world")],
+  },
+  center: [20, 54], zoom: 5, attributionControl: { compact: true },
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+let mapReady = false, worldFailed = false;
+map.on("error", (e) => {
+  if (!worldFailed && String(e.error && e.error.message).includes("world")) { worldFailed = true; status("The world map is not available (offline, and not cached yet): packs still show.", "bad"); }
+});
+const boxRing = ([w, s, e, n]) => [[w, s], [e, s], [e, n], [w, n], [w, s]];
+map.on("load", () => {
+  mapReady = true;
+  // Every pack's box, dashed; the scenario's own, bright.
+  map.addSource("packs", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "packs-line", type: "line", source: "packs", paint: { "line-color": ["case", ["get", "current"], "#f2c14e", "#8a93b5"], "line-width": ["case", ["get", "current"], 2, 1], "line-dasharray": [3, 2] } });
+  map.addSource("theatre", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "theatre-line", type: "line", source: "theatre", paint: { "line-color": "#c3c2b7", "line-width": 1 } });
+  draw(); fit();
+});
+
+// The scenario's pack in full detail, under the outlines.
+let shownPack = null;
+function showPack() {
+  const name = sc.theatre.pack || null;
+  if (!mapReady || name === shownPack) return;
+  for (const l of map.getStyle().layers) if (l.id.startsWith("pack-") && l.id !== "pack-line") map.removeLayer(l.id);
+  for (const id of ["pack", "pack-dem"]) if (map.getSource(id)) map.removeSource(id);
+  shownPack = name;
+  const p = (D.packs || []).find((x) => x.name === name);
+  if (!p || !p.basemap) return;
+  map.addSource("pack", { type: "vector", url: abs(p.basemap), attribution: "© OpenStreetMap contributors · Protomaps" });
+  if (p.dem) map.addSource("pack-dem", { type: "raster-dem", url: abs(p.dem), encoding: "terrarium", tileSize: 512 });
+  for (const l of terrainLayers("pack", "pack-dem", "pack")) if (l.id !== "pack-hillshade" || p.dem) map.addLayer(l, "packs-line");
+}
+
+// Place names, drawn on a canvas over the map (no glyph server needed).
+const LABEL_KINDS = { country: 0, region: 1, locality: 2 };
+function labels() {
+  const c = $("labels"), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
   c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext("2d"); g.scale(dpr, dpr);
-  const css = getComputedStyle(document.documentElement);
-  g.fillStyle = css.getPropertyValue("--page"); g.fillRect(0, 0, W, H);
-  const o = sc.theatre.origin, kx = 111320 * Math.cos(o.lat * Math.PI / 180), ky = 111320;
-  const pts = sc.forces.map((f) => [(f.position.lon - o.lon) * kx, (f.position.lat - o.lat) * ky]);
-  const b = sc.theatre.bounds;
-  if (b) pts.push([(b.west - o.lon) * kx, (b.south - o.lat) * ky], [(b.east - o.lon) * kx, (b.north - o.lat) * ky]);
-  pts.push([-2000, -2000], [2000, 2000]);
-  const minX = Math.min(...pts.map((p) => p[0])), maxX = Math.max(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1])), maxY = Math.max(...pts.map((p) => p[1]));
-  const k = 0.9 * Math.min(W / (maxX - minX), H / (maxY - minY)), cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-  const X = (e) => W / 2 + (e - cx) * k, Y = (n) => H / 2 - (n - cy) * k;
-  proj = { toGeo: (px, py) => ({ lon: o.lon + (cx + (px - W / 2) / k) / kx, lat: o.lat + (cy - (py - H / 2) / k) / ky }) };
-  // A kilometre grid.
-  g.strokeStyle = css.getPropertyValue("--line"); g.lineWidth = 1;
-  // The smallest 1-2-5 step that leaves ~80 px between lines.
-  const want = 80 / k, mag = Math.pow(10, Math.floor(Math.log10(want)));
-  const step = [1, 2, 5, 10].map((m) => m * mag).find((x) => x >= want) || 1000;
-  for (let e = Math.floor((cx - W / 2 / k) / step) * step; e < cx + W / 2 / k; e += step) { g.beginPath(); g.moveTo(X(e), 0); g.lineTo(X(e), H); g.stroke(); }
-  for (let n = Math.floor((cy - H / 2 / k) / step) * step; n < cy + H / 2 / k; n += step) { g.beginPath(); g.moveTo(0, Y(n)); g.lineTo(W, Y(n)); g.stroke(); }
-  g.fillStyle = css.getPropertyValue("--muted"); g.font = "11px system-ui"; g.fillText(`grid ${step >= 1000 ? step / 1000 + " km" : step + " m"}`, 10, H - 10);
-  if (b) { g.strokeStyle = css.getPropertyValue("--ink-2"); g.setLineDash([6, 4]); g.strokeRect(X((b.west - o.lon) * kx), Y((b.north - o.lat) * ky), ((b.east - b.west) * kx) * k, ((b.north - b.south) * ky) * k); g.setLineDash([]); }
-  g.strokeStyle = css.getPropertyValue("--muted"); g.beginPath(); g.moveTo(X(0) - 6, Y(0)); g.lineTo(X(0) + 6, Y(0)); g.moveTo(X(0), Y(0) - 6); g.lineTo(X(0), Y(0) + 6); g.stroke();
-  sc.forces.forEach((f, i) => {
-    const px = X((f.position.lon - o.lon) * kx), py = Y((f.position.lat - o.lat) * ky);
-    g.fillStyle = COLOR[f.side] || COLOR.neutral;
-    g.beginPath(); g.arc(px, py, i === selected ? 8 : 6, 0, 2 * Math.PI); g.fill();
-    if (i === selected) { g.strokeStyle = css.getPropertyValue("--ink"); g.lineWidth = 2; g.stroke(); g.lineWidth = 1; }
-    g.fillStyle = css.getPropertyValue("--ink"); g.fillText(`${f.id}${f.count > 1 ? " ×" + f.count : ""}`, px + 10, py - 6);
-  });
+  if (!mapReady) return;
+  const z = map.getZoom();
+  const feats = [];
+  for (const src of ["world", "pack"]) {
+    if (!map.getSource(src)) continue;
+    for (const f of map.querySourceFeatures(src, { sourceLayer: "places" })) {
+      const k = LABEL_KINDS[f.properties.kind], name = f.properties.name;
+      if (k == null || !name || f.geometry.type !== "Point") continue;
+      if ((f.properties.min_zoom ?? 0) > z + 0.5) continue;
+      if (k === 0 && z > 7) continue;
+      if (k === 1 && (z < 4 || z > 8)) continue;
+      feats.push({ k, name, at: f.geometry.coordinates, rank: f.properties.population_rank ?? 0 });
+    }
+  }
+  feats.sort((a, b) => a.k - b.k || b.rank - a.rank);
+  const taken = [], seen = new Set();
+  for (const f of feats) {
+    if (seen.has(f.name)) continue;
+    const p = map.project(f.at);
+    const size = f.k === 0 ? 14 : f.k === 1 ? 11 : f.rank >= 10 ? 13 : 11;
+    g.font = `${f.k === 2 ? 600 : 500} ${size}px system-ui, sans-serif`;
+    const w = g.measureText(f.name).width, box = [p.x - w / 2 - 3, p.y - size, p.x + w / 2 + 3, p.y + 4];
+    if (box[2] < 0 || box[0] > W || box[3] < 0 || box[1] > H || taken.some((t) => box[0] < t[2] && box[2] > t[0] && box[1] < t[3] && box[3] > t[1])) continue;
+    taken.push(box); seen.add(f.name);
+    g.lineWidth = 3; g.strokeStyle = "rgba(5,8,15,0.9)"; g.fillStyle = f.k === 0 ? "#c9cfe6" : f.k === 1 ? "#9aa3c2" : "#eceef6";
+    g.textAlign = "center";
+    if (f.k === 2) { g.beginPath(); g.arc(p.x, p.y + 6, 2, 0, 2 * Math.PI); g.fill(); }
+    g.strokeText(f.name, p.x, p.y); g.fillText(f.name, p.x, p.y);
+  }
 }
-$("cv").onclick = (ev) => {
-  if (selected == null || !proj) return;
-  const p = proj.toGeo(ev.offsetX, ev.offsetY), f = sc.forces[selected];
-  f.position = { ...f.position, lat: p.lat, lon: p.lon };
+let labelQueued = false;
+const queueLabels = () => { if (!labelQueued) { labelQueued = true; requestAnimationFrame(() => { labelQueued = false; labels(); }); } };
+map.on("move", queueLabels); map.on("idle", queueLabels); map.on("sourcedata", queueLabels);
+
+// The forces, as markers: click one to select it, drag it to move it.
+let markers = [];
+function draw() {
+  if (!sc) return;
+  for (const m of markers) m.remove();
+  markers = sc.forces.map((f, i) => {
+    const el = document.createElement("div");
+    el.className = "force" + (i === selected ? " sel" : "");
+    el.innerHTML = `<i style="background:${COLOR[f.side] || COLOR.neutral}"></i><span></span>`;
+    el.querySelector("span").textContent = `${f.id}${f.count > 1 ? " ×" + f.count : ""}`;
+    el.addEventListener("click", (ev) => { ev.stopPropagation(); selected = i; table(); draw(); });
+    const m = new maplibregl.Marker({ element: el, draggable: true, anchor: "left", offset: [-8, 0] }).setLngLat([f.position.lon, f.position.lat]).addTo(map);
+    m.on("dragend", () => { const p = m.getLngLat(); f.position = { ...f.position, lat: p.lat, lon: p.lng }; selected = i; table(); draw(); });
+    return m;
+  });
+  if (!mapReady) return;
+  showPack();
+  map.getSource("packs").setData({ type: "FeatureCollection", features: (D.packs || []).filter((p) => p.bbox).map((p) => ({ type: "Feature", properties: { current: p.name === sc.theatre.pack }, geometry: { type: "LineString", coordinates: boxRing(p.bbox) } })) });
+  const b = sc.theatre.bounds;
+  map.getSource("theatre").setData({ type: "FeatureCollection", features: b ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: boxRing([b.west, b.south, b.east, b.north]) } }] : [] });
+}
+// Look at the forces (and the pack's box, if it has one).
+function fit() {
+  if (!mapReady || !sc) return;
+  const pts = sc.forces.map((f) => [f.position.lon, f.position.lat]);
+  if (!pts.length) pts.push([sc.theatre.origin.lon, sc.theatre.origin.lat]);
+  const lons = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
+  const pad = 0.02;
+  map.fitBounds([[Math.min(...lons) - pad, Math.min(...lats) - pad], [Math.max(...lons) + pad, Math.max(...lats) + pad]], { padding: 60, maxZoom: 13, duration: 0 });
+}
+map.on("click", (ev) => {
+  if (selected == null || !sc.forces[selected]) return;
+  const f = sc.forces[selected];
+  f.position = { ...f.position, lat: ev.lngLat.lat, lon: ev.lngLat.lng };
   draw();
-};
-addEventListener("resize", draw);
+});
 
 // The server checks it and can load it into the running game.
 let ws = null;
