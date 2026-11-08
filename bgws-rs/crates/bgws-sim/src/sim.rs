@@ -90,11 +90,15 @@ pub struct SimOptions {
     pub weather: Option<WeatherField>,
     /// Terrain loaded by the host from the scenario's theatre pack (§14.2).
     pub terrain: Option<bgws_env::Terrain>,
+    /// The pack's roads, in the scenario's frame: units move at road speed on them.
+    pub roads: Option<Vec<bgws_env::RoadLine>>,
+    /// The pack's rivers, in the scenario's frame: crossed at bridges or where shallow enough to ford.
+    pub rivers: Option<Vec<bgws_env::River>>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None }
     }
 }
 
@@ -141,6 +145,9 @@ pub struct Ctx {
     pub order: Vec<Entity>,
     pub by_name: BTreeMap<String, EntityId>,
     pub seats: BTreeMap<Side, SeatKind>,
+    /// The obstacles on the ground and the sides that know of them, for the
+    /// route planner (refreshed by the engineers' tick).
+    pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,
     pub(crate) reports: Vec<(SimTime, Side, bgws_know::Detection)>,
     pub(crate) last_plan: BTreeMap<Side, Plan>,
@@ -196,7 +203,7 @@ impl Sim {
             let v = frame.geodetic_to_enu(g);
             half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
         }
-        let ground = if let Some(t) = opts.terrain.clone() {
+        let mut ground = if let Some(t) = opts.terrain.clone() {
             Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures)
         } else if opts.flat_ground || scenario.theatre.ground == "flat" {
             Ground::flat(origin, half, &figures)
@@ -204,6 +211,12 @@ impl Sim {
             let seed_text = if scenario.theatre.ground_seed.is_empty() { scenario.name.clone() } else { scenario.theatre.ground_seed.clone() };
             Ground::generated(origin, &seed_text, half, &figures)
         };
+        if let Some(r) = &opts.roads {
+            ground = ground.with_roads(r);
+        }
+        if let Some(r) = &opts.rivers {
+            ground = ground.with_rivers(r);
+        }
         let start = UtcDateTime::parse(&scenario.start_utc).map_err(|e| LoadError::StartTime(format!("{e:?}")))?;
         let wspec = bgws_env::GridSpec::new(4, 4, half * 2.0 / 3.0, -half, -half);
         let weather = opts.weather.clone().unwrap_or_else(|| match &scenario.weather {
@@ -247,6 +260,7 @@ impl Sim {
             order: Vec::new(),
             by_name: BTreeMap::new(),
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
+            route_obstacles: Vec::new(),
             last_asked: BTreeMap::new(),
             reports: Vec::new(),
             last_plan: BTreeMap::new(),

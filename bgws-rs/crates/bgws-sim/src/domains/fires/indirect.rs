@@ -861,6 +861,12 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
             effects.push(serde_json::json!({ "entity": tid.0, "pk": pk, "kills": kills, "blasts": blasts, "posture": format!("{posture:?}"), "lethalAreaM2": c.lethal_area() }));
         }
     }
+    // Heavy rounds crater the ground: roads hit often enough are cut, and the going slows.
+    if matches!(salvo.round, RoundClass::Howitzer155 | RoundClass::Rocket122) {
+        for p in &salvo.impacts {
+            s.ctx.ground.crater(p.e, p.n);
+        }
+    }
     let centre = salvo.impacts.iter().fold(Enu::default(), |a, p| a.add(*p)).scale(1.0 / salvo.impacts.len().max(1) as f64);
     let text = format!("{} rounds of {} land{}: {} knocked out", salvo.impacts.len(), salvo.munition, if salvo.adjusting { " (adjusting)" } else { "" }, kills_total);
     let mut b = s.ctx.log.push(now, "fires.impact").side(side).text(text).data(serde_json::json!({ "mission": mid - ID_BASE, "munition": salvo.munition, "rounds": salvo.impacts.len(), "centreE": centre.e, "centreN": centre.n, "kills": kills_total, "effects": effects, "adjusting": salvo.adjusting }));

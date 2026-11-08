@@ -6,7 +6,8 @@
 //!           [--record game.json] [--events events.jsonl] [--flat]
 //! bgws replay <game.json>                 replay a record without calling any model
 //! bgws branch <game.json> --at M [--deciders jev]   "what if": replay to minute M, then play on
-//! bgws pack <dir> --name N --lat --lon [--dem dem.tif]   build a theatre pack
+//! bgws pack <dir> --name N --lat --lon [--dem dem.tif]   build a theatre pack (generated ground)
+//! bgws terrain <dir> --bbox W,S,E,N [--name N] [--cell-m 30]   build a theatre pack from real ground
 //! bgws batch <scenario> [-n 100]          many seeded games on the rules, in parallel
 //! bgws vignettes [--only id] [-n 200] [--store dir]   benchmark vignettes; regression against a baseline
 //! bgws sensitivity <vignette>             Morris then Sobol over its figures; the research backlog
@@ -83,6 +84,37 @@ enum Cmd {
         minutes: Option<f64>,
         #[arg(long)]
         record_out: Option<PathBuf>,
+    },
+    /// Build a theatre pack from real ground for a box (§14.2): elevation (Mapterhorn), land cover,
+    /// water, towns and roads (a Protomaps OpenStreetMap build), and the viewer's basemap, read by
+    /// HTTP range from planet PMTiles and cached. Scenarios name the folder as `theatre.pack`.
+    Terrain {
+        out: PathBuf,
+        /// west,south,east,north in degrees.
+        #[arg(long, allow_hyphen_values = true)]
+        bbox: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+        /// Protomaps archive (URL or path); the latest daily build by default.
+        #[arg(long)]
+        planet: Option<String>,
+        /// Elevation archive (terrarium PMTiles, URL or path).
+        #[arg(long, default_value = bgws_geodata::build::ELEVATION_URL)]
+        elevation: String,
+        /// Fraction of canopy and roof height taken off the elevation (a surface model); 0 keeps it.
+        #[arg(long, default_value_t = 0.5)]
+        dsm_canopy_fraction: f64,
+        /// Road vertices closer than this join, metres.
+        #[arg(long, default_value_t = 3.0)]
+        snap_m: f64,
+        /// Highest basemap zoom kept for the viewer.
+        #[arg(long, default_value_t = 14)]
+        basemap_max_zoom: u8,
+        /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
+        #[arg(long)]
+        cache: Option<PathBuf>,
     },
     /// Build a theatre pack (§14.2): synthetic ground for an area, tiled, for scenarios to name.
     Pack {
@@ -293,6 +325,34 @@ fn main() -> Result<()> {
             if let Some(p) = record_out {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
+        }
+        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, dsm_canopy_fraction, snap_m, basemap_max_zoom, cache } => {
+            let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
+            let mut spec = bgws_geodata::build::BuildSpec::new(bbox);
+            spec.cell_m = cell_m;
+            spec.planet = planet;
+            spec.elevation = elevation;
+            spec.dsm_canopy_fraction = dsm_canopy_fraction;
+            spec.basemap_max_zoom = basemap_max_zoom;
+            if cache.is_some() {
+                spec.cache = cache;
+            }
+            let name = name.unwrap_or_else(|| out.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "theatre".into()));
+            let started = Instant::now();
+            let last = std::sync::Mutex::new((String::new(), 0u32));
+            let progress = |stage: &str, f: f64| {
+                // A line per stage and every tenth of it.
+                let step = (f * 10.0).floor() as u32;
+                if let Ok(mut l) = last.lock() {
+                    if l.0 != stage || step > l.1 {
+                        *l = (stage.to_string(), step);
+                        eprintln!("[{:6.1} s] {stage} {:>3.0}%", started.elapsed().as_secs_f64(), f * 100.0);
+                    }
+                }
+            };
+            let meta = bgws_geodata::pack::build_pack(&out, &name, &spec, snap_m, &progress).map_err(|e| anyhow!("{e}"))?;
+            println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());
+            eprintln!("theatre pack `{}` in {} ({} terrain tiles, {:.0} s)", meta.name, out.display(), meta.tiles.len(), started.elapsed().as_secs_f64());
         }
         Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed, dem } => {
             let f = default_figures();

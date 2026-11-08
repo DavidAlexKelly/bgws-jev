@@ -16,7 +16,8 @@ target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, 
 cargo build --release -p bgws-run --features duckdb  # event logs as DuckDB databases (builds DuckDB, ~25 min)
 target/release/bgws play m4-drone-line --events game.duckdb
 target/release/bgws events game.duckdb --sql "SELECT kind, count(*) FROM events WHERE side = 'blue' GROUP BY kind"
-target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
+target/release/bgws terrain packs/kaliningrad --bbox 20.35,54.65,20.60,54.76   # real ground for a box (see "Real ground")
+target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack of generated ground
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
@@ -42,6 +43,7 @@ fallbacks decide and the log says why.
 |---|---|
 | `bgws-core` | ids, µs time, units, WGS84/ECEF/ENU, the figures registry, keyed ChaCha8 streams, the event log and fingerprint, question and answer types |
 | `bgws-catalogue` | 105 platforms and 48 munitions built from parts (movers, bodies, signatures, sensors, mounts, radios, emitters, stores), class defaults, derivation, validation |
+| `bgws-geodata` | real ground from planet PMTiles: a PMTiles reader over HTTP ranges with a disk cache, vector tiles, terrarium elevation, land cover, the road graph builder, and pack writing |
 | `bgws-env` | terrain grids and pyramids, synthetic theatres, land cover and micro-terrain, soil and trafficability, roads, the change layer, tiles and theatre packs, sea state and sound speed, weather fields, optics, sun and moon, thermal days |
 | `bgws-prop` | optical LOS with canopy, horizons, Deygout diffraction, ITM-style loss, HF ground wave and NVIS, satellite and microwave links, acoustic TL, link budgets |
 | `bgws-gpu` | LOS, viewsheds, candidate pairs, path-loss and J/S fields, flow fields, Monte Carlo hits: CPU twins always, WGSL kernels behind `--features gpu` |
@@ -107,7 +109,21 @@ fallbacks decide and the log says why.
   transit to targets 3–6 km away at 90 km/h, mid-range of the reported
   65–150 km/h. On voice nets (the scenario's `network: voice`) the same chain
   takes about 23 minutes, inside P2's ~20. CI runs it with
-  `--backlog detect-to-strike-networked`, so it is reported but does not fail.
+  `--backlog detect-to-strike-networked,attack-halt`, so it is reported but does not fail.
+- **Attack halt [P14]:** in the advance-to-contact skirmish the attack stops at
+  a median of a third of its strength lost (4 of 12 vehicles; 95% CI
+  0.25–0.42, 200 games), just above the 10–30% band. The stored 0.25 came
+  from a Red troop that started inside a dense wood its vehicles could not
+  leave, so it never advanced. Vehicles now crawl out of such woods
+  (`sim.route.crawl_kmh`), all of Red fights, and Blue loses one more vehicle
+  before it halts. The pinned threshold (`people.morale.theta.pinned`) and
+  the route weights do not move it: the halt here comes from the fight, not
+  from morale. The next step is a playtest of the scene, not a figure tweak.
+- **Vehicle march rates:** the research reference sources dismounted pace
+  (P26, now a vignette: 2.3 km/h across generated mixed ground, in its
+  1.5–3 km/h band) but no road-march or cross-country rate for vehicles. The
+  road speeds by class (`env.road.*`) and the planner's march weights
+  are [default] until a source is added.
 - **Lethality:** meeting engagements in open ground end within a minute or two.
   Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
   fire are worth checking against playtests.
@@ -183,6 +199,160 @@ it at http://localhost:5173 against a running `bgws-server` (port 8765).
 `npm run build` writes `web/app/dist`, which the server embeds; commit it. CI
 fails if it is stale.
 
+## Real ground: theatre packs from PMTiles
+
+`bgws terrain <dir> --bbox W,S,E,N` (or *New game… → Generate ground from
+the map's current view* in the viewer) builds a theatre pack for a box. It
+reads only that box's tiles from two planet PMTiles archives, by HTTP range,
+and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
+`~/Library/Caches/bgws/pmtiles`):
+
+- **Elevation:** Mapterhorn's terrarium planet (`download.mapterhorn.com`,
+  Copernicus GLO-30 plus national models), zoom 12, sampled onto the engine's
+  grid (30 m by default, `--cell-m`). Copernicus is a surface model that
+  includes trees, and the engine models canopy itself, so half the canopy
+  height comes off in woods (`--dsm-canopy-fraction`, 0 to keep it). Water
+  sits at its surface, not the lagoon floor.
+- **Land cover:** a Protomaps OpenStreetMap build (`build.protomaps.com`, the
+  latest daily one unless `--planet`), zoom 14. Land use and water polygons
+  are painted in priority order (water over towns over wetland over woods
+  over fields), then cells turn to dense urban by building footprint cover.
+  Soil, wetness and forest obstacles follow from the class.
+- **Roads:** from the same tiles, by a port of the project's Python
+  road-graph builder:
+  - tile clipping and T-junctions;
+  - snapping within `--snap-m` (3 m), where motorways join only motorways
+    and slip roads unless one really ends there;
+  - degree-2 contraction.
+
+  Tracks and service roads are kept for a tactical game. The output is in
+  `roads/`: `nodes.bin`, `edges.bin`, `edge_geom.bin` and `adjacency.bin`
+  (fixed-width little-endian), with `graph.json` describing the layout and
+  the build's statistics.
+- **For the viewer:** `basemap.pmtiles` and `dem.pmtiles`, extracts of the
+  same archives that `bgws-server` serves under `/packs/`. The "terrain"
+  basemap draws them, with hillshade and town names, with no internet.
+- **To check a build:** `preview.png` shows land cover over hillshade, with
+  rivers, roads by class and bridges. `pack.json` records the box, the
+  archives used and their attributions.
+
+A 16 × 12 km box west of Kaliningrad builds in about seven seconds once
+cached. It has 1,900 km of road, and 96% of its nodes are in one network.
+
+A scenario names a pack as `theatre.pack`: a folder under `packs/`
+(`$BGWS_PACKS`), or a path. The host re-samples the pack into the scenario's
+frame through latitude and longitude when their origins differ. The viewer's
+New game card can move any shipped scenario onto a pack, keeping its layout,
+and the editor's *Move onto the pack* does the same. On a pack's roads a
+vehicle moves at the road's speed for its class, and route planning prefers
+roads where they are quicker. Moving vehicles in a shipped scenario on the
+Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
+ground. Generated ground has no road layer.
+
+CI builds a pack with no network: `crates/bgws-geodata/tests/offline.rs`
+writes a small vector archive (two roads meeting at a junction, a wood, a
+lake) and a terrarium elevation archive. It then builds the pack through the
+same path as `bgws terrain`, and checks the heights, the land cover, the
+water and the road graph. The tests against the real planet archives are
+ignored by default (`cargo test -p bgws-geodata -- --ignored`), and so are
+the engine's tests on a real pack (`BGWS_TEST_PACK=<dir> cargo test
+--release -p bgws-run --test terrain_pack -- --ignored`).
+
+### Moving on roads and across country
+
+One planner (`bgws_sim::routing`) searches roads and open ground together.
+It works on the terrain grid at its own resolution (30 m), in a corridor round
+the move. Very long moves use a coarser grid, and a wider corridor when
+nothing joins the ends. A cell's cost is its travel time (the road's speed for
+the vehicle, or what the going allows), plus exposure, plus a verge's time to
+get on or off a road. What the move is for decides the weights:
+
+| Mode | Weighs |
+|---|---|
+| March | time; wheeled vehicles keep to roads (a strong preference), tracked ones cut across fields when that is quicker (a soft one) |
+| Tactical | time, open ground by the land cover's concealment, more so near the enemy the side believes in; roads near that enemy cost more, the nearer the more |
+| Assault | time only: straight at it |
+| Stealth | concealment everywhere; roads are watched |
+
+Exposure counts the time spent in the open: troops on foot are exposed for
+as long as they take to cross, and a fast vehicle at least at a reference
+pace. Threats are the side's confirmed tracks and its units' own sightings,
+never the truth. The enemy at the destination is what the move closes with,
+so only threats elsewhere are steered round. Recce, screens and observers
+keep to cover but do not steer away from the enemy they are looking for.
+An urgent move (orders `now`, or fire support getting into range) weighs
+exposure only near a believed threat. A threat weighs fully only on ground
+it can see: its sight is worked out over the terrain (`sim.route.sight_*`),
+and in its dead ground, behind a crest or a ridge, half its weight
+applies (`sim.route.masked`: dead ground hides a unit from direct fire, not from drones or indirect fire). So a move round an enemy takes the side it
+cannot see. Orders set the mode per phase
+(`march`, `assault`, `bound` for stealth, otherwise tactical).
+
+**Rivers and bridges.** A pack's rivers are drawn onto the grid with their
+depth. Across country, a vehicle crosses one only where it is shallower than
+the vehicle can ford (`env.ford.*`: tracked 1.2 m, wheeled 0.75 m, on foot
+0.9 m), at the cost of a ford's time. A road on the ground crosses what it
+crosses (culverts, causeways). Bridges and tunnels sit on a second level of
+the grid: a unit gets on and off them only along their road, from an edge
+that joins them at a node, or onto open ground at their ends. So an
+overpass is not a junction with the road beneath it.
+
+`Ground::blow_bridge(edge)` drops a bridge, leaving whatever is under it.
+`Ground::cut_road(edge)` takes a road's speed and any deck away. Routes
+re-plan round both.
+
+**Obstacles and craters.** A move plans round the minefields, ditches and
+dragon's teeth its side knows of. Crossing one without a lane costs about a
+breach (`sim.route.obstacle_s`, 1 h). So a unit goes round when that is
+quicker, uses a lane when one is open, and goes to the edge to be breached
+when there is no other way. Ditches and teeth stop vehicles only; troops on
+foot cross them. Obstacles the side does not know of are not in the plan: the
+unit meets them on the ground (and the planner leaks nothing to it). Heavy
+rounds (155 mm, 122 mm rockets) crater the cell they land in. Two craters
+(`sim.route.crater_cut`) cut a road through that cell. Each crater also slows
+the going across it (`sim.route.crater_slow`). Both movement and the planner
+see the craters.
+
+**Columns.** On a road, a unit within `sim.route.column_gap_m` (100 m) of a
+friendly unit moving the same way ahead of it follows at that unit's pace: a
+column does not drive through itself. Off the road, units pass each other.
+
+**Long moves.** A move longer than `sim.route.long_m` (20 km) goes by the
+pack's road graph: Dijkstra over its nodes and edges, by the same weights.
+It gets on at a node within `sim.route.access_m` (3 km) of the start, gets
+off near the destination, and plans both end legs on the grid. Cut edges and
+blown bridges are left out; when the graph does not join the ends, the move
+is planned on the grid. On the Kaliningrad pack, routes by the graph take
+about as long to drive as the grid's and plan in about half the time.
+
+**Woods a vehicle cannot enter.** A vehicle standing in ground it cannot
+cross (a dense wood, never water) crawls out at `sim.route.crawl_kmh`. A
+route may crawl only within `sim.route.escape_m` of its start. A unit sent
+into such a wood goes to its edge (the closest approach).
+
+**Unreachable destinations.** When a destination cannot be reached (ground
+the vehicle cannot enter, or water with no way over), the route goes as near
+as it can (the wood's edge, the near bank) rather than in a straight line.
+
+Every weight is a figure (`sim.route.*`, [default] until calibrated). On the
+Kaliningrad pack, about half of moving vehicles' time is on roads, which
+cover 23% of the ground. No plan there falls back to a straight line (an
+ignored test, given a pack). A 20 km move plans in about 50 ms.
+
+EW, drone-team and HQ displacements now move a unit to one side (across the
+line to the enemy), swinging about its first site. Before, each one moved it
+1.5 km further back, so over a few hours they drifted out of their area.
+
+Next steps:
+- exposure from believed threats' viewsheds;
+- mines, craters and blown bridges cutting the road graph;
+- columns on roads and formations off them;
+- calibration of road march rates and of where units leave the road.
+
+Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
+cover derived from it are derived databases). Mapterhorn asks for
+attribution. `pack.json` carries both.
+
 ## Game records
 
 A record (`--record`, or *Save* on the server) holds the scenario, seed,
@@ -204,7 +374,7 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 
 `.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`,
 and type-checks and rebuilds the viewer (`web/app`) to check its committed build.
-Fifteen benchmark vignettes run against stored baselines: fourteen are in band,
-and networked detect-to-strike is on the calibration backlog. Batches and
+Sixteen benchmark vignettes run against stored baselines: fourteen are in band,
+and networked detect-to-strike and the attack halt are on the calibration backlog. Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.

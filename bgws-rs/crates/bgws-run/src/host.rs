@@ -109,21 +109,98 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     r
 }
 
-/// The scenario's theatre pack, if it names one, assembled over the area its
-/// positions cover (with a margin): the host does the disk, the sim stays pure.
-pub fn load_pack_terrain(scenario: &ScenarioV4) -> Result<Option<bgws_env::Terrain>> {
+/// A pack's ground for a scenario: terrain, road lines and rivers in its frame.
+pub type PackGround = (bgws_env::Terrain, Vec<bgws_env::RoadLine>, Vec<bgws_env::River>);
+
+/// The scenario's theatre pack, if it names one: terrain assembled over the
+/// area its positions cover (with a margin), and the pack's roads there.
+/// The host does the disk, the sim stays pure. A pack built around another
+/// origin (a box's centre) is re-sampled into the scenario's frame through
+/// latitude and longitude, so positions and ground agree.
+pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
     let Some(dir) = &scenario.theatre.pack else { return Ok(None) };
-    let mut pack = bgws_env::TheatrePack::open(Path::new(dir)).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    let path = crate::resolve_pack(dir);
+    let mut pack = bgws_env::TheatrePack::open(&path).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
     let frame = scenario.frame();
+    let pack_frame = bgws_core::EnuFrame::new(pack.meta.frame_origin);
     let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
     for (_, g) in scenario.positions() {
-        let v = frame.geodetic_to_enu(g);
+        let v = pack_frame.geodetic_to_enu(g);
         lo = (lo.0.min(v.e), lo.1.min(v.n));
         hi = (hi.0.max(v.e), hi.1.max(v.n));
     }
+    if lo.0 > hi.0 {
+        // No positions: the whole pack.
+        let s = pack.meta.spec;
+        lo = (s.origin_e, s.origin_n);
+        hi = (s.origin_e + s.cell * (s.width - 1) as f64, s.origin_n + s.cell * (s.height - 1) as f64);
+    }
     let m = 5_000.0;
     let aoi = bgws_env::Aoi { min_e: lo.0 - m, min_n: lo.1 - m, max_e: hi.0 + m, max_n: hi.1 + m };
-    Ok(Some(pack.assemble(&aoi).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?))
+    let terrain = pack.assemble(&aoi).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    let same = frame.geodetic_to_enu(pack.meta.frame_origin).horizontal() < 1.0;
+    let to_scenario = |e: f64, n: f64| {
+        if same {
+            (e, n)
+        } else {
+            let v = frame.geodetic_to_enu(pack_frame.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
+            (v.e, v.n)
+        }
+    };
+    let terrain = if same { terrain } else { reframe(&terrain, &pack_frame, &frame) };
+    let inside = |p: &[f64; 2]| p[0] >= aoi.min_e && p[0] <= aoi.max_e && p[1] >= aoi.min_n && p[1] <= aoi.max_n;
+    let mut roads = Vec::new();
+    if let Some(rg) = &pack.meta.road_graph {
+        let g = bgws_geodata::roads::RoadGraph::read(&path.join(rg)).map_err(|e| anyhow!("theatre pack {dir} roads: {e}"))?;
+        for (k, e) in g.edges.iter().enumerate().filter(|(_, e)| e.geom.iter().any(inside)) {
+            roads.push(bgws_env::RoadLine {
+                class: e.class,
+                bridge: e.bridge,
+                tunnel: e.tunnel,
+                edge: k as u32,
+                from: e.from,
+                to: e.to,
+                line: e.geom.iter().map(|p| to_scenario(p[0], p[1])).collect(),
+            });
+        }
+    }
+    let mut rivers = Vec::new();
+    if let Some(rf) = &pack.meta.rivers {
+        let all: Vec<bgws_env::River> = std::fs::read(path.join(rf)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        for r in all.into_iter().filter(|r| r.line.iter().any(|p| inside(&[p.0, p.1]))) {
+            rivers.push(bgws_env::River { line: r.line.iter().map(|p| to_scenario(p.0, p.1)).collect(), ..r });
+        }
+    }
+    Ok(Some((terrain, roads, rivers)))
+}
+
+/// A terrain grid in another ENU frame, sampled through latitude and longitude.
+fn reframe(t: &bgws_env::Terrain, from: &bgws_core::EnuFrame, to: &bgws_core::EnuFrame) -> bgws_env::Terrain {
+    let s = t.spec;
+    let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
+    for (i, j) in [(0, 0), (s.width - 1, 0), (0, s.height - 1), (s.width - 1, s.height - 1)] {
+        let (e, n) = s.pos(i, j);
+        let v = to.geodetic_to_enu(from.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
+        lo = (lo.0.min(v.e), lo.1.min(v.n));
+        hi = (hi.0.max(v.e), hi.1.max(v.n));
+    }
+    let spec = bgws_env::GridSpec::new(((hi.0 - lo.0) / s.cell).ceil() as usize + 1, ((hi.1 - lo.1) / s.cell).ceil() as usize + 1, s.cell, lo.0, lo.1);
+    let mut out = bgws_env::Terrain::flat(to.origin, spec, 0.0);
+    for j in 0..spec.height {
+        for i in 0..spec.width {
+            let (e, n) = spec.pos(i, j);
+            let v = from.geodetic_to_enu(to.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
+            let k = spec.idx(i, j);
+            out.elevation.data[k] = t.height(v.e, v.n) as f32;
+            let (si, sj) = s.nearest_clamped(v.e, v.n);
+            let sk = s.idx(si, sj);
+            out.land_cover.data[k] = t.land_cover.data[sk];
+            out.soil.data[k] = t.soil.data[sk];
+            out.wetness.data[k] = t.wetness.data[sk];
+            out.obstacle_gap.data[k] = t.obstacle_gap.data[sk];
+        }
+    }
+    out
 }
 
 /// What a played game produced.
@@ -162,7 +239,11 @@ impl Host {
         let overrides = figures.iter().filter(|f| defaults.figure(&f.key).is_some_and(|d| d.value != f.value)).map(|f| (f.key.clone(), f.value)).collect();
         let mut sim_opts = opts.sim.clone();
         if sim_opts.terrain.is_none() {
-            sim_opts.terrain = load_pack_terrain(scenario)?;
+            if let Some((terrain, roads, rivers)) = load_pack(scenario)? {
+                sim_opts.terrain = Some(terrain);
+                sim_opts.roads = Some(roads);
+                sim_opts.rivers = Some(rivers);
+            }
         }
         let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;
         let mut machine = MachineInfo::compiled_for();

@@ -40,6 +40,13 @@ export function App() {
   const [endClosed, setEndClosed] = useState(false);
   const [focus, setFocus] = useState<{ lon: number; lat: number; key: number } | null>(null);
   const pickedAt = useRef(0);
+  const [view, setView] = useState<[number, number, number, number] | null>(null);
+  const hasPackMap = !!s.game?.pack?.basemap;
+  // A game on a theatre pack shows the pack's own map; without one, "terrain" falls back to dark.
+  useEffect(() => {
+    if (hasPackMap) setBasemap("terrain");
+    else setBasemap((b) => (b === "terrain" ? "dark" : b));
+  }, [hasPackMap, s.game?.name]);
 
   useEffect(() => writePref("layers", [...layers].join(",")), [layers]);
   useEffect(() => writePref("basemap", basemap), [basemap]);
@@ -95,7 +102,7 @@ export function App() {
   const deckLayers = useMemo(
     () =>
       s.frame
-        ? buildLayers({ frame: s.frame, events: s.events, game: s.game, on: layers, selected, unit: s.unit, viewshed: s.viewshed, objective, onPick: pickOnMap })
+        ? buildLayers({ frame: s.frame, events: s.events, game: s.game, on: layers, selected, unit: s.unit, viewshed: s.viewshed, objective, towns: s.game?.pack?.towns ?? [], onPick: pickOnMap })
         : [],
     // The frame object is mutated in place; `version` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +135,7 @@ export function App() {
 
   return (
     <>
-      <MapView layers={deckLayers} basemap={basemap} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
+      <MapView layers={deckLayers} basemap={basemap} pack={s.game?.pack ?? null} onView={setView} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
 
       <div className="header">
         <span className="brand">BGWS</span>
@@ -198,6 +205,7 @@ export function App() {
           }
           basemap={basemap}
           onBasemap={setBasemap}
+          hasPackMap={hasPackMap}
           hqOpen={hqOpen}
           onHq={() => setHqOpen((o) => !o)}
         />
@@ -248,11 +256,15 @@ export function App() {
       {newGame && (
         <NewGameCard
           scenarios={s.scenarios}
+          packs={s.packs}
+          terrain={s.terrain}
+          view={view}
           current={s.game?.name}
-          onOpen={(name) => {
-            send({ kind: "open", name });
+          onOpen={(name, pack) => {
+            send({ kind: "open", name, ...(pack ? { pack } : {}) });
             setNewGame(false);
           }}
+          onBuild={(name, bbox, cellM) => send({ kind: "terrain", name, bbox, cell_m: cellM })}
           onClose={() => setNewGame(false)}
         />
       )}

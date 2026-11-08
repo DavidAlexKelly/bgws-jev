@@ -62,6 +62,32 @@ pub struct RoadEdge {
     pub blocked: bool,
 }
 
+/// A road as a line on the ground (ENU metres), for drawing it onto a grid:
+/// one edge of the road graph, with the nodes at its ends.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RoadLine {
+    pub class: RoadClass,
+    pub bridge: bool,
+    #[serde(default)]
+    pub tunnel: bool,
+    /// The edge's index in the road graph.
+    #[serde(default)]
+    pub edge: u32,
+    /// Its end nodes: edges sharing a node join there.
+    #[serde(default)]
+    pub from: u32,
+    #[serde(default)]
+    pub to: u32,
+    pub line: Vec<(f64, f64)>,
+}
+
+impl RoadLine {
+    /// A road with no graph behind it (tests, generated ground): its own edge and nodes.
+    pub fn new(class: RoadClass, line: Vec<(f64, f64)>) -> Self {
+        RoadLine { class, bridge: false, tunnel: false, edge: 0, from: 0, to: 1, line }
+    }
+}
+
 /// The road network.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RoadNetwork {

@@ -25,6 +25,7 @@ pub mod ground;
 pub mod hq;
 pub mod params;
 pub mod queue;
+pub mod routing;
 pub mod sim;
 pub mod systems;
 pub mod view;

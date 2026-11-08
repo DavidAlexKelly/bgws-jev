@@ -108,7 +108,21 @@ enum Inbound {
     /// The shipped scenarios, for the "new game" picker.
     Scenarios,
     /// Replace the game with a shipped scenario, same deciders.
-    Open { name: String },
+    /// With `pack`: moved onto that theatre pack (its forces shifted so the
+    /// scenario's origin sits at the pack's centre).
+    Open {
+        name: String,
+        #[serde(default)]
+        pack: Option<String>,
+    },
+    /// Build a theatre pack from real ground for a box (west, south, east, north),
+    /// in the background, reporting `terrain` progress.
+    Terrain {
+        name: String,
+        bbox: [f64; 4],
+        #[serde(default)]
+        cell_m: Option<f64>,
+    },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -294,7 +308,77 @@ fn game_json(host: &Host, opts: &HostOptions, person: Option<Side>) -> serde_jso
         "forces": { "blue": count(Side::Blue), "red": count(Side::Red) },
         "deciders": deciders_json(sc, opts, person), "flat": host.record.run.flat_ground,
         "limitS": host.sim.ctx.duration_limit().secs(),
+        "pack": sc.theatre.pack.as_deref().and_then(pack_json),
     })
+}
+
+/// A pack in brief, with the viewer's URLs for its basemap and hillshade
+/// (served under /packs/ when it lives in the packs folder).
+fn pack_json(name: &str) -> Option<serde_json::Value> {
+    let dir = bgws_run::resolve_pack(name);
+    let meta: bgws_env::PackMeta = serde_json::from_slice(&std::fs::read(dir.join("pack.json")).ok()?).ok()?;
+    let served = dir.parent().and_then(|p| p.canonicalize().ok()) == bgws_run::packs_dir().canonicalize().ok();
+    let folder = dir.file_name()?.to_string_lossy().into_owned();
+    let url = |f: &Option<String>| f.as_ref().filter(|_| served).map(|f| format!("/packs/{folder}/{f}"));
+    let roads_km = meta.sources.as_ref().and_then(|s| s["roads"]["km"].as_f64());
+    // Towns, for the viewer's place names (the basemap carries no fonts).
+    let frame = bgws_core::EnuFrame::new(meta.frame_origin);
+    let towns: Vec<serde_json::Value> = meta
+        .towns
+        .as_ref()
+        .and_then(|f| std::fs::read(dir.join(f)).ok())
+        .and_then(|b| serde_json::from_slice::<Vec<bgws_env::Town>>(&b).ok())
+        .unwrap_or_default()
+        .iter()
+        .map(|t| {
+            let g = frame.enu_to_geodetic(bgws_core::Enu::new(t.e, t.n, 0.0));
+            json!({ "name": t.name, "lat": g.lat, "lon": g.lon, "radiusM": t.radius_m })
+        })
+        .collect();
+    Some(json!({
+        "name": folder, "bbox": meta.bbox, "cellM": meta.cell, "basemap": url(&meta.basemap), "dem": url(&meta.dem),
+        "preview": url(&Some("preview.png".to_string())), "roadsKm": roads_km, "towns": towns,
+        "sizeKm": [meta.spec.cell * (meta.spec.width - 1) as f64 / 1000.0, meta.spec.cell * (meta.spec.height - 1) as f64 / 1000.0],
+    }))
+}
+
+/// Every pack in the packs folder.
+fn packs_json() -> Vec<serde_json::Value> {
+    let mut out: Vec<serde_json::Value> = std::fs::read_dir(bgws_run::packs_dir())
+        .map(|d| d.flatten().filter(|e| e.path().join("pack.json").exists()).filter_map(|e| pack_json(&e.file_name().to_string_lossy())).collect())
+        .unwrap_or_default();
+    out.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    out
+}
+
+/// A scenario moved onto a pack: every position shifted by the step that
+/// takes the middle of its forces to the pack's centre (their layout kept),
+/// checked to fit.
+fn onto_pack(mut sc: bgws_scenario::ScenarioV4, pack: &str) -> Result<bgws_scenario::ScenarioV4, String> {
+    let dir = bgws_run::resolve_pack(pack);
+    let meta: bgws_env::PackMeta = serde_json::from_slice(&std::fs::read(dir.join("pack.json")).map_err(|e| format!("pack {pack}: {e}"))?).map_err(|e| format!("pack {pack}: {e}"))?;
+    let [w, s, e, n] = meta.bbox.ok_or_else(|| format!("pack {pack} has no box (built by `bgws pack`, not `bgws terrain`)"))?;
+    let (mut lat0, mut lat1, mut lon0, mut lon1) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+    for f in &sc.forces {
+        lat0 = lat0.min(f.position.lat);
+        lat1 = lat1.max(f.position.lat);
+        lon0 = lon0.min(f.position.lon);
+        lon1 = lon1.max(f.position.lon);
+    }
+    let (mid_lat, mid_lon) = if sc.forces.is_empty() { (sc.theatre.origin.lat, sc.theatre.origin.lon) } else { ((lat0 + lat1) / 2.0, (lon0 + lon1) / 2.0) };
+    let (dlat, dlon) = ((s + n) / 2.0 - mid_lat, (w + e) / 2.0 - mid_lon);
+    let shift = |g: bgws_core::Geodetic| bgws_core::Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
+    sc.theatre.origin = shift(sc.theatre.origin);
+    sc.theatre.bounds = None;
+    sc.theatre.pack = Some(pack.to_string());
+    for f in &mut sc.forces {
+        f.position = shift(f.position);
+    }
+    let outside = sc.forces.iter().filter(|f| f.position.lat < s || f.position.lat > n || f.position.lon < w || f.position.lon > e).count();
+    if outside > 0 {
+        return Err(format!("{outside} of the scenario's forces fall outside pack {pack}: build a bigger box"));
+    }
+    Ok(sc)
 }
 
 /// Log events as the browser reads them, with names for ids.
@@ -319,7 +403,90 @@ fn scenarios_json() -> serde_json::Value {
             out.push(json!({ "file": p.file_stem().and_then(|s| s.to_str()), "name": v["name"], "description": v["description"], "type": v["scope"]["type"], "durationMin": v["scope"]["durationMin"], "units": forces }));
         }
     }
-    json!({ "kind": "scenarios", "scenarios": out })
+    json!({ "kind": "scenarios", "scenarios": out, "packs": packs_json() })
+}
+
+/// Build a theatre pack on its own thread, reporting progress to every browser.
+fn spawn_terrain_build(name: String, bbox: [f64; 4], cell_m: Option<f64>, out: broadcast::Sender<Out>) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let send = |v: serde_json::Value| drop(out.send(Out::Text(v.to_string())));
+        let safe = !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !safe {
+            return send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": "name: letters, digits, - and _ only" }));
+        }
+        let b = bgws_geodata::mercator::BBox::new(bbox[0], bbox[1], bbox[2], bbox[3]);
+        if let Err(e) = bgws_geodata::mercator::BBox::parse(&format!("{},{},{},{}", b.west, b.south, b.east, b.north)) {
+            return send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e }));
+        }
+        let mut spec = bgws_geodata::build::BuildSpec::new(b);
+        if let Some(c) = cell_m {
+            spec.cell_m = c.clamp(10.0, 200.0);
+        }
+        let last = std::sync::Mutex::new((String::new(), -1i32));
+        let progress = |stage: &str, f: f64| {
+            let pct = (f * 100.0).floor() as i32;
+            if let Ok(mut l) = last.lock() {
+                if l.0 != stage || pct >= l.1 + 5 {
+                    *l = (stage.to_string(), pct);
+                    send(json!({ "kind": "terrain", "name": name, "state": "running", "stage": stage, "fraction": f }));
+                }
+            }
+        };
+        let dir = bgws_run::packs_dir().join(&name);
+        match bgws_geodata::pack::build_pack(&dir, &name, &spec, 3.0, &progress) {
+            Ok(_) => {
+                send(json!({ "kind": "terrain", "name": name, "state": "done", "pack": pack_json(&name) }));
+                send(scenarios_json());
+            }
+            Err(e) => send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e.to_string() })),
+        }
+    })
+}
+
+/// A pack's file, with byte ranges (MapLibre reads PMTiles by range).
+async fn pack_file(UrlPath((pack, file)): UrlPath<(String, String)>, headers: axum::http::HeaderMap) -> axum::response::Response {
+    use axum::http::{header, StatusCode};
+    let ok = |s: &str| !s.is_empty() && !s.contains("..") && !s.starts_with('/') && !s.contains('\\');
+    if !ok(&pack) || !ok(&file) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let path = bgws_run::packs_dir().join(&pack).join(&file);
+    let Ok(mut f) = std::fs::File::open(&path) else { return StatusCode::NOT_FOUND.into_response() };
+    let len = f.metadata().map(|m| m.len()).unwrap_or(0);
+    let kind = match path.extension().and_then(|e| e.to_str()) {
+        Some("png") => "image/png",
+        Some("json") => "application/json",
+        _ => "application/octet-stream",
+    };
+    let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("bytes=")).and_then(|r| {
+        let (a, b) = r.split_once('-')?;
+        let a: u64 = a.parse().ok()?;
+        let b: u64 = if b.is_empty() { len.saturating_sub(1) } else { b.parse().ok()? };
+        (a <= b && a < len).then_some((a, b.min(len - 1)))
+    });
+    // Only the bytes asked for: a map reads a basemap a tile at a time.
+    let read = |f: &mut std::fs::File, a: u64, n: u64| -> std::io::Result<Vec<u8>> {
+        use std::io::{Read, Seek, SeekFrom};
+        f.seek(SeekFrom::Start(a))?;
+        let mut buf = vec![0; n as usize];
+        f.read_exact(&mut buf)?;
+        Ok(buf)
+    };
+    match range {
+        Some((a, b)) => match read(&mut f, a, b - a + 1) {
+            Ok(bytes) => (
+                StatusCode::PARTIAL_CONTENT,
+                [(header::CONTENT_TYPE, kind.to_string()), (header::CONTENT_RANGE, format!("bytes {a}-{b}/{len}")), (header::ACCEPT_RANGES, "bytes".to_string())],
+                bytes,
+            )
+                .into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        },
+        None => match read(&mut f, 0, len) {
+            Ok(bytes) => ([(header::CONTENT_TYPE, kind.to_string()), (header::ACCEPT_RANGES, "bytes".to_string())], bytes).into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        },
+    }
 }
 
 /// The game thread: the sim never waits on the network or the UI in wall
@@ -338,6 +505,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
     let mut viewer = Viewer::Umpire;
     // What the browsers were last told of the clock.
     let mut told = (false, speed, viewer);
+    // A terrain build in the background, if one is running.
+    let mut building: Option<std::thread::JoinHandle<()>> = None;
     let mut waiting: BTreeMap<QuestionId, Question> = BTreeMap::new();
     let mut held: Vec<Answer> = Vec::new();
     let mut held_at = SimTime::ZERO;
@@ -430,7 +599,10 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     let from_editor = matches!(m, Inbound::Load { .. });
                     let made = match m {
                         Inbound::Load { scenario } => bgws_run::editor::check(scenario).map_err(|e| e.join("; ")),
-                        Inbound::Open { name } => load_scenario(&scenario_path(&name)).map_err(|e| e.to_string()),
+                        Inbound::Open { name, pack } => load_scenario(&scenario_path(&name)).map_err(|e| e.to_string()).and_then(|sc| match pack {
+                            Some(p) => onto_pack(sc, &p),
+                            None => Ok(sc),
+                        }),
                         _ => unreachable!(),
                     }
                     .and_then(|sc| Host::new(&sc, sc.seed, default_figures(), &cfg.opts).map_err(|e| e.to_string()));
@@ -481,6 +653,13 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     None => send(&out, json!({ "kind": "unit", "name": unit, "gone": true })),
                 },
                 Inbound::Scenarios => send(&out, scenarios_json()),
+                Inbound::Terrain { name, bbox, cell_m } => {
+                    if building.as_ref().is_some_and(|h: &std::thread::JoinHandle<()>| !h.is_finished()) {
+                        send(&out, json!({ "kind": "terrain", "name": name, "state": "busy", "text": "a terrain build is already running" }));
+                    } else {
+                        building = Some(spawn_terrain_build(name, bbox, cell_m, out.clone()));
+                    }
+                }
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {
                         Ok(()) => format!("saved {}", cfg.record.display()),
@@ -711,6 +890,7 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
         .route("/app.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")], APP_JS) }))
         .route("/app.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], APP_CSS) }))
         .route("/classic", get(|| async { Html(CLASSIC) }))
+        .route("/packs/:pack/*file", get(pack_file))
         .route("/behaviour", get(behaviour_page))
         .route("/api/behaviour", get(behaviour_data))
         .route("/api/templates", post(save_template))

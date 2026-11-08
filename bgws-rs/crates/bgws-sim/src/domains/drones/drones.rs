@@ -1463,8 +1463,8 @@ pub fn relocate(s: &mut Sim, id: EntityId) {
         return;
     }
     let dist = s.world.get_resource::<C4>().map(|c| c.p.relocate_m).unwrap_or(1500.0);
-    let to = super::ew::point_away(s, id, dist);
-    let route = crate::decide::route_for(s, e, to);
+    let to = super::ew::point_aside(s, id, dist);
+    let route = crate::decide::route_for(s, e, to, MoveModeS::March);
     if let Some(mut a) = s.world.get_mut::<Act>(e) {
         a.activity = Activity::Move { route, mode: MoveModeS::March, then: Some(Box::new(Activity::Hold)) };
     }
@@ -1596,7 +1596,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
         "relocate" | "scatter" | "moveToCover" => {
             c4.on_air.insert(id, 0.0);
             let to = match action {
-                "relocate" => super::ew::point_away(s, id, c4.p.relocate_m),
+                "relocate" => super::ew::point_aside(s, id, c4.p.relocate_m),
                 "scatter" => {
                     let b = s.ctx.rng("drones.scatter", id.0 as u64, 0).gen::<f64>() * std::f64::consts::TAU;
                     me.add(Enu::new(b.sin() * 200.0, b.cos() * 200.0, 0.0))
@@ -1669,7 +1669,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
     };
     super::put(s, c4);
     if let Some((to, mode)) = move_to {
-        let route = crate::decide::route_for(s, e, to);
+        let route = crate::decide::route_for(s, e, to, mode);
         if let Some(mut a) = s.world.get_mut::<Act>(e) {
             a.activity = Activity::Move { route, mode, then: Some(Box::new(Activity::Hold)) };
         }

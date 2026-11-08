@@ -56,6 +56,7 @@ pub fn all_figures() -> Vec<Figure> {
     v.extend(bgws_domains::figures());
     v.extend(bgws_ops::figures());
     v.extend(crate::domains::drones::figures());
+    v.extend(crate::routing::figures());
     v
 }
 

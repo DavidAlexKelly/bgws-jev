@@ -93,6 +93,8 @@ export function buildLayers(args: {
   unit: UnitDetail | null;
   viewshed: Viewshed | null;
   objective: { lon: number; lat: number } | null;
+  /** The pack's towns, named on the map (its basemap carries no fonts). */
+  towns: { name: string; lat: number; lon: number; radiusM: number }[];
   onPick: (name: string) => void;
 }): Layer[] {
   const { frame: f, on } = args;
@@ -110,6 +112,23 @@ export function buildLayers(args: {
       ...(dashed && dash.length ? { extensions: dash, getDashArray: [4, 3] } : {}),
     });
 
+  if (args.towns.length) {
+    out.push(
+      new TextLayer({
+        id: "places",
+        data: args.towns,
+        getPosition: (t: { lon: number; lat: number }) => [t.lon, t.lat],
+        getText: (t: { name: string }) => t.name,
+        getSize: (t: { radiusM: number }) => (t.radiusM >= 4000 ? 15 : t.radiusM >= 1500 ? 13 : 11),
+        getColor: [199, 204, 219, 200],
+        fontFamily: "system-ui, sans-serif",
+        fontSettings: { sdf: true },
+        outlineWidth: 3,
+        outlineColor: [6, 13, 24, 220],
+        characterSet: "auto",
+      }),
+    );
+  }
   if (args.viewshed) {
     const v = args.viewshed;
     out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north] }));

@@ -186,6 +186,26 @@ fn sortie(f: &Figures, seed: Seed, tempo: bgws_domains::air::sortie::Tempo) -> V
     Some(simulate_fleet(&p, 24, 10, &mut rng(seed, "v.sortie")).per_aircraft_per_day)
 }
 
+/// Troops on foot crossing mixed country [P26]: a 3 km tactical move planned
+/// over generated ground (one of sixteen pieces of it), its pace the route's
+/// length over its time at the going's speeds.
+pub fn dismounted(f: &Figures, seed: Seed) -> Value {
+    use bgws_core::{Enu, Geodetic};
+    let mut r = rng(seed, "v.dismounted");
+    let piece = r.gen_range(0..16u32);
+    let g = bgws_sim::ground::Ground::generated(Geodetic::new(54.7, 20.5, 0.0), &format!("v.dismounted.{piece}"), 4_000.0, f);
+    let a = Enu::new(r.gen_range(-2_000.0..2_000.0), r.gen_range(-2_000.0..2_000.0), 0.0);
+    let t = r.gen_range(0.0..std::f64::consts::TAU);
+    let b = Enu::new((a.e + 3_000.0 * t.cos()).clamp(-3_500.0, 3_500.0), (a.n + 3_000.0 * t.sin()).clamp(-3_500.0, 3_500.0), 0.0);
+    let water = |p: Enu| g.land_cover(p.e, p.n) == bgws_env::LandCover::Water;
+    if water(a) || water(b) {
+        return None;
+    }
+    let req = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Foot, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 4.0, cross_kmh: 2.5, threats: &[], obstacles: &[], urgent: false };
+    let p = g.plan(&req, &g.route_params);
+    (p.time_s > 0.0).then(|| (p.road_m + p.open_m) / 1000.0 / (p.time_s / 3600.0))
+}
+
 /// Fighter sorties per aircraft per day, surge [P30].
 pub fn sortie_surge(f: &Figures, seed: Seed) -> Value {
     sortie(f, seed, bgws_domains::air::sortie::Tempo::Surge)
@@ -327,7 +347,7 @@ pub fn counter_battery_scene(base: &ScenarioV4) -> anyhow::Result<ScenarioV4> {
 /// it lost no vehicle in 40 minutes, else 0.
 pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
-        let opts = SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None };
+        let opts = SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None };
         let mut sim = Sim::with_options(scene, seed, f.clone(), opts).ok()?;
         let gun = *sim.ctx.by_name.get("b-gun")?;
         loop {
@@ -405,6 +425,7 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
             "sortie-surge" => check(&sortie_surge),
             "sortie-sustained" => check(&sortie_sustained),
             "casevac-delay" => check(&casevac),
+            "dismounted-cross-country" => check(&dismounted),
             "red-sea-magazine" => check(&red_sea),
             "attack-halt" => match &scenarios.attack {
                 Some(sc) => check(&attack_halt(sc)),

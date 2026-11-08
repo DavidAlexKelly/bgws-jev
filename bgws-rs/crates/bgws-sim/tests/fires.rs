@@ -54,7 +54,7 @@ fn vignette(forces: &[F], obstacles: Value, domains: &[(&str, &str)], events: Va
 }
 
 fn sim(sc: &ScenarioV4, seed: u64) -> Sim {
-    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None }).unwrap()
+    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None }).unwrap()
 }
 
 fn entity(s: &Sim, name: &str) -> bevy_ecs::prelude::Entity {
@@ -349,4 +349,31 @@ fn fires_games_are_deterministic() {
     let one = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| supply_game(2, true).2);
     let many = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap().install(|| supply_game(2, true).2);
     assert_eq!(one, many);
+}
+
+/// A column on a road: the unit behind closes no nearer than the column gap
+/// on a slower friendly unit ahead, and follows at its pace; off the road it
+/// passes it.
+#[test]
+fn a_column_on_a_road_does_not_drive_through_the_unit_ahead() {
+    let gap_after = |road: bool| {
+        let sc = vignette(&[("lead", "blue", "generic/engineerSection", 4, 60.0, 0.0), ("tail", "blue", "generic/convoyTruck", 4, 0.0, 0.0), ("red", "red", "generic/mbt", 4, 0.0, 30_000.0)], json!([]), &[], json!([]));
+        let roads = road.then(|| vec![bgws_env::RoadLine::new(bgws_env::RoadClass::Primary, vec![(-2_000.0, 0.0), (8_000.0, 0.0)])]);
+        let mut s = Sim::with_options(&sc, Seed(1), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads, rivers: None }).unwrap();
+        let (lead, tail) = (entity(&s, "lead"), entity(&s, "tail"));
+        // Engineers in front (slower), trucks behind on a march.
+        order_move(&mut s, "lead", vec![Enu::new(7_000.0, 0.0, 0.0)]);
+        s.world.get_mut::<Act>(tail).unwrap().activity = Activity::Move { route: vec![Enu::new(7_000.0, 0.0, 0.0)], mode: MoveModeS::March, then: Some(Box::new(Activity::Hold)) };
+        let mut closest = f64::INFINITY;
+        for step in 1..=30 {
+            play(&mut s, step as f64 * 10.0, rules);
+            let (a, b) = (s.world.get::<bgws_sim::components::Kin>(lead).unwrap().pos, s.world.get::<bgws_sim::components::Kin>(tail).unwrap().pos);
+            closest = closest.min(a.e - b.e);
+        }
+        closest
+    };
+    let on_road = gap_after(true);
+    assert!(on_road > 40.0, "the tail keeps its distance on the road: {on_road:.0} m");
+    let open = gap_after(false);
+    assert!(open < 0.0, "off a road it passes: {open:.0} m");
 }

@@ -4,6 +4,7 @@ members = [
   "crates/bgws-core",
   "crates/bgws-catalogue",
   "crates/bgws-env",
+  "crates/bgws-geodata",
   "crates/bgws-prop",
   "crates/bgws-gpu",
   "crates/bgws-know",
@@ -24,6 +25,7 @@ default-members = [
   "crates/bgws-core",
   "crates/bgws-catalogue",
   "crates/bgws-env",
+  "crates/bgws-geodata",
   "crates/bgws-prop",
   "crates/bgws-gpu",
   "crates/bgws-know",
@@ -49,6 +51,7 @@ publish = false
 bgws-core = { path = "crates/bgws-core" }
 bgws-catalogue = { path = "crates/bgws-catalogue" }
 bgws-env = { path = "crates/bgws-env" }
+bgws-geodata = { path = "crates/bgws-geodata" }
 bgws-prop = { path = "crates/bgws-prop" }
 bgws-gpu = { path = "crates/bgws-gpu" }
 bgws-know = { path = "crates/bgws-know" }

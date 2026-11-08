@@ -1026,7 +1026,7 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
                 if dist > c4.p.regain_m {
                     let to = me.add(d.scale((dist - c4.p.regain_m * 0.8) / dist));
                     super::put(s, c4);
-                    let route = crate::decide::route_for(s, e, to);
+                    let route = crate::decide::route_for(s, e, to, MoveModeS::Tactical);
                     if let Some(mut a) = s.world.get_mut::<Act>(e) {
                         a.activity = Activity::Move { route, mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) };
                     }
@@ -1036,13 +1036,13 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
             true
         }
         "displacePost" => {
-            let away = super::ew::point_away(s, id, c4.p.relocate_m);
+            let away = super::ew::point_aside(s, id, c4.p.relocate_m);
             if let Some(h) = c4.c2.post_of(id) {
                 c4.c2.hqs[h].relocating_until = Some(now + SimDuration::from_secs(c4.p.relocation_s));
             }
             c4.on_air.insert(id, 0.0);
             super::put(s, c4);
-            let route = crate::decide::route_for(s, e, away);
+            let route = crate::decide::route_for(s, e, away, MoveModeS::March);
             if let Some(mut a) = s.world.get_mut::<Act>(e) {
                 a.activity = Activity::Move { route, mode: MoveModeS::March, then: Some(Box::new(Activity::Hold)) };
             }

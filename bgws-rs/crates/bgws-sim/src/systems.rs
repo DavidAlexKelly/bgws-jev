@@ -74,6 +74,22 @@ pub(crate) fn mover_class(k: MoverKind) -> (bgws_env::VehicleClass, bool) {
 /// trafficability, the vehicle's speeds, the order's mode and suppression.
 pub fn movement(s: &mut Sim, dt: f64) {
     let now = s.ctx.now;
+    // Units moving on roads, as they were at the start of the tick: a column
+    // does not drive through the unit ahead of it.
+    let on_roads: Vec<(Entity, bgws_core::Side, Enu, Enu)> = if s.ctx.ground.road_layer.is_some() {
+        s.ctx
+            .order
+            .iter()
+            .filter(|&&e| alive(s, e) && is_land(s, e))
+            .filter_map(|&e| {
+                let (i, k) = (s.world.get::<Ident>(e)?, s.world.get::<Kin>(e)?);
+                (k.vel.horizontal() > 0.5 && s.ctx.ground.road_at(k.pos.e, k.pos.n).is_some()).then_some((e, i.side, k.pos, k.vel))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let gap = s.ctx.ground.route_params.column_gap_m;
     for &e in &s.ctx.order.clone() {
         // Aggregated formations move by their formation mover (domains::lod).
         if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
@@ -112,9 +128,31 @@ pub fn movement(s: &mut Sim, dt: f64) {
         };
         let k = *s.world.get::<Kin>(e).expect("kin");
         let going = s.ctx.ground.going(k.pos.e, k.pos.n, class);
-        let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(0.0));
+        // Ground it cannot otherwise cross (a dense wood, not water): a crawl, as the planner allows near a route's ends.
+        let crawl = if s.ctx.ground.land_cover(k.pos.e, k.pos.n) == bgws_env::LandCover::Water { 0.0 } else { s.ctx.ground.route_params.crawl_kmh };
+        let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(crawl));
+        // On a road (a theatre pack's): the road's speed, up to the vehicle's own.
+        let on_road = s.ctx.ground.road_kmh(k.pos.e, k.pos.n, class).map(|r| r.min(platform.mover.road_kmh)).unwrap_or(0.0);
+        let mut base = off_road.max(on_road);
+        // On the road behind a friendly unit moving the same way: its pace.
+        if on_road > off_road && !on_roads.is_empty() {
+            let side = s.world.get::<Ident>(e).expect("ident").side;
+            let d = Enu::new(wp.e - k.pos.e, wp.n - k.pos.n, 0.0);
+            let len = d.horizontal().max(1e-6);
+            let (ue, un) = (d.e / len, d.n / len);
+            for &(o, oside, opos, ovel) in &on_roads {
+                if o == e || oside != side || ovel.e * ue + ovel.n * un <= 0.0 {
+                    continue;
+                }
+                let (re, rn) = (opos.e - k.pos.e, opos.n - k.pos.n);
+                let ahead = re * ue + rn * un;
+                if ahead > 0.0 && ahead <= gap && (re * un - rn * ue).abs() < 20.0 {
+                    base = base.min(ovel.horizontal() * 3.6);
+                }
+            }
+        }
         let cap = platform.mover.road_kmh.max(platform.mover.cross_country_kmh) * bgws_models::ground::mode_cap(mode.into(), &s.ctx.p.ground);
-        let speed_kmh = if withdrawing { off_road } else { off_road.min(cap) } * supp_mult;
+        let speed_kmh = if withdrawing { base } else { base.min(cap) } * supp_mult;
         let v = speed_kmh / 3.6;
         let d = Enu::new(wp.e - k.pos.e, wp.n - k.pos.n, 0.0);
         let dist = d.horizontal();

@@ -28,7 +28,19 @@ pub fn data(scenarios_dir: &Path) -> Result<Value> {
     let reg = bgws_behaviour::Registry::with_custom(&lib, &bgws_behaviour::Vocabulary::builtin(), bgws_behaviour::LoadMode::Strict).map_err(|e| anyhow!("{e}"))?;
     let templates: Vec<Value> = reg.templates().iter().map(|(id, t)| json!({ "id": id, "name": t.name, "custom": id.starts_with("custom/") })).collect();
     let weather: Vec<Value> = [Weather::Clear, Weather::Overcast, Weather::Rain, Weather::Fog, Weather::Snow, Weather::Storm].iter().map(|w| serde_json::to_value(w).unwrap_or_default()).collect();
-    Ok(json!({ "presets": presets, "platforms": platforms, "weather": weather, "templates": templates, "custom": lib }))
+    // Theatre packs to put the scenario on, with their centres (to move the origin there).
+    let mut packs: Vec<Value> = std::fs::read_dir(crate::packs_dir())
+        .map(|d| {
+            d.flatten()
+                .filter_map(|e| {
+                    let meta: bgws_env::PackMeta = serde_json::from_slice(&std::fs::read(e.path().join("pack.json")).ok()?).ok()?;
+                    Some(json!({ "name": e.file_name().to_string_lossy(), "bbox": meta.bbox, "origin": meta.frame_origin }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    packs.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    Ok(json!({ "presets": presets, "platforms": platforms, "weather": weather, "templates": templates, "custom": lib, "packs": packs }))
 }
 
 pub fn html(scenarios_dir: &Path) -> Result<String> {

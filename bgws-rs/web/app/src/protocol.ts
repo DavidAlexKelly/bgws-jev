@@ -37,6 +37,29 @@ export interface SideDeciders {
 }
 
 /** The game as the server describes it on `hello` and after a new one is opened. */
+/** A theatre pack (`bgws terrain`), as the server describes it. */
+export interface PackInfo {
+  name: string;
+  bbox: [number, number, number, number] | null;
+  cellM: number;
+  /** URLs under /packs/, when the pack lives in the packs folder. */
+  basemap: string | null;
+  dem: string | null;
+  preview: string | null;
+  roadsKm: number | null;
+  sizeKm: [number, number];
+  towns: { name: string; lat: number; lon: number; radiusM: number }[];
+}
+
+/** A terrain build's progress. */
+export interface TerrainProgress {
+  name: string;
+  state: "running" | "done" | "failed" | "busy";
+  stage?: string;
+  fraction?: number;
+  text?: string;
+}
+
 export interface GameInfo {
   name: string;
   description: string;
@@ -49,6 +72,7 @@ export interface GameInfo {
   deciders: Record<"blue" | "red", SideDeciders>;
   flat: boolean;
   limitS: number;
+  pack: PackInfo | null;
 }
 
 export interface ScenarioBrief {
@@ -142,7 +166,8 @@ export type Outbound =
   | { kind: "viewshed"; unit: string }
   | { kind: "inspect"; unit: string }
   | { kind: "scenarios" }
-  | { kind: "open"; name: string };
+  | { kind: "open"; name: string; pack?: string }
+  | { kind: "terrain"; name: string; bbox: [number, number, number, number]; cell_m?: number };
 
 /** Positions between full frames: u8 1, f64 t, u32 n; then u32 id, f64 lat, f64 lon, f32 alt, f32 heading, u8 status. */
 const STATUS = ["ok", "suppressed", "pinned", "broken", "destroyed"];

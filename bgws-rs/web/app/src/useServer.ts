@@ -8,6 +8,8 @@ import {
   type FrameView,
   type GameEvent,
   type GameInfo,
+  type PackInfo,
+  type TerrainProgress,
   type Outbound,
   type Question,
   type ScenarioBrief,
@@ -40,6 +42,8 @@ export interface ServerState {
   unit: UnitDetail | null;
   viewshed: Viewshed | null;
   scenarios: ScenarioBrief[] | null;
+  packs: PackInfo[];
+  terrain: TerrainProgress | null;
 }
 
 const MAX_EVENTS = 3000;
@@ -65,6 +69,8 @@ export function useServer() {
     unit: null,
     viewshed: null,
     scenarios: null,
+    packs: [],
+    terrain: null,
   });
 
   const bump = useCallback((patch?: Partial<ServerState>) => {
@@ -151,7 +157,10 @@ export function useServer() {
             setState((s) => ({ ...s, viewshed: msg }));
             break;
           case "scenarios":
-            setState((s) => ({ ...s, scenarios: msg.scenarios }));
+            setState((s) => ({ ...s, scenarios: msg.scenarios, packs: msg.packs ?? s.packs }));
+            break;
+          case "terrain":
+            setState((s) => ({ ...s, terrain: msg }));
             break;
         }
       };

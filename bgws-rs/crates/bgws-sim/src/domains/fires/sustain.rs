@@ -240,7 +240,7 @@ pub fn apply(s: &mut Sim, st: &mut FiresWorld, e: Entity, id: EntityId, action: 
                 let away = crate::systems::threat_bearing(s, e).map(|b| b + std::f64::consts::PI).unwrap_or(if side == bgws_core::Side::Blue { std::f64::consts::PI } else { 0.0 });
                 pos.add(bgws_core::Enu::new(away.sin(), away.cos(), 0.0).scale(2.0 * s.ctx.p.withdraw_m))
             });
-            let route = crate::decide::route_for(s, e, to);
+            let route = crate::decide::route_for(s, e, to, MoveModeS::Tactical);
             if let Some(mut a) = s.world.get_mut::<Act>(e) {
                 a.activity = Activity::Withdraw { route, then: Some(Box::new(Activity::Overwatch)) };
             }

@@ -50,7 +50,9 @@
     <label>Start (UTC) <input id="start" type="datetime-local"></label>
     <label>Weather <select id="weather"></select></label>
     <label>Ground <select id="ground"><option value="generated">generated</option><option value="raster+relief">raster + relief</option><option value="raster">raster</option></select></label>
-    <label>Theatre pack <input id="pack" placeholder="none (folder under packs/)"></label>
+    <label>Theatre pack <input id="pack" list="pack-list" placeholder="none (folder under packs/)"></label>
+    <datalist id="pack-list"></datalist>
+    <button id="pack-centre" title="Move the theatre (origin and forces) to the pack's centre">Move onto the pack</button>
     <label>Origin <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input id="lat" type="number" step="0.001" aria-label="Origin latitude"><input id="lon" type="number" step="0.001" aria-label="Origin longitude"></span></label>
     <h2>Forces</h2>
     <div class="row"><button id="add">Add a force</button><span class="muted" style="color:var(--muted);font-size:12px">Select a row, then click the map to place it.</span></div>
@@ -117,6 +119,16 @@ $("start").oninput = (e) => (sc.startUtc = e.target.value ? new Date(e.target.va
 $("weather").onchange = (e) => (sc.weather = { source: "preset", weather: e.target.value });
 $("ground").onchange = (e) => (sc.theatre.ground = e.target.value);
 $("pack").oninput = (e) => { if (e.target.value) sc.theatre.pack = e.target.value; else delete sc.theatre.pack; };
+// Packs built by `bgws terrain` or the viewer's "Generate ground".
+$("pack-list").innerHTML = (D.packs || []).map((p) => `<option value="${p.name}"></option>`).join("");
+$("pack-centre").onclick = () => {
+  const p = (D.packs || []).find((x) => x.name === $("pack").value);
+  if (!p || !p.bbox) return;
+  // Through the origin fields, so the forces move with it.
+  $("lat").value = ((p.bbox[1] + p.bbox[3]) / 2).toFixed(6);
+  $("lon").value = ((p.bbox[0] + p.bbox[2]) / 2).toFixed(6);
+  $("lat").dispatchEvent(new Event("change"));
+};
 // Moving the origin moves the theatre and every force with it.
 function moveOrigin() {
   const lat = Number($("lat").value), lon = Number($("lon").value);
