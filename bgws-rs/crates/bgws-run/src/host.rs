@@ -110,7 +110,7 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
 }
 
 /// A pack's ground for a scenario: terrain, road lines and rivers in its frame.
-pub type PackGround = (bgws_env::Terrain, Vec<bgws_env::RoadLine>, Vec<bgws_env::River>);
+pub type PackGround = (bgws_env::Terrain, Vec<bgws_env::RoadLine>, Vec<bgws_env::River>, Option<bgws_env::SightView>);
 
 /// The scenario's theatre pack, if it names one: terrain assembled over the
 /// area its positions cover (with a margin), and the pack's roads there.
@@ -187,7 +187,26 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
             rivers.push(bgws_env::River { line: r.line.iter().map(|p| to_scenario(p.0, p.1)).collect(), ..r });
         }
     }
-    Ok(Some((terrain, roads, rivers)))
+    // Buildings and woods for sight lines: read in the pack's frame, reached
+    // from the scenario's by an affine map (a shift and a slight turn).
+    let sight = match &pack.meta.surface {
+        Some(f) => {
+            let surface = bgws_env::SightSurface::read(&path.join(f)).map_err(|e| anyhow!("theatre pack {dir} sight surface: {e}"))?;
+            let to_pack = |e: f64, n: f64| {
+                if same {
+                    (e, n)
+                } else {
+                    let v = pack_frame.geodetic_to_enu(frame.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
+                    (v.e, v.n)
+                }
+            };
+            let (o, x, y) = (to_pack(0.0, 0.0), to_pack(1_000.0, 0.0), to_pack(0.0, 1_000.0));
+            let m = [(x.0 - o.0) / 1_000.0, (y.0 - o.0) / 1_000.0, o.0, (x.1 - o.1) / 1_000.0, (y.1 - o.1) / 1_000.0, o.1];
+            Some(bgws_env::SightView { surface: std::sync::Arc::new(surface), to_pack: m })
+        }
+        None => None,
+    };
+    Ok(Some((terrain, roads, rivers, sight)))
 }
 
 /// A terrain grid in another ENU frame, sampled through latitude and longitude.
@@ -255,10 +274,11 @@ impl Host {
         let overrides = figures.iter().filter(|f| defaults.figure(&f.key).is_some_and(|d| d.value != f.value)).map(|f| (f.key.clone(), f.value)).collect();
         let mut sim_opts = opts.sim.clone();
         if sim_opts.terrain.is_none() {
-            if let Some((terrain, roads, rivers)) = load_pack(scenario)? {
+            if let Some((terrain, roads, rivers, sight)) = load_pack(scenario)? {
                 sim_opts.terrain = Some(terrain);
                 sim_opts.roads = Some(roads);
                 sim_opts.rivers = Some(rivers);
+                sim_opts.sight = sight;
             }
         }
         let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;

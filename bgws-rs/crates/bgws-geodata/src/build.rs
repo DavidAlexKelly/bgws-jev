@@ -5,9 +5,12 @@
 //! Land cover paints polygons in priority order at cell centres (open, then
 //! fields, scrub, woods, wetland, towns, then water), then upgrades cells to
 //! dense urban by building footprint cover. Copernicus heights are a surface
-//! model (they include trees and roofs) while the engine models canopy and
-//! buildings itself, so a fraction of the canopy height comes off the
-//! elevation in woods (`BuildSpec::dsm_canopy_fraction`, 0 to keep raw heights).
+//! model (they include trees and roofs, smeared over 30 m), while the engine
+//! has every building and wood itself (the sight surface). So woods and towns
+//! are taken back to bare ground by a morphological opening of the heights
+//! (`BuildSpec::ground_filter_m`, 0 to keep raw heights): the lowest ground
+//! nearby, then the highest of those, which keeps slopes and drops the
+//! bumps that roofs and canopy make.
 
 use crate::elevation::{decode_webp, HeightTile};
 use crate::fill::{fill_polygon, ring_area};
@@ -17,7 +20,7 @@ use crate::pmtiles::{Compression, Reader};
 use crate::source::open_source;
 use crate::GeoError;
 use bgws_core::{EnuFrame, Enu, Geodetic};
-use bgws_env::{GridSpec, LandCover, LandCoverTable, Raster, River, SoilType, Terrain, Town};
+use bgws_env::{GridSpec, LandCover, Raster, River, SoilType, Terrain, Town};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -37,12 +40,15 @@ pub struct BuildSpec {
     pub elevation_zoom: u8,
     /// Highest zoom copied into the pack's basemap.
     pub basemap_max_zoom: u8,
+    /// Buildings come from this zoom when the archive has it (Protomaps keeps
+    /// every footprint only at its deepest zoom, 15).
+    pub building_zoom: u8,
     /// Protomaps archive: URL or path; `None` finds the latest daily build.
     pub planet: Option<String>,
     pub elevation: String,
     pub cache: Option<PathBuf>,
-    /// Fraction of each class's canopy height taken off the surface model.
-    pub dsm_canopy_fraction: f64,
+    /// The window the heights under woods and towns are filtered to bare ground over, m (0 keeps them).
+    pub ground_filter_m: f64,
     /// Parallel downloads.
     pub threads: usize,
 }
@@ -55,10 +61,11 @@ impl BuildSpec {
             vector_zoom: 14,
             elevation_zoom: 12,
             basemap_max_zoom: 14,
+            building_zoom: 15,
             planet: None,
             elevation: ELEVATION_URL.into(),
             cache: default_cache(),
-            dsm_canopy_fraction: 0.5,
+            ground_filter_m: 150.0,
             threads: 16,
         }
     }
@@ -131,6 +138,8 @@ pub struct Ground {
     pub dem: Vec<((u8, u32, u32), Vec<u8>)>,
     pub planet: String,
     pub stats: serde_json::Value,
+    /// Buildings at their height and woods by class, on a fine grid, for sight lines.
+    pub surface: Option<bgws_env::SightSurface>,
 }
 
 impl Ground {
@@ -161,6 +170,21 @@ pub fn landuse_class(kind: &str) -> Option<(LandCover, u8)> {
 
 const WATER_PRIORITY: u8 = 9;
 
+/// A building's height when the map gives none, m, by its footprint (m²):
+/// a house about two storeys, a larger building three, a block or hall four.
+fn default_height(area: f64) -> f64 {
+    if area < 120.0 {
+        6.0
+    } else if area < 600.0 {
+        9.0
+    } else {
+        12.0
+    }
+}
+
+/// The sight surface's cell, m: as near this as divides the terrain cell.
+const SURFACE_CELL_M: f64 = 5.0;
+
 /// River width and depth by kind (metres) [default].
 fn river_size(kind: &str) -> Option<(f64, f64)> {
     Some(match kind {
@@ -182,6 +206,8 @@ struct TileOut {
     shapes: Vec<Shape>,
     /// Building footprint area (m²) at a grid position.
     buildings: Vec<(f64, f64, f64)>,
+    /// Building footprints in grid coordinates, with their height (m).
+    footprints: Vec<(Vec<Vec<[f64; 2]>>, f32)>,
     rivers: Vec<River>,
     towns: Vec<Town>,
     roads: Vec<RawRoad>,
@@ -265,6 +291,9 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     };
     let osm = Reader::open(open_source(&planet, spec.cache.as_deref())?)?;
     let vz = spec.vector_zoom.min(osm.header.max_zoom);
+    let bz = spec.building_zoom.min(osm.header.max_zoom);
+    // Buildings from a deeper zoom when there is one; everything else from vz.
+    let deep = bz > vz;
     let vtiles = tiles_covering(&b.grown(200.0), vz);
     let to_grid = |e: f64, n: f64| [(e - gspec.origin_e) / cell, (n - gspec.origin_n) / cell];
     let done = std::sync::atomic::AtomicUsize::new(0);
@@ -273,8 +302,8 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
             .par_iter()
             .map(|&(tx, ty)| {
                 let out = match osm.tile(vz, tx, ty)? {
-                    None => TileOut { shapes: vec![], buildings: vec![], rivers: vec![], towns: vec![], roads: vec![], extent: 4096 },
-                    Some(bytes) => read_tile(&mvt::decode(&bytes)?, tx, ty, vz, &frame, &to_grid),
+                    None => TileOut { shapes: vec![], buildings: vec![], footprints: vec![], rivers: vec![], towns: vec![], roads: vec![], extent: 4096 },
+                    Some(bytes) => read_tile(&mvt::decode(&bytes)?, tx, ty, vz, &frame, &to_grid, true, !deep),
                 };
                 let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 progress("map data: tiles", n as f64 / vtiles.len() as f64);
@@ -282,6 +311,27 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
             })
             .collect::<Result<_, GeoError>>()
     })?;
+    // Every building, from the deeper zoom.
+    let bouts: Vec<TileOut> = if deep {
+        let btiles = tiles_covering(&b.grown(200.0), bz);
+        let done = std::sync::atomic::AtomicUsize::new(0);
+        net.install(|| {
+            btiles
+                .par_iter()
+                .map(|&(tx, ty)| {
+                    let out = match osm.tile(bz, tx, ty)? {
+                        None => TileOut { shapes: vec![], buildings: vec![], footprints: vec![], rivers: vec![], towns: vec![], roads: vec![], extent: 4096 },
+                        Some(bytes) => read_tile(&mvt::decode(&bytes)?, tx, ty, bz, &frame, &to_grid, false, true),
+                    };
+                    let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    progress("buildings: tiles", n as f64 / btiles.len() as f64);
+                    Ok(out)
+                })
+                .collect::<Result<_, GeoError>>()
+        })?
+    } else {
+        Vec::new()
+    };
     let extent = outs.iter().map(|o| o.extent).max().unwrap_or(4096);
 
     progress("land cover", 0.0);
@@ -300,7 +350,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     }
     // Building cover: footprint area per cell, then light and dense urban.
     let mut built = vec![0f32; gspec.len()];
-    for o in &outs {
+    for o in outs.iter().chain(&bouts) {
         for &(gi, gj, area) in &o.buildings {
             let (i, j) = (gi.round(), gj.round());
             if i >= 0.0 && j >= 0.0 && (i as usize) < w && (j as usize) < h {
@@ -325,9 +375,44 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     drop(built);
     drop(prio);
 
+    // ── The sight surface: woods and buildings on a fine grid ─────────────
+    progress("sight surface", 0.0);
+    let fine = (cell / SURFACE_CELL_M).round().max(1.0) as usize;
+    let fspec = GridSpec::new((w - 1) * fine + 1, (h - 1) * fine + 1, cell / fine as f64, lo.0, lo.1);
+    let mut surface = bgws_env::SightSurface::empty(fspec);
+    let up = |rings: &Vec<Vec<[f64; 2]>>| -> Vec<Vec<[f64; 2]>> { rings.iter().map(|r| r.iter().map(|p| [p[0] * fine as f64, p[1] * fine as f64]).collect()).collect() };
+    {
+        // Land use in priority order, as for the land cover: a wood, or what overlies it.
+        let mut shapes: Vec<&Shape> = outs.iter().flat_map(|o| o.shapes.iter()).collect();
+        shapes.sort_by_key(|s| s.priority);
+        let mut prio = vec![0u8; fspec.len()];
+        for s in shapes {
+            let wood = matches!(s.class, LandCover::ForestDense | LandCover::ForestLight | LandCover::Scrub);
+            let v = if wood { s.class as u8 + 1 } else { 0 };
+            fill_polygon(&up(&s.rings), fspec.width, fspec.height, |i, j| {
+                let k = fspec.idx(i, j);
+                if s.priority >= prio[k] {
+                    prio[k] = s.priority;
+                    surface.tree[k] = v;
+                }
+            });
+        }
+    }
+    let mut footprints = 0usize;
+    for o in outs.iter().chain(&bouts) {
+        for (rings, hgt) in &o.footprints {
+            let v = hgt.round().clamp(1.0, 255.0) as u8;
+            footprints += 1;
+            fill_polygon(&up(rings), fspec.width, fspec.height, |i, j| {
+                let k = fspec.idx(i, j);
+                surface.building_m[k] = surface.building_m[k].max(v);
+                surface.tree[k] = 0;
+            });
+        }
+    }
+
     // ── Derived layers ─────────────────────────────────────────────────────
     let figures = bgws_env::default_figures();
-    let table = LandCoverTable::from_figures(&figures);
     let gap = figures.get("env.synth.dense_forest_gap_m") as f32;
     let mut soil = Raster::filled(gspec, SoilType::Loam);
     let mut wetness = Raster::filled(gspec, 0.25f32);
@@ -352,11 +437,10 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
         if lc == LandCover::Water && elevation.data[k] < 0.0 {
             elevation.data[k] = 0.0;
         }
-        // Only woods: at 30 m a town cell is part roof, part street, and the
-        // surface model's bias there is small next to the canopy's.
-        if spec.dsm_canopy_fraction > 0.0 && lc.is_forest() {
-            elevation.data[k] -= (spec.dsm_canopy_fraction * table.props[lc as usize].canopy_m) as f32;
-        }
+    }
+    if spec.ground_filter_m > 0.0 {
+        progress("bare ground", 0.0);
+        bare_ground(&mut elevation, &cover, (spec.ground_filter_m / cell / 2.0).round().max(1.0) as usize);
     }
 
     // ── Basemap: the same archive, lower zooms and the box, as stored ─────
@@ -404,15 +488,102 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     let stats = serde_json::json!({
         "grid": [w, h], "cellM": cell, "elevationM": [emin, emax], "landCover": counts, "denseUrbanCells": dense,
         "rivers": rivers.len(), "towns": towns.len(), "roadParts": roads.len(), "basemapTiles": basemap.len(),
-        "elevationZoom": ez, "vectorZoom": vz,
+        "elevationZoom": ez, "vectorZoom": vz, "surfaceCellM": fspec.cell, "buildingFootprints": footprints,
     });
     let terrain = Terrain { frame_origin: frame.origin, spec: gspec, elevation, land_cover: cover, soil, wetness, obstacle_gap };
-    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats })
+    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats, surface: Some(surface) })
+}
+
+/// Woods and towns back to bare ground: a morphological opening (the lowest
+/// height within `r` cells, then the highest of those) over cells with trees
+/// or buildings and the cell round them, never raising a cell, then smoothed
+/// there. Water is left out of the lowest, so a riverside town is not taken
+/// down to the river's surface.
+fn bare_ground(elev: &mut Raster<f32>, cover: &Raster<LandCover>, r: usize) {
+    let s = elev.spec;
+    let (w, h) = (s.width, s.height);
+    let covered = |k: usize| matches!(cover.data[k], LandCover::ForestDense | LandCover::ForestLight | LandCover::UrbanLight | LandCover::UrbanDense);
+    let mut mask = vec![false; w * h];
+    for j in 0..h {
+        for i in 0..w {
+            if !covered(j * w + i) {
+                continue;
+            }
+            for dj in j.saturating_sub(1)..=(j + 1).min(h - 1) {
+                for di in i.saturating_sub(1)..=(i + 1).min(w - 1) {
+                    if cover.data[dj * w + di] != LandCover::Water {
+                        mask[dj * w + di] = true;
+                    }
+                }
+            }
+        }
+    }
+    if !mask.iter().any(|m| *m) {
+        return;
+    }
+    // A separable min (or max) filter over a square of side 2r + 1.
+    let filter = |src: &[f32], max: bool| -> Vec<f32> {
+        let pick = |a: f32, b: f32| if max { a.max(b) } else { a.min(b) };
+        let none = if max { f32::MIN } else { f32::MAX };
+        let mut rows = vec![none; w * h];
+        for j in 0..h {
+            for i in 0..w {
+                let mut v = none;
+                for ii in i.saturating_sub(r)..=(i + r).min(w - 1) {
+                    v = pick(v, src[j * w + ii]);
+                }
+                rows[j * w + i] = v;
+            }
+        }
+        let mut out = vec![none; w * h];
+        for j in 0..h {
+            for i in 0..w {
+                let mut v = none;
+                for jj in j.saturating_sub(r)..=(j + r).min(h - 1) {
+                    v = pick(v, rows[jj * w + i]);
+                }
+                out[j * w + i] = v;
+            }
+        }
+        out
+    };
+    let land: Vec<f32> = elev.data.iter().zip(&cover.data).map(|(&e, &c)| if c == LandCover::Water { f32::MAX } else { e }).collect();
+    let low = filter(&land, false);
+    // Where the window held only water, keep the height.
+    let low: Vec<f32> = low.iter().zip(&elev.data).map(|(&l, &e)| if l == f32::MAX { e } else { l }).collect();
+    let opened = filter(&low, true);
+    let mut bare = elev.data.clone();
+    for k in 0..w * h {
+        if mask[k] {
+            bare[k] = bare[k].min(opened[k]);
+        }
+    }
+    // Smooth the filtered cells (3 × 3 mean) so the edge of a town is no step.
+    for j in 0..h {
+        for i in 0..w {
+            let k = j * w + i;
+            if !mask[k] {
+                continue;
+            }
+            let (mut sum, mut n) = (0.0f32, 0.0f32);
+            for jj in j.saturating_sub(1)..=(j + 1).min(h - 1) {
+                for ii in i.saturating_sub(1)..=(i + 1).min(w - 1) {
+                    if cover.data[jj * w + ii] != LandCover::Water {
+                        sum += bare[jj * w + ii];
+                        n += 1.0;
+                    }
+                }
+            }
+            elev.data[k] = if n > 0.0 { (sum / n).min(elev.data[k]) } else { bare[k] };
+        }
+    }
 }
 
 /// One vector tile's contribution, in grid and ENU coordinates.
-fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, to_grid: &(dyn Fn(f64, f64) -> [f64; 2] + Sync)) -> TileOut {
-    let mut out = TileOut { shapes: vec![], buildings: vec![], rivers: vec![], towns: vec![], roads: vec![], extent: 4096 };
+/// `base`: land use, water, places and roads; `buildings`: footprints.
+#[allow(clippy::too_many_arguments)]
+fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, to_grid: &(dyn Fn(f64, f64) -> [f64; 2] + Sync), base: bool, buildings: bool) -> TileOut {
+    let mut out = TileOut { shapes: vec![], buildings: vec![], footprints: vec![], rivers: vec![], towns: vec![], roads: vec![], extent: 4096 };
     let enu = |l: &mvt::Layer, p: [f64; 2]| {
         let ext = l.extent as f64;
         let (lon, lat) = tile_lonlat(tx as f64 + p[0] / ext, ty as f64 + p[1] / ext, z);
@@ -422,6 +593,9 @@ fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, t
     for l in layers {
         out.extent = out.extent.max(l.extent);
         let m_per_unit = tile_size_m(tile_lonlat(tx as f64 + 0.5, ty as f64 + 0.5, z).1, z) / l.extent as f64;
+        if (l.name == "buildings" && !buildings) || (l.name != "buildings" && !base) {
+            continue;
+        }
         for f in &l.features {
             let kind = f.str("kind").unwrap_or("");
             match (l.name.as_str(), f.kind) {
@@ -436,6 +610,15 @@ fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, t
                     }
                 }
                 ("buildings", GeomType::Polygon) => {
+                    // The footprint at its mapped height, for sight lines.
+                    // Mapped, else by footprint: houses low, blocks and halls higher.
+                    let area: f64 = f.parts.iter().map(|r| ring_area(r)).sum::<f64>().abs() * m_per_unit * m_per_unit;
+                    let height = f.props.get("height").and_then(mvt::Value::as_f64).filter(|h| *h > 0.0).unwrap_or_else(|| default_height(area));
+                    let rings: Vec<Vec<[f64; 2]>> = f.parts.iter().map(|r| r.iter().map(|&p| {
+                        let (e, n) = enu(l, p);
+                        to_grid(e, n)
+                    }).collect()).collect();
+                    out.footprints.push((rings, height as f32));
                     for r in &f.parts {
                         let area = ring_area(r).abs() * m_per_unit * m_per_unit;
                         if area < 4.0 || r.is_empty() {

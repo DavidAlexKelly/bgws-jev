@@ -16,6 +16,10 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     std::fs::create_dir_all(dir)?;
     crate::preview::render(&g.terrain, &g.rivers, &g.towns, roads).write_png(&dir.join("preview.png"))?;
     let (towns, dem) = (g.towns, g.dem);
+    if let Some(surface) = &g.surface {
+        surface.write(&dir.join("surface.bin"))?;
+    }
+    let has_surface = g.surface.is_some();
     let world = SynthWorld { terrain: g.terrain, roads: RoadNetwork::default(), rivers: g.rivers, towns, power_lines: Vec::new() };
     let mut meta = TheatrePack::write(dir, name, &world, TILE_INTERVALS, Codec::Lz4).map_err(io)?;
     // The graph is in roads/; the engine builds its network from it.
@@ -40,11 +44,14 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
         write_archive(&dir.join("dem.pmtiles"), dem, TileType::Webp, Compression::None, [b.west, b.south, b.east, b.north], &serde_json::json!({ "name": name, "encoding": "terrarium", "attribution": "© Mapterhorn" }))?;
         meta.dem = Some("dem.pmtiles".into());
     }
+    if has_surface {
+        meta.surface = Some("surface.bin".into());
+    }
     meta.bbox = Some([b.west, b.south, b.east, b.north]);
     meta.sources = Some(serde_json::json!({
         "builtWith": concat!("bgws-geodata ", env!("CARGO_PKG_VERSION")),
         "osm": { "archive": g.planet, "zoom": g.zoom, "attribution": "© OpenStreetMap contributors, ODbL; Protomaps basemap build" },
-        "elevation": { "archive": spec.elevation, "zoom": spec.elevation_zoom, "attribution": "© Mapterhorn (Copernicus GLO-30 and national elevation models)", "dsmCanopyFraction": spec.dsm_canopy_fraction },
+        "elevation": { "archive": spec.elevation, "zoom": spec.elevation_zoom, "attribution": "© Mapterhorn (Copernicus GLO-30 and national elevation models)", "groundFilterM": spec.ground_filter_m },
         "cellM": spec.cell_m,
         "ground": g.stats,
         "roads": roads.stats,

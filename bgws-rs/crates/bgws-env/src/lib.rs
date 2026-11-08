@@ -17,6 +17,7 @@ pub mod optics;
 pub mod raster;
 pub mod sea;
 pub mod soil;
+pub mod surface;
 pub mod synth;
 pub mod terrain;
 pub mod thermal;
@@ -31,6 +32,7 @@ pub use optics::{band_extinction, extinction_from_visibility, rain_attenuation_d
 pub use raster::{GridSpec, Raster};
 pub use sea::{Bathymetry, OceanRegion, SeaStateField, Season, SoundSpeedProfile, WaterColumn};
 pub use soil::{trafficability, update_wetness, CellGoing, SoilType, TrafficParams, Trafficability, VehicleClass};
+pub use surface::{SightSurface, SightView};
 pub use synth::{generate, SynthParams, SynthWorld, Town};
 pub use terrain::{Pyramid, Terrain};
 pub use thermal::{thermal_day, DiurnalWeather, Surface, ThermalDay, ThermalParams, VehicleThermalState};

@@ -14,7 +14,7 @@
 
 use bgws_core::geo::EARTH_RADIUS;
 use bgws_core::Figures;
-use bgws_env::{LandCover, LandCoverTable, Terrain};
+use bgws_env::{LandCover, LandCoverTable, SightView, Terrain};
 use bgws_gpu::{HeightGrid, Kernels, LosParams, LosQuery, LosResult};
 use rand::Rng;
 use rayon::prelude::*;
@@ -34,17 +34,25 @@ pub fn height_grid(terrain: &Terrain) -> HeightGrid {
 pub struct TerrainGrid<'a> {
     pub terrain: &'a Terrain,
     pub heights: Arc<HeightGrid>,
+    /// Buildings and woods on a fine grid (a theatre pack's), when there is one.
+    pub surface: Option<&'a SightView>,
 }
 
 impl<'a> TerrainGrid<'a> {
     /// Build the height grid from the terrain (copies the elevation once).
     pub fn new(terrain: &'a Terrain) -> Self {
-        Self { terrain, heights: Arc::new(height_grid(terrain)) }
+        Self { terrain, heights: Arc::new(height_grid(terrain)), surface: None }
     }
 
     /// Reuse an already-built height grid (it must match `terrain`).
     pub fn with_heights(terrain: &'a Terrain, heights: Arc<HeightGrid>) -> Self {
-        Self { terrain, heights }
+        Self { terrain, heights, surface: None }
+    }
+
+    /// Trace sight lines through this surface's buildings and woods.
+    pub fn with_surface(mut self, surface: Option<&'a SightView>) -> Self {
+        self.surface = surface;
+        self
     }
 }
 
@@ -78,6 +86,9 @@ pub struct OpticalLos {
     pub canopy_path_m: BTreeMap<LandCover, f64>,
     /// Probability the canopy does not block the line.
     pub p_clear: f64,
+    /// A building stands in the way (a pack's sight surface).
+    #[serde(default)]
+    pub building_blocked: bool,
     /// Probability of an unobstructed line: 0 if the terrain masks.
     pub p_visible: f64,
 }
@@ -89,17 +100,25 @@ impl OpticalLos {
     }
 }
 
-/// Canopy pass for one query on a terrain the ray already clears.
-fn canopy(t: &Terrain, q: &LosQuery, p: &OpticalParams) -> BTreeMap<LandCover, f64> {
+/// Canopy pass for one query on a terrain the ray already clears: the
+/// length through each class's canopy, and whether a building blocks it.
+/// With a sight surface, its buildings and woods (a few metres a cell) are
+/// what the line passes through, stepped at half its cell; without one, the
+/// land cover's class heights on the terrain grid, with towns as canopy.
+fn canopy(g: &TerrainGrid<'_>, q: &LosQuery, p: &OpticalParams) -> (BTreeMap<LandCover, f64>, bool) {
+    let t = g.terrain;
     let (dx, dy) = (q.tgt_x - q.obs_x, q.tgt_y - q.obs_y);
     let d = dx.hypot(dy);
     let mut out = BTreeMap::new();
     if d <= 2.0 * p.endpoint_clear_m {
-        return out;
+        return (out, false);
     }
     let zo = t.height(q.obs_x, q.obs_y) + q.obs_agl;
     let zt = t.height(q.tgt_x, q.tgt_y) + q.tgt_agl;
-    let step = (t.spec.cell * p.los.step_cells).max(0.5);
+    let step = match g.surface {
+        Some(s) => (s.cell() * 0.5).max(0.5),
+        None => (t.spec.cell * p.los.step_cells).max(0.5),
+    };
     let n = (d / step).ceil().max(1.0) as usize;
     let seg = d / n as f64;
     let inv_2kr = 1.0 / (2.0 * p.los.k_factor * EARTH_RADIUS);
@@ -110,37 +129,49 @@ fn canopy(t: &Terrain, q: &LosQuery, p: &OpticalParams) -> BTreeMap<LandCover, f
             continue;
         }
         let (x, y) = (q.obs_x + tt * dx, q.obs_y + tt * dy);
+        let ground = t.height(x, y) + tt * (1.0 - tt) * d * d * inv_2kr;
+        let above = zo + tt * (zt - zo) - ground;
+        if let Some(sf) = g.surface {
+            let (building, wood) = sf.at(x, y);
+            if building > 0.0 && above < building {
+                return (out, true);
+            }
+            if let Some(c) = wood {
+                if above < p.cover.get(c).canopy_m {
+                    *out.entry(c).or_insert(0.0) += seg;
+                }
+            }
+            continue;
+        }
         let lc = t.land_cover_at(x, y);
         let canopy_h = p.cover.get(lc).canopy_m;
         if canopy_h <= 0.0 {
             continue;
         }
-        let ground = t.height(x, y) + tt * (1.0 - tt) * d * d * inv_2kr;
-        let ray = zo + tt * (zt - zo);
-        if ray - ground < canopy_h {
+        if above < canopy_h {
             *out.entry(lc).or_insert(0.0) += seg;
         }
     }
-    out
+    (out, false)
 }
 
-fn assemble(t: &Terrain, q: &LosQuery, r: LosResult, p: &OpticalParams) -> OpticalLos {
+fn assemble(g: &TerrainGrid<'_>, q: &LosQuery, r: LosResult, p: &OpticalParams) -> OpticalLos {
     let range_m = ((q.tgt_x - q.obs_x).powi(2) + (q.tgt_y - q.obs_y).powi(2)).sqrt();
-    let canopy_path_m = if r.visible { canopy(t, q, p) } else { BTreeMap::new() };
-    let p_clear = canopy_path_m.iter().map(|(c, l)| 1.0 - p.cover.get(*c).block_probability(*l)).product::<f64>();
-    OpticalLos { range_m, terrain_visible: r.visible, clearance_m: r.clearance_m(), p_visible: if r.visible { p_clear } else { 0.0 }, p_clear, canopy_path_m }
+    let (canopy_path_m, building_blocked) = if r.visible { canopy(g, q, p) } else { (BTreeMap::new(), false) };
+    let p_clear = if building_blocked { 0.0 } else { canopy_path_m.iter().map(|(c, l)| 1.0 - p.cover.get(*c).block_probability(*l)).product::<f64>() };
+    OpticalLos { range_m, terrain_visible: r.visible, clearance_m: r.clearance_m(), p_visible: if r.visible { p_clear } else { 0.0 }, p_clear, canopy_path_m, building_blocked }
 }
 
 /// Batched optical LOS: terrain on the kernel backend, canopy on the CPU.
 pub fn optical_los_batch<K: Kernels + ?Sized>(k: &K, g: &TerrainGrid<'_>, queries: &[LosQuery], p: &OpticalParams) -> Vec<OpticalLos> {
     let terrain = k.los_batch(&g.heights, queries, &p.los);
-    queries.par_iter().zip(terrain.par_iter()).map(|(q, r)| assemble(g.terrain, q, *r, p)).collect()
+    queries.par_iter().zip(terrain.par_iter()).map(|(q, r)| assemble(g, q, *r, p)).collect()
 }
 
 /// One optical LOS query on the CPU.
 pub fn optical_los(g: &TerrainGrid<'_>, q: &LosQuery, p: &OpticalParams) -> OpticalLos {
     let r = bgws_gpu::los::los_one(&g.heights, q, &p.los);
-    assemble(g.terrain, q, r, p)
+    assemble(g, q, r, p)
 }
 
 #[cfg(test)]
@@ -157,6 +188,39 @@ mod tests {
         // A 200 m belt of dense forest across x = 400..600.
         t.land_cover = Raster::from_fn(spec, |i, _| if (40..60).contains(&i) { LandCover::ForestDense } else { LandCover::Open });
         (t, OpticalParams::from_figures(&f))
+    }
+
+    /// A row of 20 m buildings across x = 400..420, with a 10 m street through it at y = 100.
+    fn street_surface() -> bgws_env::SightView {
+        let spec = GridSpec::new(201, 41, 5.0, 0.0, 0.0);
+        let mut sf = bgws_env::SightSurface::empty(spec);
+        for j in 0..spec.height {
+            let y = j as f64 * 5.0;
+            if (y - 100.0).abs() <= 5.0 {
+                continue;
+            }
+            for i in 80..=84 {
+                sf.building_m[spec.idx(i, j)] = 20;
+            }
+        }
+        bgws_env::SightView::same_frame(Arc::new(sf))
+    }
+
+    #[test]
+    fn buildings_block_but_a_street_lets_the_eye_through() {
+        let (mut t, p) = setup();
+        t.land_cover = Raster::filled(t.spec, LandCover::Open);
+        let sf = street_surface();
+        let g = TerrainGrid::new(&t).with_surface(Some(&sf));
+        let q = |y0: f64, y1: f64, agl: f64| LosQuery { obs_x: 100.0, obs_y: y0, obs_agl: agl, tgt_x: 900.0, tgt_y: y1, tgt_agl: 1.5 };
+        let k = CpuKernels;
+        let r = optical_los_batch(&k, &g, &[q(100.0, 100.0, 2.0), q(160.0, 160.0, 2.0), q(160.0, 160.0, 60.0)], &p);
+        assert!(r[0].p_visible > 0.99 && !r[0].building_blocked, "down the street: {:?}", r[0]);
+        assert!(r[1].building_blocked && r[1].p_visible == 0.0, "through a building: {:?}", r[1]);
+        assert!(r[2].p_visible > 0.99, "from a 60 m mast, over the roofs: {:?}", r[2]);
+        // Without the surface the town is open fields here: nothing blocks.
+        let plain = TerrainGrid::new(&t);
+        assert!(optical_los(&plain, &q(160.0, 160.0, 2.0), &p).p_visible > 0.99);
     }
 
     #[test]

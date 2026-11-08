@@ -84,11 +84,13 @@ function viewshedImage(v: Viewshed): HTMLCanvasElement {
       // The mask runs from the south-west; images from the top-left.
       const k = ((v.rows - 1 - j) * v.cols + i) * 4;
       if (Math.hypot(i - mid, j - mid) > reach) continue;
-      if (v.mask[j * v.cols + i] === "1") {
+      // The chance of a clear line, in tenths: none dark, some faint, most bright.
+      const tenths = v.mask.charCodeAt(j * v.cols + i) - 48;
+      if (tenths >= 1) {
         img.data[k] = r;
         img.data[k + 1] = gr;
         img.data[k + 2] = b;
-        img.data[k + 3] = 95;
+        img.data[k + 3] = 30 + Math.round((tenths / 9) * 90);
       } else {
         img.data[k + 3] = 125;
       }

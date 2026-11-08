@@ -145,6 +145,8 @@ export interface Viewshed {
   /** Where it stood when this was worked out. */
   lon: number;
   lat: number;
+  /** The pack's sight surface cell, m, when buildings and woods are traced cell by cell. */
+  surfaceM: number | null;
   west: number;
   south: number;
   east: number;

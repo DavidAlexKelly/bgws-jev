@@ -265,6 +265,7 @@ export function App() {
             viewer={s.viewer}
             frame={s.frame}
             viewshedOn={sightOn}
+            surfaceM={s.viewshed?.surfaceM ?? null}
             onClose={() => setSelected(null)}
             onWhy={(unit) => send({ kind: "why", unit })}
             onMessages={(unit) => send({ kind: "messages", unit })}
