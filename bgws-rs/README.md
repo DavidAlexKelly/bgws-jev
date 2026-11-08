@@ -244,6 +244,15 @@ roads where they are quicker. Moving vehicles in a shipped scenario on the
 Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
 ground. Generated ground has no road layer.
 
+CI builds a pack with no network: `crates/bgws-geodata/tests/offline.rs`
+writes a small vector archive (two roads meeting at a junction, a wood, a
+lake) and a terrarium elevation archive. It then builds the pack through the
+same path as `bgws terrain`, and checks the heights, the land cover, the
+water and the road graph. The tests against the real planet archives are
+ignored by default (`cargo test -p bgws-geodata -- --ignored`), and so are
+the engine's tests on a real pack (`BGWS_TEST_PACK=<dir> cargo test
+--release -p bgws-run --test terrain_pack -- --ignored`).
+
 ### Moving on roads and across country
 
 One planner (`bgws_sim::routing`) searches roads and open ground together.
