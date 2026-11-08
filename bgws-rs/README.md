@@ -119,6 +119,11 @@ fallbacks decide and the log says why.
   before it halts. The pinned threshold (`people.morale.theta.pinned`) and
   the route weights do not move it: the halt here comes from the fight, not
   from morale. The next step is a playtest of the scene, not a figure tweak.
+- **Vehicle march rates:** the research reference sources dismounted pace
+  (P26, now a vignette: 2.3 km/h across generated mixed ground, in its
+  1.5–3 km/h band) but no road-march or cross-country rate for vehicles. The
+  road speeds by class (`env.road.*`) and the planner's march weights
+  are [default] until a source is added.
 - **Lethality:** meeting engagements in open ground end within a minute or two.
   Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
   fire are worth checking against playtests.
@@ -369,7 +374,7 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 
 `.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`,
 and type-checks and rebuilds the viewer (`web/app`) to check its committed build.
-Fifteen benchmark vignettes run against stored baselines: thirteen are in band,
+Sixteen benchmark vignettes run against stored baselines: fourteen are in band,
 and networked detect-to-strike and the attack halt are on the calibration backlog. Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.
