@@ -25,7 +25,7 @@ target/release/bgws behaviour --html behaviour.html   # the Behaviour Manager: e
 target/release/bgws compare breach-time --set engineers.breach.rate_mph.line_charge=1000 --html cmp.html   # A/B a figure change
 target/release/bgws figures --markdown               # every figure, sourced or [default]
 target/release/bgws platform generic/mbt             # a resolved catalogue record
-target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/ (/editor, /behaviour)
+target/release/bgws-server m4-drone-line --person blue --record game.json   # then open http://127.0.0.1:8765/ (the viewer; /editor, /behaviour)
 cargo build --release -p bgws-desktop                # the desktop shell (needs libwebkit2gtk-4.1-dev)
 target/release/bgws-desktop m4-drone-line --deciders rules   # the same game and pages in a native window
 ```
@@ -58,6 +58,7 @@ fallbacks decide and the log says why.
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, the viewer, editor and Behaviour Manager over HTTP and a WebSocket |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `web/viewer` | the viewer page: MapLibre + deck.gl when online, a plain canvas offline |
+| `web/app` | The viewer (React, MapLibre, deck.gl, milsymbol): its build in `web/app/dist` is committed and embedded in `bgws-server` |
 | `web/types`, `web/client` | TypeScript types generated from Rust (`ts-rs`) and a typed client for the server |
 
 ## Rules the code keeps (plan §2)
@@ -151,6 +152,37 @@ fallbacks decide and the log says why.
   medium-range SAM and a radar take on fixed-wing drones out to
   `sim.drones.sam_reach_m`.
 
+## The viewer
+
+`bgws-server` (and `bgws-desktop`) serve the viewer at `/`, laid out like the
+TS real-time screen:
+
+- **Left pane:** the game, and who decides for each side, with a warning when
+  their API key is missing. The clock, with speeds, a timeline to look back,
+  and a branch from any moment. Views (umpire, or one side's eyes), map layers
+  and basemap (dark, streets, satellite). The forces, with strength and state.
+  A map key.
+- **Map:** units as MIL-STD-2525C symbols, with rings for suppressed, pinned
+  and broken. Shots by outcome, shell impacts, drone strikes and sightings, as
+  they happen. Kill chains, enemy tracks, sensor footprints, jammers and the
+  nets. The selected unit's route.
+- **Right pane:** the decisions waiting for you, when you hold a side
+  (`--person`), with the rules' pick and the default marked. A feed you can
+  filter, where a decision opens on its options and who chose. The selected
+  unit's orders and phases, people, weapons and what it knows, with *Why?*,
+  *Messages*, *Viewshed* and *Can it see…?*
+- **Elsewhere:** the HQ console (a side's seat, an objective and a task per
+  unit), the spectrum strip, the after-action review, the end-of-game card,
+  and *New game…* (any shipped scenario).
+
+Only the map tiles come from the internet. `/classic` is the earlier
+single-file viewer.
+
+To change the viewer: `cd web/app && npm install`. Then `npm run dev` serves
+it at http://localhost:5173 against a running `bgws-server` (port 8765).
+`npm run build` writes `web/app/dist`, which the server embeds; commit it. CI
+fails if it is stale.
+
 ## Game records
 
 A record (`--record`, or *Save* on the server) holds the scenario, seed,
@@ -170,7 +202,8 @@ cargo test -p bgws-gpu --features gpu   # GPU twin tests (skip without an adapte
 target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails on out-of-band or a shifted distribution
 ```
 
-`.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`.
+`.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`,
+and type-checks and rebuilds the viewer (`web/app`) to check its committed build.
 Fifteen benchmark vignettes run against stored baselines: fourteen are in band,
 and networked detect-to-strike is on the calibration backlog. Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the

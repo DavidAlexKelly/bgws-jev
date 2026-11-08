@@ -34,7 +34,11 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
-const VIEWER: &str = include_str!("../../../web/viewer/index.html");
+const CLASSIC: &str = include_str!("../../../web/viewer/index.html");
+// The viewer (web/app), built by `npm run build` there; the build is committed so cargo alone serves it.
+const APP_HTML: &str = include_str!("../../../web/app/dist/index.html");
+const APP_JS: &str = include_str!("../../../web/app/dist/app.js");
+const APP_CSS: &str = include_str!("../../../web/app/dist/app.css");
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "bgws-server")]
@@ -97,6 +101,14 @@ enum Inbound {
     Check { scenario: serde_json::Value },
     /// Replace the game with an edited scenario, same deciders.
     Load { scenario: serde_json::Value },
+    /// A browser has connected: the game, the clock, any questions waiting and the feed so far.
+    Hello,
+    /// One unit in detail (the inspector): truth for the umpire and own units.
+    Inspect { unit: String },
+    /// The shipped scenarios, for the "new game" picker.
+    Scenarios,
+    /// Replace the game with a shipped scenario, same deciders.
+    Open { name: String },
 }
 
 /// Views of the game every few simulated seconds, for the timeline. When
@@ -245,6 +257,71 @@ fn visible(viewer: Viewer, e: &bgws_core::LogEvent) -> bool {
     viewer.side().is_none_or(|s| e.side.is_none_or(|es| es == s))
 }
 
+/// Who decides for each side, and whether its key is there (keys never leave the host).
+fn deciders_json(sc: &bgws_scenario::ScenarioV4, opts: &HostOptions, person: Option<Side>) -> serde_json::Value {
+    let pick = |d: bgws_scenario::Decider| -> String {
+        let d = match opts.deciders {
+            DeciderChoice::Scenario => d,
+            DeciderChoice::Rules => bgws_scenario::Decider::Rules,
+            DeciderChoice::Jev => bgws_scenario::Decider::Jev,
+            DeciderChoice::Claude => bgws_scenario::Decider::Claude,
+            DeciderChoice::Local => bgws_scenario::Decider::Local,
+        };
+        format!("{d:?}").to_lowercase()
+    };
+    let key = |d: &str| match d {
+        "claude" => std::env::var_os("ANTHROPIC_API_KEY").is_some(),
+        "jev" => std::env::var_os("OPENROUTER_API_KEY").is_some(),
+        _ => true,
+    };
+    let mut out = serde_json::Map::new();
+    for side in Side::PLAYERS {
+        let c = sc.command.side(side);
+        let (units, hqs) = (pick(c.units), pick(c.hqs));
+        out.insert(side.as_str().into(), json!({ "units": units, "hqs": hqs, "keyMissing": !key(&units) || !key(&hqs), "person": person == Some(side), "directive": c.directive }));
+    }
+    serde_json::Value::Object(out)
+}
+
+/// The game as the viewer's header and "new game" panel show it.
+fn game_json(host: &Host, opts: &HostOptions, person: Option<Side>) -> serde_json::Value {
+    let sc = &host.record.scenario;
+    let count = |side: Side| sc.forces_of(side).count();
+    json!({
+        "kind": "game", "name": sc.name, "description": sc.description, "notes": sc.notes,
+        "scope": sc.scope, "startUtc": sc.start_utc, "victory": sc.victory,
+        "origin": { "lat": sc.theatre.origin.lat, "lon": sc.theatre.origin.lon },
+        "forces": { "blue": count(Side::Blue), "red": count(Side::Red) },
+        "deciders": deciders_json(sc, opts, person), "flat": host.record.run.flat_ground,
+        "limitS": host.sim.ctx.duration_limit().secs(),
+    })
+}
+
+/// Log events as the browser reads them, with names for ids.
+fn events_json(sim: &bgws_sim::Sim, events: &[bgws_core::LogEvent]) -> Vec<serde_json::Value> {
+    if events.is_empty() {
+        return Vec::new();
+    }
+    let names: BTreeMap<bgws_core::EntityId, &str> = sim.ctx.by_name.iter().map(|(n, id)| (*id, n.as_str())).collect();
+    let name = |id: Option<bgws_core::EntityId>| id.and_then(|i| names.get(&i).copied());
+    events.iter().map(|e| json!({ "clock": format!("{}", e.t), "t": e.t.secs(), "kind": e.kind, "text": e.text, "side": e.side, "entity": name(e.entity), "target": name(e.target), "data": e.data })).collect()
+}
+
+/// The shipped scenarios, in brief.
+fn scenarios_json() -> serde_json::Value {
+    let mut out = Vec::new();
+    if let Ok(dir) = std::fs::read_dir(scenarios_dir()) {
+        let mut paths: Vec<_> = dir.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
+        paths.sort();
+        for p in paths {
+            let Ok(v) = std::fs::read_to_string(&p).map_err(|_| ()).and_then(|t| serde_json::from_str::<serde_json::Value>(&t).map_err(|_| ())) else { continue };
+            let forces = v["forces"].as_array().map(|f| f.iter().filter(|x| x["layer"].as_str().unwrap_or("unit") == "unit").count()).unwrap_or(0);
+            out.push(json!({ "file": p.file_stem().and_then(|s| s.to_str()), "name": v["name"], "description": v["description"], "type": v["scope"]["type"], "durationMin": v["scope"]["durationMin"], "units": forces }));
+        }
+    }
+    json!({ "kind": "scenarios", "scenarios": out })
+}
+
 /// The game thread: the sim never waits on the network or the UI in wall
 /// time; it waits in simulated time for answers (§3.2).
 fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: broadcast::Sender<Out>) {
@@ -259,6 +336,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
     let mut playing = false;
     let mut speed = 10.0;
     let mut viewer = Viewer::Umpire;
+    // What the browsers were last told of the clock.
+    let mut told = (false, speed, viewer);
     let mut waiting: BTreeMap<QuestionId, Question> = BTreeMap::new();
     let mut held: Vec<Answer> = Vec::new();
     let mut held_at = SimTime::ZERO;
@@ -347,22 +426,61 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     let errors = bgws_run::editor::check(scenario).err().unwrap_or_default();
                     send(&out, json!({ "kind": "checked", "errors": errors, "loaded": false }));
                 }
-                Inbound::Load { scenario } => match bgws_run::editor::check(scenario).map_err(|e| e.join("; ")).and_then(|sc| Host::new(&sc, sc.seed, default_figures(), &cfg.opts).map_err(|e| e.to_string())) {
-                    Ok(h) => {
-                        host = h;
-                        playing = false;
-                        scrub = None;
-                        waiting.clear();
-                        held.clear();
-                        keys.frames.clear();
-                        last_full = None;
-                        log.clear();
-                        send(&out, json!({ "kind": "branched", "t": 0.0 }));
-                        send(&out, json!({ "kind": "status", "text": format!("loaded {}: press Play", host.record.scenario.name) }));
-                        send(&out, json!({ "kind": "checked", "errors": [], "loaded": true }));
+                m @ (Inbound::Load { .. } | Inbound::Open { .. }) => {
+                    let from_editor = matches!(m, Inbound::Load { .. });
+                    let made = match m {
+                        Inbound::Load { scenario } => bgws_run::editor::check(scenario).map_err(|e| e.join("; ")),
+                        Inbound::Open { name } => load_scenario(&scenario_path(&name)).map_err(|e| e.to_string()),
+                        _ => unreachable!(),
                     }
-                    Err(e) => send(&out, json!({ "kind": "checked", "errors": [e], "loaded": false })),
+                    .and_then(|sc| Host::new(&sc, sc.seed, default_figures(), &cfg.opts).map_err(|e| e.to_string()));
+                    match made {
+                        Ok(h) => {
+                            host = h;
+                            playing = false;
+                            scrub = None;
+                            waiting.clear();
+                            held.clear();
+                            keys.frames.clear();
+                            last_full = None;
+                            log.clear();
+                            send(&out, json!({ "kind": "branched", "t": 0.0, "new": true }));
+                            send(&out, game_json(&host, &cfg.opts, person));
+                            send(&out, json!({ "kind": "status", "text": format!("loaded {}: press Play", host.record.scenario.name) }));
+                            if from_editor {
+                                send(&out, json!({ "kind": "checked", "errors": [], "loaded": true }));
+                            }
+                        }
+                        Err(e) if from_editor => send(&out, json!({ "kind": "checked", "errors": [e], "loaded": false })),
+                        Err(e) => send(&out, json!({ "kind": "status", "text": format!("could not open: {e}") })),
+                    }
+                }
+                Inbound::Hello => {
+                    send(&out, game_json(&host, &cfg.opts, person));
+                    send(&out, json!({ "kind": "state", "playing": playing, "speed": speed, "viewer": viewer }));
+                    let seen: Vec<_> = log.iter().filter(|e| visible(viewer, e)).cloned().collect();
+                    let recent = &seen[seen.len().saturating_sub(400)..];
+                    send(&out, json!({ "kind": "events", "events": events_json(&host.sim, recent), "replay": true }));
+                    if !waiting.is_empty() {
+                        send(&out, json!({ "kind": "questions", "questions": waiting.values().collect::<Vec<_>>() }));
+                    }
+                    last_full = None;
+                }
+                Inbound::Inspect { unit } => match host.sim.ctx.by_name.get(&unit).and_then(|id| bgws_sim::view::unit_detail(&host.sim, *id, viewer)) {
+                    Some(mut d) => {
+                        // Its latest decisions and what it heard, from the feed this viewer may read.
+                        let id = host.sim.ctx.by_name[&unit];
+                        let mine = |e: &&bgws_core::LogEvent| e.entity == Some(id) && visible(viewer, e);
+                        let decisions: Vec<_> = log.iter().rev().filter(mine).filter(|e| e.kind == "decide.apply").take(6).map(|e| json!({ "t": e.t.secs(), "text": e.text, "data": e.data })).collect();
+                        let recent: Vec<_> = log.iter().rev().filter(mine).filter(|e| !e.kind.starts_with("decide.")).take(8).map(|e| json!({ "t": e.t.secs(), "kind": e.kind, "text": e.text })).collect();
+                        d["decisions"] = json!(decisions);
+                        d["recent"] = json!(recent);
+                        d["kind"] = json!("unit");
+                        send(&out, d);
+                    }
+                    None => send(&out, json!({ "kind": "unit", "name": unit, "gone": true })),
                 },
+                Inbound::Scenarios => send(&out, scenarios_json()),
                 Inbound::Save => {
                     let text = match host.finished_record().save(&cfg.record) {
                         Ok(()) => format!("saved {}", cfg.record.display()),
@@ -455,13 +573,8 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
         keys.take(&host.sim);
         let drained = host.sim.drain_events();
         log.extend(drained.iter().cloned());
-        let names: BTreeMap<bgws_core::EntityId, &str> = if drained.is_empty() { BTreeMap::new() } else { host.sim.ctx.by_name.iter().map(|(n, id)| (*id, n.as_str())).collect() };
-        let name = |id: Option<bgws_core::EntityId>| id.and_then(|i| names.get(&i).copied());
-        let events: Vec<serde_json::Value> = drained
-            .into_iter()
-            .filter(|e| visible(viewer, e))
-            .map(|e| json!({ "clock": format!("{}", e.t), "t": e.t.secs(), "kind": e.kind, "text": e.text, "side": e.side, "entity": name(e.entity), "target": name(e.target), "data": e.data }))
-            .collect();
+        let shown: Vec<bgws_core::LogEvent> = drained.into_iter().filter(|e| visible(viewer, e)).collect();
+        let events = events_json(&host.sim, &shown);
         if !events.is_empty() {
             send(&out, json!({ "kind": "events", "events": events }));
         }
@@ -489,6 +602,10 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
         }
         if waiting.is_empty() {
             send(&out, json!({ "kind": "questions", "questions": [] }));
+        }
+        if told != (playing, speed, viewer) {
+            told = (playing, speed, viewer);
+            send(&out, json!({ "kind": "state", "playing": playing, "speed": speed, "viewer": viewer }));
         }
         if step_done {
             send(&out, json!({ "kind": "advanced", "t": host.sim.now().secs(), "over": host.sim.outcome() }));
@@ -590,7 +707,10 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
     // Fail early if the editor's data does not load; it is rebuilt per request (new templates appear).
     bgws_run::editor::html(&scenarios_dir())?;
     let app = Router::new()
-        .route("/", get(|| async { Html(VIEWER) }))
+        .route("/", get(|| async { Html(APP_HTML) }))
+        .route("/app.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")], APP_JS) }))
+        .route("/app.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], APP_CSS) }))
+        .route("/classic", get(|| async { Html(CLASSIC) }))
         .route("/behaviour", get(behaviour_page))
         .route("/api/behaviour", get(behaviour_data))
         .route("/api/templates", post(save_template))

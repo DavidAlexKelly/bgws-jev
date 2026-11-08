@@ -826,6 +826,7 @@ dependencies = [
  "bgws-behaviour",
  "bgws-core",
  "bgws-run",
+ "bgws-scenario",
  "bgws-sim",
  "clap",
  "futures-util",
