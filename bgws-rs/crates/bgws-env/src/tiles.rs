@@ -353,8 +353,12 @@ impl TheatrePack {
 
     /// Load and stitch the tiles covering `aoi` into one terrain grid.
     pub fn assemble(&mut self, aoi: &Aoi) -> Result<Terrain, TileError> {
-        self.load_aoi(aoi)?;
         let s = self.meta.spec;
+        // The grid snaps the area's edges to the nearest node, up to half a
+        // cell outside it, and that node can be the first of the next tile:
+        // load the tiles a cell beyond the area too.
+        let c = s.cell;
+        self.load_aoi(&Aoi { min_e: aoi.min_e - c, min_n: aoi.min_n - c, max_e: aoi.max_e + c, max_n: aoi.max_n + c })?;
         let (i0, j0) = s.nearest_clamped(aoi.min_e, aoi.min_n);
         let (i1, j1) = s.nearest_clamped(aoi.max_e, aoi.max_n);
         let (w, h) = (i1 - i0 + 1, j1 - j0 + 1);
@@ -446,6 +450,21 @@ mod tests {
         let lc = header.layers.iter().find(|l| l.name == "land_cover").unwrap();
         bad[8 + hlen + lc.offset as usize] = 200;
         assert!(matches!(read_tile(&bad), Err(TileError::BadValue { .. })));
+    }
+
+    #[test]
+    fn an_area_ending_just_short_of_a_tile_seam_assembles() {
+        // Tiles of 16 intervals at 30 m: the second column starts at node 16
+        // (480 m). An area ending 12 m short of it snaps to that node.
+        let w = world();
+        let dir = std::env::temp_dir().join(format!("bgws-env-seam-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        TheatrePack::write(&dir, "seam", &w, 16, Codec::Lz4).unwrap();
+        let mut pack = TheatrePack::open(&dir).unwrap();
+        let aoi = Aoi { min_e: 100.0, min_n: 100.0, max_e: 16.0 * 30.0 - 12.0, max_n: 16.0 * 30.0 - 12.0 };
+        let t = pack.assemble(&aoi).expect("the next tile's first node is loaded too");
+        assert!((t.height(400.0, 400.0) - w.terrain.height(400.0, 400.0)).abs() < 1e-4);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
