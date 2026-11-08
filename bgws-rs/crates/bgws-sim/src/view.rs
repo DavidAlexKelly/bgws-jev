@@ -416,3 +416,97 @@ pub fn snapshot(s: &Sim) -> Snapshot {
         .collect();
     Snapshot { at: s.ctx.now, fingerprint: s.ctx.log.fingerprint(), entities }
 }
+
+/// One unit in detail for the viewer's inspector: what it is doing and why,
+/// its orders, its people, its weapons and what it knows. Truth for the
+/// umpire and for a side's own units; of another side's unit only what that
+/// side has seen of it.
+pub fn unit_detail(s: &Sim, id: EntityId, viewer: Viewer) -> Option<serde_json::Value> {
+    use serde_json::json;
+    let e = *s.ctx.order.get(id.index())?;
+    let i = s.world.get::<Ident>(e)?;
+    let name_of = |x: EntityId| s.ctx.order.get(x.index()).and_then(|&x| s.world.get::<Ident>(x)).map(|i| i.label.clone()).unwrap_or_else(|| format!("#{}", x.0));
+    let pos = s.world.get::<Kin>(e).map(|k| k.pos);
+    if let Some(side) = viewer.side() {
+        if side != i.side {
+            // What this side's own units have seen of it, at best.
+            let mut best: Option<&Seen> = None;
+            for &o in &s.ctx.order {
+                let (Some(oi), Some(aw)) = (s.world.get::<Ident>(o), s.world.get::<Aware>(o)) else { continue };
+                if oi.side != side {
+                    continue;
+                }
+                if let Some(seen) = aw.seen.get(&id) {
+                    if best.is_none_or(|b| (seen.level, seen.last) > (b.level, b.last)) {
+                        best = Some(seen);
+                    }
+                }
+            }
+            return Some(json!({
+                "id": id.0, "name": i.name, "side": i.side, "own": false,
+                "known": best.map(|b| ["detected", "recognised", "identified"][b.level.min(2) as usize]).unwrap_or("not seen"),
+                "label": best.filter(|b| b.level >= 2).map(|_| i.label.clone()),
+                "platform": best.filter(|b| b.level >= 1).map(|_| i.platform.name.clone()),
+                "lastSeenS": best.map(|b| (s.ctx.now - b.last).secs()),
+            }));
+        }
+    }
+    let h = s.world.get::<Health>(e);
+    let a = s.world.get::<Act>(e);
+    let c = s.world.get::<Crew>(e);
+    let arms = s.world.get::<Arms>(e);
+    let aware = s.world.get::<Aware>(e);
+    let activity = a.map(|a| {
+        let detail = match &a.activity {
+            Activity::Move { route, mode, .. } => {
+                let left = pos.map(|p| route.iter().fold((p, 0.0), |(at, d), w| (*w, d + w.sub(at).horizontal())).1).unwrap_or(0.0);
+                format!("{} km to go, {mode:?}", (left / 100.0).round() / 10.0).to_lowercase()
+            }
+            Activity::Withdraw { route, .. } => format!("{} waypoints back", route.len()),
+            Activity::Engage { target, .. } => format!("at {}", name_of(*target)),
+            Activity::Wait { target, met, .. } => format!("for {}{}", name_of(*target), if *met { ", trigger met" } else { "" }),
+            Activity::Search { bearing, .. } => format!("towards {:.0}°", bearing.to_degrees().rem_euclid(360.0)),
+            _ => String::new(),
+        };
+        let route: Vec<[f64; 2]> = match &a.activity {
+            Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.iter().map(|w| s.ctx.frame.enu_to_geodetic(*w)).map(|g| [g.lon, g.lat]).collect(),
+            _ => Vec::new(),
+        };
+        json!({ "word": a.activity.word(), "detail": detail, "route": route, "posture": a.posture, "roe": a.roe, "deciding": a.deciding,
+            "mission": { "purpose": a.mission.purpose, "phase": a.mission.phase, "urgent": a.mission.urgent,
+                "phases": a.mission.phases.iter().map(|p| p.word()).collect::<Vec<_>>() } })
+    });
+    let people = c.map(|c| {
+        let p = &s.ctx.p.people;
+        json!({ "suppression": c.suppression.level, "pinned": c.suppression.effects(p).pinned, "morale": format!("{:?}", c.morale.state).to_lowercase(),
+            "stress": c.morale.stress, "cohesion": c.morale.cohesion, "fatigue": c.fatigue.effects(p).effectiveness, "sleepDebtH": c.fatigue.sleep_debt_h,
+            "skill": c.skill.effective(p), "lastFiredOnS": c.last_incoming.map(|(t, _)| (s.ctx.now - t).secs()),
+            "lastFiredOnBy": c.last_incoming.map(|(_, by)| by).filter(|by| viewer.side().is_none() || aware.is_some_and(|aw| aw.seen.contains_key(by))).map(name_of) })
+    });
+    let mounts: Vec<_> = arms
+        .map(|ar| ar.mounts.iter().map(|m| json!({ "weapon": i.platform.mounts.get(m.index).map(|x| x.id.clone()).unwrap_or_default(), "munition": m.munition, "rounds": m.rounds })).collect())
+        .unwrap_or_default();
+    const LEVELS: [&str; 3] = ["detected", "recognised", "identified"];
+    let mut knows: Vec<_> = aware
+        .map(|aw| {
+            aw.seen
+                .iter()
+                .map(|(t, seen)| {
+                    json!({ "id": t.0, "name": if seen.level >= 2 { name_of(*t) } else { format!("contact {}", t.0) },
+                        "level": LEVELS[seen.level.min(2) as usize],
+                        "rangeM": pos.map(|p| seen.at.sub(p).horizontal()), "agoS": (s.ctx.now - seen.last).secs(), "moving": seen.moving })
+                })
+                .chain(aw.suspects.values().map(|sp| json!({ "suspect": true, "bearingDeg": sp.bearing.to_degrees().rem_euclid(360.0), "agoS": (s.ctx.now - sp.last).secs() })))
+                .collect()
+        })
+        .unwrap_or_default();
+    knows.sort_by(|a, b| a["agoS"].as_f64().partial_cmp(&b["agoS"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
+    Some(json!({
+        "id": id.0, "name": i.name, "label": i.label, "side": i.side, "own": true,
+        "platform": i.platform.name, "platformId": i.platform.id, "role": i.platform.role, "domain": format!("{:?}", i.domain).to_lowercase(),
+        "template": i.template, "quality": i.quality, "hq": i.hq, "dummy": i.dummy,
+        "health": h.map(|h| json!({ "fit": h.fit, "start": h.start, "mobilityKills": h.mobility_kills, "firepowerKills": h.firepower_kills, "destroyed": h.destroyed })),
+        "activity": activity, "people": people, "mounts": mounts, "knows": knows,
+        "speed": s.world.get::<Kin>(e).map(|k| k.vel.norm()),
+    }))
+}

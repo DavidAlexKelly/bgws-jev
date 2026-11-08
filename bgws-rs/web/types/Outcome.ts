@@ -2,4 +2,4 @@
 import type { Side } from "./Side";
 import type { SimTime } from "./SimTime";
 
-export type Outcome = { at: SimTime, winner: Side | null, reason: string, strength: { [key: Side]: number }, };
+export type Outcome = { at: SimTime, winner: Side | null, reason: string, strength: Partial<Record<Side, number>>, };

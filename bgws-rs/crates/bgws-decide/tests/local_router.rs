@@ -74,7 +74,7 @@ fn logprob_reading_maps_prefixes_and_normalises() {
 async fn the_router_batches_by_side_and_decider_and_keeps_question_order() {
     let mock = serve(|_, req| {
         let answers: serde_json::Map<String, Value> = req.body["questions"].as_object().unwrap().keys().map(|k| (k.clone(), json!({"choice": "o0", "confidence": 0.9}))).collect();
-        Reply::json(200, json!({"answers": answers})).after(Duration::from_millis(100))
+        Reply::json(200, json!({"answers": answers})).after(Duration::from_millis(300))
     })
     .await;
     let jev: Arc<dyn Decider> = Arc::new(JevClient::with_http(http(), bgws_decide::ApiKey::new("k"), JevConfig { url: mock.url.clone(), ..JevConfig::default() }));
@@ -89,7 +89,8 @@ async fn the_router_batches_by_side_and_decider_and_keeps_question_order() {
     let qs = vec![world_question(1), land_question(2, "B1"), red, world_question(4), drill];
     let started = std::time::Instant::now();
     let answers = router.answer(qs).await;
-    assert!(started.elapsed() < Duration::from_millis(190), "blue and red asked concurrently: {:?}", started.elapsed());
+    // Two 300 ms calls one after the other take 600 ms; together, a little over 300 (wide margin for a loaded machine).
+    assert!(started.elapsed() < Duration::from_millis(570), "blue and red asked concurrently: {:?}", started.elapsed());
     assert_eq!(mock.calls(), 2, "one request per side");
     assert_eq!(answers.iter().map(|a| a.question.0).collect::<Vec<_>>(), [1, 2, 3, 4, 5]);
     assert_eq!(answers[0].source, AnswerSource::Jev);

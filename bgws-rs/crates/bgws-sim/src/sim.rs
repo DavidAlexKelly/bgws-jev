@@ -42,6 +42,7 @@ pub struct Outcome {
     pub at: SimTime,
     pub winner: Option<Side>,
     pub reason: String,
+    #[cfg_attr(feature = "ts", ts(type = "Partial<Record<Side, number>>"))]
     pub strength: BTreeMap<Side, f64>,
 }
 

@@ -50,6 +50,25 @@ jobs:
           xvfb-run -a target/release/bgws-desktop skirmish-advance-to-contact-v1 --deciders rules --smoke-s 2 2>&1 | tee desktop.log
           grep -q "bgws-desktop: loaded http://127.0.0.1" desktop.log
 
+  viewer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bgws-rs/web/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bgws-rs/web/app/package-lock.json
+      - name: Type-check and build the viewer
+        run: |
+          npm ci
+          npm run build
+      - name: The committed build is the current one (bgws-server embeds it)
+        run: git diff --exit-code -- dist || (echo "web/app/dist is stale: run npm run build in bgws-rs/web/app and commit it" && exit 1)
+
   duckdb:
     runs-on: ubuntu-latest
     steps:
