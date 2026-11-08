@@ -91,8 +91,13 @@ fn viewsheds_follow_the_ground() {
     assert!((fc - std::f64::consts::FRAC_PI_4).abs() < 0.03, "flat ground: the disc ({fc})");
     assert!(rc < fc && rc > 0.0, "hills hide some ({rc})");
     let n = r["cols"].as_u64().unwrap() as usize;
-    assert_eq!(r["mask"].as_str().unwrap().len(), n * n);
-    // Each cell's chance of a clear line in tenths: '9' is clear, '0' hidden.
-    assert_eq!(&r["mask"].as_str().unwrap()[(n / 2) * n + n / 2..][..1], "9", "it sees where it stands");
-    assert!(r["mask"].as_str().unwrap().bytes().all(|b| b.is_ascii_digit()));
+    // Runs of each cell's chance of a clear line in tenths: 9 clear, 0 hidden.
+    let runs: Vec<u64> = r["runs"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    let mut mask = Vec::new();
+    for pair in runs.chunks(2) {
+        assert!(pair[0] <= 9);
+        mask.extend(std::iter::repeat_n(pair[0], pair[1] as usize));
+    }
+    assert_eq!(mask.len(), n * n);
+    assert_eq!(mask[(n / 2) * n + n / 2], 9, "it sees where it stands");
 }

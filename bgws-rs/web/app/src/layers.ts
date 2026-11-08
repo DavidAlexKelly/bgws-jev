@@ -79,13 +79,18 @@ function viewshedImage(v: Viewshed): HTMLCanvasElement {
   const img = g.createImageData(v.cols, v.rows);
   const [r, gr, b] = SIDE_RGB[v.side] ?? SIDE_RGB.neutral;
   const mid = (v.cols - 1) / 2, reach = v.rangeM / Math.max(v.cellM, 1);
+  const tenthsOf = new Uint8Array(v.cols * v.rows);
+  for (let r = 0, at = 0; r + 1 < v.runs.length; r += 2) {
+    tenthsOf.fill(v.runs[r], at, at + v.runs[r + 1]);
+    at += v.runs[r + 1];
+  }
   for (let j = 0; j < v.rows; j++)
     for (let i = 0; i < v.cols; i++) {
-      // The mask runs from the south-west; images from the top-left.
+      // The cells run from the south-west; images from the top-left.
       const k = ((v.rows - 1 - j) * v.cols + i) * 4;
       if (Math.hypot(i - mid, j - mid) > reach) continue;
       // The chance of a clear line, in tenths: none dark, some faint, most bright.
-      const tenths = v.mask.charCodeAt(j * v.cols + i) - 48;
+      const tenths = tenthsOf[j * v.cols + i];
       if (tenths >= 1) {
         img.data[k] = r;
         img.data[k + 1] = gr;
@@ -153,8 +158,8 @@ export function buildLayers(args: {
   }
   if (args.viewshed) {
     const v = args.viewshed;
-    // Crisp cells, not a blur: each square is one cell of the grid the sight is worked out on.
-    out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north], textureParameters: { minFilter: "nearest", magFilter: "nearest" } }));
+    // Cells of a few metres, blended at their edges: the sight is swept at the finest detail the ground has.
+    out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north], textureParameters: { minFilter: "linear", magFilter: "linear" } }));
     // Rings round where it stands now: how far it looks, and how far its weapons reach.
     const now = f.entities.find((x) => x.name === v.unit);
     const centre = now ? { lon: now.lon, lat: now.lat } : { lon: v.lon, lat: v.lat };

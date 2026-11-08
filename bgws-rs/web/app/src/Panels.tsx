@@ -489,7 +489,7 @@ export function Inspector(props: {
         <div className="subtle" style={{ fontSize: 11, lineHeight: 1.45, margin: "2px 0 6px" }}>
           The game's own sight lines from it to a man-high target in every cell: <span style={{ color: "#8fb8ff" }}>■</span> bright, a clear line;{" "}
           <span style={{ color: "#4d6a99" }}>■</span> faint, through trees, which may or may not hide it; <span style={{ color: "#5b6070" }}>■</span> dark, hidden by
-          the ground or a building. {props.surfaceM ? `Buildings and woods are traced cell by cell (${props.surfaceM} m), so it sees down streets.` : "Woods and towns count as a chance by their land cover (no pack sight surface here)."}{" "}
+          the ground or a building. {props.surfaceM ? `Buildings and woods are traced at ${props.surfaceM} m, so it sees down streets.` : "Woods and towns count as a chance by their land cover (no pack sight surface here)."}{" "}
           Solid ring: its best sensor's reach; dashed: its weapons'. In sight is not spotted: range, light, weather, the target's cover and movement
           decide that. Pick an enemy and use <i>Can it see…?</i> for every factor.
         </div>

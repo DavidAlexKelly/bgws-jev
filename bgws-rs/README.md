@@ -181,9 +181,15 @@ TS real-time screen:
 - **Map:** units as MIL-STD-2525C symbols, with rings for suppressed, pinned
   and broken. Shots by outcome, shell impacts, drone strikes and sightings, as
   they happen. Kill chains, enemy tracks, sensor footprints, jammers and the
-  nets. The selected unit's route, and what it can see: the game's own sight
-  lines from it to a man-high target in every cell around it, so the map
-  shows exactly what the game uses. Bright cells have a clear line. Faint
+  nets. The selected unit's route, and what it can see: a radial sweep by
+  the game's own sight rules, about 2,500 rays marched every 2.5 m. Along
+  each ray the highest ground and roof seen so far hide what lies below
+  them. A straight line from the eye keeps one elevation angle, so the
+  woodland it passes under is the canopy seen above that angle, summed per
+  class over angle bins. The result is drawn on cells of 5–12 m, depending
+  on the unit's reach, with smooth edges. It agrees with the game's
+  point-to-point sight lines at 99% or more of points, and takes about
+  90 ms. Bright cells have a clear line. Faint
   cells see through trees, which may or may not hide a target. Dark cells
   are hidden by the ground or a building. On a pack with a sight surface
   (below), buildings and woods are traced cell by cell, so a unit in a town
@@ -251,6 +257,16 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
   nearby, then the highest of those, over `--ground-filter-m` (150 m; 0
   keeps the raw heights). This keeps slopes and drops the bumps roofs and
   canopy make. Water sits at its surface, not the lagoon floor.
+- **Buildings in movement:** the share of each 30 m cell under building
+  footprints is taken from the sight surface. A vehicle cannot pass a cell
+  half or more built over (`sim.route.built_block`). Below that, its speed
+  falls with the square of what is left open. Troops on foot get through,
+  slower. Along a road, a route follows the road's own line, not the cells'
+  centres, so a column in a town keeps to the street. A vehicle's straight
+  run across country is kept only if it crosses no footprint. On the
+  Kaliningrad pack, tracked routes across the town run through a building
+  footprint for 1.9% of their length, down from 4.8%. Most of what is left
+  is narrow streets whose 5 m cells touch a wall.
 - **Sight surface:** `surface.bin`, on a 5 m grid. Every building footprint
   is drawn at its mapped height, from the archive's deepest zoom (15), where
   Protomaps keeps all of them: 63,000 in a 22 × 33 km box over Kaliningrad.

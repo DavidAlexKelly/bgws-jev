@@ -151,7 +151,9 @@ export interface Viewshed {
   south: number;
   east: number;
   north: number;
-  mask: string;
+  /** Each cell's chance of a clear line in tenths (0..9), row by row from the
+   *  south-west, as runs: [tenths, count, tenths, count, ...]. */
+  runs: number[];
 }
 
 /** What the browser sends. */

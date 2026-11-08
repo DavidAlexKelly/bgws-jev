@@ -650,7 +650,7 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     let id = host.sim.ctx.by_name.get(&unit).copied();
                     let side = id.and_then(|id| host.sim.world.get::<bgws_sim::components::Ident>(host.sim.ctx.entity(id)).map(|i| i.side));
                     match id {
-                        Some(id) if viewer.side().is_none_or(|v| Some(v) == side) => match host.sim.viewshed(id, 320) {
+                        Some(id) if viewer.side().is_none_or(|v| Some(v) == side) => match host.sim.viewshed(id, 800) {
                             Some(mut v) => {
                                 v["kind"] = json!("viewshed");
                                 v["unit"] = json!(unit);

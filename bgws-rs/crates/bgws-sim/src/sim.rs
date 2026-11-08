@@ -220,7 +220,7 @@ impl Sim {
             ground = ground.with_rivers(r);
         }
         if let Some(v) = &opts.sight {
-            ground.sight = Some(v.clone());
+            ground = ground.with_sight(v.clone());
         }
         let start = UtcDateTime::parse(&scenario.start_utc).map_err(|e| LoadError::StartTime(format!("{e:?}")))?;
         let wspec = bgws_env::GridSpec::new(4, 4, half * 2.0 / 3.0, -half, -half);
@@ -605,10 +605,18 @@ impl Sim {
         let at = self.ctx.frame.enu_to_geodetic(k.pos);
         // The furthest its weapons reach, for the ring the viewer draws.
         let weapon = i.platform.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
-        // Each cell's chance of a clear line, in tenths ('0'..'9', '9' for 0.85 and up).
-        let mask: String = chance.iter().map(|&v| char::from(b'0' + ((v * 10.0 - 0.5).round().clamp(0.0, 9.0) as u8))).collect();
+        // Each cell's chance of a clear line in tenths (0..9, 9 for 0.85 and up),
+        // row by row from the south-west, as runs: [tenths, count, tenths, count, ...].
+        let mut runs: Vec<u32> = Vec::new();
+        for &v in &chance {
+            let t = (v * 10.0 - 0.5).round().clamp(0.0, 9.0) as u32;
+            match runs.len() {
+                l if l >= 2 && runs[l - 2] == t => runs[l - 1] += 1,
+                _ => runs.extend([t, 1]),
+            }
+        }
         let fine = self.ctx.ground.sight.as_ref().map(|s| s.cell());
-        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "weaponM": weapon, "lon": at.lon, "lat": at.lat, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "surfaceM": fine, "coverage": chance.iter().filter(|v| **v >= 0.5).count() as f64 / chance.len().max(1) as f64 }))
+        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "weaponM": weapon, "lon": at.lon, "lat": at.lat, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "runs": runs, "surfaceM": fine, "coverage": chance.iter().filter(|v| **v >= 0.5).count() as f64 / chance.len().max(1) as f64 }))
     }
 
     /// Why one unit would see another now, with every factor (truth: for the umpire).

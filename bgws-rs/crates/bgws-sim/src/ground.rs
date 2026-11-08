@@ -30,6 +30,8 @@ pub struct Ground {
     pub roads: Option<Arc<Raster<u8>>>,
     /// The road lines the layer was drawn from, for the viewer.
     pub road_lines: Option<Arc<Vec<RoadLine>>>,
+    /// Which road lines carry each edge, so routes follow a road's own line.
+    pub road_index: Arc<std::collections::HashMap<u32, Vec<usize>>>,
     /// Roads by level (on the ground; on bridges and in tunnels), with their edges.
     pub road_layer: Option<Arc<RoadLayer>>,
     /// The road graph (a theatre pack's nodes and edges), for long moves.
@@ -39,6 +41,8 @@ pub struct Ground {
     pub ford: FordLimits,
     /// A pack's buildings and woods on a fine grid, for sight lines.
     pub sight: Option<bgws_env::SightView>,
+    /// The share of each terrain cell under buildings (×255), from the sight surface.
+    pub built: Option<Arc<Raster<u8>>>,
     /// Heavy-shell craters in each cell, once any have landed.
     pub craters: Option<Arc<Raster<u8>>>,
     pub road_speeds: RoadSpeeds,
@@ -120,12 +124,14 @@ impl Ground {
             backend: Backend::cpu(),
             roads: None,
             road_lines: None,
+            road_index: Default::default(),
             road_layer: None,
             road_net: None,
             rivers: None,
             ford: FordLimits::from_figures(figures),
             craters: None,
             sight: None,
+            built: None,
             sights: Default::default(),
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
@@ -138,6 +144,11 @@ impl Ground {
         self.roads = Some(Arc::new(Raster { spec: self.terrain.spec, data: layer.best_class() }));
         self.road_layer = Some(Arc::new(layer));
         self.road_lines = Some(Arc::new(lines.to_vec()));
+        let mut index: std::collections::HashMap<u32, Vec<usize>> = std::collections::HashMap::new();
+        for (k, l) in lines.iter().enumerate() {
+            index.entry(l.edge).or_default().push(k);
+        }
+        self.road_index = Arc::new(index);
         self.road_net = crate::routing::RoadNet::build(lines).map(Arc::new);
         self
     }
@@ -187,6 +198,40 @@ impl Ground {
         if let Some(l) = self.road_layer.as_mut() {
             Arc::make_mut(l).cut.insert(edge);
         }
+    }
+
+    /// The ground with a pack's sight surface: its buildings and woods for
+    /// sight lines, and the share of each terrain cell its buildings cover,
+    /// which vehicles cannot drive through (see `going`).
+    pub fn with_sight(mut self, sight: bgws_env::SightView) -> Ground {
+        use rayon::prelude::*;
+        let ts = self.terrain.spec;
+        let k = (ts.cell / sight.cell()).round().max(1.0) as usize;
+        let sub = ts.cell / k as f64;
+        let data: Vec<u8> = (0..ts.len())
+            .into_par_iter()
+            .map(|c| {
+                let (e, n) = ts.pos(c % ts.width, c / ts.width);
+                let mut hit = 0usize;
+                for a in 0..k {
+                    for b in 0..k {
+                        let (x, y) = (e - ts.cell / 2.0 + (a as f64 + 0.5) * sub, n - ts.cell / 2.0 + (b as f64 + 0.5) * sub);
+                        if sight.at(x, y).0 > 0.0 {
+                            hit += 1;
+                        }
+                    }
+                }
+                (hit * 255 / (k * k)) as u8
+            })
+            .collect();
+        self.built = Some(Arc::new(Raster { spec: ts, data }));
+        self.sight = Some(sight);
+        self
+    }
+
+    /// The share of the terrain cell at a point under buildings (0 without a sight surface).
+    pub fn built_share(&self, e: f64, n: f64) -> f64 {
+        self.built.as_ref().and_then(|r| r.spec.nearest(e, n).map(|(i, j)| r.data[r.spec.idx(i, j)] as f64 / 255.0)).unwrap_or(0.0)
     }
 
     /// A heavy shell or rocket bursts here: a crater in its cell. Enough of
@@ -272,6 +317,20 @@ impl Ground {
     /// Off-road speed factor (0–1) and whether the class is stopped.
     pub fn going(&self, e: f64, n: f64, class: EnvVehicle) -> bgws_env::soil::Trafficability {
         let mut t = trafficability(&self.terrain.going(e, n), class, &self.traffic);
+        // Buildings: vehicles go round them (a cell mostly built over is a
+        // block, not a street), and slow with what is left; troops on foot
+        // get through, slower.
+        let built = self.built_share(e, n);
+        if built > 0.0 {
+            if class == EnvVehicle::Foot {
+                t.speed_kmh *= 1.0 - 0.5 * built;
+            } else if built >= self.route_params.built_block {
+                t.speed_kmh = 0.0;
+            } else {
+                // Squared: a cell a third built over leaves less than half the room.
+                t.speed_kmh *= (1.0 - built).powi(2);
+            }
+        }
         if let Some(r) = self.craters.as_ref() {
             if let Some((i, j)) = r.spec.nearest(e, n) {
                 let c = r.data[r.spec.idx(i, j)];
@@ -327,33 +386,144 @@ impl Ground {
     }
 
     /// What an observer at `at` (eye `agl` m) has in sight out to `range` m:
-    /// for each cell of a grid of at most `max_cells` a side, the chance a
-    /// man-high target there is in its line of sight, by the game's own sight
-    /// lines (terrain, then the woods' and towns' canopy as a chance; with a
-    /// pack's sight surface, its buildings, which block, and its woods).
+    /// the chance a man-high target is in its line of sight, on a grid of
+    /// `cells` a side, by a radial sweep with the game's own rules.
+    ///
+    /// Rays leave the eye at the grid's outer spacing and march out every
+    /// half of the finest detail there is (the sight surface's cell, else the
+    /// terrain's). Along each ray the highest elevation angle of the ground
+    /// and of the roofs so far is kept: a point is in sight if the line to it
+    /// clears them. Woods are as in a sight line: a straight line from the
+    /// eye has one elevation angle, so the woodland it passes under is the
+    /// canopy seen above that angle, summed per class by a Fenwick tree over
+    /// angle bins, and turned into a chance with the class's blocking per
+    /// 100 m. Roofs and canopy within the clear distance of either end
+    /// (`prop.optical.endpoint_clear_m`) do not count, as in a sight line.
     /// Returns the grid's south-west corner, cell size, side and chances.
-    pub fn sight_map(&self, at: Enu, agl: f64, range: f64, max_cells: usize) -> (Enu, f64, usize, Vec<f32>) {
-        let cell = 2.0 * range / max_cells.max(2) as f64;
+    pub fn sight_map(&self, at: Enu, agl: f64, range: f64, cells: usize) -> (Enu, f64, usize, Vec<f32>) {
+        use rayon::prelude::*;
+        let cell = 2.0 * range / cells.max(2) as f64;
         let n = ((2.0 * range / cell).ceil() as usize + 1).max(2);
         let sw = Enu::new(at.e - range, at.n - range, 0.0);
-        let mut ks = Vec::new();
-        let mut qs = Vec::new();
-        for k in 0..n * n {
-            let (e, nn) = (sw.e + (k % n) as f64 * cell, sw.n + (k / n) as f64 * cell);
-            let d = (e - at.e).hypot(nn - at.n);
-            if d > range || !self.contains(Enu::new(e, nn, 0.0)) {
-                continue;
+        let fine = self.sight.as_ref().map(|s| s.cell()).unwrap_or(self.terrain.spec.cell).min(self.terrain.spec.cell);
+        let step = (fine * 0.5).clamp(1.0, cell);
+        let steps = (range / step).ceil() as usize;
+        let rays = ((2.0 * std::f64::consts::PI * range / cell).ceil() as usize).max(64);
+        let clear = self.optical.endpoint_clear_m;
+        let clear_steps = (clear / step).ceil() as usize;
+        let inv_2kr = 1.0 / (2.0 * self.optical.los.k_factor * bgws_core::geo::EARTH_RADIUS);
+        let z0 = self.height(at.e, at.n) + agl;
+        const BINS: usize = 4096;
+        const SPAN: f64 = 0.6;
+        let bin = |tan: f64| (((tan + SPAN) / (2.0 * SPAN)) * BINS as f64).clamp(0.0, (BINS - 1) as f64) as usize;
+        let classes = LandCover::ALL.len();
+        // What stands at a point: a roof's height, and the canopy's class and height.
+        let stands = |e: f64, nn: f64| -> (f64, Option<(LandCover, f64)>) {
+            if let Some(sf) = &self.sight {
+                let (b, wood) = sf.at(e, nn);
+                (b, wood.map(|c| (c, self.cover.props[c as usize].canopy_m)))
+            } else {
+                let lc = self.land_cover(e, nn);
+                let h = self.cover.props[lc as usize].canopy_m;
+                (0.0, (h > 0.0).then_some((lc, h)))
             }
-            ks.push(k);
-            qs.push(LosQuery { obs_x: at.e, obs_y: at.n, obs_agl: agl, tgt_x: e, tgt_y: nn, tgt_agl: 1.5 });
-        }
+        };
+        let polar: Vec<Vec<f32>> = (0..rays)
+            .into_par_iter()
+            .map(|ray| {
+                let a = ray as f64 / rays as f64 * 2.0 * std::f64::consts::PI;
+                let (dx, dy) = (a.sin(), a.cos());
+                let mut out = vec![0.0f32; steps + 1];
+                out[0] = 1.0;
+                // Per step: the ground's and roof's angles, the canopy's (class, angle).
+                let mut roof = vec![f64::MIN; steps + 1];
+                let mut canopy: Vec<Option<(usize, f64)>> = vec![None; steps + 1];
+                let mut ground_max = f64::MIN;
+                let mut roof_max = f64::MIN;
+                let mut tree: Vec<Vec<f64>> = vec![Vec::new(); classes];
+                let add = |t: &mut Vec<f64>, mut i: usize, v: f64| {
+                    i += 1;
+                    while i <= BINS {
+                        t[i - 1] += v;
+                        i += i & i.wrapping_neg();
+                    }
+                };
+                // Length above angle bin `i`: total minus the prefix up to it.
+                let above = |t: &Vec<f64>, i: usize| -> f64 {
+                    let prefix = |mut j: usize| {
+                        let mut s = 0.0;
+                        while j > 0 {
+                            s += t[j - 1];
+                            j -= j & j.wrapping_neg();
+                        }
+                        s
+                    };
+                    prefix(BINS) - prefix(i + 1)
+                };
+                for s in 1..=steps {
+                    let d = s as f64 * step;
+                    let (e, nn) = (at.e + dx * d, at.n + dy * d);
+                    let g = self.height(e, nn) - d * d * inv_2kr;
+                    // A man-high target here, and whether the line to it clears what lies before.
+                    let t = (g + 1.5 - z0) / d;
+                    let visible = t >= ground_max && t >= roof_max;
+                    out[s] = if visible {
+                        let k = bin(t);
+                        let mut p = 1.0;
+                        for (c, tc) in tree.iter().enumerate() {
+                            if !tc.is_empty() {
+                                let len = above(tc, k);
+                                if len > 0.0 {
+                                    p *= 1.0 - self.cover.props[c].block_probability(len);
+                                }
+                            }
+                        }
+                        p as f32
+                    } else {
+                        0.0
+                    };
+                    // This step's ground hides what lies beyond it at once.
+                    ground_max = ground_max.max((g - z0) / d);
+                    if d > clear {
+                        let (b, wood) = stands(e, nn);
+                        if b > 0.0 {
+                            roof[s] = (g + b - z0) / d;
+                        }
+                        if let Some((c, h)) = wood {
+                            canopy[s] = Some((c as usize, (g + h - z0) / d));
+                        }
+                    }
+                    // Roofs and canopy count once they are the clear distance behind.
+                    if s > clear_steps {
+                        let q = s - clear_steps;
+                        roof_max = roof_max.max(roof[q]);
+                        if let Some((c, ang)) = canopy[q] {
+                            if tree[c].is_empty() {
+                                tree[c] = vec![0.0; BINS];
+                            }
+                            add(&mut tree[c], bin(ang), step);
+                        }
+                    }
+                }
+                out
+            })
+            .collect();
+        // Onto the grid: each cell takes the sample on the ray and step nearest it.
         let mut p = vec![0.0f32; n * n];
-        for (k, r) in ks.into_iter().zip(self.los_batch(&qs)) {
-            // Where it stands it sees.
-            p[k] = r.p_visible as f32;
+        let mid = (n - 1) as f64 / 2.0;
+        for j in 0..n {
+            for i in 0..n {
+                let (x, y) = ((i as f64 - mid) * cell, (j as f64 - mid) * cell);
+                let d = x.hypot(y);
+                if d > range || !self.contains(Enu::new(at.e + x, at.n + y, 0.0)) {
+                    continue;
+                }
+                let a = x.atan2(y).rem_euclid(2.0 * std::f64::consts::PI);
+                let ray = ((a / (2.0 * std::f64::consts::PI)) * rays as f64).round() as usize % rays;
+                let s = ((d / step).round() as usize).min(steps);
+                p[j * n + i] = polar[ray][s];
+            }
         }
-        let c = ((n - 1) / 2) * n + (n - 1) / 2;
-        p[c] = 1.0;
         (sw, cell, n, p)
     }
 

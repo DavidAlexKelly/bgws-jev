@@ -65,6 +65,8 @@ pub struct RouteParams {
     /// A threat's eye above the ground, m, and the cell its sight is worked out on.
     pub sight_agl_m: f64,
     pub sight_cell_m: f64,
+    /// The share of a cell under buildings at which vehicles cannot pass it.
+    pub built_block: f64,
     /// A vehicle's pace through ground it cannot otherwise cross (not water), km/h.
     pub crawl_kmh: f64,
     /// How far from its start a route may crawl, m (out of a wood the vehicle stands in).
@@ -115,6 +117,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
+        figure!("sim.route.built_block", 0.5, "share", 0.1, 1.0, "default", Default, "share of a 30 m cell under buildings (a pack's sight surface) at which vehicles cannot pass it; below it they slow by the share"),
         figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace through ground it cannot otherwise cross (a dense wood; water only to get out of it)"),
         figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from its start a route may crawl through such ground (out of a wood the vehicle stands in)"),
         figure!("sim.route.column_gap_m", 100.0, "m", 10.0, 1_000.0, "default", Default, "on a road, a unit within this of a friendly unit moving ahead of it on the road follows at its speed (no overtaking)"),
@@ -146,6 +149,7 @@ impl RouteParams {
             verge_s: g("verge_s"),
             ford_s: g("ford_s"),
             obstacle_s: g("obstacle_s"),
+            built_block: g("built_block"),
             crawl_kmh: g("crawl_kmh"),
             escape_m: g("escape_m"),
             column_gap_m: g("column_gap_m"),
@@ -734,14 +738,58 @@ impl Ground {
         // Waypoints: corners, road joins and level changes, straight runs
         // merged where the straight line stays on passable ground; then the
         // time and the mix at the vehicle's own speeds.
-        let pts: Vec<(f64, f64, u8)> = states
-            .iter()
-            .map(|&st| {
-                let k = st % n_cells;
-                let (e, n) = pos(k);
-                (e, n, if st >= n_cells { 2 } else { u8::from(on_road[k]) })
-            })
-            .collect();
+        // The path's points: cell centres across country; along a road, the
+        // road's own line between where the path joins and leaves it, so a
+        // vehicle in a town keeps to the street and not the cell's centre.
+        let edge_of = |st: usize| -> Option<u32> {
+            let k = st % n_cells;
+            if st >= n_cells {
+                d_road[k].map(|x| x.1)
+            } else if on_road[k] {
+                g_road[k].map(|x| x.1)
+            } else {
+                None
+            }
+        };
+        let mut pts: Vec<(f64, f64, u8)> = Vec::with_capacity(states.len());
+        let mut q = 0;
+        while q < states.len() {
+            let kind = |st: usize| if st >= n_cells { 2 } else { u8::from(on_road[st % n_cells]) };
+            let Some(edge) = edge_of(states[q]) else {
+                let (e, n) = pos(states[q] % n_cells);
+                pts.push((e, n, kind(states[q])));
+                q += 1;
+                continue;
+            };
+            let mut z = q;
+            while z + 1 < states.len() && edge_of(states[z + 1]) == Some(edge) && kind(states[z + 1]) == kind(states[q]) {
+                z += 1;
+            }
+            let (a, b) = (pos(states[q] % n_cells), pos(states[z] % n_cells));
+            let line = self.road_index.get(&edge).and_then(|ls| {
+                let lines = self.road_lines.as_deref()?;
+                ls.iter().map(|&i| &lines[i].line).min_by(|x, y| project(x, a).3.total_cmp(&project(y, a).3))
+            });
+            match line {
+                Some(line) if line.len() >= 2 => {
+                    for p in along(line, a, b) {
+                        pts.push((p.0, p.1, kind(states[q])));
+                    }
+                }
+                _ => {
+                    for &st in &states[q..=z] {
+                        let (e, n) = pos(st % n_cells);
+                        pts.push((e, n, kind(st)));
+                    }
+                }
+            }
+            q = z + 1;
+        }
+        // The path starts and ends where the search did.
+        if let (Some(f), Some(&st)) = (pts.first_mut(), states.first()) {
+            let (e, n) = pos(st % n_cells);
+            (f.0, f.1) = (e, n);
+        }
         let mut keep = vec![false; pts.len()];
         keep[0] = true;
         *keep.last_mut().expect("a path") = true;
@@ -749,19 +797,31 @@ impl Ground {
             keep[i] = pts[i].2 != pts[i - 1].2 || pts[i].2 != pts[i + 1].2;
         }
         // A straight line across country is as good as the staircase, if it crosses nothing impassable.
+        // For a vehicle on a pack, nor through a building's footprint.
+        let walls = self.sight.as_ref().filter(|_| r.class != VehicleClass::Foot);
         let clear = |a: (f64, f64), b: (f64, f64)| {
-            let n = ((b.0 - a.0).hypot(b.1 - a.1) / (step * 0.5)).ceil().max(1.0) as usize;
-            (0..=n).all(|q| {
+            let len = (b.0 - a.0).hypot(b.1 - a.1);
+            let n = (len / (step * 0.5)).ceil().max(1.0) as usize;
+            let cells_ok = (0..=n).all(|q| {
                 let t = q as f64 / n as f64;
                 let k = cell_of(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
                 g_spm[k].is_finite() && !obst[k]
-            })
+            });
+            cells_ok
+                && walls.is_none_or(|w| {
+                    let m = (len / (w.cell() * 0.8)).ceil().max(1.0) as usize;
+                    (1..m).all(|q| {
+                        let t = q as f64 / m as f64;
+                        w.at(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t).0 <= 0.0
+                    })
+                })
         };
         let mut out: Vec<usize> = Vec::new();
         let mut a = 0;
         for b in 1..pts.len() {
             if keep[b] {
-                let tol = if pts[a].2 > 0 && pts[b].2 > 0 { ts.cell * 0.5 } else { step * 1.5 };
+                // Road runs are the road's own line: keep its bends.
+                let tol = if pts[a].2 > 0 && pts[b].2 > 0 { 2.0 } else { step * 1.5 };
                 simplify(&pts, a, b, tol, &|x, y| pts[x].2 > 0 || clear((pts[x].0, pts[x].1), (pts[y].0, pts[y].1)), &mut out);
                 a = b;
             }
@@ -796,6 +856,36 @@ impl Ground {
         }
         Some((Plan { waypoints, time_s, road_m, open_m }, arrived))
     }
+}
+
+/// The nearest point of a polyline to `p`: (segment, fraction along it, the point, distance).
+fn project(line: &[(f64, f64)], p: (f64, f64)) -> (usize, f64, (f64, f64), f64) {
+    let mut best = (0, 0.0, line.first().copied().unwrap_or(p), f64::INFINITY);
+    for (i, w) in line.windows(2).enumerate() {
+        let (dx, dy) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+        let l2 = dx * dx + dy * dy;
+        let t = if l2 > 0.0 { (((p.0 - w[0].0) * dx + (p.1 - w[0].1) * dy) / l2).clamp(0.0, 1.0) } else { 0.0 };
+        let q = (w[0].0 + t * dx, w[0].1 + t * dy);
+        let d = (q.0 - p.0).hypot(q.1 - p.1);
+        if d < best.3 {
+            best = (i, t, q, d);
+        }
+    }
+    best
+}
+
+/// A polyline's own course from the point nearest `a` to the point nearest `b`.
+fn along(line: &[(f64, f64)], a: (f64, f64), b: (f64, f64)) -> Vec<(f64, f64)> {
+    let (pa, pb) = (project(line, a), project(line, b));
+    let mut out = vec![pa.2];
+    if (pa.0, pa.1) <= (pb.0, pb.1) {
+        out.extend(line[pa.0 + 1..=pb.0].iter().copied());
+    } else {
+        out.extend(line[pb.0 + 1..=pa.0].iter().rev().copied());
+    }
+    out.push(pb.2);
+    out.dedup_by(|x, y| (x.0 - y.0).hypot(x.1 - y.1) < 0.5);
+    out
 }
 
 /// Ramer–Douglas–Peucker between `a` and `b`, pushing the kept indices
@@ -1153,6 +1243,54 @@ mod tests {
         g.cut_road(1);
         let cut = g.plan(&r, &p);
         assert!(cut.road_m < 4_000.0, "{cut:?}");
+    }
+
+    #[test]
+    fn vehicles_go_round_buildings_and_keep_to_the_road_line() {
+        // A block of buildings, 600 m square, in the middle of open fields.
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        let fine = GridSpec::new(1801, 1801, 5.0, -4_500.0, -4_500.0);
+        let mut sf = bgws_env::SightSurface::empty(fine);
+        for j in 0..fine.height {
+            for i in 0..fine.width {
+                let (e, n) = fine.pos(i, j);
+                if e.abs() < 300.0 && n.abs() < 300.0 {
+                    sf.building_m[fine.idx(i, j)] = 15;
+                }
+            }
+        }
+        let g = Ground::from_terrain(t, 1, &f).with_sight(bgws_env::SightView::same_frame(std::sync::Arc::new(sf)));
+        assert!(g.built_share(0.0, 0.0) > 0.99 && g.built_share(1_000.0, 0.0) == 0.0);
+        let through = |p: &Plan, from: (f64, f64)| {
+            let sv = g.sight.as_ref().unwrap();
+            let mut a = Enu::new(from.0, from.1, 0.0);
+            let mut hits = 0;
+            for w in &p.waypoints {
+                for q in 0..100 {
+                    let t = q as f64 / 100.0;
+                    if sv.at(a.e + (w.e - a.e) * t, a.n + (w.n - a.n) * t).0 > 0.0 {
+                        hits += 1;
+                    }
+                }
+                a = *w;
+            }
+            hits
+        };
+        let from = (-2_000.0, 0.0);
+        let tank = plan_from(&g, from, (2_000.0, 0.0), VehicleClass::Tracked, MoveModeS::Assault, &[]);
+        assert_eq!(through(&tank, from), 0, "a tank goes round the block: {:?}", tank.waypoints);
+        let foot = plan_from(&g, from, (2_000.0, 0.0), VehicleClass::Foot, MoveModeS::Assault, &[]);
+        assert!(foot.time_s > 0.0, "troops can still go through");
+
+        // On a road, the route is the road's own line, not the cells' centres.
+        let road = ground();
+        let p = plan_from(&road, (-4_000.0, -3_000.0), (3_500.0, -3_000.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
+        let line = &road.road_lines.as_ref().unwrap()[0].line;
+        for w in &p.waypoints[..p.waypoints.len() - 1] {
+            assert!(project(line, (w.e, w.n)).3 < 1.0, "{w:?} is off the road's line");
+        }
     }
 
     #[test]
