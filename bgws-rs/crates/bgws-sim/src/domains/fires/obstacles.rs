@@ -676,7 +676,9 @@ fn digging(s: &mut Sim, st: &mut FiresWorld, dt: f64) {
             continue;
         }
         let a = s.world.get::<Act>(e).expect("a");
-        let (moving, still_s, deciding) = (a.activity.moving(), (now - a.still_since).secs(), a.deciding);
+        // Units start the game settled (`still_since` before zero), but the
+        // question waits for holding the ground in the game itself.
+        let (moving, still_s, deciding) = (a.activity.moving(), (now - a.still_since.max(SimTime::ZERO)).secs(), a.deciding);
         if moving {
             if d.active || d.done || d.worked_s > 0.0 {
                 *s.world.get_mut::<Dig>(e).expect("dig") = Dig { asked: d.asked, ..Dig::default() };

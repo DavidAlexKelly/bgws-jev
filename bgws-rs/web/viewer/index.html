@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BGWS viewer</title>
+<link rel="icon" href="data:,">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
@@ -389,14 +390,32 @@ function questions(qs) {
   const el = document.getElementById("questions");
   el.style.display = qs.length ? "block" : "none";
   el.innerHTML = "";
+  if (!qs.length) return;
+  // The game waits for every answer; each question goes as it is answered.
+  let open = qs.length;
+  const head = document.createElement("div");
+  const count = () => { head.querySelector("b").textContent = `Paused: ${open} question${open === 1 ? "" : "s"} for you`; };
+  head.innerHTML = `<b></b> `;
+  const fallback = (q) => (q.options.some((o) => o.id === q.fallback) ? q.fallback : q.options[0]?.id ?? "keep");
+  const answer = (q, choice, d) => { send({ kind: "answer", question: q.id, choice }); d.remove(); open -= 1; count(); if (!open) { el.style.display = "none"; document.getElementById("status").textContent = "answered: playing on"; } };
+  const all = document.createElement("button");
+  all.textContent = "Use the defaults for all";
+  all.title = "Answer every question with its template's default";
+  head.appendChild(all);
+  el.appendChild(head);
+  count();
+  const rows = [];
   for (const q of qs) {
     const d = document.createElement("div");
     d.innerHTML = `<b>${escapeHtml(q.agent)}</b>: ${escapeHtml(q.title)}<div class="muted">${escapeHtml(q.question)}</div>`;
-    for (const o of q.options) { const b = document.createElement("button"); b.textContent = o.summary || o.id; b.onclick = () => send({ kind: "answer", question: q.id, choice: o.id }); d.appendChild(b); }
+    for (const o of q.options) { const b = document.createElement("button"); b.textContent = (o.summary || o.id) + (o.id === q.fallback ? " (default)" : ""); b.onclick = () => answer(q, o.id, d); d.appendChild(b); }
     // An HQ question is answered with orders from the HQ console, or by keeping those given.
-    if (!q.options.length) { const b = document.createElement("button"); b.textContent = "Keep current orders"; b.onclick = () => send({ kind: "answer", question: q.id, choice: "keep" }); d.appendChild(b); }
+    if (!q.options.length) { const b = document.createElement("button"); b.textContent = "Keep current orders"; b.onclick = () => answer(q, "keep", d); d.appendChild(b); }
     el.appendChild(d);
+    rows.push([q, d]);
   }
+  all.onclick = () => { for (const [q, d] of rows) if (d.isConnected) answer(q, fallback(q), d); };
+  document.getElementById("status").textContent = `paused: ${qs.length} question${qs.length === 1 ? "" : "s"} for you`;
 }
 function inspect(e) {
   const el = document.getElementById("inspect");
