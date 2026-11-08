@@ -805,6 +805,7 @@ dependencies = [
  "bgws-decide",
  "bgws-domains",
  "bgws-env",
+ "bgws-geodata",
  "bgws-models",
  "bgws-ops",
  "bgws-scenario",

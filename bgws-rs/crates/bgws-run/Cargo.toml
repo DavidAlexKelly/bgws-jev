@@ -25,6 +25,7 @@ bgws-models.workspace = true
 bgws-ops.workspace = true
 bgws-domains.workspace = true
 bgws-env.workspace = true
+bgws-geodata.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

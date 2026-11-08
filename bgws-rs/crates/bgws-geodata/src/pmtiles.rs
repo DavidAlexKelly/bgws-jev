@@ -309,12 +309,14 @@ fn find(es: &[Entry], id: u64) -> Option<Entry> {
     }
 }
 
+type LeafCache = Mutex<HashMap<(u64, u32), Arc<Vec<Entry>>>>;
+
 /// An archive open for reading tiles.
 pub struct Reader {
     src: Box<dyn RangeSource>,
     pub header: Header,
     root: Vec<Entry>,
-    leaves: Mutex<HashMap<(u64, u32), Arc<Vec<Entry>>>>,
+    leaves: LeafCache,
 }
 
 impl Reader {

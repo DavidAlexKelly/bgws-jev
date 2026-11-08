@@ -231,6 +231,18 @@ pub struct PackMeta {
     pub power_lines: Option<String>,
     #[serde(default)]
     pub towns: Option<String>,
+    /// A road graph folder (`roads/`: nodes.bin, edges.bin, …) from a real-ground build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub road_graph: Option<String>,
+    /// The viewer's basemap (vector PMTiles) for the pack's area.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basemap: Option<String>,
+    /// The box it was built for, degrees: west, south, east, north.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bbox: Option<[f64; 4]>,
+    /// Where the data came from, with attributions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources: Option<serde_json::Value>,
 }
 
 /// A theatre pack opened from disk, with lazily loaded tiles.
@@ -273,9 +285,19 @@ impl TheatrePack {
             rivers: json("rivers.json", &w.rivers)?,
             power_lines: json("power_lines.json", &w.power_lines)?,
             towns: json("towns.json", &w.towns)?,
+            road_graph: None,
+            basemap: None,
+            bbox: None,
+            sources: None,
         };
         std::fs::write(dir.join("pack.json"), serde_json::to_vec_pretty(&meta)?)?;
         Ok(meta)
+    }
+
+    /// Rewrite `pack.json` (after adding a road graph, a basemap or sources).
+    pub fn write_meta(dir: &Path, meta: &PackMeta) -> Result<(), TileError> {
+        std::fs::write(dir.join("pack.json"), serde_json::to_vec_pretty(meta)?)?;
+        Ok(())
     }
 
     /// Open a pack: reads `pack.json` only.

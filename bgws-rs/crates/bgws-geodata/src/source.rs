@@ -108,8 +108,11 @@ impl RangeSource for HttpSource {
             }
         }
         let b = self.fetch(offset, len)?;
-        // Write then rename, so a parallel reader never sees half a range.
-        let tmp = dir.join(format!("{offset}-{len}.{:x}.part", std::process::id()));
+        // Write then rename, so a parallel reader never sees half a range; two
+        // threads fetching the same range each write their own part file.
+        static PART: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = PART.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp = dir.join(format!("{offset}-{len}.{:x}-{n}.part", std::process::id()));
         std::fs::write(&tmp, &b)?;
         std::fs::rename(&tmp, &file)?;
         Ok(b)

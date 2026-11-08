@@ -4,10 +4,15 @@
 //! build gives elevation. A build fetches only the tiles its box needs and
 //! keeps them in a disk cache.
 
+pub mod build;
 pub mod elevation;
+pub mod fill;
 pub mod mercator;
 pub mod mvt;
+pub mod pack;
 pub mod pmtiles;
+pub mod preview;
+pub mod roads;
 pub mod source;
 
 #[derive(Debug, thiserror::Error)]
