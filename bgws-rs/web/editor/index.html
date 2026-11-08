@@ -52,7 +52,7 @@
     <label>Ground <select id="ground"><option value="generated">generated</option><option value="raster+relief">raster + relief</option><option value="raster">raster</option></select></label>
     <label>Theatre pack <input id="pack" list="pack-list" placeholder="none (folder under packs/)"></label>
     <datalist id="pack-list"></datalist>
-    <button id="pack-centre" title="Move the theatre (origin and forces) to the pack's centre">Move onto the pack</button>
+    <button id="pack-centre" title="Centre the forces on the pack, moving everything in the scenario with them">Move onto the pack</button>
     <label>Origin <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input id="lat" type="number" step="0.001" aria-label="Origin latitude"><input id="lon" type="number" step="0.001" aria-label="Origin longitude"></span></label>
     <h2>Forces</h2>
     <div class="row"><button id="add">Add a force</button><span class="muted" style="color:var(--muted);font-size:12px">Select a row, then click the map to place it.</span></div>
@@ -123,20 +123,35 @@ $("pack").oninput = (e) => { if (e.target.value) sc.theatre.pack = e.target.valu
 $("pack-list").innerHTML = (D.packs || []).map((p) => `<option value="${p.name}"></option>`).join("");
 $("pack-centre").onclick = () => {
   const p = (D.packs || []).find((x) => x.name === $("pack").value);
-  if (!p || !p.bbox) return;
-  // Through the origin fields, so the forces move with it.
-  $("lat").value = ((p.bbox[1] + p.bbox[3]) / 2).toFixed(6);
-  $("lon").value = ((p.bbox[0] + p.bbox[2]) / 2).toFixed(6);
-  $("lat").dispatchEvent(new Event("change"));
+  if (!p || !p.bbox) { status("Pick a pack built by `bgws terrain` (or the viewer's Generate ground) first.", "bad"); return; }
+  // Centre the forces on the pack, moving everything else with them.
+  const fs = sc.forces.length ? sc.forces : [{ position: sc.theatre.origin }];
+  const lats = fs.map((f) => f.position.lat), lons = fs.map((f) => f.position.lon);
+  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2, midLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+  shiftAll((p.bbox[1] + p.bbox[3]) / 2 - midLat, (p.bbox[0] + p.bbox[2]) / 2 - midLon);
+  delete sc.theatre.bounds;
+  const [w, so, e, n] = p.bbox;
+  const out = sc.forces.filter((f) => f.position.lat < so || f.position.lat > n || f.position.lon < w || f.position.lon > e).length;
+  if (out) status(`${out} of the forces fall outside pack ${p.name}: build a bigger box.`, "bad");
+  fill();
 };
-// Moving the origin moves the theatre and every force with it.
+// Every position in the scenario (origin, forces, tasks, lanes, obstacles,
+// measures, areas, victory conditions) moves by the same amount.
+function shiftAll(dLat, dLon) {
+  const walk = (v) => {
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (!v || typeof v !== "object") return;
+    if (typeof v.lat === "number" && typeof v.lon === "number") { v.lat += dLat; v.lon += dLon; }
+    Object.values(v).forEach(walk);
+  };
+  walk(sc);
+  if (sc.theatre.bounds) { const b = sc.theatre.bounds; b.south += dLat; b.north += dLat; b.west += dLon; b.east += dLon; }
+}
+// Moving the origin moves the theatre and everything in it.
 function moveOrigin() {
   const lat = Number($("lat").value), lon = Number($("lon").value);
   if (!isFinite(lat) || !isFinite(lon)) return;
-  const dLat = lat - sc.theatre.origin.lat, dLon = lon - sc.theatre.origin.lon;
-  sc.theatre.origin.lat = lat; sc.theatre.origin.lon = lon;
-  if (sc.theatre.bounds) { const b = sc.theatre.bounds; b.south += dLat; b.north += dLat; b.west += dLon; b.east += dLon; }
-  for (const f of sc.forces) { f.position.lat += dLat; f.position.lon += dLon; }
+  shiftAll(lat - sc.theatre.origin.lat, lon - sc.theatre.origin.lon);
   draw();
 }
 $("lat").onchange = moveOrigin; $("lon").onchange = moveOrigin;

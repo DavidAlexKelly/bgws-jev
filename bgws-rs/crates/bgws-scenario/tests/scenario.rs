@@ -265,3 +265,24 @@ fn figures_register() {
     all.extend(bgws_catalogue::figures());
     assert!(bgws_core::Figures::from_list(all).is_ok());
 }
+
+/// Moving a scenario moves every position in it by the same amount, so its
+/// layout (forces, their routes, obstacles, measures, areas) is kept.
+#[test]
+fn translate_moves_every_position_together() {
+    for s in builtin_scenarios().expect("all parse") {
+        let mut moved = s.clone();
+        moved.translate(0.5, 1.5);
+        let (a, b) = (s.positions(), moved.positions());
+        assert_eq!(a.len(), b.len(), "{}", s.name);
+        for ((ka, pa), (kb, pb)) in a.iter().zip(&b) {
+            assert_eq!(ka, kb);
+            assert!((pb.lat - pa.lat - 0.5).abs() < 1e-9 && (pb.lon - pa.lon - 1.5).abs() < 1e-9, "{}: {ka} did not move", s.name);
+        }
+        assert!((moved.theatre.origin.lat - s.theatre.origin.lat - 0.5).abs() < 1e-9);
+        // Nothing else changes.
+        moved.translate(-0.5, -1.5);
+        let back = |x: &ScenarioV4| x.positions().iter().map(|(k, p)| (k.clone(), (p.lat * 1e6).round(), (p.lon * 1e6).round())).collect::<Vec<_>>();
+        assert_eq!(back(&moved), back(&s), "{}", s.name);
+    }
+}

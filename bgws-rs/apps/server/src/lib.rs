@@ -366,14 +366,11 @@ fn onto_pack(mut sc: bgws_scenario::ScenarioV4, pack: &str) -> Result<bgws_scena
         lon1 = lon1.max(f.position.lon);
     }
     let (mid_lat, mid_lon) = if sc.forces.is_empty() { (sc.theatre.origin.lat, sc.theatre.origin.lon) } else { ((lat0 + lat1) / 2.0, (lon0 + lon1) / 2.0) };
-    let (dlat, dlon) = ((s + n) / 2.0 - mid_lat, (w + e) / 2.0 - mid_lon);
-    let shift = |g: bgws_core::Geodetic| bgws_core::Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
-    sc.theatre.origin = shift(sc.theatre.origin);
+    // Everything moves together: forces, their tasks and lanes, obstacles,
+    // measures, areas and victory conditions.
+    sc.translate((s + n) / 2.0 - mid_lat, (w + e) / 2.0 - mid_lon);
     sc.theatre.bounds = None;
     sc.theatre.pack = Some(pack.to_string());
-    for f in &mut sc.forces {
-        f.position = shift(f.position);
-    }
     let outside = sc.forces.iter().filter(|f| f.position.lat < s || f.position.lat > n || f.position.lon < w || f.position.lon > e).count();
     if outside > 0 {
         return Err(format!("{outside} of the scenario's forces fall outside pack {pack}: build a bigger box"));

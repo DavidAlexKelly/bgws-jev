@@ -249,6 +249,15 @@ roads where they are quicker. Moving vehicles in a shipped scenario on the
 Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
 ground. Generated ground has no road layer.
 
+Moving a scenario onto a pack (New game's *Ground*, or the editor's *Move
+onto the pack*) centres its forces on the pack and moves everything in it
+with them: tasks, lanes, obstacles, measures, areas and victory conditions
+(`ScenarioV4::translate`). The pack must hold the forces. The skirmishes and
+M2 fit a 16 × 12 km box. M3 and the M4 drone line need about 22 × 33 km
+(`--bbox 20.30,54.55,20.65,54.85`). M5–M8 span hundreds of kilometres and
+play on generated ground. A scenario that names a pack it is not on fails
+with a message saying where each is and how to move it.
+
 CI builds a pack with no network: `crates/bgws-geodata/tests/offline.rs`
 writes a small vector archive (two roads meeting at a junction, a wood, a
 lake) and a terrarium elevation archive. It then builds the pack through the
