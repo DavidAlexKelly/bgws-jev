@@ -165,6 +165,12 @@ export function ViewPanel(props: {
   basemap: Basemap;
   onBasemap: (b: Basemap) => void;
   hasPackMap: boolean;
+  /** 3D terrain: on, and whether this game has the elevation for it (a pack's). */
+  threeD: boolean;
+  can3D: boolean;
+  /** Why 3D is off, when it is. */
+  no3D: string;
+  onThreeD: (on: boolean) => void;
   hqOpen: boolean;
   onHq: () => void;
 }) {
@@ -191,6 +197,20 @@ export function ViewPanel(props: {
             {b}
           </button>
         ))}
+      </div>
+      <div className="chips fill">
+        <button
+          className={`chip${props.threeD && props.can3D ? " on" : ""}`}
+          disabled={!props.can3D}
+          onClick={() => props.onThreeD(!props.threeD)}
+          title={
+            props.can3D
+              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks. Right-drag or Ctrl-drag to tilt and turn."
+              : props.no3D
+          }
+        >
+          3D terrain
+        </button>
       </div>
       <button className={`chip${props.hqOpen ? " on" : ""}`} style={{ width: "100%" }} onClick={props.onHq} title="Take a side's HQ seat and give its units orders">
         {props.hqOpen ? "hide" : "show"} the HQ console
@@ -459,8 +479,8 @@ export function Inspector(props: {
       <div className="row" style={{ marginBottom: 6 }}>
         <button className="btn" onClick={() => props.onWhy(u.label ?? u.name)} title="What happened to this unit, with the figures behind it">Why?</button>
         <button className="btn" onClick={() => props.onMessages(u.name)} title="Its latest messages and why each was slow or lost">Messages</button>
-        <button className={`btn${props.viewshedOn ? " on" : ""}`} onClick={() => props.onViewshed(props.viewshedOn ? null : u.name)} title="What it can see over the ground">
-          {props.viewshedOn ? "Hide viewshed" : "Viewshed"}
+        <button className={`btn${props.viewshedOn ? " on" : ""}`} onClick={() => props.onViewshed(props.viewshedOn ? null : u.name)} title="What the selected unit can see over the ground and through woods and towns, how far it looks and how far its weapons reach (kept for every unit you select)">
+          {props.viewshedOn ? "Hide what it sees" : "Show what it sees"}
         </button>
       </div>
       <Line label="type">

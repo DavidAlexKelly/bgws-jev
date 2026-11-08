@@ -295,10 +295,28 @@ impl Ground {
     /// a side (§16 viewshed layer; canopy is per line, in `los`). Returns
     /// the grid's south-west corner, cell size and row-major seen flags.
     pub fn viewshed(&self, at: Enu, agl: f64, range: f64, max_cells: usize) -> Option<(Enu, f64, usize, Vec<bool>)> {
+        self.viewshed_over(at, agl, range, max_cells, false)
+    }
+
+    /// The same over woods and buildings at their canopy or roof height
+    /// (`env.landcover.*.canopy_m`), beyond the observer's own cell: the edge
+    /// of a wood is seen, not into or through it. What the viewer shows.
+    pub fn viewshed_with_cover(&self, at: Enu, agl: f64, range: f64, max_cells: usize) -> Option<(Enu, f64, usize, Vec<bool>)> {
+        self.viewshed_over(at, agl, range, max_cells, true)
+    }
+
+    fn viewshed_over(&self, at: Enu, agl: f64, range: f64, max_cells: usize, cover: bool) -> Option<(Enu, f64, usize, Vec<bool>)> {
         let cell = (2.0 * range / max_cells as f64).max(self.terrain.spec.cell);
         let n = ((2.0 * range / cell).ceil() as usize + 1).max(2);
         let sw = Enu::new(at.e - range, at.n - range, 0.0);
-        let heights: Vec<f32> = (0..n * n).map(|k| self.height(sw.e + (k % n) as f64 * cell, sw.n + (k / n) as f64 * cell) as f32).collect();
+        let clear = cell.max(self.terrain.spec.cell) * 1.5;
+        let heights: Vec<f32> = (0..n * n)
+            .map(|k| {
+                let (e, nn) = (sw.e + (k % n) as f64 * cell, sw.n + (k / n) as f64 * cell);
+                let canopy = if cover && (e - at.e).hypot(nn - at.n) > clear { self.cover.props[self.land_cover(e, nn) as usize].canopy_m } else { 0.0 };
+                (self.height(e, nn) + canopy) as f32
+            })
+            .collect();
         let grid = bgws_gpu::grid::HeightGrid::new(n, n, cell, sw.e, sw.n, heights).ok()?;
         let o = bgws_gpu::viewshed::ViewshedObserver { x: at.e, y: at.n, agl, max_range: range };
         let v = bgws_gpu::viewshed::viewshed_cpu(&grid, &[o], 1.5, &self.optical.los);

@@ -6,7 +6,7 @@
 import type maplibregl from "maplibre-gl";
 
 /** Protomaps' OpenStreetMap layers, drawn dark like the screens around them. */
-export function terrainLayers(source = "base", dem = "base-dem", prefix = "base"): maplibregl.LayerSpecification[] {
+export function terrainLayers(source = "base", dem = "base-dem", prefix = "base", threeD = false): maplibregl.LayerSpecification[] {
   const kind = (k: string[]) => ["in", ["get", "kind"], ["literal", k]] as maplibregl.ExpressionSpecification;
   return [
     { id: `${prefix}-earth`, type: "fill", source, "source-layer": "earth", paint: { "fill-color": "#141c2b" } },
@@ -42,7 +42,22 @@ export function terrainLayers(source = "base", dem = "base-dem", prefix = "base"
     { id: `${prefix}-water`, type: "fill", source, "source-layer": "water", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#0e2740" } },
     { id: `${prefix}-waterway`, type: "line", source, "source-layer": "water", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#1d4a72", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 15, 2] } },
     { id: `${prefix}-hillshade`, type: "hillshade", source: dem, paint: { "hillshade-shadow-color": "#05080f", "hillshade-highlight-color": "#3a4a66", "hillshade-exaggeration": 0.6 } },
-    { id: `${prefix}-buildings`, type: "fill", source, "source-layer": "buildings", minzoom: 13, paint: { "fill-color": "#2a3044", "fill-opacity": 0.8 } },
+    threeD
+      ? {
+          // Blocks at the mapped height (10 m where none is mapped), on the terrain.
+          id: `${prefix}-buildings`,
+          type: "fill-extrusion",
+          source,
+          "source-layer": "buildings",
+          minzoom: 13,
+          paint: {
+            "fill-extrusion-color": "#3a4258",
+            "fill-extrusion-height": ["coalesce", ["get", "height"], 10],
+            "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
+            "fill-extrusion-opacity": 0.9,
+          },
+        }
+      : { id: `${prefix}-buildings`, type: "fill", source, "source-layer": "buildings", minzoom: 13, paint: { "fill-color": "#2a3044", "fill-opacity": 0.8 } },
     { id: `${prefix}-rail`, type: "line", source, "source-layer": "roads", filter: kind(["rail"]), paint: { "line-color": "#4a4f60", "line-width": 1, "line-dasharray": [3, 2] } },
     { id: `${prefix}-paths`, type: "line", source, "source-layer": "roads", minzoom: 13, filter: kind(["path"]), paint: { "line-color": "#353b4c", "line-width": 0.6 } },
     { id: `${prefix}-minor`, type: "line", source, "source-layer": "roads", filter: kind(["minor_road", "other"]), paint: { "line-color": "#454c60", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 16, 2.5] } },

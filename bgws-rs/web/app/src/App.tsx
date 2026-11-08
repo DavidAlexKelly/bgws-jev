@@ -50,6 +50,18 @@ export function App() {
 
   useEffect(() => writePref("layers", [...layers].join(",")), [layers]);
   useEffect(() => writePref("basemap", basemap), [basemap]);
+  // 3D terrain, when the game is on a pack with elevation and the terrain basemap is up.
+  const [threeD, setThreeD] = useState(() => readPref<string>("3d", "off") === "on");
+  useEffect(() => writePref("3d", threeD ? "on" : "off"), [threeD]);
+  const can3D = basemap === "terrain" && !!s.game?.pack?.dem;
+  const no3D =
+    basemap !== "terrain"
+      ? "3D uses the terrain basemap: pick terrain first"
+      : !s.game?.pack
+        ? "3D needs a theatre pack (New game… → Ground): generated ground has no real elevation to show"
+        : "This pack has no elevation map (built before packs carried one): build it again with bgws terrain";
+  const [liftTick, setLiftTick] = useState(0);
+  const onLift = useCallback(() => setLiftTick((t) => t + 1), []);
 
   // The selected unit's details, now and every second and a half while selected.
   useEffect(() => {
@@ -58,6 +70,30 @@ export function App() {
     const timer = window.setInterval(() => send({ kind: "inspect", unit: selected }), 1500);
     return () => window.clearInterval(timer);
   }, [selected, send, s.viewer]);
+
+  // What the selected unit can see: shown as soon as it is picked, and kept
+  // up to date as it moves (worked out again once it has gone 100 m).
+  const [sightOn, setSightOn] = useState(() => readPref<string>("sight", "on") === "on");
+  useEffect(() => writePref("sight", sightOn ? "on" : "off"), [sightOn]);
+  const sightAsked = useRef<{ unit: string; lon: number; lat: number; at: number } | null>(null);
+  const viewerSide = s.viewer === "umpire" ? null : s.viewer;
+  const selectedEntity = selected ? s.frame?.entities.find((x) => x.name === selected) : undefined;
+  const mayLook = !!selectedEntity && (viewerSide === null || selectedEntity.side === viewerSide);
+  useEffect(() => {
+    if (!sightOn || !selectedEntity || !mayLook) {
+      if (s.viewshed) server.clearViewshed();
+      sightAsked.current = null;
+      return;
+    }
+    const last = sightAsked.current;
+    const now = performance.now();
+    const moved = last ? Math.hypot((selectedEntity.lon - last.lon) * 111_320 * Math.cos((last.lat * Math.PI) / 180), (selectedEntity.lat - last.lat) * 111_320) : Infinity;
+    if (!last || last.unit !== selectedEntity.name || (moved > 100 && now - last.at > 1000)) {
+      sightAsked.current = { unit: selectedEntity.name, lon: selectedEntity.lon, lat: selectedEntity.lat, at: now };
+      send({ kind: "viewshed", unit: selectedEntity.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sightOn, selected, mayLook, s.version]);
 
   // A new game or a branch: forget what belonged to the old one.
   const gameName = s.game?.name;
@@ -106,7 +142,7 @@ export function App() {
         : [],
     // The frame object is mutated in place; `version` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.version, s.frame, s.events, s.game, layers, selected, s.unit, s.viewshed, objective, pickOnMap],
+    [s.version, s.frame, s.events, s.game, layers, selected, s.unit, s.viewshed, objective, pickOnMap, liftTick],
   );
 
   const fit = useMemo<[[number, number], [number, number]] | null>(() => {
@@ -135,7 +171,7 @@ export function App() {
 
   return (
     <>
-      <MapView layers={deckLayers} basemap={basemap} pack={s.game?.pack ?? null} onView={setView} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
+      <MapView layers={deckLayers} basemap={basemap} pack={s.game?.pack ?? null} threeD={threeD && can3D} onLift={onLift} onView={setView} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
 
       <div className="header">
         <span className="brand">BGWS</span>
@@ -206,6 +242,10 @@ export function App() {
           basemap={basemap}
           onBasemap={setBasemap}
           hasPackMap={hasPackMap}
+          threeD={threeD}
+          can3D={can3D}
+          no3D={no3D}
+          onThreeD={setThreeD}
           hqOpen={hqOpen}
           onHq={() => setHqOpen((o) => !o)}
         />
@@ -224,11 +264,11 @@ export function App() {
             selected={selected}
             viewer={s.viewer}
             frame={s.frame}
-            viewshedOn={!!s.viewshed && s.viewshed.unit === selected}
+            viewshedOn={sightOn}
             onClose={() => setSelected(null)}
             onWhy={(unit) => send({ kind: "why", unit })}
             onMessages={(unit) => send({ kind: "messages", unit })}
-            onViewshed={(unit) => (unit ? send({ kind: "viewshed", unit }) : server.clearViewshed())}
+            onViewshed={(unit) => setSightOn(!!unit)}
             onDetect={(observer, target) => send({ kind: "detect", observer, target })}
           />
         </div>
