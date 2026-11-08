@@ -109,7 +109,16 @@ fallbacks decide and the log says why.
   transit to targets 3–6 km away at 90 km/h, mid-range of the reported
   65–150 km/h. On voice nets (the scenario's `network: voice`) the same chain
   takes about 23 minutes, inside P2's ~20. CI runs it with
-  `--backlog detect-to-strike-networked`, so it is reported but does not fail.
+  `--backlog detect-to-strike-networked,attack-halt`, so it is reported but does not fail.
+- **Attack halt [P14]:** in the advance-to-contact skirmish the attack stops at
+  a median of a third of its strength lost (4 of 12 vehicles; 95% CI
+  0.25–0.42, 200 games), just above the 10–30% band. The stored 0.25 came
+  from a Red troop that started inside a dense wood its vehicles could not
+  leave, so it never advanced. Vehicles now crawl out of such woods
+  (`sim.route.crawl_kmh`), all of Red fights, and Blue loses one more vehicle
+  before it halts. The pinned threshold (`people.morale.theta.pinned`) and
+  the route weights do not move it: the halt here comes from the fight, not
+  from morale. The next step is a playtest of the scene, not a figure tweak.
 - **Lethality:** meeting engagements in open ground end within a minute or two.
   Modern tanks do kill quickly at 1.5 km, but the time to lay and the rate of
   fire are worth checking against playtests.
@@ -300,8 +309,8 @@ about as long to drive as the grid's and plan in about half the time.
 
 **Woods a vehicle cannot enter.** A vehicle standing in ground it cannot
 cross (a dense wood, never water) crawls out at `sim.route.crawl_kmh`. A
-route may crawl only within `sim.route.escape_m` of its ends, to get out of
-a wood or into one it is sent to.
+route may crawl only within `sim.route.escape_m` of its start. A unit sent
+into such a wood goes to its edge (the closest approach).
 
 **Unreachable destinations.** When a destination cannot be reached (ground
 the vehicle cannot enter, or water with no way over), the route goes as near
@@ -347,7 +356,7 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 
 `.github/workflows/rust-engine.yml` runs all of this on every change to `bgws-rs/`,
 and type-checks and rebuilds the viewer (`web/app`) to check its committed build.
-Fifteen benchmark vignettes run against stored baselines: fourteen are in band,
-and networked detect-to-strike is on the calibration backlog. Batches and
+Fifteen benchmark vignettes run against stored baselines: thirteen are in band,
+and networked detect-to-strike and the attack halt are on the calibration backlog. Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.

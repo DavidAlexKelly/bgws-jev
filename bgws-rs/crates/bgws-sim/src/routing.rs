@@ -67,7 +67,7 @@ pub struct RouteParams {
     pub sight_cell_m: f64,
     /// A vehicle's pace through ground it cannot otherwise cross (not water), km/h.
     pub crawl_kmh: f64,
-    /// How far from either end of a move a route may crawl, m (to get out of, or into, a wood).
+    /// How far from its start a route may crawl, m (out of a wood the vehicle stands in).
     pub escape_m: f64,
     /// Moves longer than this go by the road graph between grid legs at each end, m.
     pub long_m: f64,
@@ -113,7 +113,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
         figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace pushing through ground it cannot otherwise cross (dense wood; never water)"),
-        figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from either end of a move a route may crawl through such ground"),
+        figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from its start a route may crawl through such ground (out of a wood the vehicle stands in)"),
         figure!("sim.route.long_m", 20_000.0, "m", 2_000.0, 1_000_000.0, "default", Default, "moves longer than this go by the road graph, with a grid leg on and off it at each end"),
         figure!("sim.route.access_m", 3_000.0, "m", 200.0, 20_000.0, "default", Default, "how far from each end of a long move it looks for a road node to get on or off at"),
         figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),
@@ -579,13 +579,14 @@ impl Ground {
             }
         }
         let (start, goal) = (cell_of(r.from.e, r.from.n), cell_of(r.to.e, r.to.n));
-        // Near the ends, a vehicle crawls through what it cannot otherwise
-        // cross (out of the wood it stands in, into the one it is sent to);
-        // never through water.
+        // Near the start, a vehicle crawls through what it cannot otherwise
+        // cross (out of the wood it stands in), never through water. A wood
+        // it is sent into is gone to the edge of (the closest approach).
         if p.escape_m > 0.0 && p.crawl_kmh > 0.0 {
             let crawl = 3.6 / p.crawl_kmh;
             let reach = (p.escape_m / step).ceil() as isize;
-            for end in [start, goal] {
+            {
+                let end = start;
                 let (cx, cy) = ((end % w) as isize, (end / w) as isize);
                 for y in (cy - reach).max(0)..=(cy + reach).min(h as isize - 1) {
                     for x in (cx - reach).max(0)..=(cx + reach).min(w as isize - 1) {
