@@ -483,6 +483,14 @@ export function Inspector(props: {
           {props.viewshedOn ? "Hide what it sees" : "Show what it sees"}
         </button>
       </div>
+      {props.viewshedOn && (
+        <div className="subtle" style={{ fontSize: 11, lineHeight: 1.45, margin: "2px 0 6px" }}>
+          <span style={{ color: "#8fb8ff" }}>■</span> in its line of sight: something man-high standing there could be seen.{" "}
+          <span style={{ color: "#5b6070" }}>■</span> hidden from it by a rise, a wood (at canopy height) or buildings. Each square is one 30 m cell.
+          Solid ring: how far its best sensor looks; dashed: how far its weapons reach. In sight is not spotted: whether it actually picks a target out
+          also depends on range, light, weather, the target's cover and movement. Pick an enemy and use <i>Can it see…?</i> for every factor.
+        </div>
+      )}
       <Line label="type">
         {u.platform} · {u.role}
         {u.hq ? " · HQ" : ""}

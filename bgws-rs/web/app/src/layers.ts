@@ -151,7 +151,8 @@ export function buildLayers(args: {
   }
   if (args.viewshed) {
     const v = args.viewshed;
-    out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north] }));
+    // Crisp cells, not a blur: each square is one cell of the grid the sight is worked out on.
+    out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north], textureParameters: { minFilter: "nearest", magFilter: "nearest" } }));
     // Rings round where it stands now: how far it looks, and how far its weapons reach.
     const now = f.entities.find((x) => x.name === v.unit);
     const centre = now ? { lon: now.lon, lat: now.lat } : { lon: v.lon, lat: v.lat };
