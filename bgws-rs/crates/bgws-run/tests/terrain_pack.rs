@@ -81,7 +81,7 @@ fn plans_on_real_ground_never_fall_back_to_a_straight_line() {
             let a = bgws_core::Enu::new(s.origin_e + next() * s.cell * s.width as f64, s.origin_n + next() * s.cell * s.height as f64, 0.0);
             let b = bgws_core::Enu::new(a.e + (next() - 0.5) * 6000.0, a.n + (next() - 0.5) * 6000.0, 0.0);
             if !gg.contains(b) || gg.land_cover(a.e, a.n) == bgws_env::LandCover::Water || gg.land_cover(b.e, b.n) == bgws_env::LandCover::Water { continue; }
-            let r = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Tracked, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 80.0, cross_kmh: 40.0, threats: &[], urgent: false };
+            let r = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Tracked, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 80.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false };
             let p = gg.plan(&r, &gg.route_params);
             road += p.road_m;
             open += p.open_m;

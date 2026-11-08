@@ -58,6 +58,12 @@ pub struct RouteParams {
     pub verge_s: f64,
     /// Time to ford a river the vehicle can cross, s.
     pub ford_s: f64,
+    /// What crossing a known obstacle costs a move without a lane (about a breach), s.
+    pub obstacle_s: f64,
+    /// Heavy-shell craters in a cell that cut the road through it.
+    pub crater_cut: u8,
+    /// Off-road speed lost per crater in a cell: speed / (1 + this × craters).
+    pub crater_slow: f64,
     /// The corridor round a move: at least this far either side, m.
     pub corridor_min_m: f64,
     /// And this fraction of the move's length.
@@ -90,6 +96,9 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
         figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
+        figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),
+        figure!("sim.route.crater_cut", 2.0, "craters", 1.0, 50.0, "default", Default, "heavy-shell (155 mm, 122 mm rocket) craters in a 30 m stretch of road that cut it"),
+        figure!("sim.route.crater_slow", 0.1, "ratio", 0.0, 2.0, "default", Default, "cross-country speed lost per heavy-shell crater in a cell: speed / (1 + this × craters)"),
         figure!("sim.route.corridor_min_m", 1_500.0, "m", 200.0, 20_000.0, "default", Default, "least corridor either side of a planned move"),
         figure!("sim.route.corridor_frac", 0.35, "ratio", 0.05, 2.0, "default", Default, "corridor either side of a planned move, as a fraction of its length"),
         figure!("sim.route.max_cells", 400_000.0, "cells", 10_000.0, 20_000_000.0, "default", Default, "largest search grid before it is thinned"),
@@ -112,6 +121,9 @@ impl RouteParams {
             objective_frac: g("objective_frac"),
             verge_s: g("verge_s"),
             ford_s: g("ford_s"),
+            obstacle_s: g("obstacle_s"),
+            crater_cut: g("crater_cut").round().clamp(1.0, 255.0) as u8,
+            crater_slow: g("crater_slow"),
             corridor_min_m: g("corridor_min_m"),
             corridor_frac: g("corridor_frac"),
             max_cells: g("max_cells") as usize,
@@ -131,9 +143,39 @@ pub struct RouteRequest<'a> {
     pub cross_kmh: f64,
     /// Enemy positions the side believes in (ENU e, n).
     pub threats: &'a [(f64, f64)],
+    /// Obstacles the side knows of (unknown ones are met on the ground, not planned round).
+    pub obstacles: &'a [KnownObstacle],
     /// Time-critical (orders "now", or getting a weapon into range): exposure
     /// counts only near a believed threat, not everywhere.
     pub urgent: bool,
+}
+
+/// An obstacle the moving side knows of (a minefield, ditch or dragon's
+/// teeth): a rectangle `width_m` across its front and `depth_m` deep, its
+/// depth along `bearing` (radians clockwise from north), with the lanes
+/// cleared through it. Crossing one costs about a breach (`obstacle_s`), so a
+/// move goes round it when going round is quicker, through a lane when there
+/// is one, and to its edge to breach when there is no other way.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KnownObstacle {
+    pub e: f64,
+    pub n: f64,
+    pub width_m: f64,
+    pub depth_m: f64,
+    pub bearing: f64,
+    /// Lanes as (position across the front, width), m.
+    pub lanes: Vec<(f64, f64)>,
+    /// Stops troops on foot too (a minefield); ditches and teeth stop vehicles only.
+    pub stops_foot: bool,
+}
+
+impl KnownObstacle {
+    /// (u across the front, v into the depth) of a point.
+    pub fn local(&self, e: f64, n: f64) -> (f64, f64) {
+        let (de, dn) = (e - self.e, n - self.n);
+        let b = self.bearing;
+        (de * b.cos() - dn * b.sin(), de * b.sin() + dn * b.cos())
+    }
 }
 
 fn mode_ix(m: MoveModeS) -> usize {
@@ -231,7 +273,7 @@ impl Ground {
                         continue;
                     }
                     let tk = ts.idx(ti, tj);
-                    if let Some(l) = layer {
+                    if let Some(l) = layer.filter(|_| !self.road_cratered(tk)) {
                         if let Some(g) = l.ground(tk) {
                             if g_road[k].is_none_or(|c| (g.0 as u8) < (c.0 as u8)) {
                                 g_road[k] = Some(g);
@@ -316,6 +358,26 @@ impl Ground {
                 d_spm[k] = dv;
             }
             best_spm = best_spm.min(g_spm[k]).min(d_spm[k]);
+        }
+        // Known obstacles: crossing one without a lane costs about a breach,
+        // spread over its depth (at least a cell and a half, so a thin ditch
+        // is not stepped over between cells).
+        let mut obst = vec![false; n_cells];
+        let foot = r.class == VehicleClass::Foot;
+        let blocking: Vec<(&KnownObstacle, f64)> = r.obstacles.iter().filter(|o| o.stops_foot || !foot).map(|o| (o, o.depth_m.max(step * 1.5))).collect();
+        if !blocking.is_empty() {
+            let half = step * 0.5;
+            for (k, ob) in obst.iter_mut().enumerate() {
+                let (e, n) = pos(k);
+                for &(o, deep) in &blocking {
+                    let (u, v) = o.local(e, n);
+                    if u.abs() > o.width_m / 2.0 + half || v.abs() > deep / 2.0 || o.lanes.iter().any(|&(lu, lw)| (lu - u).abs() <= lw / 2.0 + half) {
+                        continue;
+                    }
+                    *ob = true;
+                    g_spm[k] += p.obstacle_s / deep;
+                }
+            }
         }
         let (start, goal) = (cell_of(r.from.e, r.from.n), cell_of(r.to.e, r.to.n));
         // Where the ends sit in water or a wall, let them out.
@@ -461,7 +523,8 @@ impl Ground {
             let n = ((b.0 - a.0).hypot(b.1 - a.1) / (step * 0.5)).ceil().max(1.0) as usize;
             (0..=n).all(|q| {
                 let t = q as f64 / n as f64;
-                g_spm[cell_of(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)].is_finite()
+                let k = cell_of(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+                g_spm[k].is_finite() && !obst[k]
             })
         };
         let mut out: Vec<usize> = Vec::new();
@@ -570,7 +633,7 @@ mod tests {
             VehicleClass::Wheeled => (90.0, 40.0),
             _ => (60.0, 40.0),
         };
-        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats, urgent: false };
+        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats, obstacles: &[], urgent: false };
         g.plan(&r, &g.route_params)
     }
 
@@ -737,10 +800,66 @@ mod tests {
         assert!(p.road_m > 7_000.0, "{p:?}");
     }
 
+    /// A minefield 2 km across and 200 m deep, east–west across the middle.
+    fn minefield(lanes: Vec<(f64, f64)>, stops_foot: bool) -> KnownObstacle {
+        KnownObstacle { e: 0.0, n: 0.0, width_m: 2_000.0, depth_m: 200.0, bearing: 0.0, lanes, stops_foot }
+    }
+
+    fn plan_past(g: &Ground, class: VehicleClass, obstacles: &[KnownObstacle]) -> Plan {
+        let r = RouteRequest { from: Enu::new(0.0, -3_000.0, 0.0), to: Enu::new(0.0, 3_000.0, 0.0), class, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles, urgent: false };
+        g.plan(&r, &g.route_params)
+    }
+
+    #[test]
+    fn a_known_minefield_is_gone_round_or_through_its_lane() {
+        let g = wooded_edges();
+        let from = (0.0, -3_000.0);
+        // Unknown to the side: straight through (it is met on the ground).
+        let blind = crossing(&plan_past(&g, VehicleClass::Tracked, &[]), from).expect("crosses");
+        assert!(blind.abs() < 100.0, "{blind}");
+        // Known: round an end.
+        let known = crossing(&plan_past(&g, VehicleClass::Tracked, &[minefield(vec![], true)]), from).expect("crosses");
+        assert!(known.abs() >= 1_000.0, "{known}");
+        // With a lane cleared 300 m east of the line: through the lane.
+        let p = plan_past(&g, VehicleClass::Tracked, &[minefield(vec![(300.0, 8.0)], true)]);
+        let lane = crossing(&p, from).expect("crosses");
+        assert!((lane - 300.0).abs() < 40.0, "{lane}");
+        // A ditch stops vehicles, not troops on foot.
+        let ditch = minefield(vec![], false);
+        assert!(crossing(&plan_past(&g, VehicleClass::Foot, std::slice::from_ref(&ditch)), from).expect("crosses").abs() < 100.0);
+        assert!(crossing(&plan_past(&g, VehicleClass::Tracked, &[ditch]), from).expect("crosses").abs() >= 1_000.0);
+    }
+
+    #[test]
+    fn a_belt_with_no_way_round_is_crossed_to_be_breached() {
+        let g = wooded_edges();
+        let belt = KnownObstacle { e: 0.0, n: 0.0, width_m: 30_000.0, depth_m: 300.0, bearing: 0.0, lanes: vec![], stops_foot: true };
+        let p = plan_past(&g, VehicleClass::Tracked, &[belt]);
+        assert_eq!(p.waypoints.last().copied(), Some(Enu::new(0.0, 3_000.0, 0.0)));
+        assert!(crossing(&p, (0.0, -3_000.0)).expect("crosses").abs() < 500.0);
+    }
+
+    #[test]
+    fn heavy_shelling_cuts_a_road_and_slows_the_going() {
+        let mut g = ground();
+        let tracked = VehicleClass::Tracked;
+        let before = g.going(0.0, -3_000.0, tracked).speed_kmh;
+        assert!(g.road_at(0.0, -3_000.0).is_some());
+        g.crater(0.0, -3_000.0);
+        assert!(g.road_at(0.0, -3_000.0).is_some(), "one crater does not cut it");
+        g.crater(0.0, -3_000.0);
+        assert!(g.road_at(0.0, -3_000.0).is_none(), "two do");
+        assert!(g.road_at(30.0, -3_000.0).is_some(), "only there");
+        assert!(g.going(0.0, -3_000.0, tracked).speed_kmh < before);
+        // A wheeled march along it still goes, round the cut.
+        let p = plan_from(&g, (-4_000.0, -3_000.0), (3_500.0, -3_000.0), VehicleClass::Wheeled, MoveModeS::March, &[]);
+        assert!(p.road_m > 6_500.0 && p.open_m > 0.0, "{p:?}");
+    }
+
     #[test]
     fn ends_off_the_ground_go_straight() {
         let g = ground();
-        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], urgent: false };
+        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false };
         assert_eq!(g.plan(&r, &g.route_params).waypoints, vec![Enu::new(50_000.0, 0.0, 0.0)]);
     }
 }

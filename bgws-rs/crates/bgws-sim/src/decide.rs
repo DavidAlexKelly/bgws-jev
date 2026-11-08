@@ -361,7 +361,9 @@ fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, s
     };
     let threats = if seeks { Vec::new() } else { believed_threats(s, i.side) };
     let m = &i.platform.mover;
-    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats, urgent };
+    // Only the obstacles this side knows of: an unknown minefield is met, not avoided.
+    let obstacles: Vec<crate::routing::KnownObstacle> = s.ctx.route_obstacles.iter().filter(|(_, known)| known.contains(&i.side)).map(|(o, _)| o.clone()).collect();
+    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats, obstacles: &obstacles, urgent };
     s.ctx.ground.plan(&r, &s.ctx.ground.route_params).waypoints
 }
 

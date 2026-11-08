@@ -78,6 +78,18 @@ impl ObstacleSt {
         let (u, _) = self.local(p);
         self.lanes.iter().find(|l| (l.u - u).abs() <= l.width_m / 2.0 + slack)
     }
+    /// As the route planner sees it (open lanes only).
+    pub fn for_routing(&self) -> crate::routing::KnownObstacle {
+        crate::routing::KnownObstacle {
+            e: self.centre.e,
+            n: self.centre.n,
+            width_m: self.width_m,
+            depth_m: self.depth_m,
+            bearing: self.bearing,
+            lanes: self.lanes.iter().map(|l| (l.u, l.width_m)).collect(),
+            stops_foot: !self.blocks_vehicles(),
+        }
+    }
     fn blocks_vehicles(&self) -> bool {
         matches!(self.kind, ObstacleKind::Ditch | ObstacleKind::DragonsTeeth)
     }
@@ -185,6 +197,7 @@ pub fn base(s: &mut Sim, st: &mut FiresWorld, dt: f64) {
     if st.obstacles.obstacles.is_empty() {
         return;
     }
+    s.ctx.route_obstacles = st.obstacles.obstacles.iter().map(|o| (o.for_routing(), o.known_to.clone())).collect();
     let now = s.ctx.now;
     let breaching: BTreeSet<EntityId> = st.obstacles.breaches.iter().map(|b| b.by).collect();
     for &e in &s.ctx.order.clone() {

@@ -35,6 +35,8 @@ pub struct Ground {
     /// River depth in each cell a river crosses, m (0 none).
     pub rivers: Option<Arc<Raster<f32>>>,
     pub ford: FordLimits,
+    /// Heavy-shell craters in each cell, once any have landed.
+    pub craters: Option<Arc<Raster<u8>>>,
     pub road_speeds: RoadSpeeds,
     /// The route planner's weights.
     pub route_params: crate::routing::RouteParams,
@@ -90,6 +92,7 @@ impl Ground {
             road_layer: None,
             rivers: None,
             ford: FordLimits::from_figures(figures),
+            craters: None,
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
         }
@@ -151,6 +154,27 @@ impl Ground {
         }
     }
 
+    /// A heavy shell or rocket bursts here: a crater in its cell. Enough of
+    /// them cut the road through the cell (`sim.route.crater_cut`), and each
+    /// slows going across it (`sim.route.crater_slow`).
+    pub fn crater(&mut self, e: f64, n: f64) {
+        let spec = self.terrain.spec;
+        let Some((i, j)) = spec.nearest(e, n) else { return };
+        let r = self.craters.get_or_insert_with(|| Arc::new(Raster::filled(spec, 0u8)));
+        let c = &mut Arc::make_mut(r).data[spec.idx(i, j)];
+        *c = c.saturating_add(1);
+    }
+
+    /// Craters in terrain cell `k`.
+    pub fn craters_in(&self, k: usize) -> u8 {
+        self.craters.as_ref().map(|r| r.data[k]).unwrap_or(0)
+    }
+
+    /// Whether the road through terrain cell `k` is cratered out.
+    pub fn road_cratered(&self, k: usize) -> bool {
+        self.craters_in(k) >= self.route_params.crater_cut
+    }
+
     /// River depth under a point, m (0 where there is none).
     pub fn river_depth(&self, e: f64, n: f64) -> f64 {
         let Some(r) = self.rivers.as_ref() else { return 0.0 };
@@ -162,6 +186,9 @@ impl Ground {
         let l = self.road_layer.as_ref()?;
         let (i, j) = l.spec.nearest(e, n)?;
         let k = l.spec.idx(i, j);
+        if self.road_cratered(k) {
+            return None;
+        }
         l.deck(k).or_else(|| l.ground(k)).map(|(c, _)| c)
     }
 
@@ -188,7 +215,16 @@ impl Ground {
 
     /// Off-road speed factor (0–1) and whether the class is stopped.
     pub fn going(&self, e: f64, n: f64, class: EnvVehicle) -> bgws_env::soil::Trafficability {
-        trafficability(&self.terrain.going(e, n), class, &self.traffic)
+        let mut t = trafficability(&self.terrain.going(e, n), class, &self.traffic);
+        if let Some(r) = self.craters.as_ref() {
+            if let Some((i, j)) = r.spec.nearest(e, n) {
+                let c = r.data[r.spec.idx(i, j)];
+                if c > 0 {
+                    t.speed_kmh /= 1.0 + self.route_params.crater_slow * c as f64;
+                }
+            }
+        }
+        t
     }
 
     fn grid(&self) -> TerrainGrid<'_> {
@@ -229,7 +265,7 @@ impl Ground {
             EnvVehicle::Wheeled => (90.0, 40.0),
             EnvVehicle::Foot => (5.0, 4.0),
         };
-        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[], urgent: false };
+        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[], obstacles: &[], urgent: false };
         self.plan(&r, &self.route_params).waypoints
     }
 

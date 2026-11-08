@@ -274,6 +274,18 @@ overpass is not a junction with the road beneath it.
 `Ground::cut_road(edge)` takes a road's speed and any deck away. Routes
 re-plan round both.
 
+**Obstacles and craters.** A move plans round the minefields, ditches and
+dragon's teeth its side knows of. Crossing one without a lane costs about a
+breach (`sim.route.obstacle_s`, 1 h). So a unit goes round when that is
+quicker, uses a lane when one is open, and goes to the edge to be breached
+when there is no other way. Ditches and teeth stop vehicles only; troops on
+foot cross them. Obstacles the side does not know of are not in the plan: the
+unit meets them on the ground (and the planner leaks nothing to it). Heavy
+rounds (155 mm, 122 mm rockets) crater the cell they land in. Two craters
+(`sim.route.crater_cut`) cut a road through that cell. Each crater also slows
+the going across it (`sim.route.crater_slow`). Both movement and the planner
+see the craters.
+
 **Unreachable destinations.** When a destination cannot be reached (ground
 the vehicle cannot enter, or water with no way over), the route goes as near
 as it can (the wood's edge, the near bank) rather than in a straight line.

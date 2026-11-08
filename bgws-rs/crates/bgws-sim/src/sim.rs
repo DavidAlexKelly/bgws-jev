@@ -145,6 +145,9 @@ pub struct Ctx {
     pub order: Vec<Entity>,
     pub by_name: BTreeMap<String, EntityId>,
     pub seats: BTreeMap<Side, SeatKind>,
+    /// The obstacles on the ground and the sides that know of them, for the
+    /// route planner (refreshed by the engineers' tick).
+    pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,
     pub(crate) reports: Vec<(SimTime, Side, bgws_know::Detection)>,
     pub(crate) last_plan: BTreeMap<Side, Plan>,
@@ -258,6 +261,7 @@ impl Sim {
             order: Vec::new(),
             by_name: BTreeMap::new(),
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
+            route_obstacles: Vec::new(),
             last_asked: BTreeMap::new(),
             reports: Vec::new(),
             last_plan: BTreeMap::new(),
