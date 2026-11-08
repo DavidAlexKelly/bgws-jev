@@ -48,6 +48,9 @@ pub struct RouteParams {
     pub threat_road: [f64; 4],
     /// Radius of a believed threat's reach over roads (direct fire, ATGMs, FPV drones), m.
     pub threat_radius_m: f64,
+    /// Threats this close to the destination (as a fraction of the threat radius)
+    /// are the objective itself, not steered round.
+    pub objective_frac: f64,
     /// The fastest pace exposure is counted at (slower movers count their own time), km/h.
     pub exposure_ref_kmh: f64,
     /// Time to get on or off a road across a verge or ditch, s.
@@ -80,6 +83,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.threat_road.assault", 0.0, "ratio", 0.0, 20.0, "default", Default, "extra road cost next to a believed threat in an assault"),
         figure!("sim.route.threat_road.stealth", 5.0, "ratio", 0.0, 20.0, "default", Default, "extra road cost next to a believed threat when moving by stealth"),
         figure!("sim.route.threat_radius_m", 4_000.0, "m", 500.0, 20_000.0, "default", Default, "reach of a believed threat over roads (direct fire, ATGM, FPV)"),
+        figure!("sim.route.objective_frac", 0.5, "ratio", 0.0, 2.0, "default", Default, "believed threats within this share of the threat radius of a move's destination are its objective, not steered round"),
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
         figure!("sim.route.corridor_min_m", 1_500.0, "m", 200.0, 20_000.0, "default", Default, "least corridor either side of a planned move"),
@@ -101,6 +105,7 @@ impl RouteParams {
             threat_road: [g("threat_road.march"), g("threat_road.tactical"), g("threat_road.assault"), g("threat_road.stealth")],
             threat_radius_m: g("threat_radius_m"),
             exposure_ref_kmh: g("exposure_ref_kmh"),
+            objective_frac: g("objective_frac"),
             verge_s: g("verge_s"),
             corridor_min_m: g("corridor_min_m"),
             corridor_frac: g("corridor_frac"),
@@ -121,6 +126,9 @@ pub struct RouteRequest<'a> {
     pub cross_kmh: f64,
     /// Enemy positions the side believes in (ENU e, n).
     pub threats: &'a [(f64, f64)],
+    /// Time-critical (orders "now", or getting a weapon into range): exposure
+    /// counts only near a believed threat, not everywhere.
+    pub urgent: bool,
 }
 
 fn mode_ix(m: MoveModeS) -> usize {
@@ -196,6 +204,10 @@ impl Ground {
 
         // Seconds per metre in each cell, and whether it is road.
         let (mi, ci) = (mode_ix(r.mode), class_ix(r.class));
+        // The enemy at the destination is what the move closes with: only
+        // threats elsewhere (a flank, a position on the way) are steered round.
+        let keep_clear = p.threat_radius_m * p.objective_frac;
+        let threats: Vec<(f64, f64)> = r.threats.iter().copied().filter(|t| (t.0 - r.to.e).hypot(t.1 - r.to.n) > keep_clear).collect();
         let march = r.mode == MoveModeS::March;
         let r2 = p.threat_radius_m * p.threat_radius_m;
         let mut spm = vec![f64::INFINITY; w * h];
@@ -206,10 +218,10 @@ impl Ground {
         for (k, (cost, is_road)) in spm.iter_mut().zip(on_road.iter_mut()).enumerate() {
             let (e, n) = pos(k);
             // How near the nearest believed threat is: 0 outside its radius, 1 on it.
-            let near = if r.threats.is_empty() {
+            let near = if threats.is_empty() {
                 0.0
             } else {
-                let d2 = r.threats.iter().map(|t| (t.0 - e).powi(2) + (t.1 - n).powi(2)).fold(f64::INFINITY, f64::min);
+                let d2 = threats.iter().map(|t| (t.0 - e).powi(2) + (t.1 - n).powi(2)).fold(f64::INFINITY, f64::min);
                 if d2 < r2 {
                     1.0 - d2.sqrt() / p.threat_radius_m
                 } else {
@@ -217,7 +229,8 @@ impl Ground {
                 }
             };
             // Exposure weight here, per second spent in the open.
-            let exposure = p.exposure[mi] * (p.exposure_baseline[mi] + (1.0 - p.exposure_baseline[mi]) * near);
+            let base = if r.urgent { 0.0 } else { p.exposure_baseline[mi] };
+            let exposure = p.exposure[mi] * (base + (1.0 - base) * near);
             let off = self.going(e, n, r.class).speed_kmh.min(r.cross_kmh);
             let road_kmh = self.road_kmh(e, n, r.class).map(|v| v.min(r.road_kmh));
             let open = if off >= 1.0 {
@@ -417,7 +430,7 @@ mod tests {
             VehicleClass::Wheeled => (90.0, 40.0),
             _ => (60.0, 40.0),
         };
-        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats };
+        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats, urgent: false };
         g.plan(&r, &g.route_params)
     }
 
@@ -498,7 +511,7 @@ mod tests {
     #[test]
     fn ends_off_the_ground_go_straight() {
         let g = ground();
-        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[] };
+        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], urgent: false };
         assert_eq!(g.plan(&r, &g.route_params).waypoints, vec![Enu::new(50_000.0, 0.0, 0.0)]);
     }
 }

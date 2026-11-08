@@ -322,7 +322,20 @@ fn nearest_friend(s: &Sim, e: bevy_ecs::prelude::Entity) -> Option<(EntityId, En
 /// to cover but does not steer away from it.
 pub(crate) fn route_for(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS) -> Vec<Enu> {
     let seeks = seeks_contact(s, e, None);
-    plan_route(s, e, to, mode, seeks)
+    let urgent = is_urgent(s, e, None);
+    plan_route(s, e, to, mode, seeks, urgent)
+}
+
+/// Is this move time-critical: orders "now", or a weapon getting into range (fire support)?
+pub(crate) fn is_urgent(s: &Sim, e: bevy_ecs::prelude::Entity, order: Option<&crate::hq::UnitOrder>) -> bool {
+    let fires = |t: &str| {
+        let t = t.to_lowercase();
+        t.contains("fire support") || t.contains("support by fire") || t.contains("firing position")
+    };
+    if let Some(o) = order {
+        return o.urgency.as_deref() == Some("now") || fires(&o.task);
+    }
+    s.world.get::<Act>(e).is_some_and(|a| a.mission.urgent || fires(&a.mission.purpose))
 }
 
 /// Is this unit out to find the enemy: by its orders (when given), its mission, or its role?
@@ -338,7 +351,7 @@ pub(crate) fn seeks_contact(s: &Sim, e: bevy_ecs::prelude::Entity, order: Option
     s.world.get::<Act>(e).is_some_and(|a| has(&a.mission.purpose)) || s.world.get::<Ident>(e).is_some_and(|i| has(&i.platform.role) || has(&i.platform.class))
 }
 
-fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, seeks: bool) -> Vec<Enu> {
+fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, seeks: bool, urgent: bool) -> Vec<Enu> {
     let k = s.world.get::<Kin>(e).expect("k");
     let i = s.world.get::<Ident>(e).expect("i");
     let class = match i.platform.mover.kind {
@@ -348,7 +361,7 @@ fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, s
     };
     let threats = if seeks { Vec::new() } else { believed_threats(s, i.side) };
     let m = &i.platform.mover;
-    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats };
+    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats, urgent };
     s.ctx.ground.plan(&r, &s.ctx.ground.route_params).waypoints
 }
 
@@ -454,6 +467,7 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
     }
     let own = s.ctx.frame.enu_to_geodetic(s.world.get::<Kin>(e).expect("k").pos);
     let seeks = seeks_contact(s, e, Some(o)) || seeks_contact(s, e, None);
+    let urgent = is_urgent(s, e, Some(o));
     let phases: Vec<Activity> = o
         .phases
         .iter()
@@ -466,8 +480,8 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
                 _ => MoveModeS::Tactical,
             };
             match (ph.action.as_str(), to) {
-                ("move", Some(p)) => Activity::Move { route: plan_route(s, e, p, mode, seeks), mode, then: None },
-                ("withdraw", Some(p)) => Activity::Withdraw { route: plan_route(s, e, p, MoveModeS::Tactical, false), then: None },
+                ("move", Some(p)) => Activity::Move { route: plan_route(s, e, p, mode, seeks, urgent), mode, then: None },
+                ("withdraw", Some(p)) => Activity::Withdraw { route: plan_route(s, e, p, MoveModeS::Tactical, false, urgent), then: None },
                 ("observe", _) => Activity::Observe,
                 ("hold", _) => Activity::Hold,
                 _ => Activity::Overwatch,

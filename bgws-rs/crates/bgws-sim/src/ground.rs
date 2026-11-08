@@ -183,7 +183,7 @@ impl Ground {
             EnvVehicle::Wheeled => (90.0, 40.0),
             EnvVehicle::Foot => (5.0, 4.0),
         };
-        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[] };
+        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[], urgent: false };
         self.plan(&r, &self.route_params).waypoints
     }
 
