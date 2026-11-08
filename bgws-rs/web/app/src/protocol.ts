@@ -138,6 +138,13 @@ export interface Viewshed {
   side: Side;
   cols: number;
   rows: number;
+  /** Grid cell, m; how far it looks (its best sensor), m; its weapons' reach, m. */
+  cellM: number;
+  rangeM: number;
+  weaponM: number;
+  /** Where it stood when this was worked out. */
+  lon: number;
+  lat: number;
   west: number;
   south: number;
   east: number;

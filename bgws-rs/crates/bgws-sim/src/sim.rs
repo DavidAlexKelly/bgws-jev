@@ -594,11 +594,14 @@ impl Sim {
         let (i, k) = (self.world.get::<crate::components::Ident>(e)?, self.world.get::<crate::components::Kin>(e)?);
         let reach = i.platform.sensors.iter().map(|s| s.range_max_m).fold(0.0, f64::max).min(self.ctx.p.sense_max_m).max(500.0);
         let eye = i.platform.sensors.iter().map(|s| s.height_m).fold(2.0, f64::max) + k.agl;
-        let (sw, cell, n, seen) = self.ctx.ground.viewshed(k.pos, eye, reach, max_cells)?;
+        let (sw, cell, n, seen) = self.ctx.ground.viewshed_with_cover(k.pos, eye, reach, max_cells)?;
         let a = self.ctx.frame.enu_to_geodetic(sw);
         let b = self.ctx.frame.enu_to_geodetic(Enu::new(sw.e + cell * (n - 1) as f64, sw.n + cell * (n - 1) as f64, 0.0));
+        let at = self.ctx.frame.enu_to_geodetic(k.pos);
+        // The furthest its weapons reach, for the ring the viewer draws.
+        let weapon = i.platform.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
         let mask: String = seen.iter().map(|&v| if v { '1' } else { '0' }).collect();
-        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "coverage": seen.iter().filter(|v| **v).count() as f64 / seen.len().max(1) as f64 }))
+        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "weaponM": weapon, "lon": at.lon, "lat": at.lat, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "coverage": seen.iter().filter(|v| **v).count() as f64 / seen.len().max(1) as f64 }))
     }
 
     /// Why one unit would see another now, with every factor (truth: for the umpire).

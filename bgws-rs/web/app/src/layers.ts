@@ -55,6 +55,7 @@ function ellipse(t: FrameTrack): [number, number][] {
 }
 
 const viewshedImages = new WeakMap<Viewshed, HTMLCanvasElement>();
+/** Seen ground in the side's colour, hidden ground within reach darkened, beyond reach clear. */
 function viewshedImage(v: Viewshed): HTMLCanvasElement {
   const hit = viewshedImages.get(v);
   if (hit) return hit;
@@ -64,14 +65,20 @@ function viewshedImage(v: Viewshed): HTMLCanvasElement {
   const g = c.getContext("2d")!;
   const img = g.createImageData(v.cols, v.rows);
   const [r, gr, b] = SIDE_RGB[v.side] ?? SIDE_RGB.neutral;
+  const mid = (v.cols - 1) / 2, reach = v.rangeM / Math.max(v.cellM, 1);
   for (let j = 0; j < v.rows; j++)
     for (let i = 0; i < v.cols; i++) {
       // The mask runs from the south-west; images from the top-left.
       const k = ((v.rows - 1 - j) * v.cols + i) * 4;
-      img.data[k] = r;
-      img.data[k + 1] = gr;
-      img.data[k + 2] = b;
-      img.data[k + 3] = v.mask[j * v.cols + i] === "1" ? 80 : 0;
+      if (Math.hypot(i - mid, j - mid) > reach) continue;
+      if (v.mask[j * v.cols + i] === "1") {
+        img.data[k] = r;
+        img.data[k + 1] = gr;
+        img.data[k + 2] = b;
+        img.data[k + 3] = 95;
+      } else {
+        img.data[k + 3] = 125;
+      }
     }
   g.putImageData(img, 0, 0);
   viewshedImages.set(v, c);
@@ -132,6 +139,43 @@ export function buildLayers(args: {
   if (args.viewshed) {
     const v = args.viewshed;
     out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north] }));
+    // Rings round where it stands now: how far it looks, and how far its weapons reach.
+    const at = f.entities.find((x) => x.name === v.unit);
+    const centre = at ? { lon: at.lon, lat: at.lat } : { lon: v.lon, lat: v.lat };
+    const ring = (m: number) => Array.from({ length: 97 }, (_, q) => {
+      const a = (q / 96) * 2 * Math.PI;
+      return [centre.lon + (m * Math.sin(a)) / mLon(centre.lat), centre.lat + (m * Math.cos(a)) / M_LAT] as [number, number];
+    });
+    const [r, gr, b] = SIDE_RGB[v.side] ?? SIDE_RGB.neutral;
+    type Ring = { path: [number, number][]; color: number[]; dash: number[]; label: string };
+    const rings: Ring[] = [{ path: ring(v.rangeM), color: [r, gr, b, 230], dash: [1, 0], label: `sees ${(v.rangeM / 1000).toFixed(1)} km` }];
+    if (v.weaponM > 0) rings.push({ path: ring(v.weaponM), color: [255, 214, 102, 230], dash: [6, 4], label: `weapons ${(v.weaponM / 1000).toFixed(1)} km` });
+    out.push(
+      new PathLayer({
+        id: "viewshed-rings",
+        data: rings,
+        getPath: (d: Ring) => d.path,
+        getColor: (d: Ring) => d.color as [number, number, number, number],
+        getWidth: 2,
+        widthUnits: "pixels",
+        getDashArray: (d: Ring) => d.dash as [number, number],
+        dashJustified: true,
+        extensions: [new PathStyleExtension({ dash: true })],
+      }),
+      new TextLayer({
+        id: "viewshed-ring-labels",
+        data: rings,
+        getPosition: (d: Ring) => d.path[0],
+        getText: (d: Ring) => d.label,
+        getColor: (d: Ring) => d.color as [number, number, number, number],
+        getSize: 12,
+        getPixelOffset: [0, -10],
+        fontFamily: "ui-monospace, monospace",
+        fontSettings: { sdf: true },
+        outlineWidth: 3,
+        outlineColor: [6, 13, 24, 220],
+      }),
+    );
   }
   if (on.has("sensors")) {
     const data = f.sensors.filter((s) => byId.has(s.entity)).map((s) => ({ ...s, poly: footprint(byId.get(s.entity)!, s) }));

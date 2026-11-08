@@ -59,6 +59,30 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [selected, send, s.viewer]);
 
+  // What the selected unit can see: shown as soon as it is picked, and kept
+  // up to date as it moves (worked out again once it has gone 100 m).
+  const [sightOn, setSightOn] = useState(() => readPref<string>("sight", "on") === "on");
+  useEffect(() => writePref("sight", sightOn ? "on" : "off"), [sightOn]);
+  const sightAsked = useRef<{ unit: string; lon: number; lat: number; at: number } | null>(null);
+  const viewerSide = s.viewer === "umpire" ? null : s.viewer;
+  const selectedEntity = selected ? s.frame?.entities.find((x) => x.name === selected) : undefined;
+  const mayLook = !!selectedEntity && (viewerSide === null || selectedEntity.side === viewerSide);
+  useEffect(() => {
+    if (!sightOn || !selectedEntity || !mayLook) {
+      if (s.viewshed) server.clearViewshed();
+      sightAsked.current = null;
+      return;
+    }
+    const last = sightAsked.current;
+    const now = performance.now();
+    const moved = last ? Math.hypot((selectedEntity.lon - last.lon) * 111_320 * Math.cos((last.lat * Math.PI) / 180), (selectedEntity.lat - last.lat) * 111_320) : Infinity;
+    if (!last || last.unit !== selectedEntity.name || (moved > 100 && now - last.at > 1000)) {
+      sightAsked.current = { unit: selectedEntity.name, lon: selectedEntity.lon, lat: selectedEntity.lat, at: now };
+      send({ kind: "viewshed", unit: selectedEntity.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sightOn, selected, mayLook, s.version]);
+
   // A new game or a branch: forget what belonged to the old one.
   const gameName = s.game?.name;
   useEffect(() => {
@@ -224,11 +248,11 @@ export function App() {
             selected={selected}
             viewer={s.viewer}
             frame={s.frame}
-            viewshedOn={!!s.viewshed && s.viewshed.unit === selected}
+            viewshedOn={sightOn}
             onClose={() => setSelected(null)}
             onWhy={(unit) => send({ kind: "why", unit })}
             onMessages={(unit) => send({ kind: "messages", unit })}
-            onViewshed={(unit) => (unit ? send({ kind: "viewshed", unit }) : server.clearViewshed())}
+            onViewshed={(unit) => setSightOn(!!unit)}
             onDetect={(observer, target) => send({ kind: "detect", observer, target })}
           />
         </div>

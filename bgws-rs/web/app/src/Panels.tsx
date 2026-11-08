@@ -459,8 +459,8 @@ export function Inspector(props: {
       <div className="row" style={{ marginBottom: 6 }}>
         <button className="btn" onClick={() => props.onWhy(u.label ?? u.name)} title="What happened to this unit, with the figures behind it">Why?</button>
         <button className="btn" onClick={() => props.onMessages(u.name)} title="Its latest messages and why each was slow or lost">Messages</button>
-        <button className={`btn${props.viewshedOn ? " on" : ""}`} onClick={() => props.onViewshed(props.viewshedOn ? null : u.name)} title="What it can see over the ground">
-          {props.viewshedOn ? "Hide viewshed" : "Viewshed"}
+        <button className={`btn${props.viewshedOn ? " on" : ""}`} onClick={() => props.onViewshed(props.viewshedOn ? null : u.name)} title="What the selected unit can see over the ground and through woods and towns, how far it looks and how far its weapons reach (kept for every unit you select)">
+          {props.viewshedOn ? "Hide what it sees" : "Show what it sees"}
         </button>
       </div>
       <Line label="type">

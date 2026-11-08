@@ -181,12 +181,18 @@ TS real-time screen:
 - **Map:** units as MIL-STD-2525C symbols, with rings for suppressed, pinned
   and broken. Shots by outcome, shell impacts, drone strikes and sightings, as
   they happen. Kill chains, enemy tracks, sensor footprints, jammers and the
-  nets. The selected unit's route.
+  nets. The selected unit's route, and what it can see. Ground it sees is
+  shown in its side's colour, and hidden ground within reach is darkened:
+  dead ground behind rises, and woods and towns at their canopy or roof
+  height, so it sees the edge of a wood but not into it. A solid ring shows
+  how far its best sensor looks, and a dashed ring how far its weapons reach.
+  The view follows the unit as it moves. *Hide what it sees* turns it off, and
+  the choice is remembered. A side's view shows only its own units' sight.
 - **Right pane:** the decisions waiting for you, when you hold a side
   (`--person`), with the rules' pick and the default marked. A feed you can
   filter, where a decision opens on its options and who chose. The selected
   unit's orders and phases, people, weapons and what it knows, with *Why?*,
-  *Messages*, *Viewshed* and *Can it see…?*
+  *Messages*, *Show what it sees* and *Can it see…?*
 - **Elsewhere:** the HQ console (a side's seat, an objective and a task per
   unit), the spectrum strip, the after-action review, the end-of-game card,
   and *New game…* (any shipped scenario).
