@@ -165,6 +165,12 @@ export function ViewPanel(props: {
   basemap: Basemap;
   onBasemap: (b: Basemap) => void;
   hasPackMap: boolean;
+  /** 3D terrain: on, and whether this game has the elevation for it (a pack's). */
+  threeD: boolean;
+  can3D: boolean;
+  /** Why 3D is off, when it is. */
+  no3D: string;
+  onThreeD: (on: boolean) => void;
   hqOpen: boolean;
   onHq: () => void;
 }) {
@@ -191,6 +197,20 @@ export function ViewPanel(props: {
             {b}
           </button>
         ))}
+      </div>
+      <div className="chips fill">
+        <button
+          className={`chip${props.threeD && props.can3D ? " on" : ""}`}
+          disabled={!props.can3D}
+          onClick={() => props.onThreeD(!props.threeD)}
+          title={
+            props.can3D
+              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks. Right-drag or Ctrl-drag to tilt and turn."
+              : props.no3D
+          }
+        >
+          3D terrain
+        </button>
       </div>
       <button className={`chip${props.hqOpen ? " on" : ""}`} style={{ width: "100%" }} onClick={props.onHq} title="Take a side's HQ seat and give its units orders">
         {props.hqOpen ? "hide" : "show"} the HQ console

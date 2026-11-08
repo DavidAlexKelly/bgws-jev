@@ -188,6 +188,16 @@ TS real-time screen:
   how far its best sensor looks, and a dashed ring how far its weapons reach.
   The view follows the unit as it moves. *Hide what it sees* turns it off, and
   the choice is remembered. A side's view shows only its own units' sight.
+- **3D terrain:** on a theatre pack, the *3D terrain* button (under the
+  basemaps) drapes the map over the pack's own elevation. It is the same
+  ground the game is played on, stretched ×1.5 upright because most theatres
+  are low. It tilts the view, and buildings stand up as blocks at their mapped
+  height (10 m where none is mapped). Units, tracks, shots and rings sit on
+  the ground; drones and aircraft keep their height. Right-drag or Ctrl-drag
+  to tilt and turn. Generated ground has no real elevation to show, so 3D is
+  only offered on a pack, and only one built with an elevation map
+  (`dem.pmtiles`; build an older pack again). The editor has the same
+  *3D terrain* box.
 - **Right pane:** the decisions waiting for you, when you hold a side
   (`--person`), with the rules' pick and the default marked. A feed you can
   filter, where a decision opens on its options and who chose. The selected

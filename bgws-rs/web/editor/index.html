@@ -60,6 +60,7 @@
     <label>Theatre pack <input id="pack" list="pack-list" placeholder="none (folder under packs/)"></label>
     <datalist id="pack-list"></datalist>
     <button id="pack-centre" title="Centre the forces on the pack, moving everything in the scenario with them">Move onto the pack</button>
+    <label title="The pack's elevation as 3D terrain (×1.5) and buildings as blocks: right-drag or Ctrl-drag to tilt and turn">3D terrain <input id="threed" type="checkbox" style="justify-self:start"></label>
     <label>Origin <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input id="lat" type="number" step="0.001" aria-label="Origin latitude"><input id="lon" type="number" step="0.001" aria-label="Origin longitude"></span></label>
     <h2>Forces</h2>
     <div class="row"><button id="add">Add a force</button><span class="muted" style="color:var(--muted);font-size:12px">Select a row, then click the map to place it.</span></div>
@@ -240,16 +241,27 @@ map.on("load", () => {
 let shownPack = null;
 function showPack() {
   const name = sc.theatre.pack || null;
-  if (!mapReady || name === shownPack) return;
+  const key = `${name}|${$("threed").checked}`;
+  if (!mapReady || key === shownPack) return;
+  if (map.getTerrain()) map.setTerrain(null);
   for (const l of map.getStyle().layers) if (l.id.startsWith("pack-") && l.id !== "pack-line") map.removeLayer(l.id);
-  for (const id of ["pack", "pack-dem"]) if (map.getSource(id)) map.removeSource(id);
-  shownPack = name;
+  for (const id of ["pack", "pack-dem", "pack-terrain"]) if (map.getSource(id)) map.removeSource(id);
+  shownPack = key;
   const p = (D.packs || []).find((x) => x.name === name);
+  $("threed").disabled = !(p && p.dem);
+  $("threed").parentElement.title = p && p.dem ? "The pack's elevation as 3D terrain (×1.5) and buildings as blocks: right-drag or Ctrl-drag to tilt and turn" : "3D needs a pack with an elevation map: pick one, or build it again with bgws terrain";
   if (!p || !p.basemap) return;
+  const solid = $("threed").checked && !!p.dem;
   map.addSource("pack", { type: "vector", url: abs(p.basemap), attribution: "© OpenStreetMap contributors · Protomaps" });
   if (p.dem) map.addSource("pack-dem", { type: "raster-dem", url: abs(p.dem), encoding: "terrarium", tileSize: 512 });
-  for (const l of terrainLayers("pack", "pack-dem", "pack")) if (l.id !== "pack-hillshade" || p.dem) map.addLayer(l, "packs-line");
+  for (const l of terrainLayers("pack", "pack-dem", "pack", solid)) if (l.id !== "pack-hillshade" || p.dem) map.addLayer(l, "packs-line");
+  if (solid) {
+    map.addSource("pack-terrain", { type: "raster-dem", url: abs(p.dem), encoding: "terrarium", tileSize: 512 });
+    map.setTerrain({ source: "pack-terrain", exaggeration: 1.5 });
+    if (map.getPitch() < 30) map.easeTo({ pitch: 55, duration: 800 });
+  } else if (map.getPitch() > 0) map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
 }
+$("threed").onchange = () => showPack();
 
 // Place names, drawn on a canvas over the map (no glyph server needed).
 const LABEL_KINDS = { country: 0, region: 1, locality: 2 };

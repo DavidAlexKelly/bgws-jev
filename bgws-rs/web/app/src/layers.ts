@@ -54,6 +54,19 @@ function ellipse(t: FrameTrack): [number, number][] {
   return pts;
 }
 
+/** In 3D, the terrain's height under a point (MapView sets it from MapLibre's
+ *  terrain, exaggeration included); flat, none. */
+let terrainZ: ((lon: number, lat: number) => number) | null = null;
+/** How much the 3D terrain is stretched upright (the theatres are mostly low and flat). */
+export const TERRAIN_EXAGGERATION = 1.5;
+export function setTerrainZ(f: ((lon: number, lat: number) => number) | null) {
+  terrainZ = f;
+}
+/** A position on the ground: lifted onto the terrain in 3D, a few metres up so it is not buried. */
+const at = (lon: number, lat: number): [number, number] | [number, number, number] => (terrainZ ? [lon, lat, terrainZ(lon, lat) + 4] : [lon, lat]);
+/** A line on the ground, each point lifted in 3D. */
+const onGround = (path: [number, number][]) => (terrainZ ? path.map(([lon, lat]) => at(lon, lat)) : path);
+
 const viewshedImages = new WeakMap<Viewshed, HTMLCanvasElement>();
 /** Seen ground in the side's colour, hidden ground within reach darkened, beyond reach clear. */
 function viewshedImage(v: Viewshed): HTMLCanvasElement {
@@ -112,7 +125,7 @@ export function buildLayers(args: {
     new PathLayer({
       id,
       data: data.filter((s) => s.dashed === dashed),
-      getPath: (s: Shot) => [s.from, s.to],
+      getPath: (s: Shot) => onGround([s.from, s.to]),
       getColor: (s: Shot) => s.colour,
       getWidth: (s: Shot) => s.width,
       widthUnits: "pixels",
@@ -124,7 +137,7 @@ export function buildLayers(args: {
       new TextLayer({
         id: "places",
         data: args.towns,
-        getPosition: (t: { lon: number; lat: number }) => [t.lon, t.lat],
+        getPosition: (t: { lon: number; lat: number }) => at(t.lon, t.lat),
         getText: (t: { name: string }) => t.name,
         getSize: (t: { radiusM: number }) => (t.radiusM >= 4000 ? 15 : t.radiusM >= 1500 ? 13 : 11),
         getColor: [199, 204, 219, 200],
@@ -140,8 +153,8 @@ export function buildLayers(args: {
     const v = args.viewshed;
     out.push(new BitmapLayer({ id: "viewshed", image: viewshedImage(v), bounds: [v.west, v.south, v.east, v.north] }));
     // Rings round where it stands now: how far it looks, and how far its weapons reach.
-    const at = f.entities.find((x) => x.name === v.unit);
-    const centre = at ? { lon: at.lon, lat: at.lat } : { lon: v.lon, lat: v.lat };
+    const now = f.entities.find((x) => x.name === v.unit);
+    const centre = now ? { lon: now.lon, lat: now.lat } : { lon: v.lon, lat: v.lat };
     const ring = (m: number) => Array.from({ length: 97 }, (_, q) => {
       const a = (q / 96) * 2 * Math.PI;
       return [centre.lon + (m * Math.sin(a)) / mLon(centre.lat), centre.lat + (m * Math.cos(a)) / M_LAT] as [number, number];
@@ -154,7 +167,7 @@ export function buildLayers(args: {
       new PathLayer({
         id: "viewshed-rings",
         data: rings,
-        getPath: (d: Ring) => d.path,
+        getPath: (d: Ring) => onGround(d.path),
         getColor: (d: Ring) => d.color as [number, number, number, number],
         getWidth: 2,
         widthUnits: "pixels",
@@ -165,7 +178,7 @@ export function buildLayers(args: {
       new TextLayer({
         id: "viewshed-ring-labels",
         data: rings,
-        getPosition: (d: Ring) => d.path[0],
+        getPosition: (d: Ring) => at(...d.path[0]),
         getText: (d: Ring) => d.label,
         getColor: (d: Ring) => d.color as [number, number, number, number],
         getSize: 12,
@@ -197,7 +210,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "jammers",
         data: f.emitters.filter((x) => x.kind === "jammer"),
-        getPosition: (j: { lon: number; lat: number }) => [j.lon, j.lat],
+        getPosition: (j: { lon: number; lat: number }) => at(j.lon, j.lat),
         getRadius: (j: { radius_m: number }) => j.radius_m,
         radiusUnits: "meters",
         filled: true,
@@ -209,7 +222,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "emitters",
         data: f.emitters.filter((x) => x.kind !== "jammer"),
-        getPosition: (x: { lon: number; lat: number }) => [x.lon, x.lat],
+        getPosition: (x: { lon: number; lat: number }) => at(x.lon, x.lat),
         getRadius: 13,
         radiusUnits: "pixels",
         filled: false,
@@ -225,8 +238,8 @@ export function buildLayers(args: {
       new LineLayer({
         id: "nets",
         data,
-        getSourcePosition: (l: { from: number }) => [byId.get(l.from)!.lon, byId.get(l.from)!.lat],
-        getTargetPosition: (l: { to: number }) => [byId.get(l.to)!.lon, byId.get(l.to)!.lat],
+        getSourcePosition: (l: { from: number }) => at(byId.get(l.from)!.lon, byId.get(l.from)!.lat),
+        getTargetPosition: (l: { to: number }) => at(byId.get(l.to)!.lon, byId.get(l.to)!.lat),
         getColor: (l: { up: boolean; side: "blue" | "red" }) => (l.up ? [...SIDE_RGB[l.side], 130] : [120, 120, 110, 110]),
         getWidth: (l: { traffic: number }) => 1 + Math.min(4, l.traffic),
         widthUnits: "pixels",
@@ -249,7 +262,7 @@ export function buildLayers(args: {
       new IconLayer({
         id: "track-icons",
         data: f.tracks,
-        getPosition: (t: FrameTrack) => [t.lon, t.lat],
+        getPosition: (t: FrameTrack) => at(t.lon, t.lat),
         getIcon: (t: FrameTrack) => trackIcon(t.owner, t.class),
         getSize: 28,
         pickable: true,
@@ -263,7 +276,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "wrecks",
         data: ov.wrecks,
-        getPosition: (m: Mark) => m.at,
+        getPosition: (m: Mark) => at(m.at[0], m.at[1]),
         getRadius: (m: Mark) => m.radius,
         radiusUnits: "pixels",
         getFillColor: (m: Mark) => m.colour,
@@ -276,7 +289,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "marks",
         data: ov.marks,
-        getPosition: (m: Mark) => m.at,
+        getPosition: (m: Mark) => at(m.at[0], m.at[1]),
         getRadius: (m: Mark) => m.radius,
         radiusUnits: "pixels",
         filled: true,
@@ -293,8 +306,8 @@ export function buildLayers(args: {
       new LineLayer({
         id: "chain-cue",
         data: chains.filter((c) => c.sensor != null && byId.has(c.sensor)),
-        getSourcePosition: (c: { sensor: number }) => [byId.get(c.sensor)!.lon, byId.get(c.sensor)!.lat],
-        getTargetPosition: (c: { shooter: number }) => [byId.get(c.shooter)!.lon, byId.get(c.shooter)!.lat],
+        getSourcePosition: (c: { sensor: number }) => at(byId.get(c.sensor)!.lon, byId.get(c.sensor)!.lat),
+        getTargetPosition: (c: { shooter: number }) => at(byId.get(c.shooter)!.lon, byId.get(c.shooter)!.lat),
         getColor: [196, 181, 253, 150],
         getWidth: 1,
         widthUnits: "pixels",
@@ -303,8 +316,8 @@ export function buildLayers(args: {
         id: "chain-fire",
         data: chains,
         pickable: true,
-        getSourcePosition: (c: { shooter: number }) => [byId.get(c.shooter)!.lon, byId.get(c.shooter)!.lat],
-        getTargetPosition: (c: { aim_lon: number; aim_lat: number }) => [c.aim_lon, c.aim_lat],
+        getSourcePosition: (c: { shooter: number }) => at(byId.get(c.shooter)!.lon, byId.get(c.shooter)!.lat),
+        getTargetPosition: (c: { aim_lon: number; aim_lat: number }) => at(c.aim_lon, c.aim_lat),
         getColor: (c: { side: "blue" | "red" }) => [...SIDE_RGB[c.side], 220],
         getWidth: 2.5,
         widthUnits: "pixels",
@@ -312,7 +325,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "chain-aim",
         data: chains,
-        getPosition: (c: { aim_lon: number; aim_lat: number }) => [c.aim_lon, c.aim_lat],
+        getPosition: (c: { aim_lon: number; aim_lat: number }) => at(c.aim_lon, c.aim_lat),
         getRadius: 9,
         radiusUnits: "pixels",
         filled: false,
@@ -330,7 +343,7 @@ export function buildLayers(args: {
       new PathLayer({
         id: "route",
         data: [{ path: [[sel.lon, sel.lat], ...route] }],
-        getPath: (r: { path: [number, number][] }) => r.path,
+        getPath: (r: { path: [number, number][] }) => onGround(r.path),
         getColor: [255, 255, 255, 200],
         getWidth: 2,
         widthUnits: "pixels",
@@ -344,7 +357,7 @@ export function buildLayers(args: {
       new ScatterplotLayer({
         id: "objective",
         data: [args.objective],
-        getPosition: (o: { lon: number; lat: number }) => [o.lon, o.lat],
+        getPosition: (o: { lon: number; lat: number }) => at(o.lon, o.lat),
         getRadius: 12,
         radiusUnits: "pixels",
         filled: true,
@@ -361,7 +374,7 @@ export function buildLayers(args: {
     new ScatterplotLayer({
       id: "status",
       data: ground.filter((e) => STATUS_RING[e.status]),
-      getPosition: (e: FrameEntity) => [e.lon, e.lat],
+      getPosition: (e: FrameEntity) => at(e.lon, e.lat),
       getRadius: 21,
       radiusUnits: "pixels",
       filled: false,
@@ -372,7 +385,7 @@ export function buildLayers(args: {
     new ScatterplotLayer({
       id: "selected",
       data: sel ? [sel] : [],
-      getPosition: (e: FrameEntity) => [e.lon, e.lat],
+      getPosition: (e: FrameEntity) => at(e.lon, e.lat),
       getRadius: 25,
       radiusUnits: "pixels",
       filled: true,
@@ -384,7 +397,8 @@ export function buildLayers(args: {
     new IconLayer({
       id: "drones",
       data: drones,
-      getPosition: (e: FrameEntity) => [e.lon, e.lat],
+      // Flying: at its own height (exaggerated like the terrain), never below the ground.
+      getPosition: (e: FrameEntity) => (terrainZ ? [e.lon, e.lat, Math.max(terrainZ(e.lon, e.lat) + 4, e.alt * TERRAIN_EXAGGERATION)] : [e.lon, e.lat]),
       getIcon: unitIcon,
       getSize: 20,
       pickable: true,
@@ -392,7 +406,7 @@ export function buildLayers(args: {
     new IconLayer({
       id: "units",
       data: ground,
-      getPosition: (e: FrameEntity) => [e.lon, e.lat],
+      getPosition: (e: FrameEntity) => at(e.lon, e.lat),
       getIcon: unitIcon,
       getSize: 34,
       pickable: true,
@@ -408,7 +422,7 @@ export function buildLayers(args: {
       new TextLayer({
         id: "labels",
         data: ground,
-        getPosition: (e: FrameEntity) => [e.lon, e.lat],
+        getPosition: (e: FrameEntity) => at(e.lon, e.lat),
         getText: (e: FrameEntity) => e.label || e.name,
         getSize: 11,
         getPixelOffset: [0, 30],
