@@ -188,6 +188,13 @@ TS real-time screen:
   how far its best sensor looks, and a dashed ring how far its weapons reach.
   The view follows the unit as it moves. *Hide what it sees* turns it off, and
   the choice is remembered. A side's view shows only its own units' sight.
+  The squares are the 30 m cells it is worked out on, for a man-high target.
+  In sight is not spotted: whether a unit picks a target out also depends on
+  range, light, weather and the target's cover and movement (*Can it see…?*
+  gives every factor). The shading treats woods and buildings as solid walls.
+  The game's own sight lines are softer: each 100 m through them has a chance
+  of being blocked (`env.landcover.*.los_block_per_100m`). So the dark is a
+  cautious picture in light woods and suburbs.
 - **3D terrain:** on a theatre pack, the *3D terrain* button (under the
   basemaps) drapes the map over the pack's own elevation. It is the same
   ground the game is played on, stretched ×1.5 upright because most theatres

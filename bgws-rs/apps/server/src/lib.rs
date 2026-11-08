@@ -650,7 +650,7 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     let id = host.sim.ctx.by_name.get(&unit).copied();
                     let side = id.and_then(|id| host.sim.world.get::<bgws_sim::components::Ident>(host.sim.ctx.entity(id)).map(|i| i.side));
                     match id {
-                        Some(id) if viewer.side().is_none_or(|v| Some(v) == side) => match host.sim.viewshed(id, 160) {
+                        Some(id) if viewer.side().is_none_or(|v| Some(v) == side) => match host.sim.viewshed(id, 320) {
                             Some(mut v) => {
                                 v["kind"] = json!("viewshed");
                                 v["unit"] = json!(unit);
@@ -957,13 +957,13 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
     // Fail early if the editor's data does not load; it is rebuilt per request (new templates appear).
     bgws_run::editor::html(&scenarios_dir())?;
     let app = Router::new()
-        .route("/", get(|| async { Html(APP_HTML) }))
-        .route("/app.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")], APP_JS) }))
-        .route("/app.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], APP_CSS) }))
+        .route("/", get(|| async { ([(axum::http::header::CACHE_CONTROL, "no-cache")], Html(APP_HTML)) }))
+        .route("/app.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-cache")], APP_JS) }))
+        .route("/app.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-cache")], APP_CSS) }))
         .route("/classic", get(|| async { Html(CLASSIC) }))
         .route("/packs/:pack/*file", get(pack_file))
-        .route("/map.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")], MAP_JS) }))
-        .route("/map.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], MAP_CSS) }))
+        .route("/map.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-cache")], MAP_JS) }))
+        .route("/map.css", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-cache")], MAP_CSS) }))
         .route("/world.pmtiles", get(world_file))
         .route("/behaviour", get(behaviour_page))
         .route("/api/behaviour", get(behaviour_data))
