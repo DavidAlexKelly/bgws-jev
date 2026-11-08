@@ -94,11 +94,13 @@ pub struct SimOptions {
     pub roads: Option<Vec<bgws_env::RoadLine>>,
     /// The pack's rivers, in the scenario's frame: crossed at bridges or where shallow enough to ford.
     pub rivers: Option<Vec<bgws_env::River>>,
+    /// The pack's buildings and woods on a fine grid: sight lines are traced through them.
+    pub sight: Option<bgws_env::SightView>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, sight: None }
     }
 }
 
@@ -216,6 +218,9 @@ impl Sim {
         }
         if let Some(r) = &opts.rivers {
             ground = ground.with_rivers(r);
+        }
+        if let Some(v) = &opts.sight {
+            ground.sight = Some(v.clone());
         }
         let start = UtcDateTime::parse(&scenario.start_utc).map_err(|e| LoadError::StartTime(format!("{e:?}")))?;
         let wspec = bgws_env::GridSpec::new(4, 4, half * 2.0 / 3.0, -half, -half);
@@ -594,14 +599,16 @@ impl Sim {
         let (i, k) = (self.world.get::<crate::components::Ident>(e)?, self.world.get::<crate::components::Kin>(e)?);
         let reach = i.platform.sensors.iter().map(|s| s.range_max_m).fold(0.0, f64::max).min(self.ctx.p.sense_max_m).max(500.0);
         let eye = i.platform.sensors.iter().map(|s| s.height_m).fold(2.0, f64::max) + k.agl;
-        let (sw, cell, n, seen) = self.ctx.ground.viewshed_with_cover(k.pos, eye, reach, max_cells)?;
+        let (sw, cell, n, chance) = self.ctx.ground.sight_map(k.pos, eye, reach, max_cells);
         let a = self.ctx.frame.enu_to_geodetic(sw);
         let b = self.ctx.frame.enu_to_geodetic(Enu::new(sw.e + cell * (n - 1) as f64, sw.n + cell * (n - 1) as f64, 0.0));
         let at = self.ctx.frame.enu_to_geodetic(k.pos);
         // The furthest its weapons reach, for the ring the viewer draws.
         let weapon = i.platform.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| self.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
-        let mask: String = seen.iter().map(|&v| if v { '1' } else { '0' }).collect();
-        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "weaponM": weapon, "lon": at.lon, "lat": at.lat, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "coverage": seen.iter().filter(|v| **v).count() as f64 / seen.len().max(1) as f64 }))
+        // Each cell's chance of a clear line, in tenths ('0'..'9', '9' for 0.85 and up).
+        let mask: String = chance.iter().map(|&v| char::from(b'0' + ((v * 10.0 - 0.5).round().clamp(0.0, 9.0) as u8))).collect();
+        let fine = self.ctx.ground.sight.as_ref().map(|s| s.cell());
+        Some(serde_json::json!({ "cols": n, "rows": n, "cellM": cell, "rangeM": reach, "weaponM": weapon, "lon": at.lon, "lat": at.lat, "west": a.lon, "south": a.lat, "east": b.lon, "north": b.lat, "mask": mask, "surfaceM": fine, "coverage": chance.iter().filter(|v| **v >= 0.5).count() as f64 / chance.len().max(1) as f64 }))
     }
 
     /// Why one unit would see another now, with every factor (truth: for the umpire).

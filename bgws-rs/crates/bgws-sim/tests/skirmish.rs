@@ -92,5 +92,7 @@ fn viewsheds_follow_the_ground() {
     assert!(rc < fc && rc > 0.0, "hills hide some ({rc})");
     let n = r["cols"].as_u64().unwrap() as usize;
     assert_eq!(r["mask"].as_str().unwrap().len(), n * n);
-    assert_eq!(&r["mask"].as_str().unwrap()[(n / 2) * n + n / 2..][..1], "1", "it sees where it stands");
+    // Each cell's chance of a clear line in tenths: '9' is clear, '0' hidden.
+    assert_eq!(&r["mask"].as_str().unwrap()[(n / 2) * n + n / 2..][..1], "9", "it sees where it stands");
+    assert!(r["mask"].as_str().unwrap().bytes().all(|b| b.is_ascii_digit()));
 }

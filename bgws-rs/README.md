@@ -181,20 +181,20 @@ TS real-time screen:
 - **Map:** units as MIL-STD-2525C symbols, with rings for suppressed, pinned
   and broken. Shots by outcome, shell impacts, drone strikes and sightings, as
   they happen. Kill chains, enemy tracks, sensor footprints, jammers and the
-  nets. The selected unit's route, and what it can see. Ground it sees is
-  shown in its side's colour, and hidden ground within reach is darkened:
-  dead ground behind rises, and woods and towns at their canopy or roof
-  height, so it sees the edge of a wood but not into it. A solid ring shows
-  how far its best sensor looks, and a dashed ring how far its weapons reach.
-  The view follows the unit as it moves. *Hide what it sees* turns it off, and
+  nets. The selected unit's route, and what it can see: the game's own sight
+  lines from it to a man-high target in every cell around it, so the map
+  shows exactly what the game uses. Bright cells have a clear line. Faint
+  cells see through trees, which may or may not hide a target. Dark cells
+  are hidden by the ground or a building. On a pack with a sight surface
+  (below), buildings and woods are traced cell by cell, so a unit in a town
+  sees down its streets and not through its blocks. Elsewhere, woods and
+  towns count as a chance by their land cover. A solid ring shows how far
+  its best sensor looks, and a dashed ring how far its weapons reach. The
+  view follows the unit as it moves. *Hide what it sees* turns it off, and
   the choice is remembered. A side's view shows only its own units' sight.
-  The squares are the 30 m cells it is worked out on, for a man-high target.
   In sight is not spotted: whether a unit picks a target out also depends on
   range, light, weather and the target's cover and movement (*Can it see…?*
-  gives every factor). The shading treats woods and buildings as solid walls.
-  The game's own sight lines are softer: each 100 m through them has a chance
-  of being blocked (`env.landcover.*.los_block_per_100m`). So the dark is a
-  cautious picture in light woods and suburbs.
+  gives every factor).
 - **3D terrain:** on a theatre pack, the *3D terrain* button (under the
   basemaps) drapes the map over the pack's own elevation. It is the same
   ground the game is played on, stretched ×1.5 upright because most theatres
@@ -244,10 +244,25 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
 
 - **Elevation:** Mapterhorn's terrarium planet (`download.mapterhorn.com`,
   Copernicus GLO-30 plus national models), zoom 12, sampled onto the engine's
-  grid (30 m by default, `--cell-m`). Copernicus is a surface model that
-  includes trees, and the engine models canopy itself, so half the canopy
-  height comes off in woods (`--dsm-canopy-fraction`, 0 to keep it). Water
-  sits at its surface, not the lagoon floor.
+  grid (30 m by default, `--cell-m`). Copernicus is a surface model: its
+  heights include trees and roofs, smeared over 30 m. The engine has every
+  wood and building itself (the sight surface), so woods and towns are
+  taken back to bare ground by a morphological opening: the lowest height
+  nearby, then the highest of those, over `--ground-filter-m` (150 m; 0
+  keeps the raw heights). This keeps slopes and drops the bumps roofs and
+  canopy make. Water sits at its surface, not the lagoon floor.
+- **Sight surface:** `surface.bin`, on a 5 m grid. Every building footprint
+  is drawn at its mapped height, from the archive's deepest zoom (15), where
+  Protomaps keeps all of them: 63,000 in a 22 × 33 km box over Kaliningrad.
+  About a fifth have a mapped height. The rest get a height by size: 6 m
+  under 120 m², 9 m under 600 m², 12 m above. Woods are drawn by class. Sight
+  lines step through it at 2.5 m. A line that passes below a roof is
+  blocked. A line through trees counts its length toward its chance of
+  being blocked (`env.landcover.*.los_block_per_100m`). The last 15 m at
+  each end are clear, so a unit by a building or at a wood's edge sees out.
+  The game's spotting and the viewer's shading use the same lines. A 16 ×
+  12 km pack's surface is about 2 MB. Packs built before it fall back to
+  land cover for sight.
 - **Land cover:** a Protomaps OpenStreetMap build (`build.protomaps.com`, the
   latest daily one unless `--planet`), zoom 14. Land use and water polygons
   are painted in priority order (water over towns over wetland over woods

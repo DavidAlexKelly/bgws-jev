@@ -103,9 +103,10 @@ enum Cmd {
         /// Elevation archive (terrarium PMTiles, URL or path).
         #[arg(long, default_value = bgws_geodata::build::ELEVATION_URL)]
         elevation: String,
-        /// Fraction of canopy and roof height taken off the elevation (a surface model); 0 keeps it.
-        #[arg(long, default_value_t = 0.5)]
-        dsm_canopy_fraction: f64,
+        /// Bare ground under woods and towns: the elevation is a surface model
+        /// (trees and roofs in it), filtered over this window, metres; 0 keeps it.
+        #[arg(long, default_value_t = 150.0)]
+        ground_filter_m: f64,
         /// Road vertices closer than this join, metres.
         #[arg(long, default_value_t = 3.0)]
         snap_m: f64,
@@ -326,13 +327,13 @@ fn main() -> Result<()> {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
-        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, dsm_canopy_fraction, snap_m, basemap_max_zoom, cache } => {
+        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, cache } => {
             let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
             let mut spec = bgws_geodata::build::BuildSpec::new(bbox);
             spec.cell_m = cell_m;
             spec.planet = planet;
             spec.elevation = elevation;
-            spec.dsm_canopy_fraction = dsm_canopy_fraction;
+            spec.ground_filter_m = ground_filter_m;
             spec.basemap_max_zoom = basemap_max_zoom;
             if cache.is_some() {
                 spec.cache = cache;

@@ -594,7 +594,7 @@ mod tests {
             }
             r
         }).collect();
-        Ground { frame, terrain, rivers: vec![], towns: vec![], roads, zoom: 14, extent: 4096, basemap: vec![], dem: vec![], planet: String::new(), stats: serde_json::Value::Null }
+        Ground { frame, terrain, rivers: vec![], towns: vec![], roads, zoom: 14, extent: 4096, basemap: vec![], dem: vec![], planet: String::new(), stats: serde_json::Value::Null, surface: None }
     }
 
     #[test]

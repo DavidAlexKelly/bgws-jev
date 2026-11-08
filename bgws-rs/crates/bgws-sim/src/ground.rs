@@ -37,6 +37,8 @@ pub struct Ground {
     /// River depth in each cell a river crosses, m (0 none).
     pub rivers: Option<Arc<Raster<f32>>>,
     pub ford: FordLimits,
+    /// A pack's buildings and woods on a fine grid, for sight lines.
+    pub sight: Option<bgws_env::SightView>,
     /// Heavy-shell craters in each cell, once any have landed.
     pub craters: Option<Arc<Raster<u8>>>,
     pub road_speeds: RoadSpeeds,
@@ -123,6 +125,7 @@ impl Ground {
             rivers: None,
             ford: FordLimits::from_figures(figures),
             craters: None,
+            sight: None,
             sights: Default::default(),
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
@@ -281,7 +284,7 @@ impl Ground {
     }
 
     fn grid(&self) -> TerrainGrid<'_> {
-        TerrainGrid::with_heights(&self.terrain, self.heights.clone())
+        TerrainGrid::with_heights(&self.terrain, self.heights.clone()).with_surface(self.sight.as_ref())
     }
 
     /// Line of sight between two points with heights above ground.
@@ -321,6 +324,37 @@ impl Ground {
         let o = bgws_gpu::viewshed::ViewshedObserver { x: at.e, y: at.n, agl, max_range: range };
         let v = bgws_gpu::viewshed::viewshed_cpu(&grid, &[o], 1.5, &self.optical.los);
         Some((sw, cell, n, v.count.iter().map(|c| *c > 0).collect()))
+    }
+
+    /// What an observer at `at` (eye `agl` m) has in sight out to `range` m:
+    /// for each cell of a grid of at most `max_cells` a side, the chance a
+    /// man-high target there is in its line of sight, by the game's own sight
+    /// lines (terrain, then the woods' and towns' canopy as a chance; with a
+    /// pack's sight surface, its buildings, which block, and its woods).
+    /// Returns the grid's south-west corner, cell size, side and chances.
+    pub fn sight_map(&self, at: Enu, agl: f64, range: f64, max_cells: usize) -> (Enu, f64, usize, Vec<f32>) {
+        let cell = 2.0 * range / max_cells.max(2) as f64;
+        let n = ((2.0 * range / cell).ceil() as usize + 1).max(2);
+        let sw = Enu::new(at.e - range, at.n - range, 0.0);
+        let mut ks = Vec::new();
+        let mut qs = Vec::new();
+        for k in 0..n * n {
+            let (e, nn) = (sw.e + (k % n) as f64 * cell, sw.n + (k / n) as f64 * cell);
+            let d = (e - at.e).hypot(nn - at.n);
+            if d > range || !self.contains(Enu::new(e, nn, 0.0)) {
+                continue;
+            }
+            ks.push(k);
+            qs.push(LosQuery { obs_x: at.e, obs_y: at.n, obs_agl: agl, tgt_x: e, tgt_y: nn, tgt_agl: 1.5 });
+        }
+        let mut p = vec![0.0f32; n * n];
+        for (k, r) in ks.into_iter().zip(self.los_batch(&qs)) {
+            // Where it stands it sees.
+            p[k] = r.p_visible as f32;
+        }
+        let c = ((n - 1) / 2) * n + (n - 1) / 2;
+        p[c] = 1.0;
+        (sw, cell, n, p)
     }
 
     /// Many at once, through the kernel layer.

@@ -56,27 +56,39 @@ fn geometry(pts: &[(i64, i64)], ring: bool) -> Vec<u8> {
     c
 }
 
-/// One layer's features: (geometry type, points, string tags).
+/// One layer's features: (geometry type, points, string tags, a height).
 struct Feature {
     kind: u64,
     pts: Vec<(i64, i64)>,
     tags: Vec<(&'static str, &'static str)>,
+    height: Option<f64>,
 }
 
 fn layer(name: &str, features: &[Feature]) -> Vec<u8> {
     let mut keys: Vec<&str> = Vec::new();
-    let mut values: Vec<&str> = Vec::new();
+    let mut values: Vec<Vec<u8>> = Vec::new();
     let mut l = Vec::new();
     bytes(&mut l, 1, name.as_bytes());
     for f in features {
         let mut tags = Vec::new();
-        for &(k, v) in &f.tags {
+        let mut all: Vec<(&str, Vec<u8>)> = f.tags.iter().map(|&(k, v)| {
+            let mut vb = Vec::new();
+            bytes(&mut vb, 1, v.as_bytes());
+            (k, vb)
+        }).collect();
+        if let Some(h) = f.height {
+            // A double (field 3, fixed 64-bit).
+            let mut vb = vec![(3 << 3) | 1];
+            vb.extend_from_slice(&h.to_le_bytes());
+            all.push(("height", vb));
+        }
+        for (k, vb) in all {
             let ki = keys.iter().position(|x| *x == k).unwrap_or_else(|| {
                 keys.push(k);
                 keys.len() - 1
             });
-            let vi = values.iter().position(|x| *x == v).unwrap_or_else(|| {
-                values.push(v);
+            let vi = values.iter().position(|x| *x == vb).unwrap_or_else(|| {
+                values.push(vb);
                 values.len() - 1
             });
             varint(&mut tags, ki as u64);
@@ -92,9 +104,7 @@ fn layer(name: &str, features: &[Feature]) -> Vec<u8> {
     for k in keys {
         bytes(&mut l, 3, k.as_bytes());
     }
-    for v in values {
-        let mut vb = Vec::new();
-        bytes(&mut vb, 1, v.as_bytes());
+    for vb in values {
         bytes(&mut l, 4, &vb);
     }
     varint(&mut l, 5 << 3);
@@ -153,24 +163,29 @@ fn vector_tile(z: u8, x: u32, y: u32) -> Vec<u8> {
     let x0 = (20.415, 54.71);
     for (a, b) in [((20.395, 54.71), x0), (x0, (20.435, 54.71))] {
         if let Some(pts) = clip_line(z, x, y, a, b) {
-            roads.push(Feature { kind: 2, pts, tags: vec![("kind", "major_road"), ("kind_detail", "primary"), ("name", "Main Road")] });
+            roads.push(Feature { kind: 2, pts, tags: vec![("kind", "major_road"), ("kind_detail", "primary"), ("name", "Main Road")], height: None });
         }
     }
     for (a, b) in [((20.415, 54.695), x0), (x0, (20.415, 54.725))] {
         if let Some(pts) = clip_line(z, x, y, a, b) {
-            roads.push(Feature { kind: 2, pts, tags: vec![("kind", "minor_road"), ("kind_detail", "tertiary")] });
+            roads.push(Feature { kind: 2, pts, tags: vec![("kind", "minor_road"), ("kind_detail", "tertiary")], height: None });
         }
     }
     let mut landuse = Vec::new();
     if let Some(pts) = rect(z, x, y, 20.400, 54.712, 20.410, 54.718) {
-        landuse.push(Feature { kind: 3, pts, tags: vec![("kind", "forest")] });
+        landuse.push(Feature { kind: 3, pts, tags: vec![("kind", "forest")], height: None });
     }
     let mut water = Vec::new();
     if let Some(pts) = rect(z, x, y, 20.420, 54.701, 20.428, 54.705) {
-        water.push(Feature { kind: 3, pts, tags: vec![("kind", "lake")] });
+        water.push(Feature { kind: 3, pts, tags: vec![("kind", "lake")], height: None });
+    }
+    // A 25 m block of flats, about 40 × 45 m, north-east of the crossing.
+    let mut buildings = Vec::new();
+    if let Some(pts) = rect(z, x, y, 20.4200, 54.7140, 20.4206, 54.7144) {
+        buildings.push(Feature { kind: 3, pts, tags: vec![("kind", "building")], height: Some(25.0) });
     }
     let mut tile = Vec::new();
-    for (name, f) in [("roads", roads), ("landuse", landuse), ("water", water)] {
+    for (name, f) in [("roads", roads), ("landuse", landuse), ("water", water), ("buildings", buildings)] {
         if !f.is_empty() {
             bytes(&mut tile, 3, &layer(name, &f));
         }
@@ -244,6 +259,16 @@ fn a_pack_from_local_archives_has_its_ground_roads_and_water() {
     assert_eq!(t.land_cover_at(le, ln), LandCover::Water);
     let (oe, on) = at(20.425, 54.716);
     assert_eq!(t.land_cover_at(oe, on), LandCover::Open);
+
+    // The sight surface: the block at its height, the wood by class, open ground clear.
+    let sf = ground.surface.as_ref().expect("a sight surface");
+    assert!(sf.spec.cell <= 5.0 + 1e-9, "fine: {} m", sf.spec.cell);
+    let (be, bn) = at(20.4203, 54.7142);
+    assert_eq!(sf.at(be, bn), (25.0, None));
+    assert_eq!(sf.at(fe, fn_).1, Some(LandCover::ForestDense));
+    assert_eq!(sf.at(oe, on), (0.0, None));
+    assert_eq!(meta.surface.as_deref(), Some("surface.bin"));
+    assert_eq!(bgws_env::SightSurface::read(&pack.join("surface.bin")).unwrap().spec, sf.spec);
 
     // The roads: one graph, the crossing a junction, the main road primary
     // across the box (kept a little beyond it) and joined across tile seams.
