@@ -290,6 +290,19 @@ rounds (155 mm, 122 mm rockets) crater the cell they land in. Two craters
 the going across it (`sim.route.crater_slow`). Both movement and the planner
 see the craters.
 
+**Long moves.** A move longer than `sim.route.long_m` (20 km) goes by the
+pack's road graph: Dijkstra over its nodes and edges, by the same weights.
+It gets on at a node within `sim.route.access_m` (3 km) of the start, gets
+off near the destination, and plans both end legs on the grid. Cut edges and
+blown bridges are left out; when the graph does not join the ends, the move
+is planned on the grid. On the Kaliningrad pack, routes by the graph take
+about as long to drive as the grid's and plan in about half the time.
+
+**Woods a vehicle cannot enter.** A vehicle standing in ground it cannot
+cross (a dense wood, never water) crawls out at `sim.route.crawl_kmh`. A
+route may crawl only within `sim.route.escape_m` of its ends, to get out of
+a wood or into one it is sent to.
+
 **Unreachable destinations.** When a destination cannot be reached (ground
 the vehicle cannot enter, or water with no way over), the route goes as near
 as it can (the wood's edge, the near bank) rather than in a straight line.

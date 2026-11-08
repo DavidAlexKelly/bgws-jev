@@ -97,3 +97,48 @@ fn plans_on_real_ground_never_fall_back_to_a_straight_line() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs a theatre pack: BGWS_TEST_PACK=<dir> cargo test --release -p bgws-run --test terrain_pack -- --ignored"]
+/// Long moves by the road graph take about as long as the full grid search
+/// finds, in a fraction of the planning time.
+fn long_moves_by_the_road_graph_are_as_good_as_the_grid() {
+    let pack = std::env::var("BGWS_TEST_PACK").expect("BGWS_TEST_PACK: a pack over Kaliningrad");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sc = load_scenario(&root.join("data/scenarios/skirmish-advance-to-contact-v1.json")).unwrap();
+    let (dlat, dlon) = (54.672 - sc.theatre.origin.lat, 20.43 - sc.theatre.origin.lon);
+    let shift = |g: Geodetic| Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
+    sc.theatre.origin = shift(sc.theatre.origin);
+    sc.theatre.bounds = None;
+    sc.theatre.pack = Some(pack);
+    for f in &mut sc.forces { f.position = shift(f.position); }
+    let host = Host::new(&sc, sc.seed, bgws_run::default_figures(), &HostOptions::default()).unwrap();
+    let gg = &host.sim.ctx.ground;
+    assert!(gg.road_net.is_some(), "the pack's road graph");
+    let s = gg.terrain.spec;
+    let mut graph_p = gg.route_params.clone();
+    graph_p.long_m = 8_000.0;
+    let mut grid_p = gg.route_params.clone();
+    grid_p.long_m = f64::INFINITY;
+    let mut rng = 777u64;
+    let mut next = || { rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (rng >> 33) as f64 / (1u64 << 31) as f64 };
+    let (mut t_graph, mut t_grid, mut ms_graph, mut ms_grid, mut n) = (0.0, 0.0, 0.0, 0.0, 0);
+    while n < 15 {
+        let a = bgws_core::Enu::new(s.origin_e + next() * s.cell * s.width as f64, s.origin_n + next() * s.cell * s.height as f64, 0.0);
+        let b = bgws_core::Enu::new(s.origin_e + next() * s.cell * s.width as f64, s.origin_n + next() * s.cell * s.height as f64, 0.0);
+        if a.sub(b).horizontal() < 10_000.0 || gg.land_cover(a.e, a.n) == bgws_env::LandCover::Water || gg.land_cover(b.e, b.n) == bgws_env::LandCover::Water { continue; }
+        let r = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Wheeled, mode: bgws_sim::components::MoveModeS::March, road_kmh: 80.0, cross_kmh: 30.0, threats: &[], obstacles: &[], urgent: false };
+        let t0 = std::time::Instant::now();
+        let pg = gg.plan(&r, &graph_p);
+        let t1 = std::time::Instant::now();
+        let pd = gg.plan(&r, &grid_p);
+        let t2 = std::time::Instant::now();
+        t_graph += pg.time_s;
+        t_grid += pd.time_s;
+        ms_graph += (t1 - t0).as_secs_f64() * 1e3;
+        ms_grid += (t2 - t1).as_secs_f64() * 1e3;
+        n += 1;
+    }
+    println!("{n} moves: by graph {:.0} min ({:.0} ms each), on the grid {:.0} min ({:.0} ms each)", t_graph / 60.0, ms_graph / n as f64, t_grid / 60.0, ms_grid / n as f64);
+    assert!(t_graph < t_grid * 1.25, "the graph's routes are not much slower to drive");
+}

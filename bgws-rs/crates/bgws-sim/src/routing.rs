@@ -65,6 +65,14 @@ pub struct RouteParams {
     /// A threat's eye above the ground, m, and the cell its sight is worked out on.
     pub sight_agl_m: f64,
     pub sight_cell_m: f64,
+    /// A vehicle's pace through ground it cannot otherwise cross (not water), km/h.
+    pub crawl_kmh: f64,
+    /// How far from either end of a move a route may crawl, m (to get out of, or into, a wood).
+    pub escape_m: f64,
+    /// Moves longer than this go by the road graph between grid legs at each end, m.
+    pub long_m: f64,
+    /// How far from each end a long move looks for a road node to get on at, m.
+    pub access_m: f64,
     /// Heavy-shell craters in a cell that cut the road through it.
     pub crater_cut: u8,
     /// Off-road speed lost per crater in a cell: speed / (1 + this × craters).
@@ -104,6 +112,10 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
+        figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace pushing through ground it cannot otherwise cross (dense wood; never water)"),
+        figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from either end of a move a route may crawl through such ground"),
+        figure!("sim.route.long_m", 20_000.0, "m", 2_000.0, 1_000_000.0, "default", Default, "moves longer than this go by the road graph, with a grid leg on and off it at each end"),
+        figure!("sim.route.access_m", 3_000.0, "m", 200.0, 20_000.0, "default", Default, "how far from each end of a long move it looks for a road node to get on or off at"),
         figure!("sim.route.obstacle_s", 3_600.0, "s", 0.0, 86_400.0, "default", Default, "what crossing a known obstacle without a lane costs a planned move (about a breach)"),
         figure!("sim.route.crater_cut", 2.0, "craters", 1.0, 50.0, "default", Default, "heavy-shell (155 mm, 122 mm rocket) craters in a 30 m stretch of road that cut it"),
         figure!("sim.route.crater_slow", 0.1, "ratio", 0.0, 2.0, "default", Default, "cross-country speed lost per heavy-shell crater in a cell: speed / (1 + this × craters)"),
@@ -130,6 +142,10 @@ impl RouteParams {
             verge_s: g("verge_s"),
             ford_s: g("ford_s"),
             obstacle_s: g("obstacle_s"),
+            crawl_kmh: g("crawl_kmh"),
+            escape_m: g("escape_m"),
+            long_m: g("long_m"),
+            access_m: g("access_m"),
             masked: g("masked"),
             sight_agl_m: g("sight_agl_m"),
             sight_cell_m: g("sight_cell_m"),
@@ -189,6 +205,55 @@ impl KnownObstacle {
     }
 }
 
+/// The road graph: nodes where edges meet, and each edge's line.
+#[derive(Clone, Debug)]
+pub struct RoadNet {
+    /// Node positions (ENU e, n).
+    pub nodes: Vec<(f64, f64)>,
+    /// From each node: (the node at the far end, the edge's line, whether the line runs that way).
+    pub adj: Vec<Vec<(usize, usize, bool)>>,
+    pub lines: Vec<bgws_env::RoadLine>,
+    /// Each line's length, m.
+    pub len: Vec<f64>,
+}
+
+impl RoadNet {
+    /// The graph behind a pack's road lines; none for lines that carry no
+    /// graph (generated ground, where every line is its own edge 0 → 1).
+    pub fn build(lines: &[bgws_env::RoadLine]) -> Option<RoadNet> {
+        if lines.len() < 2 || lines.iter().all(|l| l.from == 0 && l.to == 1) {
+            return None;
+        }
+        let mut ids: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+        let mut nodes = Vec::new();
+        let mut adj: Vec<Vec<(usize, usize, bool)>> = Vec::new();
+        let mut len = Vec::with_capacity(lines.len());
+        let mut node = |id: u32, at: (f64, f64), nodes: &mut Vec<(f64, f64)>, adj: &mut Vec<Vec<(usize, usize, bool)>>| {
+            *ids.entry(id).or_insert_with(|| {
+                nodes.push(at);
+                adj.push(Vec::new());
+                nodes.len() - 1
+            })
+        };
+        for (k, l) in lines.iter().enumerate() {
+            len.push(l.line.windows(2).map(|w| (w[1].0 - w[0].0).hypot(w[1].1 - w[0].1)).sum());
+            let (Some(&a), Some(&b)) = (l.line.first(), l.line.last()) else { continue };
+            let (i, j) = (node(l.from, a, &mut nodes, &mut adj), node(l.to, b, &mut nodes, &mut adj));
+            adj[i].push((j, k, true));
+            adj[j].push((i, k, false));
+        }
+        Some(RoadNet { nodes, adj, lines: lines.to_vec(), len })
+    }
+
+    /// The `n` nodes nearest a point within `within` m, nearest first.
+    fn near(&self, e: f64, n: f64, within: f64, count: usize) -> Vec<(usize, f64)> {
+        let mut v: Vec<(usize, f64)> = self.nodes.iter().enumerate().map(|(k, p)| (k, (p.0 - e).hypot(p.1 - n))).filter(|x| x.1 <= within && !self.adj[x.0].is_empty()).collect();
+        v.sort_by(|a, b| a.1.total_cmp(&b.1));
+        v.truncate(count);
+        v
+    }
+}
+
 fn mode_ix(m: MoveModeS) -> usize {
     match m {
         MoveModeS::March => 0,
@@ -231,6 +296,11 @@ impl Ground {
         // whose bridge lies outside it). When none does (the end is in ground
         // the vehicle cannot enter, or across water with no way over), the
         // route goes as near as it can: the wood's edge, the near bank.
+        if dist > p.long_m {
+            if let Some(plan) = self.plan_long(r, p) {
+                return plan;
+            }
+        }
         let mut margin = p.corridor_min_m.max(p.corridor_frac * dist);
         let mut closest: Option<Plan> = None;
         for _ in 0..3 {
@@ -242,6 +312,104 @@ impl Ground {
             margin *= 3.0;
         }
         closest.unwrap_or_else(|| straight(0.0))
+    }
+
+    /// A long move: on to the road graph near the start, along it, and off
+    /// near the destination, each end leg planned on the grid. None when the
+    /// graph does not join the ends.
+    fn plan_long(&self, r: &RouteRequest, p: &RouteParams) -> Option<Plan> {
+        let net = self.road_net.as_deref()?;
+        let layer = self.road_layer.as_deref();
+        let (mi, ci) = (mode_ix(r.mode), class_ix(r.class));
+        let march = r.mode == MoveModeS::March;
+        let keep_clear = p.threat_radius_m * p.objective_frac;
+        let threats: Vec<(f64, f64)> = r.threats.iter().copied().filter(|t| (t.0 - r.to.e).hypot(t.1 - r.to.n) > keep_clear).collect();
+        let near = |e: f64, n: f64| threats.iter().map(|t| (1.0 - (t.0 - e).hypot(t.1 - n) / p.threat_radius_m).max(0.0)).fold(0.0, f64::max);
+        let open_s = |d: f64| d / (r.cross_kmh.max(1.0) / 3.6) * if march { p.march_open[ci] } else { 1.0 };
+        let starts = net.near(r.from.e, r.from.n, p.access_m, 8);
+        let ends = net.near(r.to.e, r.to.n, p.access_m, 8);
+        if starts.is_empty() || ends.is_empty() {
+            return None;
+        }
+        // Dijkstra over the nodes, in weighted seconds.
+        let n = net.nodes.len();
+        let mut cost = vec![f64::INFINITY; n];
+        let mut came: Vec<Option<(usize, usize, bool)>> = vec![None; n];
+        let mut heap = BinaryHeap::new();
+        for &(k, d) in &starts {
+            let c = open_s(d);
+            if c < cost[k] {
+                cost[k] = c;
+                heap.push(Reverse((c.to_bits(), k)));
+            }
+        }
+        let exit: std::collections::HashMap<usize, f64> = ends.iter().map(|&(k, d)| (k, open_s(d))).collect();
+        let mut best: Option<(f64, usize)> = None;
+        while let Some(Reverse((cb, k))) = heap.pop() {
+            let c = f64::from_bits(cb);
+            if c > cost[k] {
+                continue;
+            }
+            if best.is_some_and(|b| c >= b.0) {
+                break;
+            }
+            if let Some(x) = exit.get(&k) {
+                if best.is_none_or(|b| c + x < b.0) {
+                    best = Some((c + x, k));
+                }
+            }
+            for &(to, li, fwd) in &net.adj[k] {
+                let l = &net.lines[li];
+                if layer.is_some_and(|y| y.cut.contains(&l.edge) || (l.bridge && y.blown.contains(&l.edge))) {
+                    continue;
+                }
+                let v = self.road_speeds.speed(r.class, l.class).min(r.road_kmh);
+                if v < 1.0 {
+                    continue;
+                }
+                let mid = l.line[l.line.len() / 2];
+                let t = net.len[li] / (v / 3.6);
+                let m = p.road_mult[mi] * if march { p.march_road[ci] } else { 1.0 };
+                let c2 = c + t * m + t * p.threat_road[mi] * near(mid.0, mid.1);
+                if c2 < cost[to] {
+                    cost[to] = c2;
+                    came[to] = Some((k, li, fwd));
+                    heap.push(Reverse((c2.to_bits(), to)));
+                }
+            }
+        }
+        let (_, last) = best?;
+        let mut legs = Vec::new();
+        let mut k = last;
+        while let Some((prev, li, fwd)) = came[k] {
+            legs.push((li, fwd));
+            k = prev;
+        }
+        legs.reverse();
+        let first = k;
+        // On at `first`, along the legs, off at `last`; the end legs on the grid.
+        let short = |a: Enu, b: Enu| {
+            let q = RouteRequest { from: a, to: b, ..r.clone() };
+            let mut sp = p.clone();
+            sp.long_m = f64::INFINITY;
+            self.plan(&q, &sp)
+        };
+        let on = Enu::new(net.nodes[first].0, net.nodes[first].1, 0.0);
+        let off = Enu::new(net.nodes[last].0, net.nodes[last].1, 0.0);
+        let a = short(r.from, on);
+        let b = short(off, r.to);
+        let mut waypoints = a.waypoints;
+        let (mut time_s, mut road_m, open_m) = (a.time_s + b.time_s, a.road_m + b.road_m, a.open_m + b.open_m);
+        for (li, fwd) in legs {
+            let l = &net.lines[li];
+            let pts: Box<dyn Iterator<Item = &(f64, f64)>> = if fwd { Box::new(l.line.iter().skip(1)) } else { Box::new(l.line.iter().rev().skip(1)) };
+            waypoints.extend(pts.map(|q| Enu::new(q.0, q.1, 0.0)));
+            road_m += net.len[li];
+            time_s += net.len[li] / (self.road_speeds.speed(r.class, l.class).min(r.road_kmh) / 3.6);
+        }
+        waypoints.extend(b.waypoints);
+        waypoints.dedup();
+        Some(Plan { waypoints, time_s, road_m, open_m })
     }
 
     /// The plan in one corridor, and whether it reaches the destination.
@@ -411,6 +579,28 @@ impl Ground {
             }
         }
         let (start, goal) = (cell_of(r.from.e, r.from.n), cell_of(r.to.e, r.to.n));
+        // Near the ends, a vehicle crawls through what it cannot otherwise
+        // cross (out of the wood it stands in, into the one it is sent to);
+        // never through water.
+        if p.escape_m > 0.0 && p.crawl_kmh > 0.0 {
+            let crawl = 3.6 / p.crawl_kmh;
+            let reach = (p.escape_m / step).ceil() as isize;
+            for end in [start, goal] {
+                let (cx, cy) = ((end % w) as isize, (end / w) as isize);
+                for y in (cy - reach).max(0)..=(cy + reach).min(h as isize - 1) {
+                    for x in (cx - reach).max(0)..=(cx + reach).min(w as isize - 1) {
+                        let k = y as usize * w + x as usize;
+                        if g_spm[k].is_finite() || river[k] > ford_limit || (((x - cx) * (x - cx) + (y - cy) * (y - cy)) as f64).sqrt() * step > p.escape_m {
+                            continue;
+                        }
+                        let (e, n) = pos(k);
+                        if self.land_cover(e, n) != bgws_env::LandCover::Water {
+                            g_spm[k] = crawl;
+                        }
+                    }
+                }
+            }
+        }
         // Where the ends sit in water or a wall, let them out.
         g_spm[start] = g_spm[start].min(1e3);
         g_spm[goal] = g_spm[goal].min(1e3);
@@ -926,6 +1116,34 @@ mod tests {
         assert!(n_blind < 800.0, "without sight it has no reason to: {n_blind:.0}");
         let sight = g.sight(0.0, 0.0, 4_000.0).expect("a sight");
         assert!(sight.sees(0.0, -1_500.0) && !sight.sees(0.0, 1_500.0));
+    }
+
+    #[test]
+    fn a_long_move_goes_by_the_road_graph() {
+        // The U as a graph of three edges between four nodes.
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        let edge = |edge: u32, from: u32, to: u32, line: Vec<(f64, f64)>| RoadLine { class: RoadClass::Primary, bridge: false, tunnel: false, edge, from, to, line };
+        let lines = vec![
+            edge(0, 10, 11, vec![(-4_000.0, -3_000.0), (-2_200.0, -3_000.0)]),
+            // Drawn north to south: taken backwards.
+            edge(1, 12, 11, vec![(-2_200.0, 3_000.0), (-2_200.0, 0.0), (-2_200.0, -3_000.0)]),
+            edge(2, 12, 13, vec![(-2_200.0, 3_000.0), (-4_000.0, 3_000.0)]),
+        ];
+        let mut g = Ground::from_terrain(t, 1, &f).with_roads(&lines);
+        assert_eq!(g.road_net.as_ref().map(|n| n.nodes.len()), Some(4));
+        let mut p = g.route_params.clone();
+        p.long_m = 3_000.0;
+        let r = RouteRequest { from: Enu::new(-4_100.0, -3_100.0, 0.0), to: Enu::new(-4_100.0, 3_100.0, 0.0), class: VehicleClass::Wheeled, mode: MoveModeS::March, road_kmh: 90.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false };
+        let plan = g.plan(&r, &p);
+        assert!(plan.road_m > 9_000.0, "{plan:?}");
+        assert!(plan.waypoints.contains(&Enu::new(-2_200.0, 0.0, 0.0)), "along the edge's line: {:?}", plan.waypoints);
+        assert_eq!(plan.waypoints.last().copied(), Some(r.to));
+        // With the middle edge cut, the graph does not join the ends: across country.
+        g.cut_road(1);
+        let cut = g.plan(&r, &p);
+        assert!(cut.road_m < 4_000.0, "{cut:?}");
     }
 
     #[test]

@@ -32,6 +32,8 @@ pub struct Ground {
     pub road_lines: Option<Arc<Vec<RoadLine>>>,
     /// Roads by level (on the ground; on bridges and in tunnels), with their edges.
     pub road_layer: Option<Arc<RoadLayer>>,
+    /// The road graph (a theatre pack's nodes and edges), for long moves.
+    pub road_net: Option<Arc<crate::routing::RoadNet>>,
     /// River depth in each cell a river crosses, m (0 none).
     pub rivers: Option<Arc<Raster<f32>>>,
     pub ford: FordLimits,
@@ -117,6 +119,7 @@ impl Ground {
             roads: None,
             road_lines: None,
             road_layer: None,
+            road_net: None,
             rivers: None,
             ford: FordLimits::from_figures(figures),
             craters: None,
@@ -132,6 +135,7 @@ impl Ground {
         self.roads = Some(Arc::new(Raster { spec: self.terrain.spec, data: layer.best_class() }));
         self.road_layer = Some(Arc::new(layer));
         self.road_lines = Some(Arc::new(lines.to_vec()));
+        self.road_net = crate::routing::RoadNet::build(lines).map(Arc::new);
         self
     }
 

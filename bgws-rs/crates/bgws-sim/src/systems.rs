@@ -112,7 +112,9 @@ pub fn movement(s: &mut Sim, dt: f64) {
         };
         let k = *s.world.get::<Kin>(e).expect("kin");
         let going = s.ctx.ground.going(k.pos.e, k.pos.n, class);
-        let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(0.0));
+        // Ground it cannot otherwise cross (a dense wood, not water): a crawl, as the planner allows near a route's ends.
+        let crawl = if s.ctx.ground.land_cover(k.pos.e, k.pos.n) == bgws_env::LandCover::Water { 0.0 } else { s.ctx.ground.route_params.crawl_kmh };
+        let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(crawl));
         // On a road (a theatre pack's): the road's speed, up to the vehicle's own.
         let on_road = s.ctx.ground.road_kmh(k.pos.e, k.pos.n, class).map(|r| r.min(platform.mover.road_kmh)).unwrap_or(0.0);
         let base = off_road.max(on_road);
