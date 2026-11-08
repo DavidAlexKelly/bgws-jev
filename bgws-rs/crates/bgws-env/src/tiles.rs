@@ -237,6 +237,9 @@ pub struct PackMeta {
     /// The viewer's basemap (vector PMTiles) for the pack's area.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basemap: Option<String>,
+    /// Elevation tiles (terrarium PMTiles) for the viewer's hillshade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dem: Option<String>,
     /// The box it was built for, degrees: west, south, east, north.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<[f64; 4]>,
@@ -287,6 +290,7 @@ impl TheatrePack {
             towns: json("towns.json", &w.towns)?,
             road_graph: None,
             basemap: None,
+            dem: None,
             bbox: None,
             sources: None,
         };

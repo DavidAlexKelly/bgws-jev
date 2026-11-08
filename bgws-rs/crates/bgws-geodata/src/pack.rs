@@ -15,7 +15,7 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     let io = |e: bgws_env::TileError| GeoError::Io(format!("{e:?}"));
     std::fs::create_dir_all(dir)?;
     crate::preview::render(&g.terrain, &g.rivers, &g.towns, roads).write_png(&dir.join("preview.png"))?;
-    let towns = g.towns;
+    let (towns, dem) = (g.towns, g.dem);
     let world = SynthWorld { terrain: g.terrain, roads: RoadNetwork::default(), rivers: g.rivers, towns, power_lines: Vec::new() };
     let mut meta = TheatrePack::write(dir, name, &world, TILE_INTERVALS, Codec::Lz4).map_err(io)?;
     // The graph is in roads/; the engine builds its network from it.
@@ -36,6 +36,10 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
         meta.basemap = Some("basemap.pmtiles".into());
     }
     let b = spec.bbox;
+    if !dem.is_empty() {
+        write_archive(&dir.join("dem.pmtiles"), dem, TileType::Webp, Compression::None, [b.west, b.south, b.east, b.north], &serde_json::json!({ "name": name, "encoding": "terrarium", "attribution": "© Mapterhorn" }))?;
+        meta.dem = Some("dem.pmtiles".into());
+    }
     meta.bbox = Some([b.west, b.south, b.east, b.north]);
     meta.sources = Some(serde_json::json!({
         "builtWith": concat!("bgws-geodata ", env!("CARGO_PKG_VERSION")),

@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { category, CATEGORY_COLOUR, CATEGORY_LABEL, SIDE_COLOUR, type Category } from "./overlays";
-import { clock, span, type FrameEntity, type FrameView, type GameEvent, type GameInfo, type Question, type ScenarioBrief, type Side, type UnitDetail, type Viewer } from "./protocol";
+import { clock, span, type FrameEntity, type FrameView, type GameEvent, type GameInfo, type PackInfo, type Question, type ScenarioBrief, type Side, type TerrainProgress, type UnitDetail, type Viewer } from "./protocol";
 import { LAYERS, type LayerKey } from "./layers";
 import type { Basemap } from "./MapView";
 
@@ -39,6 +39,26 @@ export function GamePanel(props: { game: GameInfo | null; onNew: () => void; onS
             {g.flat ? " · flat ground" : ""}
           </div>
           {g.description && <div className="subtle" style={{ lineHeight: 1.5, marginBottom: 6 }}>{g.description}</div>}
+          <Line label="ground">
+            {g.pack ? (
+              <>
+                pack <b>{g.pack.name}</b>: {g.pack.sizeKm[0].toFixed(0)} × {g.pack.sizeKm[1].toFixed(0)} km
+                {g.pack.roadsKm ? `, ${Math.round(g.pack.roadsKm).toLocaleString()} km of road` : ""}
+                {g.pack.preview && (
+                  <>
+                    {" "}
+                    <a className="link" href={g.pack.preview} target="_blank" rel="noopener">
+                      preview ↗
+                    </a>
+                  </>
+                )}
+              </>
+            ) : g.flat ? (
+              "flat"
+            ) : (
+              "generated (no theatre pack)"
+            )}
+          </Line>
           {(["blue", "red"] as const).map((s) => {
             const d = g.deciders[s];
             const missing = d.keyMissing ? [d.units, d.hqs].filter((x) => KEY_NAME[x]).map((x) => KEY_NAME[x]) : [];
@@ -144,6 +164,7 @@ export function ViewPanel(props: {
   onLayer: (k: LayerKey) => void;
   basemap: Basemap;
   onBasemap: (b: Basemap) => void;
+  hasPackMap: boolean;
   hqOpen: boolean;
   onHq: () => void;
 }) {
@@ -165,8 +186,8 @@ export function ViewPanel(props: {
         ))}
       </div>
       <div className="chips fill">
-        {(["dark", "streets", "satellite"] as Basemap[]).map((b) => (
-          <button key={b} className={`chip${props.basemap === b ? " on" : ""}`} onClick={() => props.onBasemap(b)}>
+        {((props.hasPackMap ? ["terrain", "dark", "streets", "satellite"] : ["dark", "streets", "satellite"]) as Basemap[]).map((b) => (
+          <button key={b} className={`chip${props.basemap === b ? " on" : ""}`} onClick={() => props.onBasemap(b)} title={b === "terrain" ? "The theatre pack's own map and hillshade: no internet needed" : undefined}>
             {b}
           </button>
         ))}
@@ -807,7 +828,25 @@ export function EndCard(props: { frame: FrameView; events: GameEvent[]; onReview
   );
 }
 
-export function NewGameCard(props: { scenarios: ScenarioBrief[] | null; current: string | undefined; onOpen: (file: string) => void; onClose: () => void }) {
+export function NewGameCard(props: {
+  scenarios: ScenarioBrief[] | null;
+  packs: PackInfo[];
+  terrain: TerrainProgress | null;
+  /** The map's view, for "Generate ground" (west, south, east, north). */
+  view: [number, number, number, number] | null;
+  current: string | undefined;
+  onOpen: (file: string, pack?: string) => void;
+  onBuild: (name: string, bbox: [number, number, number, number], cellM: number) => void;
+  onClose: () => void;
+}) {
+  const [ground, setGround] = useState("");
+  const [name, setName] = useState("");
+  const [cell, setCell] = useState(30);
+  const v = props.view;
+  const km = v ? [((v[2] - v[0]) * 111.32 * Math.cos((((v[1] + v[3]) / 2) * Math.PI) / 180)).toFixed(0), ((v[3] - v[1]) * 111.32).toFixed(0)] : null;
+  const t = props.terrain;
+  const building = t?.state === "running";
+  const nameOk = /^[A-Za-z0-9_-]+$/.test(name);
   return (
     <div className="veil" onClick={props.onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
@@ -815,17 +854,68 @@ export function NewGameCard(props: { scenarios: ScenarioBrief[] | null; current:
           <b>New game</b>
           <button className="btn" onClick={props.onClose}>Close</button>
         </div>
-        <div className="subtle" style={{ margin: "4px 0 10px", lineHeight: 1.5 }}>
-          The shipped scenarios. The game restarts with the deciders the server was started with; the scenario editor makes your own.
+
+        <div className="group">Ground</div>
+        <div className="row" style={{ flexWrap: "nowrap" }}>
+          <select className="select" value={ground} onChange={(e) => setGround(e.target.value)} aria-label="Ground">
+            <option value="">each scenario's own ground</option>
+            {props.packs.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}: {p.sizeKm[0].toFixed(0)} × {p.sizeKm[1].toFixed(0)} km{p.roadsKm ? `, ${Math.round(p.roadsKm).toLocaleString()} km of road` : ""}
+              </option>
+            ))}
+          </select>
         </div>
+        <div className="subtle" style={{ lineHeight: 1.5, marginBottom: 6 }}>
+          {ground
+            ? `The scenario is moved onto ${ground}: its forces keep their layout, centred on the pack (the box must be big enough for them).`
+            : "A theatre pack is real ground: elevation, land cover, towns and roads, built for a box."}
+        </div>
+        <details style={{ marginBottom: 8 }}>
+          <summary className="subtle" style={{ cursor: "pointer" }}>Generate ground from the map's current view…</summary>
+          <div className="callout">
+            Downloads the view's elevation and OpenStreetMap data (only that area, cached) and builds a pack in <code>bgws-rs/packs/</code>.
+            {km && (
+              <>
+                {" "}
+                The view is about {km[0]} × {km[1]} km; zoom the map to frame the area first.
+              </>
+            )}
+          </div>
+          <div className="row" style={{ flexWrap: "nowrap" }}>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="pack name, e.g. kaliningrad" aria-label="Pack name" />
+            <select className="select" style={{ width: 120 }} value={cell} onChange={(e) => setCell(Number(e.target.value))} aria-label="Cell size">
+              <option value={20}>20 m cells</option>
+              <option value={30}>30 m cells</option>
+              <option value={50}>50 m cells</option>
+              <option value={100}>100 m cells</option>
+            </select>
+            <button className="btn" disabled={!v || !nameOk || building} onClick={() => v && props.onBuild(name, v, cell)}>
+              Generate
+            </button>
+          </div>
+          {t && (
+            <div className="subtle" style={{ color: t.state === "failed" || t.state === "busy" ? "#e07a5f" : t.state === "done" ? "#8fd18f" : "#e8c547" }}>
+              {t.name}: {t.state === "running" ? `${t.stage} ${Math.round((t.fraction ?? 0) * 100)}%` : t.state === "done" ? "built: pick it under Ground" : t.text}
+            </div>
+          )}
+          {building && (
+            <div className="bar" style={{ marginTop: 4 }}>
+              <div style={{ width: `${Math.round((t?.fraction ?? 0) * 100)}%`, background: "#e8c547" }} />
+            </div>
+          )}
+        </details>
+
+        <div className="group">Scenario</div>
         {!props.scenarios && <div className="subtle">Loading…</div>}
         {props.scenarios?.map((s) => (
-          <button key={s.file} className="scenario" onClick={() => props.onOpen(s.file)} style={s.name === props.current ? { borderColor: "#e8c547" } : undefined}>
+          <button key={s.file} className="scenario" onClick={() => props.onOpen(s.file, ground || undefined)} style={s.name === props.current ? { borderColor: "#e8c547" } : undefined}>
             <div>
               <b>{s.name}</b> {s.name === props.current && <span className="subtle">(playing now)</span>}
             </div>
             <div className="meta">
               {s.type} · {s.durationMin} min · {s.units} units · {s.file}
+              {ground ? ` · on ${ground}` : ""}
             </div>
             {s.description && <div className="meta" style={{ color: "#c7ccdb" }}>{s.description}</div>}
           </button>

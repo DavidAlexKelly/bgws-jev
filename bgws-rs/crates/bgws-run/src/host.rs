@@ -116,7 +116,8 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
 /// latitude and longitude, so positions and ground agree.
 pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<(bgws_env::Terrain, Vec<bgws_env::RoadLine>)>> {
     let Some(dir) = &scenario.theatre.pack else { return Ok(None) };
-    let mut pack = bgws_env::TheatrePack::open(Path::new(dir)).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    let path = crate::resolve_pack(dir);
+    let mut pack = bgws_env::TheatrePack::open(&path).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
     let frame = scenario.frame();
     let pack_frame = bgws_core::EnuFrame::new(pack.meta.frame_origin);
     let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
@@ -146,7 +147,7 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<(bgws_env::Terrain, Vec
     let terrain = if same { terrain } else { reframe(&terrain, &pack_frame, &frame) };
     let mut roads = Vec::new();
     if let Some(rg) = &pack.meta.road_graph {
-        let g = bgws_geodata::roads::RoadGraph::read(&Path::new(dir).join(rg)).map_err(|e| anyhow!("theatre pack {dir} roads: {e}"))?;
+        let g = bgws_geodata::roads::RoadGraph::read(&path.join(rg)).map_err(|e| anyhow!("theatre pack {dir} roads: {e}"))?;
         let inside = |p: &[f64; 2]| p[0] >= aoi.min_e && p[0] <= aoi.max_e && p[1] >= aoi.min_n && p[1] <= aoi.max_n;
         for e in g.edges.iter().filter(|e| e.geom.iter().any(inside)) {
             roads.push(bgws_env::RoadLine { class: e.class, bridge: e.bridge, line: e.geom.iter().map(|p| to_scenario(p[0], p[1])).collect() });

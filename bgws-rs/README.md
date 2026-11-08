@@ -16,7 +16,8 @@ target/release/bgws why events.jsonl "Blue 1 Troop"  # what happened to a unit, 
 cargo build --release -p bgws-run --features duckdb  # event logs as DuckDB databases (builds DuckDB, ~25 min)
 target/release/bgws play m4-drone-line --events game.duckdb
 target/release/bgws events game.duckdb --sql "SELECT kind, count(*) FROM events WHERE side = 'blue' GROUP BY kind"
-target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack
+target/release/bgws terrain packs/kaliningrad --bbox 20.35,54.65,20.60,54.76   # real ground for a box (see "Real ground")
+target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack of generated ground
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
@@ -42,6 +43,7 @@ fallbacks decide and the log says why.
 |---|---|
 | `bgws-core` | ids, µs time, units, WGS84/ECEF/ENU, the figures registry, keyed ChaCha8 streams, the event log and fingerprint, question and answer types |
 | `bgws-catalogue` | 105 platforms and 48 munitions built from parts (movers, bodies, signatures, sensors, mounts, radios, emitters, stores), class defaults, derivation, validation |
+| `bgws-geodata` | real ground from planet PMTiles: a PMTiles reader over HTTP ranges with a disk cache, vector tiles, terrarium elevation, land cover, the road graph builder, and pack writing |
 | `bgws-env` | terrain grids and pyramids, synthetic theatres, land cover and micro-terrain, soil and trafficability, roads, the change layer, tiles and theatre packs, sea state and sound speed, weather fields, optics, sun and moon, thermal days |
 | `bgws-prop` | optical LOS with canopy, horizons, Deygout diffraction, ITM-style loss, HF ground wave and NVIS, satellite and microwave links, acoustic TL, link budgets |
 | `bgws-gpu` | LOS, viewsheds, candidate pairs, path-loss and J/S fields, flow fields, Monte Carlo hits: CPU twins always, WGSL kernels behind `--features gpu` |
@@ -182,6 +184,61 @@ To change the viewer: `cd web/app && npm install`. Then `npm run dev` serves
 it at http://localhost:5173 against a running `bgws-server` (port 8765).
 `npm run build` writes `web/app/dist`, which the server embeds; commit it. CI
 fails if it is stale.
+
+## Real ground: theatre packs from PMTiles
+
+`bgws terrain <dir> --bbox W,S,E,N` (or *New game… → Generate ground from
+the map's current view* in the viewer) builds a theatre pack for a box. It
+reads only that box's tiles from two planet PMTiles archives, by HTTP range,
+and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
+`~/Library/Caches/bgws/pmtiles`):
+
+- **Elevation:** Mapterhorn's terrarium planet (`download.mapterhorn.com`,
+  Copernicus GLO-30 plus national models), zoom 12, sampled onto the engine's
+  grid (30 m by default, `--cell-m`). Copernicus is a surface model that
+  includes trees, and the engine models canopy itself, so half the canopy
+  height comes off in woods (`--dsm-canopy-fraction`, 0 to keep it). Water
+  sits at its surface, not the lagoon floor.
+- **Land cover:** a Protomaps OpenStreetMap build (`build.protomaps.com`, the
+  latest daily one unless `--planet`), zoom 14. Land use and water polygons
+  are painted in priority order (water over towns over wetland over woods
+  over fields), then cells turn to dense urban by building footprint cover.
+  Soil, wetness and forest obstacles follow from the class.
+- **Roads:** from the same tiles, by a port of the project's Python
+  road-graph builder:
+  - tile clipping and T-junctions;
+  - snapping within `--snap-m` (3 m), where motorways join only motorways
+    and slip roads unless one really ends there;
+  - degree-2 contraction.
+
+  Tracks and service roads are kept for a tactical game. The output is in
+  `roads/`: `nodes.bin`, `edges.bin`, `edge_geom.bin` and `adjacency.bin`
+  (fixed-width little-endian), with `graph.json` describing the layout and
+  the build's statistics.
+- **For the viewer:** `basemap.pmtiles` and `dem.pmtiles`, extracts of the
+  same archives that `bgws-server` serves under `/packs/`. The "terrain"
+  basemap draws them, with hillshade and town names, with no internet.
+- **To check a build:** `preview.png` shows land cover over hillshade, with
+  rivers, roads by class and bridges. `pack.json` records the box, the
+  archives used and their attributions.
+
+A 16 × 12 km box west of Kaliningrad builds in about seven seconds once
+cached. It has 1,900 km of road, and 96% of its nodes are in one network.
+
+A scenario names a pack as `theatre.pack`: a folder under `packs/`
+(`$BGWS_PACKS`), or a path. The host re-samples the pack into the scenario's
+frame through latitude and longitude when their origins differ. The viewer's
+New game card can move any shipped scenario onto a pack, keeping its layout,
+and the editor's *Move onto the pack* does the same. On a pack's roads a
+vehicle moves at the road's speed for its class, and route planning prefers
+roads where they are quicker. Moving vehicles in a shipped scenario on the
+Kaliningrad pack spend 53% of their time on roads, which cover 23% of the
+ground. Generated ground has no road layer, so the shipped scenarios and the
+calibration baselines are unchanged.
+
+Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
+cover derived from it are derived databases). Mapterhorn asks for
+attribution. `pack.json` carries both.
 
 ## Game records
 

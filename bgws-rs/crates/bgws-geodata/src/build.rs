@@ -127,6 +127,8 @@ pub struct Ground {
     pub extent: u32,
     /// Basemap tiles, as stored (gzipped vector tiles).
     pub basemap: Vec<((u8, u32, u32), Vec<u8>)>,
+    /// Elevation tiles, as stored (terrarium WebP), for the viewer's hillshade.
+    pub dem: Vec<((u8, u32, u32), Vec<u8>)>,
     pub planet: String,
     pub stats: serde_json::Value,
 }
@@ -243,6 +245,17 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
         }
     });
     drop(heights);
+    // The same tiles as stored, and a few zooms below, for the viewer's hillshade.
+    let mut dem_want: Vec<(u8, u32, u32)> = Vec::new();
+    for z in ez.saturating_sub(4)..=ez {
+        dem_want.extend(tiles_covering(&b.grown(500.0), z).into_iter().map(|(x, y)| (z, x, y)));
+    }
+    let dem: Vec<((u8, u32, u32), Vec<u8>)> = net.install(|| {
+        dem_want
+            .par_iter()
+            .filter_map(|&(z, x, y)| elev.tile_raw(z, x, y).transpose().map(|r| r.map(|b| ((z, x, y), b))))
+            .collect::<Result<_, GeoError>>()
+    })?;
 
     // ── Vector tiles: land cover, water, buildings, towns, roads ──────────
     progress("map data: opening archive", 0.0);
@@ -394,7 +407,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
         "elevationZoom": ez, "vectorZoom": vz,
     });
     let terrain = Terrain { frame_origin: frame.origin, spec: gspec, elevation, land_cover: cover, soil, wetness, obstacle_gap };
-    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, planet, stats })
+    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats })
 }
 
 /// One vector tile's contribution, in grid and ENU coordinates.

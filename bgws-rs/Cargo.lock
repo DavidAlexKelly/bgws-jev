@@ -842,6 +842,8 @@ dependencies = [
  "axum",
  "bgws-behaviour",
  "bgws-core",
+ "bgws-env",
+ "bgws-geodata",
  "bgws-run",
  "bgws-scenario",
  "bgws-sim",

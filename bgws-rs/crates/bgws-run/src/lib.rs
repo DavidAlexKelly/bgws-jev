@@ -15,6 +15,21 @@ pub mod workbench;
 
 pub use host::{load_scenario, router_for, DeciderChoice, Host, HostOptions, PlayReport};
 
+/// Where theatre packs live: `$BGWS_PACKS`, else `bgws-rs/packs/`.
+pub fn packs_dir() -> std::path::PathBuf {
+    std::env::var_os("BGWS_PACKS").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../packs"))
+}
+
+/// A scenario's `theatre.pack`: a path, or a folder name under `packs_dir()`.
+pub fn resolve_pack(name: &str) -> std::path::PathBuf {
+    let p = std::path::PathBuf::from(name);
+    if p.is_absolute() || p.exists() {
+        p
+    } else {
+        packs_dir().join(name)
+    }
+}
+
 /// Every figure the whole engine declares: the sim's crates plus the
 /// deciders and the analysis settings.
 pub fn all_figures() -> Vec<bgws_core::Figure> {
