@@ -1,0 +1,21 @@
+[package]
+name = "bgws-geodata"
+description = "Real terrain from planet PMTiles: a PMTiles reader over HTTP ranges with a disk cache, vector-tile decoding and terrarium elevation, for building theatre packs."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+bgws-env.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rayon.workspace = true
+flate2 = "1"
+image-webp = "0.2"
+reqwest = { workspace = true, features = ["blocking", "rustls-tls-native-roots"] }
+
+[dev-dependencies]
+approx.workspace = true
