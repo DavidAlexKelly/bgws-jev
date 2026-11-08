@@ -115,7 +115,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
-        figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace pushing through ground it cannot otherwise cross (dense wood; never water)"),
+        figure!("sim.route.crawl_kmh", 1.0, "km/h", 0.1, 10.0, "default", Default, "a vehicle's pace through ground it cannot otherwise cross (a dense wood; water only to get out of it)"),
         figure!("sim.route.escape_m", 300.0, "m", 0.0, 3_000.0, "default", Default, "how far from its start a route may crawl through such ground (out of a wood the vehicle stands in)"),
         figure!("sim.route.column_gap_m", 100.0, "m", 10.0, 1_000.0, "default", Default, "on a road, a unit within this of a friendly unit moving ahead of it on the road follows at its speed (no overtaking)"),
         figure!("sim.route.long_m", 20_000.0, "m", 2_000.0, 1_000_000.0, "default", Default, "moves longer than this go by the road graph, with a grid leg on and off it at each end"),
@@ -585,8 +585,11 @@ impl Ground {
         }
         let (start, goal) = (cell_of(r.from.e, r.from.n), cell_of(r.to.e, r.to.n));
         // Near the start, a vehicle crawls through what it cannot otherwise
-        // cross (out of the wood it stands in), never through water. A wood
-        // it is sent into is gone to the edge of (the closest approach).
+        // cross (out of the wood it stands in); through water only when it
+        // stands in water itself (placed there), never across a river from its
+        // bank. A wood it is sent into is gone to the edge of (the closest
+        // approach).
+        let in_water = river[start] > ford_limit || self.land_cover(r.from.e, r.from.n) == bgws_env::LandCover::Water;
         if p.escape_m > 0.0 && p.crawl_kmh > 0.0 {
             let crawl = 3.6 / p.crawl_kmh;
             let reach = (p.escape_m / step).ceil() as isize;
@@ -596,11 +599,11 @@ impl Ground {
                 for y in (cy - reach).max(0)..=(cy + reach).min(h as isize - 1) {
                     for x in (cx - reach).max(0)..=(cx + reach).min(w as isize - 1) {
                         let k = y as usize * w + x as usize;
-                        if g_spm[k].is_finite() || river[k] > ford_limit || (((x - cx) * (x - cx) + (y - cy) * (y - cy)) as f64).sqrt() * step > p.escape_m {
+                        if g_spm[k].is_finite() || (river[k] > ford_limit && !in_water) || (((x - cx) * (x - cx) + (y - cy) * (y - cy)) as f64).sqrt() * step > p.escape_m {
                             continue;
                         }
                         let (e, n) = pos(k);
-                        if self.land_cover(e, n) != bgws_env::LandCover::Water {
+                        if in_water || self.land_cover(e, n) != bgws_env::LandCover::Water {
                             g_spm[k] = crawl;
                         }
                     }

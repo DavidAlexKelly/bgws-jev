@@ -346,10 +346,15 @@ blown bridges are left out; when the graph does not join the ends, the move
 is planned on the grid. On the Kaliningrad pack, routes by the graph take
 about as long to drive as the grid's and plan in about half the time.
 
-**Woods a vehicle cannot enter.** A vehicle standing in ground it cannot
-cross (a dense wood, never water) crawls out at `sim.route.crawl_kmh`. A
-route may crawl only within `sim.route.escape_m` of its start. A unit sent
-into such a wood goes to its edge (the closest approach).
+**Never stuck.** A vehicle standing in ground it cannot cross crawls out
+at `sim.route.crawl_kmh`. That ground is a dense wood, or water a scenario
+put it in. A route may crawl only within `sim.route.escape_m` of its start,
+and through water only when it starts in water. So a unit on a river bank
+still goes to a bridge or a ford. A unit sent into such a wood goes to its
+edge (the closest approach). Roads are drawn on the 30 m terrain grid, and
+routes cut its corners. A vehicle following a road into a cell beside it
+(water by a causeway) keeps the road's speed. Before this, units on real
+ground could stop for good in such a cell.
 
 **Unreachable destinations.** When a destination cannot be reached (ground
 the vehicle cannot enter, or water with no way over), the route goes as near

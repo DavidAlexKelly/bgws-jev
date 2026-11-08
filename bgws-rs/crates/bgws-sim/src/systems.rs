@@ -128,11 +128,23 @@ pub fn movement(s: &mut Sim, dt: f64) {
         };
         let k = *s.world.get::<Kin>(e).expect("kin");
         let going = s.ctx.ground.going(k.pos.e, k.pos.n, class);
-        // Ground it cannot otherwise cross (a dense wood, not water): a crawl, as the planner allows near a route's ends.
-        let crawl = if s.ctx.ground.land_cover(k.pos.e, k.pos.n) == bgws_env::LandCover::Water { 0.0 } else { s.ctx.ground.route_params.crawl_kmh };
+        // Ground it cannot otherwise cross (a dense wood, or water it was put
+        // in): a crawl, so no unit is ever stuck for good. Routes only go
+        // through such ground to get out of it.
+        let crawl = s.ctx.ground.route_params.crawl_kmh;
         let off_road = platform.mover.cross_country_kmh.max(1.0).min(going.speed_kmh.max(crawl));
         // On a road (a theatre pack's): the road's speed, up to the vehicle's own.
-        let on_road = s.ctx.ground.road_kmh(k.pos.e, k.pos.n, class).map(|r| r.min(platform.mover.road_kmh)).unwrap_or(0.0);
+        let road_here = |e: f64, n: f64| s.ctx.ground.road_kmh(e, n, class).map(|r| r.min(platform.mover.road_kmh));
+        let mut on_road = road_here(k.pos.e, k.pos.n).unwrap_or(0.0);
+        // Roads are drawn on the terrain grid and routes cut its corners: a
+        // vehicle following one into a cell beside it (water by a causeway, a
+        // wall by a lane) is still on the road.
+        if on_road == 0.0 && going.speed_kmh < crawl {
+            let c = s.ctx.ground.terrain.spec.cell;
+            for (de, dn) in [(c, 0.0), (-c, 0.0), (0.0, c), (0.0, -c), (c, c), (c, -c), (-c, c), (-c, -c)] {
+                on_road = on_road.max(road_here(k.pos.e + de, k.pos.n + dn).unwrap_or(0.0));
+            }
+        }
         let mut base = off_road.max(on_road);
         // On the road behind a friendly unit moving the same way: its pace.
         if on_road > off_road && !on_roads.is_empty() {
