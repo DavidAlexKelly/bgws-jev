@@ -555,6 +555,29 @@ pub(crate) fn route_for(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: Mo
     plan_route(s, e, to, mode, seeks, urgent)
 }
 
+/// A mission phase as the activity to start now: a move's route planned
+/// afresh from where the unit is (the phase's route was planned from where
+/// it stood when the order came, so taken as it is it leads back there).
+pub(crate) fn phase_activity(s: &Sim, e: bevy_ecs::prelude::Entity, phase: &Activity) -> Activity {
+    match phase {
+        Activity::Move { route, mode, then } => match route.last() {
+            Some(&to) => Activity::Move { route: route_for(s, e, to, *mode), mode: *mode, then: then.clone() },
+            None => phase.clone(),
+        },
+        Activity::Withdraw { route, then } => match route.last() {
+            Some(&to) => Activity::Withdraw { route: plan_route(s, e, to, MoveModeS::Tactical, false, is_urgent(s, e, None)), then: then.clone() },
+            None => phase.clone(),
+        },
+        _ => phase.clone(),
+    }
+}
+
+/// The unit's current mission phase as the activity to start now.
+pub(crate) fn current_phase(s: &Sim, e: bevy_ecs::prelude::Entity) -> Activity {
+    let phase = s.world.get::<Act>(e).and_then(|a| a.mission.phases.get(a.mission.phase).cloned());
+    phase.map(|p| phase_activity(s, e, &p)).unwrap_or(Activity::Overwatch)
+}
+
 /// Is this move time-critical: orders "now", or a weapon getting into range (fire support)?
 pub(crate) fn is_urgent(s: &Sim, e: bevy_ecs::prelude::Entity, order: Option<&crate::hq::UnitOrder>) -> bool {
     let fires = |t: &str| {
@@ -615,10 +638,7 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         s.world.get::<Aware>(e)?.seen.iter().min_by(|a, b| a.1.at.sub(pos).horizontal().total_cmp(&b.1.at.sub(pos).horizontal())).map(|x| *x.0)
     });
     let current = s.world.get::<Act>(e).expect("a").activity.clone();
-    let mission_activity = {
-        let a = s.world.get::<Act>(e).expect("a");
-        a.mission.phases.get(a.mission.phase).cloned().unwrap_or(Activity::Overwatch)
-    };
+    let mission_activity = current_phase(s, e);
     let withdraw_m = s.ctx.p.withdraw_m;
     let reach = {
         let i = s.world.get::<Ident>(e).expect("i");
@@ -629,11 +649,13 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         "complyWithOrders" | "resumeOrders" | "resumeOrCarryOn" | "complyWithRequest" => Some(mission_activity),
         "carryOn" | "keepAtIt" | "keepFiring" | "keepHolding" | "keepHoldingHere" | "finishFightFirst" => None,
         "skipToNextPhase" => {
-            let mut a = s.world.get_mut::<Act>(e).expect("a");
-            if a.mission.phase + 1 < a.mission.phases.len() {
-                a.mission.phase += 1;
+            {
+                let mut a = s.world.get_mut::<Act>(e).expect("a");
+                if a.mission.phase + 1 < a.mission.phases.len() {
+                    a.mission.phase += 1;
+                }
             }
-            Some(a.mission.phases.get(a.mission.phase).cloned().unwrap_or(Activity::Overwatch))
+            Some(current_phase(s, e))
         }
         "engageNow" | "returnFire" | "fireNow" | "fireFirst" | "shiftFire" | "betterShotOnTarget" | "shiftFireFromLost" | "shiftFireFromTarget" => target.map(|t| Activity::Engage { target: t, volleys: None, then: Some(Box::new(Activity::Overwatch)) }),
         "fireAndMove" => target.map(|t| Activity::Engage { target: t, volleys: Some(2), then: Some(Box::new(Activity::Move { route: vec![better_spot(s, e)], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })) }),

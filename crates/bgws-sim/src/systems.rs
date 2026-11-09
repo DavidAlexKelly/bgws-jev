@@ -257,23 +257,33 @@ pub fn movement(s: &mut Sim, dt: f64) {
 /// Reached the end of a route: carry on with `then`, else the next phase, else hold.
 pub(crate) fn arrive(s: &mut Sim, e: Entity) {
     let id = s.world.get::<Ident>(e).expect("ident").id;
-    let mut a = s.world.get_mut::<Act>(e).expect("act");
-    let then = match &a.activity {
-        Activity::Move { then, .. } | Activity::Withdraw { then, .. } => then.clone(),
-        _ => None,
-    };
-    let was_phase = a.mission.phase < a.mission.phases.len();
-    match then {
-        Some(t) => a.activity = *t,
-        None => {
-            if was_phase && a.mission.phase + 1 < a.mission.phases.len() {
-                a.mission.phase += 1;
-                a.activity = a.mission.phases[a.mission.phase].clone();
+    // What comes next: the move's own follow-on, the next phase, or nothing.
+    let next_phase = {
+        let mut a = s.world.get_mut::<Act>(e).expect("act");
+        let then = match &a.activity {
+            Activity::Move { then, .. } | Activity::Withdraw { then, .. } => then.clone(),
+            _ => None,
+        };
+        match then {
+            Some(t) => {
+                a.activity = *t;
                 return;
             }
-            a.activity = Activity::Overwatch;
-            s.ctx.triggers.push(Trigger { entity: id, point: "D10", about: None });
+            None if a.mission.phase < a.mission.phases.len() && a.mission.phase + 1 < a.mission.phases.len() => {
+                a.mission.phase += 1;
+                true
+            }
+            None => {
+                a.activity = Activity::Overwatch;
+                false
+            }
         }
+    };
+    if next_phase {
+        let next = crate::decide::current_phase(s, e);
+        s.world.get_mut::<Act>(e).expect("act").activity = next;
+    } else {
+        s.ctx.triggers.push(Trigger { entity: id, point: "D10", about: None });
     }
 }
 

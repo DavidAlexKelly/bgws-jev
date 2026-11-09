@@ -85,3 +85,31 @@ fn an_undefended_objective_is_taken_and_one_not_reached_loses() {
     assert_eq!(out.winner, Some(Side::Red), "{}", out.reason);
     assert!(out.reason.contains("did not take its objective"), "{}", out.reason);
 }
+
+/// A unit starting the next phase of its orders (the bound after the
+/// release line) sets off from where it is: its route is planned afresh, not
+/// the one planned from its start line when the order came.
+#[test]
+fn the_next_phase_starts_from_where_the_unit_is() {
+    use bgws_sim::components::{Act, Activity, Ident, Kin};
+    let spec = standard().into_iter().find(|s| s.name == "gen-company-attack").unwrap();
+    let sc = load(&spec);
+    let mut h = bgws_run::Host::new(&sc, Seed(1), bgws_run::default_figures(), &bgws_run::HostOptions { deciders: bgws_run::DeciderChoice::Rules, ..Default::default() }).unwrap();
+    let mut later_phases = 0;
+    for minute in 1..=40 {
+        if h.play_until(SimTime::from_secs(minute as f64 * 60.0), |_| {}).unwrap().is_some() {
+            break;
+        }
+        for &e in &h.sim.ctx.order {
+            let (Some(i), Some(a), Some(k)) = (h.sim.world.get::<Ident>(e), h.sim.world.get::<Act>(e), h.sim.world.get::<Kin>(e)) else { continue };
+            if let Activity::Move { route, .. } = &a.activity {
+                if let Some(next) = route.first() {
+                    later_phases += usize::from(a.mission.phase > 0);
+                    let d = next.sub(k.pos).horizontal();
+                    assert!(d < 1_500.0, "{} at {minute} min, phase {}: next waypoint {d:.0} m away", i.name, a.mission.phase);
+                }
+            }
+        }
+    }
+    assert!(later_phases > 0, "some unit moved on a later phase");
+}

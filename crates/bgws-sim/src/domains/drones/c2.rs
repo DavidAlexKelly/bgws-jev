@@ -1000,13 +1000,18 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
     let handled = match action {
         "carryOnPhase" | "carryOn" | "acceptRisk" | "holdReserve" | "commitReserve" | "fireFirstRequest" => true,
         "actOnIntent" => {
-            if let Some(mut a) = s.world.get_mut::<Act>(e) {
-                if a.mission.phase + 1 < a.mission.phases.len() {
-                    a.mission.phase += 1;
-                    a.activity = a.mission.phases[a.mission.phase].clone();
-                } else if let Some(p) = a.mission.phases.get(a.mission.phase).cloned() {
-                    a.activity = p;
+            let has = match s.world.get_mut::<Act>(e) {
+                Some(mut a) => {
+                    if a.mission.phase + 1 < a.mission.phases.len() {
+                        a.mission.phase += 1;
+                    }
+                    a.mission.phase < a.mission.phases.len()
                 }
+                None => false,
+            };
+            if has {
+                let next = crate::decide::current_phase(s, e);
+                s.world.get_mut::<Act>(e).expect("a").activity = next;
             }
             true
         }
