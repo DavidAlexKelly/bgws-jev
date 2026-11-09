@@ -1,0 +1,39 @@
+[
+ {
+  "id": "tank-firing-from-the-open-while-an-atgm-can-reach-it",
+  "point": "D6",
+  "base": "tank-troop",
+  "why": "It has fired from one spot in the open and an enemy ATGM it cannot reach has it in range: staying put to keep firing is how tanks die. Fire and move, change target to one it can hit, or pull back.",
+  "set": {
+   "unit.posture": "halted",
+   "enemiesSeen.0": {
+    "what": "Kornet team",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 5500,
+    "thisDecisionIsAboutIt": false,
+    "rangeM": 3600
+   },
+   "enemiesSeen.1": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 2200
+   }
+  },
+  "acceptable": [
+   "fireAndMove",
+   "pullBack",
+   "quiet"
+  ],
+  "wrong": [
+   "keep"
+  ]
+ }
+]

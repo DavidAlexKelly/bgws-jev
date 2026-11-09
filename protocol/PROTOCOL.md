@@ -130,6 +130,9 @@ n × { u32 id, f64 lat, f64 lon, f32 alt, f32 heading_deg, u8 status }
 | `POST /api/lab/collect` | `{ scenario, seeds, minutes, deciders }`: play games and keep their decisions |
 | `POST /api/lab/grade` | `{ deciders, model?, prose?, judgedOnly? }`: ask a decider every moment afresh |
 | `GET /api/lab/report` | how each decider does, overall and per decision point |
+| `GET /api/lab/cases` | the decision cases (each with its options as built) and the test runs kept |
+| `POST /api/lab/test` | `{ deciders, model?, prose? }`: test a decider on every case |
+| `POST /api/lab/moments/:id/case` | `{ why }`: make a moment a decision case |
 
 The map data is PMTiles: any client with a PMTiles reader (MapLibre with
 the `pmtiles` protocol, `pmtiles` for Python, …) reads the packs and the

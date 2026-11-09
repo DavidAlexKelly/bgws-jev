@@ -1,0 +1,32 @@
+[
+ {
+  "id": "tank-ordered-to-withdraw-mid-fight",
+  "point": "D0",
+  "base": "tank-troop",
+  "why": "Urgent orders to withdraw arrive while it is trading fire with a tank at 1.5 km. Breaking off under cover (or firing as it goes) carries out the order without being shot in the back; finishing the fight first ignores an urgent order.",
+  "set": {
+   "orders.urgent": true,
+   "orders.purpose": "withdraw to the second line",
+   "orders.doing": "engaging",
+   "unit.posture": "halted",
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1500
+   }
+  },
+  "acceptable": [
+   "covered",
+   "fireAndBack",
+   "comply"
+  ],
+  "wrong": [
+   "finish"
+  ]
+ }
+]

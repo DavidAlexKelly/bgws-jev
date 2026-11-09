@@ -1,0 +1,30 @@
+[
+ {
+  "id": "tank-friend-under-fire-enemy-in-reach",
+  "point": "D9",
+  "base": "tank-troop",
+  "why": "The troop next door is under fire from a tank this troop can see and reach at 2 km, and it is not itself engaged. Fire on the attacker or move to support; carrying on leaves a friend to be shot.",
+  "set": {
+   "unit.posture": "in position",
+   "orders.doing": "holding",
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north-east",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 2000
+   },
+   "friendsWithin3km.0.strengthPct": 50
+  },
+  "acceptable": [
+   "help",
+   "support"
+  ],
+  "wrong": [
+   "keep"
+  ]
+ }
+]

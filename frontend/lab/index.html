@@ -59,7 +59,7 @@
 <body>
 <header>
   <b>BGWS</b><span>DECISION LAB</span>
-  <span class="tabs"><button data-tab="moments" class="on">Moments</button> <button data-tab="report">Report</button> <button data-tab="work">Collect &amp; grade</button></span>
+  <span class="tabs"><button data-tab="cases">Cases</button> <button data-tab="moments" class="on">Moments</button> <button data-tab="report">Report</button> <button data-tab="work">Collect &amp; grade</button></span>
   <span id="status"></span>
   <span style="flex:1"></span>
   <a href="/">viewer</a><a href="/behaviour">behaviour</a>
@@ -93,6 +93,7 @@ function show(t) {
   if (t === "moments") current ? openMoment(current.id) : ($("#detail").innerHTML = "");
   if (t === "report") report();
   if (t === "work") work();
+  if (t === "cases") casesTab();
 }
 
 async function load() {
@@ -222,6 +223,7 @@ async function openMoment(id) {
       <input id="note" placeholder="a note: why" size="50" value="${esc(label.note || "")}">
       <button class="go" id="save">Save my call</button>
       <button id="clear">Clear</button>
+      <button id="mkcase" title="Keep it as a decision case: your best and acceptable options (else the play-outs' near-best) pass, options the play-outs found clearly worse fail">Make it a case</button>
     </div>
     <div class="card" style="margin-top:14px">
       <div class="row">
@@ -249,6 +251,12 @@ async function openMoment(id) {
     await load();
     openMoment(m.id);
   };
+  $("#mkcase").onclick = async () => {
+    try {
+      const c = await api(`/api/lab/moments/${encodeURIComponent(m.id)}/case`, { why: $("#note").value });
+      status(`case ${c.id}: acceptable ${c.acceptable.join(", ")}${c.wrong.length ? "; wrong " + c.wrong.join(", ") : ""}`);
+    } catch (err) { status(err.message); }
+  };
   $("#play").onclick = async (e) => {
     e.target.disabled = true;
     status("playing out… (each option, every run)");
@@ -262,6 +270,81 @@ async function openMoment(id) {
 }
 
 // ── Report ────────────────────────────────────────────────────────────────
+
+// ── Cases ─────────────────────────────────────────────────────────────────
+
+async function casesTab() {
+  $("#detail").innerHTML = `<p class="dim">building the cases…</p>`;
+  const d = await api("/api/lab/cases");
+  const runs = d.runs;
+  const verdictOf = (run, caseId, variant = "base") => run.items.find((i) => i.case === caseId && i.variant === variant);
+  const mark = (v) => (!v ? `<span class="dim">–</span>` : v.verdict === "pass" ? `<span style="color:var(--good)">✓ ${esc(v.choice)}</span>` : v.verdict === "wrong" ? `<span style="color:var(--bad)">✗ ${esc(v.choice)}</span>` : `<span class="dim">~ ${esc(v.choice)}</span>`);
+  const n = (r) => r.pass + r.wrong + r.other;
+  const points = [...new Set(runs.flatMap((r) => r.byPoint.map((p) => p.point)))].sort((a, b) => +a.slice(1) - +b.slice(1));
+  const summary = runs.length
+    ? `<table>
+      <tr><th>decider</th><th class="num">questions</th><th class="num">pass</th><th class="num">wrong</th><th class="num">neither</th><th class="num">same when reordered / renamed</th><th class="num">trends</th><th class="num">sure when right</th><th class="num">sure when wrong</th><th class="num">cost</th></tr>
+      ${runs.map((r) => `<tr><td>${esc(r.decider)}${r.fellBack && r.decider !== "template fallback" ? ` <span class="tag r" title="${esc((r.items.find((i) => i.source.startsWith("fallback")) || {}).source || "")}">${r.fellBack} fell back</span>` : ""}</td><td class="num">${n(r)}</td><td class="num">${pct(r.pass / n(r))}</td><td class="num">${pct(r.wrong / n(r))}</td><td class="num">${pct(r.other / n(r))}</td><td class="num">${r.invariant}/${r.invarianceChecks}</td><td class="num">${r.trends.filter((t) => t.pass).length}/${r.trends.length}</td><td class="num">${pct(r.meanConfidencePass)}</td><td class="num">${pct(r.meanConfidenceWrong)}</td><td class="num">$${r.costUsd.toFixed(4)}</td></tr>`).join("")}
+    </table>
+    <h3>Pass rate by decision point</h3>
+    <table><tr><th>decider</th>${points.map((p) => `<th class="num">${p}</th>`).join("")}</tr>
+      ${runs.map((r) => `<tr><td>${esc(r.decider)}</td>${points.map((p) => { const x = r.byPoint.find((y) => y.point === p); return `<td class="num">${x ? `${x.pass}/${x.items}` : "–"}</td>`; }).join("")}</tr>`).join("")}
+    </table>`
+    : `<p class="dim">No runs yet.</p>`;
+  const rowsHtml = d.cases.map((x, k) => {
+    const c = x.case;
+    return `<tr class="case-row" data-k="${k}" style="cursor:pointer">
+      <td><b>${esc(c.id)}</b>${c.source ? ` <span class="tag">from a moment</span>` : ""}${x.error ? `<div style="color:var(--bad)">${esc(x.error)}</div>` : ""}</td>
+      <td>${esc(c.point)}</td><td>${esc(c.acceptable.join(", "))}</td><td>${esc((c.wrong || []).join(", "))}</td>
+      ${runs.map((r) => `<td>${mark(verdictOf(r, c.id))}</td>`).join("")}
+    </tr><tr id="cd-${k}" style="display:none"><td colspan="${4 + runs.length}"></td></tr>`;
+  }).join("");
+  $("#detail").innerHTML = `
+    <h2>Decision cases</h2>
+    <p class="note">Hand-written situations with the answers expected: the template's options for the decision point after its gates, the unit's state as the game would send it. A pass is a choice among the acceptable ones; wrong is one marked wrong; ~ is neither. Each case also asks with its options reversed and its unit renamed: the choice should not change. A trend asks the same case as one fact changes (an enemy closing) and checks the share on some options does not fall. Click a case for its picture, options and every question it asks.</p>
+    <div class="card">
+      <div class="row">Test <select id="t-dec"><option>jev</option><option>claude</option><option>local</option><option>rules</option></select>
+        model <input id="t-model" placeholder="as configured" size="22">
+        <label><input type="checkbox" id="t-prose"> also the words (Jev)</label>
+        <button class="go" id="t-go">Run the cases</button>
+        <span class="dim">${d.cases.length} cases. Jev needs OPENROUTER_API_KEY where the server runs; without it every answer is the fallback.</span></div>
+    </div>
+    ${summary}
+    <h3>The cases</h3>
+    <table>
+      <tr><th>case</th><th>point</th><th>acceptable</th><th>wrong</th>${runs.map((r) => `<th>${esc(r.decider)}</th>`).join("")}</tr>
+      ${rowsHtml}
+    </table>`;
+  document.querySelectorAll(".case-row").forEach((row) => (row.onclick = () => {
+    const k = +row.dataset.k, x = d.cases[k], c = x.case, el = $(`#cd-${k}`);
+    if (el.style.display !== "none") { el.style.display = "none"; return; }
+    el.style.display = "";
+    const variants = x.variants || ["base"];
+    const optRows = (x.options || []).map((o) => `<tr><td><b>${esc(o.id)}</b>${c.acceptable.includes(o.id) ? ` <span class="tag g">acceptable</span>` : ""}${(c.wrong || []).includes(o.id) ? ` <span class="tag r">wrong</span>` : ""}<div class="dim">${esc(o.summary)}${o.bias ? ` (bias ${o.bias})` : ""}</div></td>
+        <td>${o.id === x.fallback ? "✓" : ""}</td>
+        ${runs.map((r) => { const v = verdictOf(r, c.id); const p = v && v.probabilities[o.id]; return `<td class="num" style="${v && v.choice === o.id ? "color:var(--accent);font-weight:bold" : ""}">${p != null ? pct(p) : v && v.choice === o.id ? "✓" : ""}</td>`; }).join("")}</tr>`).join("");
+    const varRows = variants.map((v) => `<tr><td>${esc(v)}</td>${runs.map((r) => { const i = verdictOf(r, c.id, v); return `<td>${!i ? "–" : i.verdict === "same" ? `<span style="color:var(--good)">same (${esc(i.choice)})</span>` : i.verdict === "changed" ? `<span style="color:var(--bad)">changed to ${esc(i.choice)}</span>` : mark(i)}</td>`; }).join("")}</tr>`).join("");
+    const trends = runs.flatMap((r) => r.trends.filter((t) => t.case === c.id).map((t) => `<p class="note">${esc(r.decider)}: trend "${esc(t.variation)}" toward ${esc(t.toward.join("/"))}: ${t.series.map((s) => pct(s)).join(" → ")} ${t.pass ? "✓" : "✗"}</p>`)).join("");
+    el.firstElementChild.innerHTML = `
+      <p class="note">${esc(c.why)}</p>
+      <div class="grid2"><div>${x.state ? radar(x.state) : ""}</div><div>
+        <h3>The options</h3>
+        <table><tr><th>option</th><th>fallback</th>${runs.map((r) => `<th class="num">${esc(r.decider)}</th>`).join("")}</tr>${optRows}</table>
+        <h3>Every question it asks</h3>
+        <table><tr><th>variant</th>${runs.map((r) => `<th>${esc(r.decider)}</th>`).join("")}</tr>${varRows}</table>
+        ${trends}
+      </div></div>`;
+  }));
+  $("#t-go").onclick = async (e) => {
+    e.target.disabled = true;
+    status("asking every case…");
+    try {
+      const r = await api("/api/lab/test", { deciders: $("#t-dec").value, model: $("#t-model").value || null, prose: $("#t-prose").checked });
+      status(`${r.decider}: ${r.pass} pass, ${r.wrong} wrong of ${n(r)}`);
+      casesTab();
+    } catch (err) { status(err.message); e.target.disabled = false; }
+  };
+}
 
 async function report() {
   const r = await api("/api/lab/report");

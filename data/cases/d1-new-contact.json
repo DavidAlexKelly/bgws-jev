@@ -1,0 +1,151 @@
+[
+ {
+  "id": "tank-outranged-by-atgm-in-the-open",
+  "point": "D1",
+  "base": "tank-troop",
+  "why": "An ATGM team it cannot reach can reach it, and it is moving in the open: carrying on or firing from here only feeds the missiles. Get out of its sight or into a better position, or stop and watch while friends deal with it.",
+  "set": {
+   "enemiesSeen.0": {
+    "what": "Kornet team",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 5500,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 4200
+   }
+  },
+  "acceptable": [
+   "better",
+   "pullBack",
+   "observe"
+  ],
+  "wrong": [
+   "keep",
+   "engage"
+  ]
+ },
+ {
+  "id": "tank-sees-tank-in-reach-from-hull-down",
+  "point": "D1",
+  "base": "tank-troop",
+  "why": "Hull-down on overwatch, a tank crossing in the open at 1.8 km, well inside its gun's reach: the best shot it will get. Engage, or wait a moment for a flank shot; leaving its position throws the advantage away.",
+  "set": {
+   "unit.posture": "hull-down in cover",
+   "orders.doing": "on overwatch",
+   "orders.purpose": "overwatch the valley and destroy enemy armour crossing it",
+   "ground.cover": 0.7,
+   "ground.concealment": 0.6,
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "east",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1800
+   }
+  },
+  "acceptable": [
+   "engage",
+   "wait"
+  ],
+  "wrong": [
+   "pullBack",
+   "keep"
+  ],
+  "variations": [
+   {
+    "name": "the tank closes",
+    "trend": [
+     "engage",
+     "wait"
+    ],
+    "steps": [
+     {
+      "label": "4.5 km, out of reach",
+      "set": {
+       "enemiesSeen.0.rangeM": 4500
+      },
+      "acceptable": [
+       "wait",
+       "observe",
+       "keep"
+      ],
+      "wrong": [
+       "pullBack"
+      ]
+     },
+     {
+      "label": "3.2 km",
+      "set": {
+       "enemiesSeen.0.rangeM": 3200
+      },
+      "acceptable": [
+       "wait",
+       "observe",
+       "keep"
+      ],
+      "wrong": [
+       "pullBack"
+      ]
+     },
+     {
+      "label": "2.4 km",
+      "set": {
+       "enemiesSeen.0.rangeM": 2400
+      },
+      "acceptable": [
+       "engage",
+       "wait"
+      ],
+      "wrong": [
+       "pullBack"
+      ]
+     },
+     {
+      "label": "1.2 km",
+      "set": {
+       "enemiesSeen.0.rangeM": 1200
+      },
+      "acceptable": [
+       "engage"
+      ],
+      "wrong": [
+       "pullBack",
+       "keep"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "infantry-sees-tank-beyond-its-reach",
+  "point": "D1",
+  "base": "infantry-section",
+  "why": "A tank 1.5 km off, beyond anything the section has that can hurt it, has not seen the section in its wood. Opening fire only gives the position away; stay hidden and watch (or wait for it to come close).",
+  "set": {
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1500
+   }
+  },
+  "acceptable": [
+   "observe",
+   "wait",
+   "keep"
+  ],
+  "wrong": [
+   "engage"
+  ]
+ }
+]

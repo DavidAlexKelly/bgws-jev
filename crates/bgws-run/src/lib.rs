@@ -7,6 +7,7 @@
 pub mod aar;
 pub mod experiments;
 pub mod geotiff;
+pub mod cases;
 pub mod host;
 pub mod lab;
 pub mod behaviour;
@@ -15,6 +16,11 @@ pub mod eventlog;
 pub mod workbench;
 
 pub use host::{load_scenario, router_for, DeciderChoice, Host, HostOptions, PlayReport};
+
+/// The shipped data (scenarios, catalogue, templates, cases): `$BGWS_DATA`, else `data/` at the repository root.
+pub fn data_dir() -> std::path::PathBuf {
+    std::env::var_os("BGWS_DATA").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+}
 
 /// Where theatre packs live: `$BGWS_PACKS`, else `packs/` at the repository root.
 pub fn packs_dir() -> std::path::PathBuf {

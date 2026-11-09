@@ -1,0 +1,72 @@
+[
+ {
+  "id": "atgm-ambush-target-in-the-killing-area",
+  "point": "D4",
+  "base": "atgm-team",
+  "why": "An ambush whose trigger is met: an enemy tank on the road at 1.8 km, well inside the missile's 4 km. Fire now; letting it pass fails the task.",
+  "set": {
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "south",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1800
+   }
+  },
+  "acceptable": [
+   "fire"
+  ],
+  "wrong": [
+   "letPass"
+  ],
+  "variations": [
+   {
+    "name": "range",
+    "trend": [
+     "fire"
+    ],
+    "steps": [
+     {
+      "label": "5 km, beyond the missile",
+      "set": {
+       "enemiesSeen.0.rangeM": 5000
+      },
+      "acceptable": [
+       "closer",
+       "letPass"
+      ],
+      "wrong": [
+       "fire"
+      ]
+     },
+     {
+      "label": "3.5 km",
+      "set": {
+       "enemiesSeen.0.rangeM": 3500
+      },
+      "acceptable": [
+       "fire",
+       "closer"
+      ],
+      "wrong": []
+     },
+     {
+      "label": "1.5 km",
+      "set": {
+       "enemiesSeen.0.rangeM": 1500
+      },
+      "acceptable": [
+       "fire"
+      ],
+      "wrong": [
+       "letPass"
+      ]
+     }
+    ]
+   }
+  ]
+ }
+]

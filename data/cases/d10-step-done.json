@@ -1,0 +1,30 @@
+[
+ {
+  "id": "tank-reaches-objective-enemy-nearby",
+  "point": "D10",
+  "base": "tank-troop",
+  "why": "On the objective at the end of its orders, an enemy tank seen 2 km off: hold the ground and overwatch it, ready to fire.",
+  "set": {
+   "orders.phase": "2 of 2",
+   "orders.doing": "holding",
+   "orders.headingFor": null,
+   "unit.posture": "halted",
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": false,
+    "rangeM": 2000
+   }
+  },
+  "acceptable": [
+   "overwatch",
+   "hold",
+   "keep"
+  ],
+  "wrong": []
+ }
+]

@@ -31,7 +31,7 @@ use bgws_scenario::record::GameRecord;
 use bgws_run::default_figures;
 use bgws_sim::SimOptions;
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Parser)]
@@ -254,7 +254,7 @@ enum Cmd {
 }
 
 fn data_dir() -> PathBuf {
-    std::env::var_os("BGWS_DATA").map(PathBuf::from).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+    bgws_run::data_dir()
 }
 
 /// The scenarios the sim-played vignettes run on, from the shipped presets.
@@ -320,6 +320,32 @@ enum LabCmd {
         local_url: String,
         #[arg(long, default_value = "local")]
         local_model: String,
+    },
+    /// Test a decider on the decision cases (data/cases and the lab's own):
+    /// hand-written situations with the answers expected.
+    Test {
+        #[arg(long, default_value = "jev")]
+        deciders: DeciderChoice,
+        #[arg(long)]
+        model: Option<String>,
+        /// Jev only: give the situation in words as well as the fields.
+        #[arg(long)]
+        prose: bool,
+        /// Only cases whose id contains this.
+        #[arg(long)]
+        case: Option<String>,
+        /// Only this decision point (D1…).
+        #[arg(long)]
+        point: Option<String>,
+        /// Check that every case builds (its options exist) and show the template fallback's score; ask no one.
+        #[arg(long)]
+        check: bool,
+    },
+    /// Make a decision case from a lab moment (your label, else its play-outs).
+    Case {
+        moment: String,
+        #[arg(long, default_value = "")]
+        why: String,
     },
     /// How each decider does: near-best against the play-outs, agreement with your labels, calibration.
     Report {
@@ -486,6 +512,33 @@ fn main() -> Result<()> {
                     let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, (&local_url, &local_model))?;
                     let n = lab.grade(d, &name, |m| !judged_only || m.playouts.is_some() || m.label.is_some())?;
                     eprintln!("{n} moments graded as {name}");
+                }
+                LabCmd::Test { deciders, model, prose, case, point, check } => {
+                    let (bases, cases) = bgws_run::cases::load(&bgws_run::cases::case_dirs(&lab.dir))?;
+                    let cases: Vec<_> = cases.into_iter().filter(|c| case.as_ref().is_none_or(|k| c.id.contains(k.as_str())) && point.as_ref().is_none_or(|p| &c.point == p)).collect();
+                    let mut b = bgws_run::cases::Builder::new(bases, &default_figures())?;
+                    let items = bgws_run::cases::build_all(&mut b, &cases)?;
+                    let fb = bgws_run::cases::judge(&cases, &items, &bgws_run::cases::fallback_answers(&items), "template fallback");
+                    if check {
+                        eprintln!("{} cases, {} questions: every one builds", cases.len(), items.len());
+                        print!("{}", fb.table());
+                    } else {
+                        let (d, name) = bgws_run::cases::decider(deciders, &default_figures(), model, prose)?;
+                        let t0 = Instant::now();
+                        let run = bgws_run::cases::run(&cases, &items, d, &name)?;
+                        let p = bgws_run::cases::save_run(&lab.dir, &run)?;
+                        bgws_run::cases::save_run(&lab.dir, &fb)?;
+                        print!("{}", run.table());
+                        eprintln!("\n{} questions in {:.0} s, ${:.4}; kept in {}. The template fallback scores {} pass, {} wrong.", items.len(), t0.elapsed().as_secs_f64(), run.cost_usd, p.display(), fb.pass, fb.wrong);
+                    }
+                }
+                LabCmd::Case { moment, why } => {
+                    let m = lab.moment(&moment)?;
+                    let c = bgws_run::cases::case_from_moment(&m, &why)?;
+                    let (bases, _) = bgws_run::cases::load(&bgws_run::cases::case_dirs(&lab.dir))?;
+                    bgws_run::cases::Builder::new(bases, &default_figures())?.items(&c)?;
+                    let p = bgws_run::cases::save_case(&lab.dir, &c)?;
+                    eprintln!("case {} kept in {} (acceptable: {}; wrong: {})", c.id, p.display(), c.acceptable.join(", "), c.wrong.join(", "));
                 }
                 LabCmd::Report { points, json } => {
                     let r = lab.report()?;

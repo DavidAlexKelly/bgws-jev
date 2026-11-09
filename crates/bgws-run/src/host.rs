@@ -598,6 +598,14 @@ impl Host {
                 }
                 Step::NeedsAnswers { at, questions } => {
                     self.apply_recorded()?;
+                    // A record saved while questions were out (before Play, or while a
+                    // person was deciding) ends here: those were never answered.
+                    if let Some(rec) = &self.replay {
+                        let unanswered = questions.iter().any(|q| !rec.answers.iter().any(|a| a.answer.question == q.id));
+                        if unanswered && rec.ended_at.is_some_and(|e| at >= e) {
+                            return Ok(None);
+                        }
+                    }
                     self.questions += questions.len();
                     if self.keep_questions {
                         self.asked.extend(questions.iter().cloned());

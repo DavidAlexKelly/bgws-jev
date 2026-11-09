@@ -1145,6 +1145,71 @@ async fn lab_grade(Json(r): Json<GradeReq>) -> axum::response::Response {
     .await
 }
 
+/// The decision cases, each with its question's options as built, and the test runs kept.
+async fn lab_cases() -> axum::response::Response {
+    lab_blocking(|| {
+        let l = lab()?;
+        let (bases, cases) = bgws_run::cases::load(&bgws_run::cases::case_dirs(&l.dir))?;
+        let mut b = bgws_run::cases::Builder::new(bases, &default_figures())?;
+        let list: Vec<serde_json::Value> = cases
+            .iter()
+            .map(|c| match b.items(c) {
+                Ok(items) => {
+                    let q = &items[0].question;
+                    json!({ "case": c, "options": q.options, "fallback": q.fallback, "doctrine": q.doctrine, "state": q.state, "variants": items.iter().map(|i| &i.variant).collect::<Vec<_>>() })
+                }
+                Err(e) => json!({ "case": c, "error": e.to_string() }),
+            })
+            .collect();
+        Ok(json!({ "cases": list, "runs": bgws_run::cases::runs(&l.dir) }))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestReq {
+    deciders: DeciderChoice,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    prose: bool,
+}
+
+/// Test a decider on every case (and keep the fallback's score beside it).
+async fn lab_test(Json(r): Json<TestReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let l = lab()?;
+        let (bases, cases) = bgws_run::cases::load(&bgws_run::cases::case_dirs(&l.dir))?;
+        let mut b = bgws_run::cases::Builder::new(bases, &default_figures())?;
+        let items = bgws_run::cases::build_all(&mut b, &cases)?;
+        bgws_run::cases::save_run(&l.dir, &bgws_run::cases::judge(&cases, &items, &bgws_run::cases::fallback_answers(&items), "template fallback"))?;
+        let (d, name) = bgws_run::cases::decider(r.deciders, &default_figures(), r.model, r.prose)?;
+        let run = bgws_run::cases::run(&cases, &items, d, &name)?;
+        bgws_run::cases::save_run(&l.dir, &run)?;
+        Ok(run)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct CaseReq {
+    #[serde(default)]
+    why: String,
+}
+
+async fn lab_make_case(UrlPath(id): UrlPath<String>, Json(r): Json<CaseReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let l = lab()?;
+        let c = bgws_run::cases::case_from_moment(&l.moment(&id)?, &r.why)?;
+        let (bases, _) = bgws_run::cases::load(&bgws_run::cases::case_dirs(&l.dir))?;
+        bgws_run::cases::Builder::new(bases, &default_figures())?.items(&c)?;
+        bgws_run::cases::save_case(&l.dir, &c)?;
+        Ok(c)
+    })
+    .await
+}
+
 async fn lab_report() -> axum::response::Response {
     lab_reply(lab().and_then(|l| l.report()))
 }
@@ -1187,6 +1252,9 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
         .route("/api/lab/collect", post(lab_collect))
         .route("/api/lab/grade", post(lab_grade))
         .route("/api/lab/report", get(lab_report))
+        .route("/api/lab/cases", get(lab_cases))
+        .route("/api/lab/test", post(lab_test))
+        .route("/api/lab/moments/:id/case", post(lab_make_case))
         .route("/ws", get(ws))
         .with_state(AppState { out, to_game });
     // The frontend: a folder given with --web, else the bundled viewer.

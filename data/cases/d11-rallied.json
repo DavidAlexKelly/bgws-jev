@@ -1,0 +1,31 @@
+[
+ {
+  "id": "shaken-troop-rallies-with-the-enemy-close",
+  "point": "D11",
+  "base": "tank-troop",
+  "why": "Down to under half strength and only just rallied, with an enemy tank 1 km off: hold and recover, or join friends. Straight back into the advance is asking to break again.",
+  "set": {
+   "unit.vehicles": "1 of 4",
+   "unit.strengthPct": 30,
+   "unit.morale": "shaken",
+   "unit.posture": "halted",
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": false,
+    "rangeM": 1000
+   }
+  },
+  "acceptable": [
+   "hold",
+   "join"
+  ],
+  "wrong": [
+   "resume"
+  ]
+ }
+]

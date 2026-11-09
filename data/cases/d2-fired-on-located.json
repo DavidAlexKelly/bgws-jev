@@ -1,0 +1,77 @@
+[
+ {
+  "id": "tank-troop-fired-on-by-three-tanks-in-the-open",
+  "point": "D2",
+  "base": "tank-troop",
+  "why": "Half the troop gone, suppressed, in the open, under fire from three tanks it can see: assaulting into them is suicide and staying in the open is too. Get hull-down or out of sight, or bring in a friend's fire.",
+  "set": {
+   "unit.vehicles": "2 of 4",
+   "unit.strengthPct": 50,
+   "unit.suppressionPct": 40,
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1500
+   },
+   "enemiesSeen.1": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": false,
+    "rangeM": 1550
+   },
+   "enemiesSeen.2": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": false,
+    "rangeM": 1600
+   }
+  },
+  "acceptable": [
+   "hullDown",
+   "pullBack",
+   "askFriend"
+  ],
+  "wrong": [
+   "assault"
+  ]
+ },
+ {
+  "id": "tank-fired-on-by-infantry-at-close-range",
+  "point": "D2",
+  "base": "tank-troop",
+  "why": "Infantry with RPGs at 300 m, located: inside their reach, but the troop out-ranges them by kilometres. Return fire, or back off out of RPG range and fire from there; going quiet in the open helps nobody.",
+  "set": {
+   "enemiesSeen.0": {
+    "what": "infantry squad",
+    "identified": true,
+    "bearing": "east",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 700,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 300
+   }
+  },
+  "acceptable": [
+   "returnFire",
+   "pullBack",
+   "askFriend"
+  ],
+  "wrong": [
+   "quiet"
+  ]
+ }
+]
