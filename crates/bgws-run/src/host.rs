@@ -202,7 +202,7 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
             };
             let (o, x, y) = (to_pack(0.0, 0.0), to_pack(1_000.0, 0.0), to_pack(0.0, 1_000.0));
             let m = [(x.0 - o.0) / 1_000.0, (y.0 - o.0) / 1_000.0, o.0, (x.1 - o.1) / 1_000.0, (y.1 - o.1) / 1_000.0, o.1];
-            Some(bgws_env::SightView { surface: std::sync::Arc::new(surface), to_pack: m })
+            Some(bgws_env::SightView::new(std::sync::Arc::new(surface), m))
         }
         None => None,
     };

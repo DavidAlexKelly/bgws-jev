@@ -154,3 +154,55 @@ fn a_scenario_off_its_pack_is_told_how_to_fix_it() {
     let e = bgws_run::host::load_pack(&sc).map(|_| ()).expect_err("an error").to_string();
     assert!(e.contains("none of the scenario's forces are on it") && e.contains("Move onto the pack"), "{e}");
 }
+
+/// The city's blocks come out of the pack's buildings, split by its
+/// streets: many of them, of every material, and a heavy shell brings part
+/// of one down and lowers it for sight lines.
+#[test]
+#[ignore = "needs a real pack: BGWS_TEST_PACK"]
+fn the_city_is_cut_into_blocks() {
+    let pack = PathBuf::from(std::env::var("BGWS_TEST_PACK").expect("BGWS_TEST_PACK: a pack over Kaliningrad"));
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sc = load_scenario(&root.join("data/scenarios/skirmish-advance-to-contact-v1.json")).unwrap();
+    // Onto the city centre.
+    let (dlat, dlon) = (54.712 - sc.theatre.origin.lat, 20.51 - sc.theatre.origin.lon);
+    let shift = |g: Geodetic| Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
+    sc.theatre.origin = shift(sc.theatre.origin);
+    sc.theatre.bounds = None;
+    sc.theatre.pack = Some(pack.display().to_string());
+    for f in &mut sc.forces {
+        f.position = shift(f.position);
+    }
+    let t0 = std::time::Instant::now();
+    let mut host = Host::new(&sc, sc.seed, bgws_run::default_figures(), &HostOptions::default()).unwrap();
+    let g = &host.sim.ctx.ground;
+    let u = g.urban.as_ref().expect("the pack's town is in blocks");
+    let n = u.blocks.len();
+    let mut by = [0usize; 3];
+    for b in &u.blocks {
+        by[b.material as usize] += 1;
+    }
+    let big: Vec<_> = u.blocks.iter().filter(|b| b.area_m2 >= 5_000.0).collect();
+    let largest = u.blocks.iter().map(|b| b.area_m2).fold(0.0, f64::max);
+    eprintln!("{n} blocks (light {}, masonry {}, concrete {}), {} over 5,000 m², largest {:.0} m², loaded in {:.1} s", by[0], by[1], by[2], big.len(), largest, t0.elapsed().as_secs_f64());
+    assert!(n > 200, "a city has hundreds of blocks");
+    assert!(by.iter().all(|&c| c > 0), "light, masonry and concrete all occur");
+    assert!(largest < 2.0e6, "streets cut the city up: no block is the whole town");
+    // A built-over block near the centre: shell it.
+    let b = big.iter().min_by(|a, b| a.e.hypot(a.n).total_cmp(&b.e.hypot(b.n))).unwrap();
+    let (id, e, n0) = (b.id, b.e, b.n);
+    let cell = host.sim.ctx.ground.urban.as_ref().unwrap().cells[id as usize][0] as usize;
+    let spec = host.sim.ctx.ground.terrain.spec;
+    let (ce, cn) = spec.pos(cell % spec.width, cell / spec.width);
+    let sight = host.sim.ctx.ground.sight.clone().unwrap();
+    // The tallest roof sample in that cell, before and after.
+    let tallest = |v: &bgws_env::SightView| (0..36).map(|k| v.at(ce - 15.0 + (k % 6) as f64 * 5.0 + 2.5, cn - 15.0 + (k / 6) as f64 * 5.0 + 2.5).0).fold(0.0, f64::max);
+    let before = tallest(&sight);
+    let mut left = 1.0;
+    for _ in 0..40 {
+        left = host.sim.ctx.ground.strike_building(ce, cn).map(|x| x.1).unwrap_or(left);
+    }
+    let after = tallest(host.sim.ctx.ground.sight.as_ref().unwrap());
+    eprintln!("block {id} at ({e:.0}, {n0:.0}): {:.0}% standing after 40 rounds; roofs {before:.0} m → {after:.1} m", left * 100.0);
+    assert!(left < 1.0 && after < before, "shelling brings it down");
+}

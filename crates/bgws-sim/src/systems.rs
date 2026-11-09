@@ -33,6 +33,18 @@ pub(crate) fn lod(s: &Sim, e: Entity) -> Lod {
     s.world.get::<Lod>(e).copied().unwrap_or_default()
 }
 
+/// Eye height for sensing: troops settled in a block watch from its upper
+/// floors, else the platform's own (`eye`).
+fn upper_floor_eye(s: &Sim, p: &bgws_catalogue::Platform, posture: Posture, pos: Enu, eye: f64) -> f64 {
+    if p.body.vulnerability != bgws_catalogue::Vulnerability::Personnel || !matches!(posture, Posture::Settled | Posture::HullDown) {
+        return eye;
+    }
+    match s.ctx.ground.urban.as_ref() {
+        Some(u) => u.at(pos.e, pos.n).map(|b| eye.max(u.eye_m(b))).unwrap_or(eye),
+        None => eye,
+    }
+}
+
 /// Posture from how long it has been still (moving, halted, settled, hull-down).
 pub fn posture(s: &mut Sim) {
     let now = s.ctx.now;
@@ -333,7 +345,7 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
                 side: i.side,
                 pos: k.pos,
                 agl: k.agl,
-                eye_h: p.sensors.iter().map(|x| x.height_m).fold(2.0, f64::max).min(6.0),
+                eye_h: upper_floor_eye(s, p, a.posture, k.pos, p.sensors.iter().map(|x| x.height_m).fold(2.0, f64::max).min(6.0)),
                 crit,
                 contrast,
                 delta_t,
@@ -707,7 +719,8 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
         "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
         "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
-        "lineOfSight": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked, "pAnyElement": p_elements, "linesChecked": lines.len() },
+        // pVisible is what sensing uses (any element seen); the rest is the line between the two units' centres.
+        "lineOfSight": { "pVisible": p_elements, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
         "sensors": sensors,
         "bestRatePerS": best_rate,
         "windowS": over_s,

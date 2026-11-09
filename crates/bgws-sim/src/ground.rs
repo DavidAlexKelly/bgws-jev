@@ -43,6 +43,9 @@ pub struct Ground {
     pub sight: Option<bgws_env::SightView>,
     /// The share of each terrain cell under buildings (×255), from the sight surface.
     pub built: Option<Arc<Raster<u8>>>,
+    /// The town's blocks (from the sight surface, split by roads).
+    pub urban: Option<crate::urban::Urban>,
+    pub urban_params: crate::urban::UrbanParams,
     /// Heavy-shell craters in each cell, once any have landed.
     pub craters: Option<Arc<Raster<u8>>>,
     pub road_speeds: RoadSpeeds,
@@ -132,6 +135,8 @@ impl Ground {
             craters: None,
             sight: None,
             built: None,
+            urban: None,
+            urban_params: crate::urban::UrbanParams::from_figures(figures),
             sights: Default::default(),
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
@@ -208,25 +213,51 @@ impl Ground {
         let ts = self.terrain.spec;
         let k = (ts.cell / sight.cell()).round().max(1.0) as usize;
         let sub = ts.cell / k as f64;
-        let data: Vec<u8> = (0..ts.len())
+        let cells: Vec<crate::urban::CellBuilt> = (0..ts.len())
             .into_par_iter()
             .map(|c| {
                 let (e, n) = ts.pos(c % ts.width, c / ts.width);
-                let mut hit = 0usize;
+                let (mut hit, mut sum, mut max) = (0usize, 0.0, 0.0f64);
                 for a in 0..k {
                     for b in 0..k {
                         let (x, y) = (e - ts.cell / 2.0 + (a as f64 + 0.5) * sub, n - ts.cell / 2.0 + (b as f64 + 0.5) * sub);
-                        if sight.at(x, y).0 > 0.0 {
+                        let h = sight.at(x, y).0;
+                        if h > 0.0 {
                             hit += 1;
+                            sum += h;
+                            max = max.max(h);
                         }
                     }
                 }
-                (hit * 255 / (k * k)) as u8
+                crate::urban::CellBuilt { share: hit as f64 / (k * k) as f64, mean_height_m: if hit > 0 { sum / hit as f64 } else { 0.0 }, max_height_m: max }
             })
             .collect();
+        let data: Vec<u8> = cells.iter().map(|c| (c.share * 255.0) as u8).collect();
         self.built = Some(Arc::new(Raster { spec: ts, data }));
+        // Blocks: built-over cells, split by the streets.
+        let roads = self.roads.clone();
+        self.urban = crate::urban::Urban::find(ts, &cells, |c| roads.as_ref().map(|r| r.data[c] > 0).unwrap_or(false), self.urban_params.clone());
+        let mut sight = sight;
+        sight.standing = self.urban.as_ref().map(|u| u.standing.clone());
         self.sight = Some(sight);
         self
+    }
+
+    /// The block at a point, if the ground has a town there.
+    pub fn block(&self, e: f64, n: f64) -> Option<&crate::urban::Block> {
+        self.urban.as_ref()?.at(e, n)
+    }
+
+    /// A heavy round bursts here: part of the block it lands in comes down,
+    /// and sight lines see that block's buildings lower. The block and what
+    /// stands of it, if it hit one.
+    pub fn strike_building(&mut self, e: f64, n: f64) -> Option<(u32, f64)> {
+        let u = self.urban.as_mut()?;
+        let hit = u.strike(e, n)?;
+        if let Some(v) = self.sight.as_mut() {
+            v.standing = Some(u.standing.clone());
+        }
+        Some(hit)
     }
 
     /// The share of the terrain cell at a point under buildings (0 without a sight surface).
@@ -311,7 +342,15 @@ impl Ground {
         let s = self.terrain.spec;
         let i = ((e - s.origin_e) / s.cell).round().max(0.0) as u64;
         let j = ((n - s.origin_n) / s.cell).round().max(0.0) as u64;
-        self.cover.micro_terrain(self.land_cover(e, n), self.micro_seed, j * s.width as u64 + i)
+        let mut m = self.cover.micro_terrain(self.land_cover(e, n), self.micro_seed, j * s.width as u64 + i);
+        // Among a block's buildings: its walls' cover, and hidden by them.
+        if let Some(u) = self.urban.as_ref() {
+            if let Some(b) = u.at(e, n) {
+                m.cover = m.cover.max(u.cover(b));
+                m.concealment = m.concealment.max(u.p.conceal);
+            }
+        }
+        m
     }
 
     /// Off-road speed factor (0–1) and whether the class is stopped.
@@ -330,6 +369,9 @@ impl Ground {
                 // Squared: a cell a third built over leaves less than half the room.
                 t.speed_kmh *= (1.0 - built).powi(2);
             }
+        }
+        if let Some(u) = self.urban.as_ref() {
+            t.speed_kmh *= u.going(e, n, class == EnvVehicle::Foot);
         }
         if let Some(r) = self.craters.as_ref() {
             if let Some((i, j)) = r.spec.nearest(e, n) {

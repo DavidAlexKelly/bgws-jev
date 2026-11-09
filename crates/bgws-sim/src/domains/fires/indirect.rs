@@ -826,6 +826,9 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
         let posture = posture_of(s, e);
         let c = Carleton::for_round(salvo.round, posture, &ip);
         let stay = if platform.body.vulnerability == Vulnerability::Structure { platform.body.staying_power.max(1.0) } else { 1.0 };
+        // Troops halted in a block are under its roofs and behind its walls.
+        let indoors = person && !matches!(posture, TargetPosture::Standing);
+        let ground = &s.ctx.ground;
         // Each element's chance of being killed by the bursts near it.
         let pk_of = |el: Enu| {
             let mut q = 1.0;
@@ -834,7 +837,11 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
                 let (r, d) = unframe(salvo.bearing, p.sub(el));
                 q *= 1.0 - (c.mean_p_kill_area(w, w, (d, r), (0.0, 0.0)) / stay).clamp(0.0, 1.0);
             }
-            1.0 - q
+            let shelter = match (indoors, ground.urban.as_ref()) {
+                (true, Some(u)) => u.at(el.e, el.n).map(|b| u.protection(b)).unwrap_or(0.0),
+                _ => 0.0,
+            };
+            (1.0 - q) * (1.0 - shelter)
         };
         let pks: Vec<f64> = (0..fit as usize).map(|j| pk_of(els.get(j).or(els.first()).copied().unwrap_or(pos))).collect();
         let pk = pks.iter().sum::<f64>() / pks.len().max(1) as f64;
@@ -874,6 +881,16 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
     if matches!(salvo.round, RoundClass::Howitzer155 | RoundClass::Rocket122) {
         for p in &salvo.impacts {
             s.ctx.ground.crater(p.e, p.n);
+        }
+        // And bring down part of the block they land in.
+        let mut struck: std::collections::BTreeMap<u32, f64> = Default::default();
+        for p in &salvo.impacts {
+            if let Some((b, left)) = s.ctx.ground.strike_building(p.e, p.n) {
+                struck.insert(b, left);
+            }
+        }
+        for (b, left) in struck {
+            s.ctx.log.push(now, "urban.damage").side(side).text(format!("block {b}: {:.0}% still standing", left * 100.0)).data(serde_json::json!({ "block": b, "standing": left }));
         }
     }
     let centre = salvo.impacts.iter().fold(Enu::default(), |a, p| a.add(*p)).scale(1.0 / salvo.impacts.len().max(1) as f64);

@@ -524,5 +524,6 @@ pub fn unit_detail(s: &Sim, id: EntityId, viewer: Viewer) -> Option<serde_json::
         "health": h.map(|h| json!({ "fit": h.fit, "start": h.start, "mobilityKills": h.mobility_kills, "firepowerKills": h.firepower_kills, "destroyed": h.destroyed })),
         "activity": activity, "people": people, "mounts": mounts, "knows": knows,
         "speed": s.world.get::<Kin>(e).map(|k| k.vel.norm()),
+        "block": s.world.get::<Kin>(e).and_then(|k| s.ctx.ground.block(k.pos.e, k.pos.n)),
     }))
 }

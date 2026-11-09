@@ -220,11 +220,12 @@ fn messages_text(sim: &bgws_sim::Sim, msgs: &[bgws_sim::domains::drones::comms::
 /// The detection inspector's answer, in words, then every factor.
 fn detection_text(x: &serde_json::Value) -> String {
     let f = |v: &serde_json::Value| v.as_f64().unwrap_or(f64::NAN);
-    let los = &x["lineOfSight"];
+    let los = &x["lineOfSight"]["centreLine"];
     let mut t = format!(
-        "{} → {} at {:.0} m: P(detect within {:.0} s) = {:.2}\n\nLine of sight: terrain {} (clearance {:.1} m); clear of canopy {:.2}; overall {:.2}\nLight: {:.1} lux{}; visibility {:.0} m\nTarget: critical size {:.1} m, contrast {:.2}, ΔT {:.1} K, concealment {:.2}{}\nObserver: {}cued, search time ×{:.2}\n\nSensors:\n",
+        "{} → {} at {:.0} m: P(detect within {:.0} s) = {:.2}\n\nLine of sight, centre to centre: terrain {} (clearance {:.1} m); clear of canopy {:.2}{}\nAny of its elements seen ({} lines): {:.2}\nLight: {:.1} lux{}; visibility {:.0} m\nTarget: critical size {:.1} m, contrast {:.2}, ΔT {:.1} K, concealment {:.2}{}\nObserver: {}cued, search time ×{:.2}\n\nSensors:\n",
         x["observer"].as_str().unwrap_or("?"), x["target"].as_str().unwrap_or("?"), f(&x["rangeM"]), f(&x["windowS"]), f(&x["pDetectInWindow"]),
-        if los["terrainVisible"].as_bool().unwrap_or(false) { "clear" } else { "masked" }, f(&los["clearanceM"]), f(&los["pClearOfCanopy"]), f(&los["pVisible"]),
+        if los["terrainVisible"].as_bool().unwrap_or(false) { "clear" } else { "masked" }, f(&los["clearanceM"]), f(&los["pClearOfCanopy"]), if los["buildingBlocked"].as_bool().unwrap_or(false) { "; a building is in the way" } else { "" },
+        x["lineOfSight"]["linesChecked"], f(&x["lineOfSight"]["pVisible"]),
         f(&x["light"]["lux"]), if x["light"]["night"].as_bool().unwrap_or(false) { " (night)" } else { "" }, f(&x["visibilityM"]),
         f(&x["target_signature"]["criticalDimM"]), f(&x["target_signature"]["contrast"]), f(&x["target_signature"]["deltaTK"]), f(&x["target_signature"]["concealment"]),
         if x["target_signature"]["moving"].as_bool().unwrap_or(false) { ", moving" } else { "" },
