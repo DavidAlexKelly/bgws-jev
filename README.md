@@ -65,6 +65,80 @@ Keys come from the environment only: `OPENROUTER_API_KEY` for Jev,
 (`--local-url`, `--local-model`). With no key or no network the template
 fallbacks decide and the log says why.
 
+### What a unit decider is told
+
+Each land unit's question carries its state as named fields
+(`Question::state`), built from the unit's own beliefs only:
+
+- **unit:** name, type, vehicles fit, strength, posture, suppression,
+  morale, when it last fired;
+- **weapons:** each mount's munition, maximum (and minimum) range, rounds
+  and volleys left, and the farthest it can reach now (`weaponReachM`);
+- **enemiesSeen** (nearest six): what it is (only as well as it has been
+  recognised), range, compass bearing, moving, how long ago it was seen,
+  whether it is within our reach, and for an identified enemy how far its
+  weapons reach and whether it can reach us;
+- **firedOnByUnseen:** bearings of fire from shooters it has not found;
+- **orders:** purpose, what it is doing, phase, urgency, ROE in words, and
+  the distance and bearing to where its move leads;
+- **ground:** cover, concealment, land cover, on a road, how open to view
+  and whether dead ground (on a pack with a terrain analysis), the town
+  block it is in, key terrain within 1.5 km;
+- **friendsWithin3km** (nearest four): name, range, bearing, strength.
+
+Jev gets it as the request's `state` (under `units.<name>`), as its
+Decisions API recommends, and the instructions point there instead of
+repeating it in words (`JevConfig::prose` sends both, to compare).
+Options are sent under their own ids (`engageNow`, `keep`) rather than
+`o0`, `o1`. Claude and local models get the same fields after the words.
+A different state is a different cache key, so a remembered answer is only
+reused for the same situation.
+
+### The decision lab
+
+How good are the deciders' choices? The lab (`crates/bgws-run/src/lab.rs`,
+the page at `/lab`) measures it.
+
+- **Moments:** every land unit's decision in a game (a question with more
+  than one option), kept with the game's record and the unit's state as it
+  was put. `bgws lab collect <scenario> --seeds 1-8` plays games and keeps
+  them; `bgws lab import game.json` takes a saved game; **Add to lab** in
+  the viewer keeps the game being played.
+- **Play-outs:** `bgws lab playout` replays the game to a moment, forces
+  each option in turn, and plays on (20 minutes by default) with the rules
+  deciding and fresh dice for each run (12 by default). Each run is scored
+  from the deciding unit's side: enemy share lost − own side share lost −
+  ½ × its own unit's share lost + ¼ × share of the way to its objective
+  made good, ±1 if the game is won or lost in that time. Options within one
+  standard error of the best are near-best. A moment is decisive when some
+  option is clearly worse; only decisive moments score a decider. Forcing
+  the answer that was given, with the original dice, replays the game
+  exactly (a test checks it). On a skirmish a moment takes 5–15 s.
+- **Your call:** on the page, mark the best option, the acceptable ones, a
+  flag and a note, beside the unit's picture (a radar of what it has seen,
+  its friends, its objective and its weapons' reach), its facts and the
+  play-out scores.
+- **Grading:** `bgws lab grade --deciders jev` asks a decider every
+  moment's question afresh, as it was put, and keeps its choice,
+  probabilities and confidence under its name (the model; `+prose` with
+  `--prose`), so settings can be compared.
+- **Report:** `bgws lab report` (and the page's Report tab) gives each
+  decider's near-best share, best share and mean regret against the
+  play-outs, its agreement with your labels, and for Jev its mean
+  confidence and calibration error (how far its confidence is from how
+  often it is near-best), overall and per decision point. The template
+  fallback, the rules' choice and what the game chose are yardsticks.
+
+The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
+`moments/`, one JSON file each. A first look at three rules games of the
+advance-to-contact skirmish: 6 of 12 played-out moments were decisive, and
+the doctrine default was near-best in 5 of them. Where it was not, a tank
+troop on first contact that carried on lost the whole troop in every run,
+while one that took a better position kept a third of it.
+
+Grading Jev needs `OPENROUTER_API_KEY` where the lab runs, and the network
+to reach openrouter.ai.
+
 ## The workspace (plan §3.1)
 
 | Crate | What it holds |
@@ -449,6 +523,63 @@ line to the enemy), swinging about its first site. Before, each one moved it
 
 Next steps:
 - calibration of road march rates and of where units leave the road.
+
+### Terrain analysis
+
+A staff studies the ground before a fight. BGWS does this once per theatre
+pack and keeps the result with it (`analysis.bin`;
+`crates/bgws-sim/src/appreciation.rs`), so games and the AI read it rather
+than work it out again. `bgws terrain` does it as it builds a pack;
+`bgws analyse <pack>` redoes it; a pack without one gets it the first time a
+game opens on it (about 5 s for the 23 × 33 km Kaliningrad pack).
+
+- **Exposure (dead ground):** from every 60 m cell, a man-high eye looks out
+  48 ways to 2 km over the ground, roofs and canopy. The share of that
+  ground it sees, by area, is the cell's exposure. Sight runs both ways, so
+  it is also how much of the ground round can see the cell: 0 is dead
+  ground, 1 open from all round. Woods and roofs count as solid here, a
+  little coarser than the game's own sight lines. Over Kaliningrad, 46% of
+  the ground is dead (under 0.1: the city, the woods, folds) and 17% open to
+  view (0.4 and over: the open farmland).
+- **Mobility:** each 30 m cell is go, slow-go (under 40% of the class's
+  open-country speed) or no-go for tracked, wheeled and foot movers, by the
+  game's own going (soil, slope, woods, buildings, rivers too deep to ford;
+  roads are go). The width of the go-ground through each cell is kept too.
+- **Chokepoints:** corridors are go-ground at least 400 m wide (about a
+  company's frontage) in open areas of a square kilometre or more. Where
+  two such areas are joined only through narrower going, the narrowest point
+  between them is a chokepoint, noted with its width and the two areas'
+  sizes.
+- **Crossings:** road bridges over rivers, with the road's class and
+  whether the water can be forded.
+- **Observation:** local high points at least 5 m above the ground round
+  them, scored by how much they see within 4 km.
+
+The game uses it:
+- **Routes:** tactical and stealthy moves count a cell's openness to view
+  (`sim.route.exposure.*`) less in dead ground: in fully dead ground, 30% of
+  it (`sim.appreciation.dead_ground_share`). They go round by folds and
+  keep out of open fields. On Kaliningrad, the advance-to-contact test's
+  moving vehicles keep to roads 94% of the time, from 76%, because most of
+  its roads run through woods and the town.
+- **Positions:** a unit looking for a better position prefers ground less
+  open to view as well as cover (`sim.appreciation.cover_exposure_weight`).
+- **Behaviour facts:** `self.deadGround` (exposure under 0.1) and
+  `self.onKeyTerrain` (within 300 m of an observation point).
+- **HQ planners:** an HQ is briefed on the best four observation points,
+  chokepoints and bridges within 5 km of its units and objective, labelled
+  `OP1`, `GAP1`, `BRIDGE1` and so on. Orders may use those labels as
+  reference points.
+- **Viewer:** the *dead ground* layer shades dead ground blue and ground
+  open to view red. *Going* shades tracked no-go dark and slow-go amber.
+  *Key terrain* marks observation points (OP), chokepoints (GAP) and bridges
+  (BR), with a note on hover. The unit panel shows how open its ground is
+  and the key terrain near it.
+
+Generated and flat ground (no pack) has no analysis, so the calibration
+vignettes are unchanged. The figures (`sim.appreciation.*`) are judgement
+(confidence low) until checked against a staff's own appreciation of real
+ground.
 
 ### Urban blocks
 

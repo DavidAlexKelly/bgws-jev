@@ -2,7 +2,7 @@
 // clock on the left, what is happening and the selected unit on the right.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildLayers, DEFAULT_LAYERS, tooltip, type LayerKey } from "./layers";
+import { buildLayers, DEFAULT_LAYERS, tooltip, type KeyPoint, type LayerKey } from "./layers";
 import { MapView, type Basemap } from "./MapView";
 import { SIDE_COLOUR } from "./overlays";
 import { clock, type Side } from "./protocol";
@@ -51,6 +51,21 @@ export function App() {
   useEffect(() => writePref("layers", [...layers].join(",")), [layers]);
   useEffect(() => writePref("basemap", basemap), [basemap]);
   // 3D terrain, when the game is on a pack with elevation and the terrain basemap is up.
+  // The pack's key terrain (its terrain analysis), fetched once per pack.
+  const [keyTerrain, setKeyTerrain] = useState<KeyPoint[]>([]);
+  const keyUrl = s.game?.pack?.analysis?.keyTerrain ?? null;
+  useEffect(() => {
+    setKeyTerrain([]);
+    if (!keyUrl) return;
+    let live = true;
+    fetch(keyUrl)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => live && j?.key && setKeyTerrain(j.key as KeyPoint[]))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [keyUrl]);
   const [threeD, setThreeD] = useState(() => readPref<string>("3d", "off") === "on");
   useEffect(() => writePref("3d", threeD ? "on" : "off"), [threeD]);
   const can3D = basemap === "terrain" && !!s.game?.pack?.dem;
@@ -138,11 +153,11 @@ export function App() {
   const deckLayers = useMemo(
     () =>
       s.frame
-        ? buildLayers({ frame: s.frame, events: s.events, game: s.game, on: layers, selected, unit: s.unit, viewshed: s.viewshed, objective, towns: s.game?.pack?.towns ?? [], onPick: pickOnMap })
+        ? buildLayers({ frame: s.frame, events: s.events, game: s.game, on: layers, selected, unit: s.unit, viewshed: s.viewshed, objective, towns: s.game?.pack?.towns ?? [], onPick: pickOnMap, keyTerrain })
         : [],
     // The frame object is mutated in place; `version` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.version, s.frame, s.events, s.game, layers, selected, s.unit, s.viewshed, objective, pickOnMap, liftTick],
+    [s.version, s.frame, s.events, s.game, layers, selected, s.unit, s.viewshed, objective, pickOnMap, liftTick, keyTerrain],
   );
 
   const fit = useMemo<[[number, number], [number, number]] | null>(() => {
@@ -211,6 +226,7 @@ export function App() {
           }}
           onSave={() => send({ kind: "save" })}
           onReview={() => send({ kind: "review" })}
+          onLab={() => send({ kind: "labKeep" })}
         />
         <ClockPanel
           frame={s.frame}

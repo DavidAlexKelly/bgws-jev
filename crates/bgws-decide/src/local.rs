@@ -67,7 +67,11 @@ pub fn request_body(model: &str, side: Side, q: &Question, top_logprobs: u32) ->
     if !q.doctrine.is_empty() {
         user.push_str(&format!("Its doctrine: {}\n\n", q.doctrine.join(" ")));
     }
-    user.push_str(&format!("{}. {} {}\nOptions:\n", q.title, q.question, q.situation));
+    user.push_str(&format!("{}. {} {}\n", q.title, q.question, q.situation));
+    if let Some(st) = &q.state {
+        user.push_str(&format!("What it knows, as fields: {st}\n"));
+    }
+    user.push_str("Options:\n");
     for o in &q.options {
         user.push_str(&format!("- {}: {}{}\n", o.id, o.summary, bias_words(o.bias)));
     }

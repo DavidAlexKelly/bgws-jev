@@ -35,6 +35,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
 const CLASSIC: &str = include_str!("../../../frontend/classic/index.html");
+const LAB: &str = include_str!("../../../frontend/lab/index.html");
 // The default frontend (frontend/viewer), built by `npm run build` there and
 // committed, so cargo alone serves it. Any other frontend speaks the same
 // protocol (protocol/PROTOCOL.md): pass `--web <dir>`, or build without the
@@ -97,6 +98,8 @@ enum Inbound {
     Branch { t: f64 },
     /// Write the game record.
     Save,
+    /// Keep the game so far in the decision lab: its units' decisions become moments.
+    LabKeep,
     /// What happened to a unit, with the figures behind it (the AAR inspector).
     Why { unit: String },
     /// The after-action review so far.
@@ -352,6 +355,9 @@ fn pack_json(name: &str) -> Option<serde_json::Value> {
     Some(json!({
         "name": folder, "bbox": meta.bbox, "cellM": meta.cell, "basemap": url(&meta.basemap), "dem": url(&meta.dem),
         "preview": url(&Some("preview.png".to_string())), "roadsKm": roads_km, "towns": towns,
+        "analysis": meta.analysis.as_ref().filter(|_| dir.join("exposure.png").exists()).map(|_| json!({
+            "exposure": url(&Some("exposure.png".to_string())), "going": url(&Some("going.png".to_string())), "keyTerrain": url(&Some("keyterrain.json".to_string())),
+        })),
         "sizeKm": [meta.spec.cell * (meta.spec.width - 1) as f64 / 1000.0, meta.spec.cell * (meta.spec.height - 1) as f64 / 1000.0],
     }))
 }
@@ -444,12 +450,12 @@ fn spawn_terrain_build(name: String, bbox: [f64; 4], cell_m: Option<f64>, out: b
             }
         };
         let dir = bgws_run::packs_dir().join(&name);
-        match bgws_geodata::pack::build_pack(&dir, &name, &spec, 3.0, &progress) {
+        match bgws_geodata::pack::build_pack(&dir, &name, &spec, 3.0, &progress).map_err(|e| e.to_string()).and_then(|_| bgws_run::host::analyse_pack(&dir, &progress).map_err(|e| e.to_string())) {
             Ok(_) => {
                 send(json!({ "kind": "terrain", "name": name, "state": "done", "pack": pack_json(&name) }));
                 send(scenarios_json());
             }
-            Err(e) => send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e.to_string() })),
+            Err(e) => send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e })),
         }
     })
 }
@@ -802,6 +808,13 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     };
                     send(&out, json!({ "kind": "status", "text": text }));
                 }
+                Inbound::LabKeep => {
+                    let text = bgws_run::lab::Lab::open(&bgws_run::lab::lab_dir())
+                        .and_then(|lab| lab.import(host.finished_record(), default_figures()))
+                        .map(|ids| format!("{} unit decisions kept in the decision lab (/lab)", ids.len()))
+                        .unwrap_or_else(|e| format!("decision lab: {e}"));
+                    send(&out, json!({ "kind": "status", "text": text }));
+                }
                 Inbound::Branch { t } => {
                     let at = SimTime::from_secs(t.max(0.0)).min(host.sim.now());
                     send(&out, json!({ "kind": "status", "text": format!("branching at {at}…") }));
@@ -1001,6 +1014,141 @@ async fn client(socket: WebSocket, st: AppState) {
     reader.abort();
 }
 
+// ── The decision lab (`/lab`, bgws_run::lab) ─────────────────────────────
+
+fn lab() -> Result<bgws_run::lab::Lab> {
+    bgws_run::lab::Lab::open(&bgws_run::lab::lab_dir())
+}
+
+fn lab_reply<T: serde::Serialize>(r: Result<T>) -> axum::response::Response {
+    match r {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => (axum::http::StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// Lab work off the async threads: replays and model calls take seconds.
+async fn lab_blocking<T: serde::Serialize + Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> axum::response::Response {
+    lab_reply(tokio::task::spawn_blocking(f).await.map_err(|e| anyhow!("{e}")).and_then(|r| r))
+}
+
+async fn lab_moments() -> axum::response::Response {
+    lab_reply(lab().and_then(|l| l.moments()).map(|ms| {
+        ms.into_iter()
+            .map(|m| {
+                let p = m.playouts.as_ref();
+                json!({
+                    "id": m.id, "game": m.game, "scenario": m.scenario, "atS": m.at_s, "agent": m.agent, "side": m.side,
+                    "trigger": m.trigger, "title": m.title, "options": m.question.options.len(),
+                    "chosen": m.chosen.as_ref().map(|c| &c.choice),
+                    "playedOut": p.is_some(), "decisive": p.is_some_and(|p| p.decisive), "best": p.map(|p| &p.best),
+                    "labelled": m.label.as_ref().is_some_and(|l| l.best.is_some() || !l.acceptable.is_empty()),
+                    "flagged": m.label.as_ref().is_some_and(|l| l.flagged),
+                    "graded": m.graded.keys().collect::<Vec<_>>(),
+                })
+            })
+            .collect::<Vec<_>>()
+    }))
+}
+
+async fn lab_moment(UrlPath(id): UrlPath<String>) -> axum::response::Response {
+    lab_reply(lab().and_then(|l| l.moment(&id)))
+}
+
+async fn lab_label(UrlPath(id): UrlPath<String>, Json(label): Json<bgws_run::lab::Label>) -> axum::response::Response {
+    lab_reply(lab().and_then(|l| l.label(&id, label)))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlayoutReq {
+    #[serde(default = "twelve")]
+    runs: usize,
+    #[serde(default = "twenty")]
+    horizon_min: f64,
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    point: Option<String>,
+}
+fn twelve() -> usize {
+    12
+}
+fn twenty() -> f64 {
+    20.0
+}
+
+async fn lab_playout(UrlPath(id): UrlPath<String>, Json(r): Json<PlayoutReq>) -> axum::response::Response {
+    lab_blocking(move || lab()?.playout(&id, r.runs.clamp(1, 100), r.horizon_min.clamp(1.0, 240.0) * 60.0, bgws_run::lab::Weights::default(), &default_figures())).await
+}
+
+/// Play out moments not played out yet (up to `limit`, of one decision point if given).
+async fn lab_playout_many(Json(r): Json<PlayoutReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let l = lab()?;
+        let ids: Vec<String> = l.moments()?.into_iter().filter(|m| m.playouts.is_none() && r.point.as_ref().is_none_or(|p| &m.trigger == p)).map(|m| m.id).take(r.limit.unwrap_or(10).min(200)).collect();
+        let f = default_figures();
+        for id in &ids {
+            l.playout(id, r.runs.clamp(1, 100), r.horizon_min.clamp(1.0, 240.0) * 60.0, bgws_run::lab::Weights::default(), &f)?;
+        }
+        Ok(json!({ "playedOut": ids.len() }))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CollectReq {
+    scenario: String,
+    #[serde(default)]
+    seeds: Vec<u64>,
+    #[serde(default)]
+    minutes: Option<f64>,
+    #[serde(default = "rules_choice")]
+    deciders: DeciderChoice,
+}
+fn rules_choice() -> DeciderChoice {
+    DeciderChoice::Rules
+}
+
+async fn lab_collect(Json(r): Json<CollectReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let sc = load_scenario(&scenario_path(&r.scenario))?;
+        let l = lab()?;
+        let mut kept = 0;
+        for seed in if r.seeds.is_empty() { vec![sc.seed.0] } else { r.seeds.clone() }.into_iter().take(20) {
+            kept += l.collect(&sc, seed, r.deciders, r.minutes.unwrap_or(sc.scope.duration_min), default_figures())?.len();
+        }
+        Ok(json!({ "kept": kept }))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GradeReq {
+    deciders: DeciderChoice,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    prose: bool,
+    #[serde(default)]
+    judged_only: bool,
+}
+
+async fn lab_grade(Json(r): Json<GradeReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let (d, name) = bgws_run::lab::decider_for(r.deciders, &default_figures(), r.model, r.prose, ("http://127.0.0.1:8080", "local"))?;
+        let n = lab()?.grade(d, &name, |m| !r.judged_only || m.playouts.is_some() || m.label.is_some())?;
+        Ok(json!({ "graded": n, "as": name }))
+    })
+    .await
+}
+
+async fn lab_report() -> axum::response::Response {
+    lab_reply(lab().and_then(|l| l.report()))
+}
+
 /// Play `a.scenario` and serve the viewer, the editor and the Behaviour
 /// Manager until the process ends. `ready` gets the address once listening
 /// (port 0 picks a free one, as the desktop shell does).
@@ -1030,6 +1178,15 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
         .route("/api/templates", post(save_template))
         .route("/api/templates/:name", delete(delete_template))
         .route("/editor", get(editor_page))
+        .route("/lab", get(|| async { Html(LAB) }))
+        .route("/api/lab/moments", get(lab_moments))
+        .route("/api/lab/moments/:id", get(lab_moment))
+        .route("/api/lab/moments/:id/label", post(lab_label))
+        .route("/api/lab/moments/:id/playout", post(lab_playout))
+        .route("/api/lab/playout", post(lab_playout_many))
+        .route("/api/lab/collect", post(lab_collect))
+        .route("/api/lab/grade", post(lab_grade))
+        .route("/api/lab/report", get(lab_report))
         .route("/ws", get(ws))
         .with_state(AppState { out, to_game });
     // The frontend: a folder given with --web, else the bundled viewer.

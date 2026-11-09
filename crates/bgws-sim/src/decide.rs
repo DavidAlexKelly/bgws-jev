@@ -73,6 +73,9 @@ fn facts(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> BTre
     m.insert("self.strength".into(), FactValue::Num((h.strength() * 10.0).round()));
     m.insert("self.cohesion".into(), FactValue::Text(cohesion.into()));
     m.insert("self.inCover".into(), FactValue::Bool(s.ctx.ground.micro(k.pos.e, k.pos.n).cover > 0.3 || a.posture == Posture::HullDown));
+    let exposure = s.ctx.ground.exposure(k.pos.e, k.pos.n);
+    m.insert("self.deadGround".into(), exposure.map(|x| FactValue::Bool(x < 0.1)).unwrap_or(FactValue::Null));
+    m.insert("self.onKeyTerrain".into(), FactValue::Bool(s.ctx.ground.key_terrain_near(k.pos.e, k.pos.n, 300.0).iter().any(|t| t.kind == bgws_env::KeyKind::Observation)));
     m.insert("enemy.known".into(), FactValue::Bool(enemy.is_some()));
     m.insert("enemy.rangeM".into(), enemy.map(|v| FactValue::Num(v.at.sub(k.pos).horizontal().round())).unwrap_or(FactValue::Null));
     m.insert("orders.urgent".into(), FactValue::Bool(a.mission.urgent));
@@ -161,6 +164,168 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
     out
 }
 
+/// Where a move leads: the end of the current move, else of the next one in its orders.
+pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
+    let end = |x: &Activity| match x {
+        Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
+        _ => None,
+    };
+    end(&a.activity).or_else(|| a.mission.phases.iter().skip(a.mission.phase).find_map(end))
+}
+
+/// The farthest any of a platform's direct weapons reaches, m (0 none).
+fn reach_m(s: &Sim, p: &bgws_catalogue::Platform) -> f64 {
+    p.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)
+}
+
+/// What a land unit believes, as named fields for a decision model: the
+/// same beliefs as [`situation`] (only what reached it), with what the
+/// words leave out: its weapons against the ranges, what each enemy it
+/// has identified can reach, its orders and where they lead, its ground
+/// (cover, dead ground, a town block, key terrain) and its friends.
+pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> serde_json::Value {
+    use serde_json::json;
+    let i = s.world.get::<Ident>(e).expect("i");
+    let h = s.world.get::<Health>(e).expect("h");
+    let k = s.world.get::<Kin>(e).expect("k");
+    let a = s.world.get::<Act>(e).expect("a");
+    let c = s.world.get::<Crew>(e).expect("c");
+    let aw = s.world.get::<Aware>(e).expect("aw");
+    let round = |x: f64| x.round();
+    let pct = |x: f64| (x * 100.0).round();
+    let posture = match a.posture {
+        Posture::Moving => "moving",
+        Posture::Halted => "halted",
+        Posture::Settled => "in position",
+        Posture::HullDown => "hull-down in cover",
+    };
+    let morale = match c.morale.state {
+        MoraleState::Steady => "steady",
+        MoraleState::Shaken => "shaken",
+        MoraleState::Pinned => "pinned",
+        _ => "broken",
+    };
+    // Its weapons and what they have left.
+    let weapons: Vec<serde_json::Value> = s
+        .world
+        .get::<Arms>(e)
+        .map(|ar| {
+            ar.mounts
+                .iter()
+                .filter_map(|m| {
+                    let mount = i.platform.mounts.get(m.index)?;
+                    let mun = s.ctx.catalogue.munition(&m.munition);
+                    let salvo = mount.salvo.max(1);
+                    Some(json!({
+                        "weapon": mount.id, "munition": m.munition,
+                        "maxRangeM": mun.map(|x| round(x.max_range_m)), "minRangeM": mun.map(|x| round(x.min_range_m)).filter(|x| *x > 0.0),
+                        "rounds": m.rounds, "volleysLeft": m.rounds / salvo,
+                    }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let my_reach = s.world.get::<Arms>(e).map(|ar| ar.mounts.iter().filter(|m| m.rounds > 0).filter_map(|m| s.ctx.catalogue.munition(&m.munition)).map(|m| m.max_range_m).fold(0.0, f64::max)).unwrap_or(0.0);
+    // Enemies it has seen itself, nearest first.
+    let mut seen: Vec<(&EntityId, &Seen)> = aw.seen.iter().collect();
+    seen.sort_by(|x, y| x.1.at.sub(k.pos).horizontal().total_cmp(&y.1.at.sub(k.pos).horizontal()).then(x.0.cmp(y.0)));
+    let enemies: Vec<serde_json::Value> = seen
+        .iter()
+        .take(6)
+        .map(|(id, v)| {
+            let d = v.at.sub(k.pos);
+            let range = d.horizontal();
+            let known = (v.level >= 2).then(|| s.world.get::<Ident>(s.ctx.entity(**id))).flatten();
+            let their_reach = known.map(|x| reach_m(s, &x.platform)).filter(|r| *r > 0.0);
+            json!({
+                "what": match v.level { 0 => "something".to_string(), 1 => "a vehicle or team".to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
+                "identified": v.level >= 2,
+                "rangeM": round(range), "bearing": compass(d.bearing()),
+                "moving": v.moving, "seenAgoS": round((s.ctx.now - v.last).secs()),
+                "inOurReach": my_reach > 0.0 && range <= my_reach,
+                "itsReachM": their_reach.map(round),
+                "canReachUs": their_reach.map(|r| range <= r),
+                "thisDecisionIsAboutIt": Some(**id) == about,
+            })
+        })
+        .collect();
+    let unseen_fire: Vec<serde_json::Value> = aw.suspects.values().map(|v| json!({ "bearing": compass(v.bearing), "agoS": round((s.ctx.now - v.last).secs()) })).collect();
+    // Its orders and where they lead.
+    let goal = heading_for(a).map(|g| {
+        let d = g.sub(k.pos);
+        json!({ "distanceM": round(d.horizontal()), "bearing": compass(d.bearing()) })
+    });
+    let orders = json!({
+        "purpose": if a.mission.purpose.is_empty() { "none" } else { &a.mission.purpose },
+        "doing": a.activity.word(),
+        "phase": format!("{} of {}", (a.mission.phase + 1).min(a.mission.phases.len().max(1)), a.mission.phases.len().max(1)),
+        "urgent": a.mission.urgent,
+        "roe": match a.roe { RoeS::Never => "weapons hold", RoeS::IfFiredUpon => "fire only if fired upon", RoeS::WithinShortRange => "fire within short range", RoeS::Always => "fire at any enemy in reach" },
+        "headingFor": goal,
+    });
+    // Its ground.
+    let g = &s.ctx.ground;
+    let micro = g.micro(k.pos.e, k.pos.n);
+    let exposure = g.exposure(k.pos.e, k.pos.n);
+    let key: Vec<serde_json::Value> = g
+        .key_terrain_near(k.pos.e, k.pos.n, 1_500.0)
+        .into_iter()
+        .take(3)
+        .map(|t| json!({ "kind": t.kind, "distanceM": round((t.e - k.pos.e).hypot(t.n - k.pos.n)), "bearing": compass((t.e - k.pos.e).atan2(t.n - k.pos.n)), "note": t.note }))
+        .collect();
+    let ground = json!({
+        "cover": pct(micro.cover) / 100.0,
+        "concealment": pct(micro.concealment) / 100.0,
+        "land": format!("{:?}", g.land_cover(k.pos.e, k.pos.n)).to_lowercase(),
+        "onRoad": g.road_at(k.pos.e, k.pos.n).is_some(),
+        "openToView": exposure.map(|x| pct(x) / 100.0),
+        "deadGround": exposure.map(|x| x < 0.1),
+        "inTownBlock": g.block(k.pos.e, k.pos.n).map(|b| json!({ "material": b.material, "floors": b.floors, "standingPct": pct(b.standing) })),
+        "keyTerrainNear": key,
+    });
+    // Friends close by, nearest first.
+    let mut friends: Vec<(f64, serde_json::Value)> = s
+        .ctx
+        .order
+        .iter()
+        .filter(|&&f| f != e && alive(s, f))
+        .filter_map(|&f| {
+            let (fi, fk, fh) = (s.world.get::<Ident>(f)?, s.world.get::<Kin>(f)?, s.world.get::<Health>(f)?);
+            if fi.side != i.side || fi.domain != Domain::Land {
+                return None;
+            }
+            let d = fk.pos.sub(k.pos);
+            let r = d.horizontal();
+            (r <= 3_000.0).then(|| (r, json!({ "unit": fi.label, "rangeM": round(r), "bearing": compass(d.bearing()), "strengthPct": pct(fh.strength()) })))
+        })
+        .collect();
+    friends.sort_by(|x, y| x.0.total_cmp(&y.0));
+    prune(json!({
+        "unit": {
+            "name": i.label, "type": i.platform.name,
+            "vehicles": format!("{} of {}", h.fit, h.start), "strengthPct": pct(h.strength()),
+            "posture": posture, "suppressionPct": pct(c.suppression.level), "morale": morale,
+            "lastFiredS": a.last_shot.map(|t| round((s.ctx.now - t).secs())),
+        },
+        "weapons": weapons,
+        "weaponReachM": round(my_reach),
+        "enemiesSeen": enemies,
+        "firedOnByUnseen": unseen_fire,
+        "orders": orders,
+        "ground": ground,
+        "friendsWithin3km": friends.into_iter().take(4).map(|x| x.1).collect::<Vec<_>>(),
+    }))
+}
+
+/// Drop fields with nothing in them (null), so the model reads only what is known.
+fn prune(v: serde_json::Value) -> serde_json::Value {
+    match v {
+        serde_json::Value::Object(m) => serde_json::Value::Object(m.into_iter().filter(|(_, x)| !x.is_null()).map(|(k, x)| (k, prune(x))).collect()),
+        serde_json::Value::Array(a) => serde_json::Value::Array(a.into_iter().map(prune).collect()),
+        x => x,
+    }
+}
+
 pub(crate) fn compass(b: f64) -> &'static str {
     const N: [&str; 8] = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
     N[(((b.to_degrees().rem_euclid(360.0) + 22.5) / 45.0) as usize) % 8]
@@ -203,6 +368,7 @@ pub(crate) fn ask_with_rule(s: &mut Sim, t: &Trigger, rule: RulesChoice) -> bool
         trigger: t.point.to_string(),
         template: resolved.id.clone(),
         situation: situation(s, e, t.about),
+        state: (kind == QuestionKind::Unit).then(|| unit_state(s, e, t.about)),
         reaction,
         summaries: BTreeMap::new(),
         expansions: BTreeMap::new(),
@@ -281,7 +447,8 @@ fn point_away(s: &Sim, e: bevy_ecs::prelude::Entity, dist: f64) -> Enu {
 fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
     let k = *s.world.get::<Kin>(e).expect("k");
     let r = s.ctx.p.cover_search_m;
-    let mut best = (s.ctx.ground.micro(k.pos.e, k.pos.n).cover, k.pos);
+    let here_open = s.ctx.ground.exposure(k.pos.e, k.pos.n).map(|x| s.ctx.ground.appreciation_use[1] * x).unwrap_or(0.0);
+    let mut best = (s.ctx.ground.micro(k.pos.e, k.pos.n).cover - here_open, k.pos);
     for ring in 1..=3 {
         for step in 0..12 {
             let b = step as f64 * std::f64::consts::TAU / 12.0;
@@ -290,7 +457,8 @@ fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
             if !s.ctx.ground.contains(p) {
                 continue;
             }
-            let c = s.ctx.ground.micro(p.e, p.n).cover + 0.002 * (s.ctx.ground.height(p.e, p.n) - k.pos.u).clamp(-20.0, 20.0);
+            let open = s.ctx.ground.exposure(p.e, p.n).map(|x| s.ctx.ground.appreciation_use[1] * x).unwrap_or(0.0);
+            let c = s.ctx.ground.micro(p.e, p.n).cover + 0.002 * (s.ctx.ground.height(p.e, p.n) - k.pos.u).clamp(-20.0, 20.0) - open;
             if c > best.0 + 0.05 {
                 best = (c, p);
             }

@@ -49,6 +49,8 @@ export interface PackInfo {
   roadsKm: number | null;
   sizeKm: [number, number];
   towns: { name: string; lat: number; lon: number; radiusM: number }[];
+  /** The terrain analysis' overlays (over `bbox`) and key terrain, when the pack has one. */
+  analysis?: { exposure: string | null; going: string | null; keyTerrain: string | null } | null;
 }
 
 /** A terrain build's progress. */
@@ -129,6 +131,8 @@ export interface UnitDetail {
   } | null;
   mounts?: { weapon: string; munition: string; rounds: number }[];
   /** The urban block it stands in (its buildings, estimated material, what still stands). */
+  /** The terrain analysis where it stands: exposure 0 (dead ground) to 1, and key terrain near. */
+  terrain?: { exposure: number; deadGround: boolean; near: { kind: string; note: string; distM: number }[] } | null;
   block?: { id: number; floors: number; material: "light" | "masonry" | "concrete"; meanHeightM: number; density: number; footprintM2: number; standing: number } | null;
   knows?: { id?: number; name?: string; level?: string; rangeM?: number | null; agoS: number; moving?: boolean; suspect?: boolean; bearingDeg?: number }[];
   decisions?: { t: number; text: string; data: GameEvent["data"] }[];
@@ -172,6 +176,7 @@ export type Outbound =
   | { kind: "live" }
   | { kind: "branch"; t: number }
   | { kind: "save" }
+  | { kind: "labKeep" }
   | { kind: "why"; unit: string }
   | { kind: "review" }
   | { kind: "detect"; observer: string; target: string }

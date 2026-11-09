@@ -8,6 +8,7 @@ pub mod aar;
 pub mod experiments;
 pub mod geotiff;
 pub mod host;
+pub mod lab;
 pub mod behaviour;
 pub mod editor;
 pub mod eventlog;

@@ -43,6 +43,10 @@ pub struct Ground {
     pub sight: Option<bgws_env::SightView>,
     /// The share of each terrain cell under buildings (×255), from the sight surface.
     pub built: Option<Arc<Raster<u8>>>,
+    /// The pack's terrain appreciation: dead ground, corridors, key terrain.
+    pub appreciation: Option<bgws_env::AppreciationView>,
+    /// Weights for using it: [dead-ground share of route exposure, cover search's exposure weight].
+    pub appreciation_use: [f64; 2],
     /// The town's blocks (from the sight surface, split by roads).
     pub urban: Option<crate::urban::Urban>,
     pub urban_params: crate::urban::UrbanParams,
@@ -136,6 +140,8 @@ impl Ground {
             sight: None,
             built: None,
             urban: None,
+            appreciation: None,
+            appreciation_use: [figures.get("sim.appreciation.dead_ground_share"), figures.get("sim.appreciation.cover_exposure_weight")],
             urban_params: crate::urban::UrbanParams::from_figures(figures),
             sights: Default::default(),
             road_speeds: RoadSpeeds::from_figures(figures),
@@ -241,6 +247,26 @@ impl Ground {
         sight.standing = self.urban.as_ref().map(|u| u.standing.clone());
         self.sight = Some(sight);
         self
+    }
+
+    /// The ground with a pack's terrain appreciation.
+    pub fn with_appreciation(mut self, a: bgws_env::AppreciationView) -> Ground {
+        self.appreciation = Some(a);
+        self
+    }
+
+    /// How open to view the ground at a point is (0 dead ground, 1 seen
+    /// from all round), when the pack has a terrain appreciation.
+    pub fn exposure(&self, e: f64, n: f64) -> Option<f64> {
+        self.appreciation.as_ref()?.exposure(e, n)
+    }
+
+    /// The key terrain within `r` m of a point, nearest first.
+    pub fn key_terrain_near(&self, e: f64, n: f64, r: f64) -> Vec<&bgws_env::KeyTerrain> {
+        let Some(a) = self.appreciation.as_ref() else { return Vec::new() };
+        let mut v: Vec<_> = a.key.iter().filter(|k| (k.e - e).hypot(k.n - n) <= r).collect();
+        v.sort_by(|x, y| (x.e - e).hypot(x.n - n).total_cmp(&(y.e - e).hypot(y.n - n)));
+        v
     }
 
     /// The block at a point, if the ground has a town there.

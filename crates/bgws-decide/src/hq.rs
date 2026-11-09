@@ -146,6 +146,22 @@ pub struct HqSituation {
     /// For the overall planner: shared means by type and what exists.
     #[serde(default)]
     pub shareable_means: BTreeMap<String, f64>,
+    /// Key terrain round the force and its objective (the terrain appreciation).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub terrain: Vec<TerrainNote>,
+}
+
+/// A piece of key terrain from the pack's terrain appreciation, as an HQ
+/// is briefed on it: orders may name it by its label.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerrainNote {
+    /// OP1, GAP1, BRIDGE1, …
+    pub label: String,
+    /// observation, chokepoint or crossing.
+    pub kind: String,
+    pub at: Geodetic,
+    pub note: String,
 }
 
 impl HqSituation {
@@ -237,6 +253,12 @@ pub fn land_prompt(s: &HqSituation, side: &str) -> String {
     }
     lines.push(format!("Why you are planning now: {}.", s.why));
     lines.push(format!("What has reached your HQ:\n{}", picture_words(&s.cop)));
+    if !s.terrain.is_empty() {
+        lines.push("Key terrain (from the terrain appreciation; orders may use these labels as reference points):".into());
+        for t in &s.terrain {
+            lines.push(format!("- {} ({}) at {:.4}, {:.4}: {}", t.label, t.kind, t.at.lat, t.at.lon, t.note));
+        }
+    }
     let units: Vec<Value> = s
         .units
         .iter()

@@ -41,6 +41,7 @@ fn situation(planner: PlannerKind) -> HqSituation {
         objective: Some(Geodetic::new(50.1, 10.0, 0.0)),
         reference_points: [("OBJECTIVE".to_string(), Geodetic::new(50.1, 10.0, 0.0))].into_iter().collect(),
         shareable_means: [("sortiesPerDay".to_string(), 8.0), ("droneHours".to_string(), 24.0)].into_iter().collect(),
+        terrain: vec![],
     }
 }
 

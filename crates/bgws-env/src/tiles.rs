@@ -243,6 +243,9 @@ pub struct PackMeta {
     /// Buildings and woods on a fine grid for sight lines (`surface.bin`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surface: Option<String>,
+    /// The terrain appreciation (`analysis.bin`): dead ground, mobility corridors, key terrain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<String>,
     /// The box it was built for, degrees: west, south, east, north.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<[f64; 4]>,
@@ -295,6 +298,7 @@ impl TheatrePack {
             basemap: None,
             dem: None,
             surface: None,
+            analysis: None,
             bbox: None,
             sources: None,
         };

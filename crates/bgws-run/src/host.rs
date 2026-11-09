@@ -109,14 +109,22 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     r
 }
 
-/// A pack's ground for a scenario: terrain, road lines and rivers in its frame.
-pub type PackGround = (bgws_env::Terrain, Vec<bgws_env::RoadLine>, Vec<bgws_env::River>, Option<bgws_env::SightView>);
+/// A pack's ground for a scenario: terrain, road lines and rivers in its
+/// frame, its sight surface and its terrain appreciation.
+pub struct PackGround {
+    pub terrain: bgws_env::Terrain,
+    pub roads: Vec<bgws_env::RoadLine>,
+    pub rivers: Vec<bgws_env::River>,
+    pub sight: Option<bgws_env::SightView>,
+    pub appreciation: Option<bgws_env::AppreciationView>,
+}
 
 /// The scenario's theatre pack, if it names one: terrain assembled over the
 /// area its positions cover (with a margin), and the pack's roads there.
 /// The host does the disk, the sim stays pure. A pack built around another
 /// origin (a box's centre) is re-sampled into the scenario's frame through
-/// latitude and longitude, so positions and ground agree.
+/// latitude and longitude, so positions and ground agree. A pack without a
+/// terrain appreciation (or with an older one) gets one now, saved with it.
 pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
     let Some(dir) = &scenario.theatre.pack else { return Ok(None) };
     let path = crate::resolve_pack(dir);
@@ -153,6 +161,59 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
     }
     let m = 5_000.0;
     let aoi = bgws_env::Aoi { min_e: lo.0 - m, min_n: lo.1 - m, max_e: hi.0 + m, max_n: hi.1 + m };
+    let mut g = pack_ground(&path, dir, &mut pack, &frame, &aoi)?;
+    if g.appreciation.is_none() {
+        // One analysis at a time: a game opening while another works it out waits and reads its result.
+        static ANALYSING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _one = ANALYSING.lock().unwrap_or_else(|e| e.into_inner());
+        let done = bgws_env::TheatrePack::open(&path)
+            .ok()
+            .and_then(|p| p.meta.analysis)
+            .and_then(|f| bgws_env::Appreciation::read(&path.join(f)).ok())
+            .filter(|a| a.version == bgws_env::appreciation::VERSION);
+        let a = match done {
+            Some(a) => a,
+            None => {
+                eprintln!("theatre pack {dir}: no terrain analysis yet; working it out once (saved with the pack)");
+                let t0 = std::time::Instant::now();
+                let a = analyse_pack(&path, &|_, _| {})?;
+                eprintln!("theatre pack {dir}: terrain analysis done in {:.0} s", t0.elapsed().as_secs_f64());
+                a
+            }
+        };
+        g.appreciation = Some(appreciation_view(std::sync::Arc::new(a), &pack_frame, &frame));
+    }
+    Ok(Some(g))
+}
+
+/// The affine map from a scenario's frame into a pack's: [a, b, c, d, e, f]
+/// with pack = (a·e + b·n + c, d·e + e·n + f).
+fn to_pack_affine(pack_frame: &bgws_core::EnuFrame, frame: &bgws_core::EnuFrame) -> [f64; 6] {
+    let to_pack = |e: f64, n: f64| {
+        let v = pack_frame.geodetic_to_enu(frame.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
+        (v.e, v.n)
+    };
+    let (o, x, y) = (to_pack(0.0, 0.0), to_pack(1_000.0, 0.0), to_pack(0.0, 1_000.0));
+    [(x.0 - o.0) / 1_000.0, (y.0 - o.0) / 1_000.0, o.0, (x.1 - o.1) / 1_000.0, (y.1 - o.1) / 1_000.0, o.1]
+}
+
+/// A pack's appreciation seen from a scenario's frame.
+fn appreciation_view(a: std::sync::Arc<bgws_env::Appreciation>, pack_frame: &bgws_core::EnuFrame, frame: &bgws_core::EnuFrame) -> bgws_env::AppreciationView {
+    let key = a
+        .key
+        .iter()
+        .map(|k| {
+            let v = frame.geodetic_to_enu(pack_frame.enu_to_geodetic(bgws_core::Enu::new(k.e, k.n, 0.0)));
+            bgws_env::KeyTerrain { e: v.e, n: v.n, ..k.clone() }
+        })
+        .collect();
+    bgws_env::AppreciationView { to_pack: to_pack_affine(pack_frame, frame), key, a }
+}
+
+/// A pack's ground over an area, in `frame`.
+fn pack_ground(path: &std::path::Path, dir: &str, pack: &mut bgws_env::TheatrePack, frame: &bgws_core::EnuFrame, aoi: &bgws_env::Aoi) -> Result<PackGround> {
+    let pack_frame = bgws_core::EnuFrame::new(pack.meta.frame_origin);
+    let aoi = *aoi;
     let terrain = pack.assemble(&aoi).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
     let same = frame.geodetic_to_enu(pack.meta.frame_origin).horizontal() < 1.0;
     let to_scenario = |e: f64, n: f64| {
@@ -163,7 +224,7 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
             (v.e, v.n)
         }
     };
-    let terrain = if same { terrain } else { reframe(&terrain, &pack_frame, &frame) };
+    let terrain = if same { terrain } else { reframe(&terrain, &pack_frame, frame) };
     let inside = |p: &[f64; 2]| p[0] >= aoi.min_e && p[0] <= aoi.max_e && p[1] >= aoi.min_n && p[1] <= aoi.max_n;
     let mut roads = Vec::new();
     if let Some(rg) = &pack.meta.road_graph {
@@ -189,25 +250,109 @@ pub fn load_pack(scenario: &ScenarioV4) -> Result<Option<PackGround>> {
     }
     // Buildings and woods for sight lines: read in the pack's frame, reached
     // from the scenario's by an affine map (a shift and a slight turn).
+    let affine = if same { [1.0, 0.0, 0.0, 0.0, 1.0, 0.0] } else { to_pack_affine(&pack_frame, frame) };
     let sight = match &pack.meta.surface {
         Some(f) => {
             let surface = bgws_env::SightSurface::read(&path.join(f)).map_err(|e| anyhow!("theatre pack {dir} sight surface: {e}"))?;
-            let to_pack = |e: f64, n: f64| {
-                if same {
-                    (e, n)
-                } else {
-                    let v = pack_frame.geodetic_to_enu(frame.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0)));
-                    (v.e, v.n)
-                }
-            };
-            let (o, x, y) = (to_pack(0.0, 0.0), to_pack(1_000.0, 0.0), to_pack(0.0, 1_000.0));
-            let m = [(x.0 - o.0) / 1_000.0, (y.0 - o.0) / 1_000.0, o.0, (x.1 - o.1) / 1_000.0, (y.1 - o.1) / 1_000.0, o.1];
-            Some(bgws_env::SightView::new(std::sync::Arc::new(surface), m))
+            Some(bgws_env::SightView::new(std::sync::Arc::new(surface), affine))
         }
         None => None,
     };
-    Ok(Some((terrain, roads, rivers, sight)))
+    // The terrain appreciation, if it is there and current.
+    let appreciation = pack
+        .meta
+        .analysis
+        .as_ref()
+        .and_then(|f| bgws_env::Appreciation::read(&path.join(f)).ok())
+        .filter(|a| a.version == bgws_env::appreciation::VERSION)
+        .map(|a| appreciation_view(std::sync::Arc::new(a), &pack_frame, frame));
+    Ok(PackGround { terrain, roads, rivers, sight, appreciation })
 }
+
+/// Work out a pack's terrain appreciation over the whole of it and save it
+/// with the pack: `analysis.bin`, overlays for the viewer (`exposure.png`,
+/// `going.png`, over the pack's box) and `keyterrain.json`, and name it in
+/// `pack.json`.
+pub fn analyse_pack(path: &std::path::Path, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<bgws_env::Appreciation> {
+    let dir = path.display().to_string();
+    let mut pack = bgws_env::TheatrePack::open(path).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    let frame = bgws_core::EnuFrame::new(pack.meta.frame_origin);
+    let s = pack.meta.spec;
+    let aoi = bgws_env::Aoi { min_e: s.origin_e, min_n: s.origin_n, max_e: s.origin_e + s.cell * (s.width - 1) as f64, max_n: s.origin_n + s.cell * (s.height - 1) as f64 };
+    progress("terrain analysis: loading the pack", 0.0);
+    let g = pack_ground(path, &dir, &mut pack, &frame, &aoi)?;
+    let figures = crate::default_figures();
+    let mut ground = bgws_sim::ground::Ground::from_terrain(g.terrain, 0, &figures).with_roads(&g.roads).with_rivers(&g.rivers);
+    if let Some(v) = g.sight {
+        ground = ground.with_sight(v);
+    }
+    let a = bgws_sim::appreciation::analyse(&ground, &bgws_sim::appreciation::AnalyseParams::from_figures(&figures), progress);
+    a.write(&path.join("analysis.bin")).map_err(|e| anyhow!("theatre pack {dir}: writing the analysis: {e}"))?;
+    write_overlays(path, &pack.meta, &frame, &a)?;
+    pack.meta.analysis = Some("analysis.bin".into());
+    bgws_env::TheatrePack::write_meta(path, &pack.meta).map_err(|e| anyhow!("theatre pack {dir}: {e:?}"))?;
+    Ok(a)
+}
+
+/// The viewer's overlays: exposure (dead ground blue, ground open to view red),
+/// tracked going (no-go dark, slow-go lighter), on a lon/lat grid over the
+/// pack's box, and the key terrain with latitude and longitude.
+fn write_overlays(path: &std::path::Path, meta: &bgws_env::PackMeta, frame: &bgws_core::EnuFrame, a: &bgws_env::Appreciation) -> Result<()> {
+    let s = meta.spec;
+    let corner = |e: f64, n: f64| frame.enu_to_geodetic(bgws_core::Enu::new(e, n, 0.0));
+    let [w, so, ea, no] = meta.bbox.unwrap_or_else(|| {
+        let (sw, ne) = (corner(s.origin_e, s.origin_n), corner(s.origin_e + s.cell * (s.width - 1) as f64, s.origin_n + s.cell * (s.height - 1) as f64));
+        [sw.lon, sw.lat, ne.lon, ne.lat]
+    });
+    let (pw, ph) = (s.width.min(2_048), ((s.width.min(2_048) as f64) * (s.height as f64 / s.width as f64)).round() as usize);
+    let px = |x: usize, y: usize| {
+        let (lon, lat) = (w + (ea - w) * (x as f64 + 0.5) / pw as f64, no - (no - so) * (y as f64 + 0.5) / ph as f64);
+        let v = frame.geodetic_to_enu(bgws_core::Geodetic::new(lat, lon, 0.0));
+        (v.e, v.n)
+    };
+    let mut exp = vec![[0u8; 4]; pw * ph];
+    let mut go = vec![[0u8; 4]; pw * ph];
+    for y in 0..ph {
+        for x in 0..pw {
+            let (e, n) = px(x, y);
+            if let Some(v) = a.exposure_at(e, n) {
+                // Dead ground blue, ground open to view red, clear between.
+                exp[y * pw + x] = if v <= 0.1 {
+                    [40, 90, 230, (60.0 + 100.0 * (1.0 - v / 0.1)) as u8]
+                } else if v >= 0.4 {
+                    [230, 70, 50, (40.0 + 110.0 * ((v - 0.4) / 0.4).min(1.0)) as u8]
+                } else {
+                    [0, 0, 0, 0]
+                };
+            }
+            if let Some((c, _)) = a.mobility_at(0, e, n) {
+                go[y * pw + x] = match c {
+                    0 => [40, 30, 30, 150],
+                    1 => [200, 140, 40, 90],
+                    _ => [0, 0, 0, 0],
+                };
+            }
+        }
+    }
+    // Each file written aside and moved into place, so a reader never sees half of one.
+    let swap = |name: &str| std::fs::rename(path.join(format!("{name}.part")), path.join(name));
+    bgws_geodata::preview::write_rgba_png(&path.join("exposure.png.part"), pw, ph, &exp)?;
+    swap("exposure.png")?;
+    bgws_geodata::preview::write_rgba_png(&path.join("going.png.part"), pw, ph, &go)?;
+    swap("going.png")?;
+    let key: Vec<serde_json::Value> = a
+        .key
+        .iter()
+        .map(|k| {
+            let g = frame.enu_to_geodetic(bgws_core::Enu::new(k.e, k.n, 0.0));
+            serde_json::json!({ "kind": k.kind, "lat": g.lat, "lon": g.lon, "score": k.score, "classes": k.classes, "note": k.note })
+        })
+        .collect();
+    std::fs::write(path.join("keyterrain.json.part"), serde_json::to_vec_pretty(&serde_json::json!({ "bbox": [w, so, ea, no], "key": key }))?)?;
+    swap("keyterrain.json")?;
+    Ok(())
+}
+
 
 /// A terrain grid in another ENU frame, sampled through latitude and longitude.
 fn reframe(t: &bgws_env::Terrain, from: &bgws_core::EnuFrame, to: &bgws_core::EnuFrame) -> bgws_env::Terrain {
@@ -265,6 +410,20 @@ pub struct Host {
     questions: usize,
     by_source: std::collections::BTreeMap<String, usize>,
     cost: f64,
+    /// Keep every question handed out (`asked`), for the decision lab.
+    pub keep_questions: bool,
+    pub asked: Vec<Question>,
+    /// A play-out: replaying, this question gets this answer instead of the
+    /// recorded one; from there the rules decide and the dice are reseeded.
+    force: Option<Forced>,
+}
+
+#[derive(Clone, Debug)]
+struct Forced {
+    question: bgws_core::QuestionId,
+    choice: String,
+    reseed: Option<u64>,
+    done: bool,
 }
 
 impl Host {
@@ -274,11 +433,12 @@ impl Host {
         let overrides = figures.iter().filter(|f| defaults.figure(&f.key).is_some_and(|d| d.value != f.value)).map(|f| (f.key.clone(), f.value)).collect();
         let mut sim_opts = opts.sim.clone();
         if sim_opts.terrain.is_none() {
-            if let Some((terrain, roads, rivers, sight)) = load_pack(scenario)? {
-                sim_opts.terrain = Some(terrain);
-                sim_opts.roads = Some(roads);
-                sim_opts.rivers = Some(rivers);
-                sim_opts.sight = sight;
+            if let Some(g) = load_pack(scenario)? {
+                sim_opts.terrain = Some(g.terrain);
+                sim_opts.roads = Some(g.roads);
+                sim_opts.rivers = Some(g.rivers);
+                sim_opts.sight = g.sight;
+                sim_opts.appreciation = g.appreciation;
             }
         }
         let sim = Sim::with_options(scenario, seed, figures, sim_opts).map_err(|e| anyhow!("{e}"))?;
@@ -288,19 +448,38 @@ impl Host {
         record.figure_overrides = overrides;
         record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start };
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0 })
+        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0, keep_questions: false, asked: Vec::new(), force: None })
     }
 
     /// Replay a recorded game without calling any decider.
     pub fn replay(record: GameRecord, figures: Figures) -> Result<Host> {
+        Host::replay_with(record, figures, SimOptions::default())
+    }
+
+    /// Replay with ground already loaded (`sim`'s terrain, roads, sight…), so
+    /// many replays of one game on a pack load it once.
+    pub fn replay_with(record: GameRecord, figures: Figures, sim: SimOptions) -> Result<Host> {
         let mut f = figures;
         for (k, v) in &record.figure_overrides {
             f.set(k, *v).map_err(|e| anyhow!("{e}"))?;
         }
-        let sim = SimOptions { flat_ground: record.run.flat_ground, plan_at_start: record.run.plan_at_start, ..Default::default() };
+        let sim = SimOptions { flat_ground: record.run.flat_ground, plan_at_start: record.run.plan_at_start, ..sim };
         let mut h = Host::new(&record.scenario, record.seed, f, &HostOptions { deciders: DeciderChoice::Rules, sim, ..Default::default() })?;
         h.replay = Some(record);
         Ok(h)
+    }
+
+    /// Make this replay a play-out: when `question` comes up it is answered
+    /// `choice` instead of what the record says; from then on the rules
+    /// answer everything, and with `reseed` the dice are drawn from a new
+    /// seed (so play-outs of one choice differ, as games do).
+    pub fn force_answer(&mut self, question: bgws_core::QuestionId, choice: &str, reseed: Option<u64>) {
+        self.force = Some(Forced { question, choice: choice.to_string(), reseed, done: false });
+    }
+
+    /// Whether a forced answer has been given yet.
+    pub fn forced(&self) -> bool {
+        self.force.as_ref().is_some_and(|f| f.done)
     }
 
     /// Restart a recorded game at `at` ("what if", §12): replay the record
@@ -420,7 +599,29 @@ impl Host {
                 Step::NeedsAnswers { at, questions } => {
                     self.apply_recorded()?;
                     self.questions += questions.len();
-                    let answers = self.answer(questions)?;
+                    if self.keep_questions {
+                        self.asked.extend(questions.iter().cloned());
+                    }
+                    let forced = self.force.as_ref().filter(|f| !f.done).and_then(|f| questions.iter().position(|q| q.id == f.question));
+                    let mut answers = self.answer(questions.clone())?;
+                    if let (Some(i), Some(f)) = (forced, self.force.as_mut()) {
+                        if !questions[i].has_option(&f.choice) {
+                            bail!("{} is not an option of question {}", f.choice, f.question.0);
+                        }
+                        // The answer given, kept as it was when it is the one forced.
+                        if answers[i].choice != f.choice {
+                            answers[i] = Answer::simple(&questions[i], f.choice.clone(), bgws_core::AnswerSource::Rules);
+                            answers[i].rationale = Some("forced for a play-out".into());
+                        }
+                        f.done = true;
+                        let reseed = f.reseed;
+                        // From here on the game is new: the rules decide (a replay host's
+                        // router is the rules', set up as the game was), and fresh dice.
+                        self.stop_replay();
+                        if let Some(k) = reseed {
+                            self.sim.ctx.seed = Seed(bgws_core::rng::fnv1a(format!("{}:{k}", self.sim.ctx.seed.0).as_bytes()));
+                        }
+                    }
                     for a in &answers {
                         let key = serde_json::to_value(&a.source).ok().and_then(|v| v.get("kind").and_then(|k| k.as_str()).map(str::to_owned)).unwrap_or_default();
                         *self.by_source.entry(key).or_default() += 1;

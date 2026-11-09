@@ -96,11 +96,13 @@ pub struct SimOptions {
     pub rivers: Option<Vec<bgws_env::River>>,
     /// The pack's buildings and woods on a fine grid: sight lines are traced through them.
     pub sight: Option<bgws_env::SightView>,
+    /// The pack's terrain appreciation, in the scenario's frame.
+    pub appreciation: Option<bgws_env::AppreciationView>,
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, sight: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, sight: None, appreciation: None }
     }
 }
 
@@ -221,6 +223,9 @@ impl Sim {
         }
         if let Some(v) = &opts.sight {
             ground = ground.with_sight(v.clone());
+        }
+        if let Some(a) = &opts.appreciation {
+            ground = ground.with_appreciation(a.clone());
         }
         let start = UtcDateTime::parse(&scenario.start_utc).map_err(|e| LoadError::StartTime(format!("{e:?}")))?;
         let wspec = bgws_env::GridSpec::new(4, 4, half * 2.0 / 3.0, -half, -half);
@@ -492,6 +497,7 @@ impl Sim {
             question: format!("Plan the {} side's operation: give each unit its task, intent and phases.", side.as_str()),
             doctrine: vec![self.ctx.scenario.command.side(side).directive.clone()].into_iter().filter(|s| !s.is_empty()).collect(),
             situation: serde_json::to_string(&situation).unwrap_or_default(),
+            state: None,
             options: vec![],
             fallback: "heuristic".into(),
             rules_choice: "heuristic".into(),
@@ -500,6 +506,22 @@ impl Sim {
         };
         self.ctx.log.push(self.ctx.now, "decide.question").side(side).text(format!("{} HQ asked for a plan ({why})", side.as_str()));
         self.ctx.pending.insert(id, Pending { q, entity: None, about: None, answered: false, handed_out: false });
+    }
+
+    /// A unit by its scenario id (its name).
+    pub fn entity_named(&self, name: &str) -> Option<bevy_ecs::prelude::Entity> {
+        self.ctx.order.iter().copied().find(|&e| self.world.get::<Ident>(e).is_some_and(|i| i.name == name))
+    }
+
+    /// Where a unit's orders lead it now: the end of its current move, else of its next.
+    pub fn goal_of(&self, name: &str) -> Option<Enu> {
+        let e = self.entity_named(name)?;
+        crate::decide::heading_for(self.world.get::<crate::components::Act>(e)?)
+    }
+
+    /// Vehicles (or teams) fit on a side, across every domain.
+    pub fn side_fit(&self, side: Side) -> u32 {
+        self.ctx.order.iter().filter(|&&e| self.world.get::<Ident>(e).is_some_and(|i| i.side == side)).filter_map(|&e| self.world.get::<Health>(e)).map(|h| h.fit).sum()
     }
 
     /// The HQ's picture: own units as reported, and the side's tracks. Never truth.
@@ -574,6 +596,10 @@ impl Sim {
         if n > 0.0 {
             refs.insert("START".to_string(), self.ctx.frame.enu_to_geodetic(centroid.scale(1.0 / n)));
         }
+        let terrain = self.key_terrain_brief(side, objective);
+        for t in &terrain {
+            refs.insert(t.label.clone(), t.at);
+        }
         HqSituation {
             hq: hq::hq_agent(side),
             echelon: format!("{:?}", self.ctx.scenario.scope.echelons.highest).to_lowercase(),
@@ -587,7 +613,36 @@ impl Sim {
             objective,
             reference_points: refs,
             shareable_means: BTreeMap::new(),
+            terrain,
         }
+    }
+
+    /// The key terrain an HQ is briefed on: the best few observation
+    /// points, gaps and bridges within 5 km of its units and objective.
+    fn key_terrain_brief(&self, side: Side, objective: Option<Geodetic>) -> Vec<hq::TerrainNote> {
+        let Some(a) = self.ctx.ground.appreciation.as_ref() else { return Vec::new() };
+        let mut pts: Vec<Enu> = self.ctx.order.iter().filter_map(|&e| {
+            let i = self.world.get::<Ident>(e)?;
+            (i.side == side && i.domain == Domain::Land).then(|| self.world.get::<Kin>(e).map(|k| k.pos)).flatten()
+        }).collect();
+        if let Some(o) = objective {
+            pts.push(self.ctx.frame.geodetic_to_enu(o));
+        }
+        if pts.is_empty() {
+            return Vec::new();
+        }
+        let m = 5_000.0;
+        let (lo_e, hi_e) = pts.iter().fold((f64::MAX, f64::MIN), |a, p| (a.0.min(p.e), a.1.max(p.e)));
+        let (lo_n, hi_n) = pts.iter().fold((f64::MAX, f64::MIN), |a, p| (a.0.min(p.n), a.1.max(p.n)));
+        let mut out = Vec::new();
+        for (kind, word, label) in [(bgws_env::KeyKind::Observation, "observation", "OP"), (bgws_env::KeyKind::Chokepoint, "chokepoint", "GAP"), (bgws_env::KeyKind::Crossing, "crossing", "BRIDGE")] {
+            let mut v: Vec<&bgws_env::KeyTerrain> = a.key.iter().filter(|k| k.kind == kind && k.e >= lo_e - m && k.e <= hi_e + m && k.n >= lo_n - m && k.n <= hi_n + m).collect();
+            v.sort_by(|x, y| y.score.total_cmp(&x.score));
+            for (j, k) in v.into_iter().take(4).enumerate() {
+                out.push(hq::TerrainNote { label: format!("{label}{}", j + 1), kind: word.into(), at: self.ctx.frame.enu_to_geodetic(Enu::new(k.e, k.n, 0.0)), note: k.note.clone() });
+            }
+        }
+        out
     }
 
     /// A frame for the UI: truth for the umpire, else what a side believes.

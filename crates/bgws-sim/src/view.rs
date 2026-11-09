@@ -525,5 +525,10 @@ pub fn unit_detail(s: &Sim, id: EntityId, viewer: Viewer) -> Option<serde_json::
         "activity": activity, "people": people, "mounts": mounts, "knows": knows,
         "speed": s.world.get::<Kin>(e).map(|k| k.vel.norm()),
         "block": s.world.get::<Kin>(e).and_then(|k| s.ctx.ground.block(k.pos.e, k.pos.n)),
+        "terrain": s.world.get::<Kin>(e).and_then(|k| {
+            let x = s.ctx.ground.exposure(k.pos.e, k.pos.n)?;
+            let near: Vec<serde_json::Value> = s.ctx.ground.key_terrain_near(k.pos.e, k.pos.n, 1_500.0).into_iter().take(3).map(|t| json!({ "kind": t.kind, "note": t.note, "distM": (t.e - k.pos.e).hypot(t.n - k.pos.n).round() })).collect();
+            Some(json!({ "exposure": x, "deadGround": x < 0.1, "near": near }))
+        }),
     }))
 }
