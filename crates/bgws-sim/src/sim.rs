@@ -508,6 +508,22 @@ impl Sim {
         self.ctx.pending.insert(id, Pending { q, entity: None, about: None, answered: false, handed_out: false });
     }
 
+    /// A unit by its scenario id (its name).
+    pub fn entity_named(&self, name: &str) -> Option<bevy_ecs::prelude::Entity> {
+        self.ctx.order.iter().copied().find(|&e| self.world.get::<Ident>(e).is_some_and(|i| i.name == name))
+    }
+
+    /// Where a unit's orders lead it now: the end of its current move, else of its next.
+    pub fn goal_of(&self, name: &str) -> Option<Enu> {
+        let e = self.entity_named(name)?;
+        crate::decide::heading_for(self.world.get::<crate::components::Act>(e)?)
+    }
+
+    /// Vehicles (or teams) fit on a side, across every domain.
+    pub fn side_fit(&self, side: Side) -> u32 {
+        self.ctx.order.iter().filter(|&&e| self.world.get::<Ident>(e).is_some_and(|i| i.side == side)).filter_map(|&e| self.world.get::<Health>(e)).map(|h| h.fit).sum()
+    }
+
     /// The HQ's picture: own units as reported, and the side's tracks. Never truth.
     pub fn hq_situation(&self, side: Side, why: &str) -> HqSituation {
         let mut units = Vec::new();

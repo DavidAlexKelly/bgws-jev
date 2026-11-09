@@ -55,6 +55,7 @@ then streams.
 | `live` | | back to the live game |
 | `branch` | `t` | restart at `t` and play on ("what if") |
 | `save` | | write the game record (`--record`) |
+| `labKeep` | | keep the game so far in the decision lab (`status` says how many decisions) |
 | `inspect` | `unit` | one unit in detail (`unit`) |
 | `why` | `unit` | what happened to a unit and why (`report`) |
 | `review` | | the after-action review so far (`report`) |
@@ -122,6 +123,13 @@ n × { u32 id, f64 lat, f64 lon, f32 alt, f32 heading_deg, u8 status }
 | `POST /api/templates` | save a custom behaviour template |
 | `DELETE /api/templates/:name` | remove one |
 | `GET /classic` | the earlier single-file viewer |
+| `GET /lab` | the decision lab |
+| `GET /api/lab/moments`, `GET /api/lab/moments/:id` | its moments: units' decisions with what each knew, play-outs, labels, graded answers |
+| `POST /api/lab/moments/:id/label` | `{ best, acceptable, flagged, note }` |
+| `POST /api/lab/moments/:id/playout`, `POST /api/lab/playout` | play out one moment, or up to `limit` not yet played out: `{ runs, horizonMin, limit?, point? }` |
+| `POST /api/lab/collect` | `{ scenario, seeds, minutes, deciders }`: play games and keep their decisions |
+| `POST /api/lab/grade` | `{ deciders, model?, prose?, judgedOnly? }`: ask a decider every moment afresh |
+| `GET /api/lab/report` | how each decider does, overall and per decision point |
 
 The map data is PMTiles: any client with a PMTiles reader (MapLibre with
 the `pmtiles` protocol, `pmtiles` for Python, …) reads the packs and the

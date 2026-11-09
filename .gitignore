@@ -3,3 +3,5 @@ target/
 packs/
 node_modules/
 .DS_Store
+# The decision lab (bgws lab): moments, play-outs and labels are yours, not the repo's.
+lab/

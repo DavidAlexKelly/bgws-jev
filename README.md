@@ -94,6 +94,51 @@ Options are sent under their own ids (`engageNow`, `keep`) rather than
 A different state is a different cache key, so a remembered answer is only
 reused for the same situation.
 
+### The decision lab
+
+How good are the deciders' choices? The lab (`crates/bgws-run/src/lab.rs`,
+the page at `/lab`) measures it.
+
+- **Moments:** every land unit's decision in a game (a question with more
+  than one option), kept with the game's record and the unit's state as it
+  was put. `bgws lab collect <scenario> --seeds 1-8` plays games and keeps
+  them; `bgws lab import game.json` takes a saved game; **Add to lab** in
+  the viewer keeps the game being played.
+- **Play-outs:** `bgws lab playout` replays the game to a moment, forces
+  each option in turn, and plays on (20 minutes by default) with the rules
+  deciding and fresh dice for each run (12 by default). Each run is scored
+  from the deciding unit's side: enemy share lost − own side share lost −
+  ½ × its own unit's share lost + ¼ × share of the way to its objective
+  made good, ±1 if the game is won or lost in that time. Options within one
+  standard error of the best are near-best. A moment is decisive when some
+  option is clearly worse; only decisive moments score a decider. Forcing
+  the answer that was given, with the original dice, replays the game
+  exactly (a test checks it). On a skirmish a moment takes 5–15 s.
+- **Your call:** on the page, mark the best option, the acceptable ones, a
+  flag and a note, beside the unit's picture (a radar of what it has seen,
+  its friends, its objective and its weapons' reach), its facts and the
+  play-out scores.
+- **Grading:** `bgws lab grade --deciders jev` asks a decider every
+  moment's question afresh, as it was put, and keeps its choice,
+  probabilities and confidence under its name (the model; `+prose` with
+  `--prose`), so settings can be compared.
+- **Report:** `bgws lab report` (and the page's Report tab) gives each
+  decider's near-best share, best share and mean regret against the
+  play-outs, its agreement with your labels, and for Jev its mean
+  confidence and calibration error (how far its confidence is from how
+  often it is near-best), overall and per decision point. The template
+  fallback, the rules' choice and what the game chose are yardsticks.
+
+The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
+`moments/`, one JSON file each. A first look at three rules games of the
+advance-to-contact skirmish: 6 of 12 played-out moments were decisive, and
+the doctrine default was near-best in 5 of them. Where it was not, a tank
+troop on first contact that carried on lost the whole troop in every run,
+while one that took a better position kept a third of it.
+
+Grading Jev needs `OPENROUTER_API_KEY` where the lab runs, and the network
+to reach openrouter.ai.
+
 ## The workspace (plan §3.1)
 
 | Crate | What it holds |

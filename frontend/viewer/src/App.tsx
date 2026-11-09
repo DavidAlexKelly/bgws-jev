@@ -226,6 +226,7 @@ export function App() {
           }}
           onSave={() => send({ kind: "save" })}
           onReview={() => send({ kind: "review" })}
+          onLab={() => send({ kind: "labKeep" })}
         />
         <ClockPanel
           frame={s.frame}

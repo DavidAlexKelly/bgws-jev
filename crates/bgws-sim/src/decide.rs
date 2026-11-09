@@ -165,7 +165,7 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
 }
 
 /// Where a move leads: the end of the current move, else of the next one in its orders.
-fn heading_for(a: &Act) -> Option<Enu> {
+pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
     let end = |x: &Activity| match x {
         Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
         _ => None,

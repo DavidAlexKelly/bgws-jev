@@ -26,7 +26,7 @@ const KEY_NAME: Record<string, string> = { claude: "ANTHROPIC_API_KEY", jev: "OP
 
 // ── Left pane ──────────────────────────────────────────────────────────────
 
-export function GamePanel(props: { game: GameInfo | null; onNew: () => void; onSave: () => void; onReview: () => void }) {
+export function GamePanel(props: { game: GameInfo | null; onNew: () => void; onSave: () => void; onReview: () => void; onLab: () => void }) {
   const g = props.game;
   return (
     <>
@@ -81,10 +81,12 @@ export function GamePanel(props: { game: GameInfo | null; onNew: () => void; onS
         <button className="btn" onClick={props.onNew} title="Pick another shipped scenario">New game…</button>
         <button className="btn" onClick={props.onReview} title="The after-action review so far">Review</button>
         <button className="btn" onClick={props.onSave} title="Write the game record on the server (--record)">Save</button>
+        <button className="btn" onClick={props.onLab} title="Keep this game's unit decisions in the decision lab, to play out and judge">Add to lab</button>
       </div>
       <div className="row">
         <a className="link" href="/editor" target="_blank" rel="noopener">Scenario editor ↗</a>
         <a className="link" href="/behaviour" target="_blank" rel="noopener">Behaviour Manager ↗</a>
+        <a className="link" href="/lab" target="_blank" rel="noopener">Decision lab ↗</a>
         <a className="link muted" href="/classic">classic viewer</a>
       </div>
     </>

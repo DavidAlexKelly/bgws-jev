@@ -176,6 +176,7 @@ export type Outbound =
   | { kind: "live" }
   | { kind: "branch"; t: number }
   | { kind: "save" }
+  | { kind: "labKeep" }
   | { kind: "why"; unit: string }
   | { kind: "review" }
   | { kind: "detect"; observer: string; target: string }

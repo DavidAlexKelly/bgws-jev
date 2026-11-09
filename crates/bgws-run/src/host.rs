@@ -410,6 +410,20 @@ pub struct Host {
     questions: usize,
     by_source: std::collections::BTreeMap<String, usize>,
     cost: f64,
+    /// Keep every question handed out (`asked`), for the decision lab.
+    pub keep_questions: bool,
+    pub asked: Vec<Question>,
+    /// A play-out: replaying, this question gets this answer instead of the
+    /// recorded one; from there the rules decide and the dice are reseeded.
+    force: Option<Forced>,
+}
+
+#[derive(Clone, Debug)]
+struct Forced {
+    question: bgws_core::QuestionId,
+    choice: String,
+    reseed: Option<u64>,
+    done: bool,
 }
 
 impl Host {
@@ -434,19 +448,38 @@ impl Host {
         record.figure_overrides = overrides;
         record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start };
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0 })
+        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0, keep_questions: false, asked: Vec::new(), force: None })
     }
 
     /// Replay a recorded game without calling any decider.
     pub fn replay(record: GameRecord, figures: Figures) -> Result<Host> {
+        Host::replay_with(record, figures, SimOptions::default())
+    }
+
+    /// Replay with ground already loaded (`sim`'s terrain, roads, sight…), so
+    /// many replays of one game on a pack load it once.
+    pub fn replay_with(record: GameRecord, figures: Figures, sim: SimOptions) -> Result<Host> {
         let mut f = figures;
         for (k, v) in &record.figure_overrides {
             f.set(k, *v).map_err(|e| anyhow!("{e}"))?;
         }
-        let sim = SimOptions { flat_ground: record.run.flat_ground, plan_at_start: record.run.plan_at_start, ..Default::default() };
+        let sim = SimOptions { flat_ground: record.run.flat_ground, plan_at_start: record.run.plan_at_start, ..sim };
         let mut h = Host::new(&record.scenario, record.seed, f, &HostOptions { deciders: DeciderChoice::Rules, sim, ..Default::default() })?;
         h.replay = Some(record);
         Ok(h)
+    }
+
+    /// Make this replay a play-out: when `question` comes up it is answered
+    /// `choice` instead of what the record says; from then on the rules
+    /// answer everything, and with `reseed` the dice are drawn from a new
+    /// seed (so play-outs of one choice differ, as games do).
+    pub fn force_answer(&mut self, question: bgws_core::QuestionId, choice: &str, reseed: Option<u64>) {
+        self.force = Some(Forced { question, choice: choice.to_string(), reseed, done: false });
+    }
+
+    /// Whether a forced answer has been given yet.
+    pub fn forced(&self) -> bool {
+        self.force.as_ref().is_some_and(|f| f.done)
     }
 
     /// Restart a recorded game at `at` ("what if", §12): replay the record
@@ -566,7 +599,29 @@ impl Host {
                 Step::NeedsAnswers { at, questions } => {
                     self.apply_recorded()?;
                     self.questions += questions.len();
-                    let answers = self.answer(questions)?;
+                    if self.keep_questions {
+                        self.asked.extend(questions.iter().cloned());
+                    }
+                    let forced = self.force.as_ref().filter(|f| !f.done).and_then(|f| questions.iter().position(|q| q.id == f.question));
+                    let mut answers = self.answer(questions.clone())?;
+                    if let (Some(i), Some(f)) = (forced, self.force.as_mut()) {
+                        if !questions[i].has_option(&f.choice) {
+                            bail!("{} is not an option of question {}", f.choice, f.question.0);
+                        }
+                        // The answer given, kept as it was when it is the one forced.
+                        if answers[i].choice != f.choice {
+                            answers[i] = Answer::simple(&questions[i], f.choice.clone(), bgws_core::AnswerSource::Rules);
+                            answers[i].rationale = Some("forced for a play-out".into());
+                        }
+                        f.done = true;
+                        let reseed = f.reseed;
+                        // From here on the game is new: the rules decide (a replay host's
+                        // router is the rules', set up as the game was), and fresh dice.
+                        self.stop_replay();
+                        if let Some(k) = reseed {
+                            self.sim.ctx.seed = Seed(bgws_core::rng::fnv1a(format!("{}:{k}", self.sim.ctx.seed.0).as_bytes()));
+                        }
+                    }
                     for a in &answers {
                         let key = serde_json::to_value(&a.source).ok().and_then(|v| v.get("kind").and_then(|k| k.as_str()).map(str::to_owned)).unwrap_or_default();
                         *self.by_source.entry(key).or_default() += 1;

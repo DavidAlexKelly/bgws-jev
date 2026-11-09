@@ -122,6 +122,15 @@ enum Cmd {
     /// `bgws terrain` does this as it builds; a pack without one gets it the first
     /// time a game opens on it.
     Analyse { pack: PathBuf },
+    /// The decision lab: collect units' decisions from games, play out every
+    /// option, grade a decider against the results and your labels.
+    Lab {
+        #[command(subcommand)]
+        cmd: LabCmd,
+        /// The lab folder ($BGWS_LAB, else ./lab).
+        #[arg(long, global = true)]
+        lab: Option<PathBuf>,
+    },
     /// Build a theatre pack (§14.2): synthetic ground for an area, tiled, for scenarios to name.
     Pack {
         out: PathBuf,
@@ -259,6 +268,80 @@ fn vignette_scenarios() -> experiments::VignetteScenarios {
 }
 
 /// A scenario by path, or by the name of a shipped one.
+#[derive(clap::Subcommand)]
+enum LabCmd {
+    /// Play a scenario (one game per seed) and keep every unit decision.
+    Collect {
+        scenario: String,
+        /// Seeds: `4` (one), `1-8` (a range) or `1,3,9`.
+        #[arg(long, default_value = "1")]
+        seeds: String,
+        #[arg(long, default_value = "rules")]
+        deciders: DeciderChoice,
+        /// How long each game runs; the scenario's length by default.
+        #[arg(long)]
+        minutes: Option<f64>,
+    },
+    /// Keep a saved game's unit decisions (`--record` from `play`, or the viewer's Save).
+    Import { record: PathBuf },
+    /// Play out every option of moments: replay to the decision, force the
+    /// option, play on with fresh dice, score from the unit's side.
+    Playout {
+        /// One moment; else every moment not played out yet (or all, with --again).
+        #[arg(long)]
+        moment: Option<String>,
+        #[arg(long, default_value_t = 12)]
+        runs: usize,
+        #[arg(long, default_value_t = 20.0)]
+        horizon_min: f64,
+        /// At most this many moments.
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Only this decision point (D1…).
+        #[arg(long)]
+        point: Option<String>,
+        #[arg(long)]
+        again: bool,
+    },
+    /// Ask a decider every moment's question afresh and keep its answers.
+    Grade {
+        #[arg(long, default_value = "jev")]
+        deciders: DeciderChoice,
+        /// The model (Jev or Claude), else the configured one.
+        #[arg(long)]
+        model: Option<String>,
+        /// Jev only: give the situation in words as well as the fields.
+        #[arg(long)]
+        prose: bool,
+        /// Only moments that have been played out or labelled.
+        #[arg(long)]
+        judged_only: bool,
+        #[arg(long, default_value = "http://127.0.0.1:8080")]
+        local_url: String,
+        #[arg(long, default_value = "local")]
+        local_model: String,
+    },
+    /// How each decider does: near-best against the play-outs, agreement with your labels, calibration.
+    Report {
+        /// Every decision point, not only the totals.
+        #[arg(long)]
+        points: bool,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+fn parse_seeds(s: &str) -> Result<Vec<u64>> {
+    let mut v = Vec::new();
+    for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        match part.split_once('-') {
+            Some((a, b)) => v.extend(a.parse::<u64>()?..=b.parse::<u64>()?),
+            None => v.push(part.parse()?),
+        }
+    }
+    Ok(v)
+}
+
 fn scenario_path(s: &str) -> PathBuf {
     let p = PathBuf::from(s);
     if p.exists() {
@@ -361,6 +444,65 @@ fn main() -> Result<()> {
             eprintln!("terrain analysis: {} key terrain points", a.key.len());
             println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());
             eprintln!("theatre pack `{}` in {} ({} terrain tiles, {:.0} s)", meta.name, out.display(), meta.tiles.len(), started.elapsed().as_secs_f64());
+        }
+        Cmd::Lab { cmd, lab } => {
+            let lab = bgws_run::lab::Lab::open(&lab.unwrap_or_else(bgws_run::lab::lab_dir))?;
+            match cmd {
+                LabCmd::Collect { scenario, seeds, deciders, minutes } => {
+                    let sc = load_scenario(&scenario_path(&scenario))?;
+                    for seed in parse_seeds(&seeds)? {
+                        let t0 = Instant::now();
+                        let ids = lab.collect(&sc, seed, deciders, minutes.unwrap_or(sc.scope.duration_min), default_figures())?;
+                        eprintln!("seed {seed}: {} unit decisions kept ({:.0} s)", ids.len(), t0.elapsed().as_secs_f64());
+                    }
+                }
+                LabCmd::Import { record } => {
+                    let r = bgws_scenario::record::GameRecord::load(&record).map_err(|e| anyhow!("{}: {e}", record.display()))?;
+                    let ids = lab.import(r, default_figures())?;
+                    eprintln!("{} unit decisions kept", ids.len());
+                }
+                LabCmd::Playout { moment, runs, horizon_min, limit, point, again } => {
+                    let ids: Vec<String> = match moment {
+                        Some(m) => vec![m],
+                        None => lab
+                            .moments()?
+                            .into_iter()
+                            .filter(|m| again || m.playouts.is_none())
+                            .filter(|m| point.as_ref().is_none_or(|p| &m.trigger == p))
+                            .map(|m| m.id)
+                            .take(limit.unwrap_or(usize::MAX))
+                            .collect(),
+                    };
+                    let f = default_figures();
+                    for (k, id) in ids.iter().enumerate() {
+                        let t0 = Instant::now();
+                        let m = lab.playout(id, runs, horizon_min * 60.0, bgws_run::lab::Weights::default(), &f)?;
+                        let p = m.playouts.as_ref().unwrap();
+                        let line: Vec<String> = p.options.iter().map(|o| format!("{} {:+.3}±{:.3}", o.option, o.mean, o.se)).collect();
+                        eprintln!("[{}/{}] {} {} {}: best {} ({}) [{:.0} s]", k + 1, ids.len(), m.agent, m.trigger, m.title, p.best, line.join(", "), t0.elapsed().as_secs_f64());
+                    }
+                }
+                LabCmd::Grade { deciders, model, prose, judged_only, local_url, local_model } => {
+                    let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, (&local_url, &local_model))?;
+                    let n = lab.grade(d, &name, |m| !judged_only || m.playouts.is_some() || m.label.is_some())?;
+                    eprintln!("{n} moments graded as {name}");
+                }
+                LabCmd::Report { points, json } => {
+                    let r = lab.report()?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&r)?);
+                    } else {
+                        print!("{}", r.table());
+                        if points {
+                            println!("\n| decider | point | moments | near-best | agrees with you |\n|---|---|---|---|---|");
+                            for row in r.rows.iter().filter(|r| r.point != "all") {
+                                let pct = |x: Option<f64>| x.map(|v| format!("{:.0}%", v * 100.0)).unwrap_or_else(|| "–".into());
+                                println!("| {} | {} | {} | {} | {} |", row.decider, row.point, row.moments, pct(row.near_best), pct(row.agrees_with_labels));
+                            }
+                        }
+                    }
+                }
+            }
         }
         Cmd::Analyse { pack } => {
             let started = Instant::now();
