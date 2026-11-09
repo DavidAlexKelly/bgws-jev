@@ -220,6 +220,26 @@ cut-offs (overall and per decision point). `bgws lab tune` improves it:
    never saw: about 30% of the cases (fixed by a hash of their ids) and the
    suite's held-out scenarios.
 
+First runs (Jev 1.13, proposer Claude Opus 5.5, $0.70–0.95 each): what
+helped was almost all **option descriptions**. Jev had only seen short
+labels ("Better position"); the rewrite says what each option costs and
+when it fits ("Drive to another firing position before engaging. No fire
+while moving. Best before the fight starts, when it cannot fire from here,
+or when an enemy out-ranges it in the open."). Most other ideas (reading
+checklists, new balance rules) were refused by the consistency checks:
+they changed answers when options were reordered. With 13 training and 5
+held-out cases:
+
+| | training cases | training scenarios | held-out cases | held-out scenarios |
+|---|---|---|---|---|
+| the engine's wording | 17 pass, 3 wrong of 20 | −0.33 ± 0.13 | 2 pass, 1 wrong of 5 | +0.02 ± 0.19 |
+| tuned | 20 pass, 0 wrong | −0.17 ± 0.12 | 3 pass, 0 wrong | +0.29 ± 0.25 |
+
+(Scenario scores are result Δ + exchange Δ against the doctrine default.)
+An earlier run held out only 2 cases, which is too few: the split now
+holds out a fixed 30%. The confidence cut-off stayed at 0.25 because the
+tuned wording left Jev nothing below it to rescue.
+
 A run is kept in `<lab>/tune/<id>/` (`report.md`, `run.json`,
 `wording.json`), and the lab's **Tune** tab shows it. Nothing changes the
 game until it is accepted: `bgws lab tune --accept <id>` (or the tab's
