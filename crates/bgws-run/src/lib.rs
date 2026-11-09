@@ -9,6 +9,7 @@ pub mod experiments;
 pub mod geotiff;
 pub mod cases;
 pub mod host;
+pub mod suite;
 pub mod lab;
 pub mod behaviour;
 pub mod editor;
@@ -20,6 +21,20 @@ pub use host::{load_scenario, router_for, DeciderChoice, Host, HostOptions, Play
 /// The shipped data (scenarios, catalogue, templates, cases): `$BGWS_DATA`, else `data/` at the repository root.
 pub fn data_dir() -> std::path::PathBuf {
     std::env::var_os("BGWS_DATA").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+}
+
+/// A scenario by path, or by the name of a shipped one (`data/scenarios/<name>.json`).
+pub fn scenario_file(s: &str) -> std::path::PathBuf {
+    let p = std::path::PathBuf::from(s);
+    if p.exists() {
+        return p;
+    }
+    let named = data_dir().join("scenarios").join(if s.ends_with(".json") { s.to_string() } else { format!("{s}.json") });
+    if named.exists() {
+        named
+    } else {
+        p
+    }
 }
 
 /// Where theatre packs live: `$BGWS_PACKS`, else `packs/` at the repository root.

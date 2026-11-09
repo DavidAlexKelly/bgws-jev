@@ -635,7 +635,10 @@ pub fn case_from_moment(m: &crate::lab::Moment, why: &str) -> Result<Case> {
         acceptable = p.map(|p| p.near_best.clone()).unwrap_or_default();
     }
     if acceptable.is_empty() {
-        return Err(anyhow!("{}: label it (best or acceptable) or play it out first", m.id));
+        return Err(match &m.playouts {
+            Some(p) if !p.decisive => anyhow!("{}: its play-outs are not decisive (every option within the noise of the best), so they say nothing about right and wrong; label it yourself if you have a view", m.id),
+            _ => anyhow!("{}: label it (best or acceptable) or play it out first", m.id),
+        });
     }
     let wrong = p.map(|p| p.options.iter().map(|o| o.option.clone()).filter(|o| !p.near_best.contains(o) && !acceptable.contains(o)).collect()).unwrap_or_default();
     // The template as resolved for the unit (custom ones fall back to the default's options).

@@ -140,3 +140,22 @@ fn the_shipped_decision_cases_build_and_can_be_judged() {
     assert_eq!(b.items(&c).unwrap()[0].acceptable, c.acceptable);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// The engagement suite pairs each game with a rules baseline on the same
+/// seed: with the rules themselves under test, the two games are the same,
+/// so every difference is exactly zero. Its worst games can be kept in the lab.
+#[test]
+fn the_suite_pairs_games_with_the_rules_baseline() {
+    use bgws_run::suite;
+    let entries = vec![suite::Entry { scenario: "skirmish-catalogue-armour-v1".into(), minutes: Some(30.0), note: String::new(), held_out: false }];
+    let (d, name) = bgws_run::lab::decider_for(DeciderChoice::Rules, &default_figures(), None, false, ("", "")).unwrap();
+    let r = suite::run(&entries, &[1, 2], d, &name, &default_figures(), 2, &suite::Options::default(), &|_| {}).unwrap();
+    assert_eq!(r.pairs.len(), 4, "two seeds, each side");
+    for p in &r.pairs {
+        assert_eq!((p.diff.result, p.diff.exchange, p.diff.own_loss, p.diff.survival), (0.0, 0.0, 0.0, 0.0), "{p:?}");
+    }
+    let all = r.summaries.iter().find(|s| s.scope == "all").unwrap();
+    assert_eq!((all.pairs, all.better, all.worse), (4, 0, 0));
+    assert!(all.baseline.survival > 0.0 && all.baseline.survival <= 1.0);
+    assert!(suite::load_entries().unwrap().len() >= 5, "the shipped suite");
+}

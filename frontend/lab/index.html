@@ -59,7 +59,7 @@
 <body>
 <header>
   <b>BGWS</b><span>DECISION LAB</span>
-  <span class="tabs"><button data-tab="cases">Cases</button> <button data-tab="moments" class="on">Moments</button> <button data-tab="report">Report</button> <button data-tab="work">Collect &amp; grade</button></span>
+  <span class="tabs"><button data-tab="cases">Cases</button> <button data-tab="suite">Suite</button> <button data-tab="moments" class="on">Moments</button> <button data-tab="report">Report</button> <button data-tab="work">Collect &amp; grade</button></span>
   <span id="status"></span>
   <span style="flex:1"></span>
   <a href="/">viewer</a><a href="/behaviour">behaviour</a>
@@ -94,6 +94,44 @@ function show(t) {
   if (t === "report") report();
   if (t === "work") work();
   if (t === "cases") casesTab();
+  if (t === "suite") suiteTab();
+}
+
+// ── The engagement suite ──────────────────────────────────────────────────
+
+async function suiteTab() {
+  $("#detail").innerHTML = `<p class="dim">loading…</p>`;
+  const d = await api("/api/lab/suite");
+  const s = (x) => (x ? `<span style="color:${x.mean > x.se ? "var(--good)" : x.mean < -x.se ? "var(--bad)" : "var(--text)"}">${x.mean >= 0 ? "+" : ""}${x.mean.toFixed(2)}</span> <span class="dim">±${x.se.toFixed(2)}</span>` : "–");
+  const run = (r) => `
+    <div class="card">
+      <b>${esc(r.decider)}</b> <span class="dim">${r.pairs.length} paired games, seeds ${r.seeds.join(", ")} · ${r.wallS.toFixed(0)} s · $${r.costUsd.toFixed(4)}${r.answeredShare != null ? ` · ${pct(r.answeredShare)} of its questions answered by it` : ""}</span>
+      <table style="margin-top:8px">
+        <tr><th>scenario</th><th class="num">pairs</th><th class="num">better / worse</th><th class="num">result Δ</th><th class="num">exchange Δ</th><th class="num">own loss Δ</th><th class="num">enemy loss Δ</th><th class="num">survival Δ</th></tr>
+        ${r.summaries.map((m) => `<tr style="${m.scope === "all" ? "font-weight:bold" : ""}"><td>${esc(m.scope)}</td><td class="num">${m.pairs}</td><td class="num">${m.better} / ${m.worse}</td><td class="num">${s(m.result)}</td><td class="num">${s(m.exchange)}</td><td class="num">${s({ mean: -m.ownLoss.mean, se: m.ownLoss.se }).replace(/^/, "")}</td><td class="num">${s(m.enemyLoss)}</td><td class="num">${s(m.survival)}</td></tr>`).join("")}
+      </table>
+      ${r.kept && r.kept.length ? `<p class="note">Its worst games are in the Moments list (filter by game) to play out: ${r.kept.map(esc).join(", ")}</p>` : ""}
+    </div>`;
+  $("#detail").innerHTML = `
+    <h2>Engagement suite</h2>
+    <p class="note">Each scenario is played over several seeds with the decider answering one side's units and the rules the other's, and again with the rules on both sides on the same seed. The two games start the same and differ only by the decider's choices, so the difference (Δ) is what it adds, for the side it played: result (+1 a win, −1 a loss), exchange (enemy share lost − own share lost), losses, survival (the share of the game its vehicles lived). Green: better than the doctrine default by more than one standard error; red: worse. Own loss is shown so that up is good (fewer losses).</p>
+    <div class="card"><div class="row">Play the suite with <select id="s-dec"><option>jev</option><option>claude</option><option>local</option><option>rules</option></select>
+      model <input id="s-model" placeholder="as configured" size="20"> <label><input type="checkbox" id="s-prose"> also the words</label>
+      seeds <input id="s-seeds" value="1,2,3,4" size="8"> keep the worst <input id="s-keep" type="number" value="4" style="width:50px"> games in the lab
+      <label><input type="checkbox" id="s-all"> with the held-out scenarios</label>
+      <button class="go" id="s-go">Play</button></div>
+      <p class="note">Scenarios (data/suite/suite.json): ${d.entries.map((e) => `${esc(e.scenario)}${e.heldOut ? " (held out)" : ""}`).join(" · ")}</p></div>
+    ${d.runs.map(run).join("") || `<p class="dim">No runs yet.</p>`}`;
+  $("#s-go").onclick = async (e) => {
+    e.target.disabled = true;
+    status("playing the suite… (a minute or two)");
+    try {
+      const r = await api("/api/lab/suite", { deciders: $("#s-dec").value, model: $("#s-model").value || null, prose: $("#s-prose").checked, seeds: $("#s-seeds").value.split(",").map((x) => +x.trim()).filter((x) => !isNaN(x)), keepWorst: +$("#s-keep").value, all: $("#s-all").checked });
+      status(`${r.decider}: result Δ ${r.summaries.at(-1).result.mean.toFixed(2)}`);
+      await load();
+      suiteTab();
+    } catch (err) { status(err.message); e.target.disabled = false; }
+  };
 }
 
 async function load() {

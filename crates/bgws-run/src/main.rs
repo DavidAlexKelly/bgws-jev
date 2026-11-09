@@ -341,6 +341,32 @@ enum LabCmd {
         #[arg(long)]
         check: bool,
     },
+    /// The engagement suite: play its scenarios with the decider on one side
+    /// against the rules, paired with a rules-against-rules game on the same
+    /// seed, and report what the decider changes (wins, losses, survival).
+    Suite {
+        #[arg(long, default_value = "jev")]
+        deciders: DeciderChoice,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        prose: bool,
+        /// Seeds: `1-5`, `1,3,9`.
+        #[arg(long, default_value = "1-4")]
+        seeds: String,
+        /// Only these scenarios (comma-separated names); else the suite's.
+        #[arg(long)]
+        scenarios: Option<String>,
+        /// Games played at once (each waits on the decider's answers).
+        #[arg(long, default_value_t = 4)]
+        parallel: usize,
+        /// Also the held-out scenarios (kept back from tuning).
+        #[arg(long)]
+        all: bool,
+        /// Keep the decider's N worst games in the lab, to play out their decisions.
+        #[arg(long, default_value_t = 0)]
+        keep_worst: usize,
+    },
     /// Make a decision case from a lab moment (your label, else its play-outs).
     Case {
         moment: String,
@@ -369,16 +395,7 @@ fn parse_seeds(s: &str) -> Result<Vec<u64>> {
 }
 
 fn scenario_path(s: &str) -> PathBuf {
-    let p = PathBuf::from(s);
-    if p.exists() {
-        return p;
-    }
-    let named = data_dir().join("scenarios").join(if s.ends_with(".json") { s.to_string() } else { format!("{s}.json") });
-    if named.exists() {
-        named
-    } else {
-        p
-    }
+    bgws_run::scenario_file(s)
 }
 
 fn main() -> Result<()> {
@@ -531,6 +548,18 @@ fn main() -> Result<()> {
                         print!("{}", run.table());
                         eprintln!("\n{} questions in {:.0} s, ${:.4}; kept in {}. The template fallback scores {} pass, {} wrong.", items.len(), t0.elapsed().as_secs_f64(), run.cost_usd, p.display(), fb.pass, fb.wrong);
                     }
+                }
+                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst } => {
+                    let entries: Vec<bgws_run::suite::Entry> = match scenarios {
+                        Some(list) => list.split(',').map(|s| bgws_run::suite::Entry { scenario: s.trim().to_string(), minutes: None, note: String::new(), held_out: false }).collect(),
+                        None => bgws_run::suite::load_entries()?.into_iter().filter(|e| all || !e.held_out).collect(),
+                    };
+                    let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, ("http://127.0.0.1:8080", "local"))?;
+                    let opts = bgws_run::suite::Options { keep_worst: (keep_worst > 0).then(|| (lab.dir.clone(), keep_worst)) };
+                    let r = bgws_run::suite::run(&entries, &parse_seeds(&seeds)?, d, &name, &default_figures(), parallel, &opts, &|l| eprintln!("{l}"))?;
+                    let p = bgws_run::suite::save(&lab.dir, &r)?;
+                    print!("{}", r.table());
+                    eprintln!("kept in {}", p.display());
                 }
                 LabCmd::Case { moment, why } => {
                     let m = lab.moment(&moment)?;

@@ -1,0 +1,9 @@
+[
+  { "scenario": "skirmish-advance-to-contact-v1", "minutes": 60, "note": "two companies advance into each other from out of range" },
+  { "scenario": "skirmish-meeting-engagement-v1", "minutes": 60, "note": "a meeting engagement, mixed arms on both sides" },
+  { "scenario": "skirmish-combined-arms-v1", "minutes": 60, "note": "tanks, infantry and support fighting together" },
+  { "scenario": "skirmish-catalogue-armour-v1", "minutes": 60, "note": "a small armour duel" },
+  { "scenario": "m2-mech-company-hasty-attack", "minutes": 90, "note": "a mechanised company's hasty attack on a defended position" },
+  { "scenario": "skirmish-symmetric-control-v1", "minutes": 60, "note": "mirror-image forces: only the deciding differs", "heldOut": true },
+  { "scenario": "m3-battalion-attack", "minutes": 120, "note": "a battalion attack: more units and longer", "heldOut": true }
+]

@@ -133,6 +133,7 @@ n × { u32 id, f64 lat, f64 lon, f32 alt, f32 heading_deg, u8 status }
 | `GET /api/lab/cases` | the decision cases (each with its options as built) and the test runs kept |
 | `POST /api/lab/test` | `{ deciders, model?, prose? }`: test a decider on every case |
 | `POST /api/lab/moments/:id/case` | `{ why }`: make a moment a decision case |
+| `GET /api/lab/suite`, `POST /api/lab/suite` | the engagement suite's runs and scenarios; play it: `{ deciders, model?, prose?, seeds, keepWorst, all }` |
 
 The map data is PMTiles: any client with a PMTiles reader (MapLibre with
 the `pmtiles` protocol, `pmtiles` for Python, …) reads the packs and the

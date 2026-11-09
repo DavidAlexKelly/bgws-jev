@@ -153,13 +153,43 @@ choice should not change.
   starting states in `bases.json` with `set` changes (dotted paths). After
   each change, weapon reach and each enemy's `inOurReach` and `canReachUs`
   are worked out again from the ranges. The expectations are a reading of
-  standard small-unit doctrine: review and correct them. The template
-  fallback (the doctrine default) passes 12 of 23 questions (52%) and is
-  wrong on 9: a decider worth its cost should beat that.
+  standard small-unit doctrine: review and correct them. Two more
+  (`from-suite-armour-duel.json`) came from the engagement suite's play-outs
+  (below). Over all 18, the template fallback (the doctrine default) passes
+  14 of 25 questions (56%) and is wrong on 9: a decider worth its cost
+  should beat that. Jev 1.13 passed 18 of the first 23 (78%); its 3 misses
+  were answers below the 0.25 confidence cut-off, where its own pick
+  (search, shift fire, help the friend) was acceptable.
 - **Make it a case** on a lab moment (or `bgws lab case <moment>`) keeps it
   as a case in `<lab>/cases/`: your best and acceptable options (else the
   play-outs' near-best) pass, and options the play-outs found clearly worse
   fail.
+
+**The engagement suite** measures what a decider changes in played games.
+Each scenario in `data/suite/suite.json` is played over several seeds with
+the decider answering one side's units and the rules the other's, paired
+with a rules-against-rules game on the same seed. The two start identically
+and differ only by the decider's choices, so the difference is what it adds
+(with the rules under test, every difference is exactly zero; a test checks
+it). Measured for the side it played: result (+1 a win, −1 a loss),
+exchange (enemy share lost − own share lost), own and enemy losses, and
+survival (the share of the game its vehicles lived), each as a mean
+difference with its standard error, per scenario and overall.
+`bgws lab suite --deciders jev --seeds 1-4` (or the page's **Suite** tab);
+`--keep-worst N` keeps the decider's N worst games in the lab, its side's
+decisions as moments to play out. Two scenarios are held out
+(`heldOut`), kept back for checking a tuned setting.
+
+First results (Jev 1.13, against the doctrine default): on the cases, 78%
+pass against the fallback's 52%, with 32 of 32 consistency checks held, but
+in the suite's 40 paired games Jev did worse: result −0.20 ± 0.12, exchange
+−0.06 ± 0.05, better in 6 pairs and worse in 18. Its worst game, an armour
+duel, shows why: on first contact with an enemy tank at 1.7 km, both in
+reach, it chose to move to a better position. Played out, that loses the
+troop (−1.1), while carrying on, engaging, waiting or watching all win
+(+1.5). In this simulation, moving mid-duel gives the enemy the first
+shots. That moment is now a case. Near-best ignores score gaps under 0.05
+(`lab::MIN_GAP`), however small the noise.
 
 The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
 `moments/`, one JSON file each. A first look at three rules games of the
