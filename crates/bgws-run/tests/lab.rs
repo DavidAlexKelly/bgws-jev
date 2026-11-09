@@ -86,3 +86,22 @@ fn play_outs_score_every_option_and_the_report_counts_them() {
     eprintln!("{}", r.table());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// A game added before it has been played (or while questions wait for an
+/// answer) ends where its record does: the questions handed out at that
+/// moment, not yet answered, are not a divergence.
+#[test]
+fn a_game_added_before_its_questions_are_answered_imports_what_there_is() {
+    let dir = tmp("early");
+    let lab = Lab::open(&dir).unwrap();
+    let sc = scenario();
+    let h = Host::new(&sc, sc.seed, default_figures(), &bgws_run::HostOptions { deciders: DeciderChoice::Rules, ..Default::default() }).unwrap();
+    let ids = lab.import(h.finished_record(), default_figures()).expect("an unplayed game imports");
+    assert!(ids.is_empty(), "nothing decided yet: {ids:?}");
+    // Played a while, then added: its decisions so far.
+    let mut h = Host::new(&sc, sc.seed, default_figures(), &bgws_run::HostOptions { deciders: DeciderChoice::Rules, ..Default::default() }).unwrap();
+    h.play_until(bgws_core::SimTime::from_secs(1_800.0), |_| {}).unwrap();
+    let ids = lab.import(h.finished_record(), default_figures()).unwrap();
+    assert!(!ids.is_empty());
+    let _ = std::fs::remove_dir_all(dir);
+}
