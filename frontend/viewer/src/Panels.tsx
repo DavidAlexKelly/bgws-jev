@@ -560,6 +560,19 @@ export function Inspector(props: {
           ))}
         </>
       )}
+      {u.terrain && (
+        <>
+          <div className="group">Terrain</div>
+          <Line label="open to view">
+            {u.terrain.deadGround ? "dead ground" : u.terrain.exposure >= 0.4 ? "open to view" : "partly hidden"} ({pct(u.terrain.exposure)} of the ground round it sees it)
+          </Line>
+          {u.terrain.near.map((k, i) => (
+            <Line key={i} label={k.kind}>
+              {k.distM < 50 ? "here" : `${(k.distM / 1000).toFixed(1)} km`}: {k.note}
+            </Line>
+          ))}
+        </>
+      )}
       {u.block && (
         <>
           <div className="group">Ground</div>

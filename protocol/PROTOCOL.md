@@ -88,7 +88,12 @@ then streams.
 
 A `pack` is { `name`, `bbox`, `cellM`, `basemap`, `dem`, `preview` (URLs
 under `/packs/`), `roadsKm`, `towns`: [{ name, lat, lon, radiusM }],
-`sizeKm` }.
+`sizeKm`, `analysis` }. `analysis`, when the pack has a terrain analysis, is
+{ `exposure`, `going` (RGBA PNG overlays over `bbox`), `keyTerrain` (JSON:
+`key`: [{ kind: observation | chokepoint | crossing, lat, lon, score,
+classes, note }]) }. A `unit` reply carries `terrain`: { `exposure` (0 dead
+ground to 1 open), `deadGround`, `near`: [{ kind, note, distM }] } on such a
+pack.
 
 ### Binary frames: positions
 

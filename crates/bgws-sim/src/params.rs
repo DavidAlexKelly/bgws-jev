@@ -59,6 +59,7 @@ pub fn all_figures() -> Vec<Figure> {
     v.extend(crate::routing::figures());
     v.extend(crate::formation::figures());
     v.extend(crate::urban::figures());
+    v.extend(crate::appreciation::figures());
     v
 }
 

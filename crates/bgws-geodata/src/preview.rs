@@ -77,6 +77,36 @@ impl Image {
     }
 }
 
+/// An RGBA PNG, row by row from the top (overlays with transparency).
+pub fn write_rgba_png(path: &Path, w: usize, h: usize, px: &[[u8; 4]]) -> std::io::Result<()> {
+    let mut raw = Vec::with_capacity(h * (1 + w * 4));
+    for row in px.chunks(w) {
+        raw.push(0);
+        for p in row {
+            raw.extend_from_slice(p);
+        }
+    }
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    z.write_all(&raw)?;
+    let idat = z.finish()?;
+    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+    let chunk = |out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]| {
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        let mut c = kind.to_vec();
+        c.extend_from_slice(data);
+        out.extend_from_slice(&c);
+        out.extend_from_slice(&crc32(&c).to_be_bytes());
+    };
+    let mut ihdr = Vec::new();
+    ihdr.extend_from_slice(&(w as u32).to_be_bytes());
+    ihdr.extend_from_slice(&(h as u32).to_be_bytes());
+    ihdr.extend_from_slice(&[8, 6, 0, 0, 0]);
+    chunk(&mut out, b"IHDR", &ihdr);
+    chunk(&mut out, b"IDAT", &idat);
+    chunk(&mut out, b"IEND", &[]);
+    std::fs::write(path, out)
+}
+
 fn crc32(b: &[u8]) -> u32 {
     let mut c = 0xffff_ffffu32;
     for &x in b {

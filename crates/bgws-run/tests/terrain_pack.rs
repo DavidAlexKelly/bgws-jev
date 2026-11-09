@@ -157,7 +157,8 @@ fn a_scenario_off_its_pack_is_told_how_to_fix_it() {
 
 /// The city's blocks come out of the pack's buildings, split by its
 /// streets: many of them, of every material, and a heavy shell brings part
-/// of one down and lowers it for sight lines.
+/// of one down and lowers it for sight lines. Needs a pack with a sight
+/// surface (built since buildings were added: `surface.bin`).
 #[test]
 #[ignore = "needs a real pack: BGWS_TEST_PACK"]
 fn the_city_is_cut_into_blocks() {
@@ -205,4 +206,42 @@ fn the_city_is_cut_into_blocks() {
     let after = tallest(host.sim.ctx.ground.sight.as_ref().unwrap());
     eprintln!("block {id} at ({e:.0}, {n0:.0}): {:.0}% standing after 40 rounds; roofs {before:.0} m → {after:.1} m", left * 100.0);
     assert!(left < 1.0 && after < before, "shelling brings it down");
+}
+
+/// The terrain appreciation: the pack has one (worked out on first opening
+/// if need be), the city is dead ground beside open farmland, and HQs are
+/// briefed on key terrain they can name in orders.
+#[test]
+#[ignore = "needs a real pack: BGWS_TEST_PACK"]
+fn the_pack_has_a_terrain_appreciation() {
+    let pack = PathBuf::from(std::env::var("BGWS_TEST_PACK").expect("BGWS_TEST_PACK: a pack over Kaliningrad"));
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sc = load_scenario(&root.join("data/scenarios/skirmish-advance-to-contact-v1.json")).unwrap();
+    let (dlat, dlon) = (54.672 - sc.theatre.origin.lat, 20.43 - sc.theatre.origin.lon);
+    let shift = |g: Geodetic| Geodetic::new(g.lat + dlat, g.lon + dlon, g.h);
+    sc.theatre.origin = shift(sc.theatre.origin);
+    sc.theatre.bounds = None;
+    sc.theatre.pack = Some(pack.display().to_string());
+    for f in &mut sc.forces {
+        f.position = shift(f.position);
+    }
+    let host = Host::new(&sc, sc.seed, bgws_run::default_figures(), &HostOptions::default()).unwrap();
+    let g = &host.sim.ctx.ground;
+    let a = g.appreciation.as_ref().expect("the pack has a terrain appreciation");
+    let count = |k: bgws_env::KeyKind| a.key.iter().filter(|x| x.kind == k).count();
+    eprintln!("observation {}, chokepoints {}, crossings {}", count(bgws_env::KeyKind::Observation), count(bgws_env::KeyKind::Chokepoint), count(bgws_env::KeyKind::Crossing));
+    assert!(count(bgws_env::KeyKind::Crossing) > 5, "Kaliningrad's rivers have bridges");
+    assert!(count(bgws_env::KeyKind::Observation) > 3);
+    // The whole scenario area: exposure is a share, and both dead and open ground occur.
+    let s = g.terrain.spec;
+    let xs: Vec<f64> = (0..s.len()).step_by(37).filter_map(|k| g.exposure(s.pos(k % s.width, k / s.width).0, s.pos(k % s.width, k / s.width).1)).collect();
+    let dead = xs.iter().filter(|&&x| x < 0.1).count() as f64 / xs.len() as f64;
+    let open = xs.iter().filter(|&&x| x >= 0.4).count() as f64 / xs.len() as f64;
+    eprintln!("{} samples: dead ground {:.0}%, open to view {:.0}%", xs.len(), dead * 100.0, open * 100.0);
+    assert!(dead > 0.05 && open > 0.05);
+    // The HQ's brief names key terrain, usable as reference points.
+    let sit = host.sim.hq_situation(bgws_core::Side::Blue, "test");
+    eprintln!("{:#?}", sit.terrain);
+    assert!(!sit.terrain.is_empty(), "the HQ is briefed on key terrain");
+    assert!(sit.terrain.iter().all(|t| sit.reference_points.contains_key(&t.label)));
 }

@@ -117,6 +117,11 @@ enum Cmd {
         #[arg(long)]
         cache: Option<PathBuf>,
     },
+    /// Work out (again) a theatre pack's terrain appreciation: dead ground, mobility
+    /// corridors, chokepoints, crossings and observation points, saved with the pack.
+    /// `bgws terrain` does this as it builds; a pack without one gets it the first
+    /// time a game opens on it.
+    Analyse { pack: PathBuf },
     /// Build a theatre pack (§14.2): synthetic ground for an area, tiled, for scenarios to name.
     Pack {
         out: PathBuf,
@@ -352,8 +357,32 @@ fn main() -> Result<()> {
                 }
             };
             let meta = bgws_geodata::pack::build_pack(&out, &name, &spec, snap_m, &progress).map_err(|e| anyhow!("{e}"))?;
+            let a = bgws_run::host::analyse_pack(&out, &progress)?;
+            eprintln!("terrain analysis: {} key terrain points", a.key.len());
             println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());
             eprintln!("theatre pack `{}` in {} ({} terrain tiles, {:.0} s)", meta.name, out.display(), meta.tiles.len(), started.elapsed().as_secs_f64());
+        }
+        Cmd::Analyse { pack } => {
+            let started = Instant::now();
+            let last = std::sync::Mutex::new((String::new(), 0u32));
+            let progress = |stage: &str, f: f64| {
+                let step = (f * 10.0).floor() as u32;
+                if let Ok(mut l) = last.lock() {
+                    if l.0 != stage || step > l.1 {
+                        *l = (stage.to_string(), step);
+                        eprintln!("[{:6.1} s] {stage} {:>3.0}%", started.elapsed().as_secs_f64(), f * 100.0);
+                    }
+                }
+            };
+            let a = bgws_run::host::analyse_pack(&pack, &progress)?;
+            for kind in [bgws_env::KeyKind::Observation, bgws_env::KeyKind::Chokepoint, bgws_env::KeyKind::Crossing] {
+                let v: Vec<_> = a.key.iter().filter(|k| k.kind == kind).collect();
+                eprintln!("{kind:?}: {}", v.len());
+                for k in v.iter().take(5) {
+                    eprintln!("  {:.2} at ({:.0}, {:.0}): {}", k.score, k.e, k.n, k.note);
+                }
+            }
+            eprintln!("terrain analysis of {} in {:.0} s", pack.display(), started.elapsed().as_secs_f64());
         }
         Cmd::Pack { out, name, lat, lon, size_km, cell_m, seed, dem } => {
             let f = default_figures();

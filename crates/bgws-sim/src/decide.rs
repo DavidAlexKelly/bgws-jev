@@ -73,6 +73,9 @@ fn facts(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> BTre
     m.insert("self.strength".into(), FactValue::Num((h.strength() * 10.0).round()));
     m.insert("self.cohesion".into(), FactValue::Text(cohesion.into()));
     m.insert("self.inCover".into(), FactValue::Bool(s.ctx.ground.micro(k.pos.e, k.pos.n).cover > 0.3 || a.posture == Posture::HullDown));
+    let exposure = s.ctx.ground.exposure(k.pos.e, k.pos.n);
+    m.insert("self.deadGround".into(), exposure.map(|x| FactValue::Bool(x < 0.1)).unwrap_or(FactValue::Null));
+    m.insert("self.onKeyTerrain".into(), FactValue::Bool(s.ctx.ground.key_terrain_near(k.pos.e, k.pos.n, 300.0).iter().any(|t| t.kind == bgws_env::KeyKind::Observation)));
     m.insert("enemy.known".into(), FactValue::Bool(enemy.is_some()));
     m.insert("enemy.rangeM".into(), enemy.map(|v| FactValue::Num(v.at.sub(k.pos).horizontal().round())).unwrap_or(FactValue::Null));
     m.insert("orders.urgent".into(), FactValue::Bool(a.mission.urgent));
@@ -281,7 +284,8 @@ fn point_away(s: &Sim, e: bevy_ecs::prelude::Entity, dist: f64) -> Enu {
 fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
     let k = *s.world.get::<Kin>(e).expect("k");
     let r = s.ctx.p.cover_search_m;
-    let mut best = (s.ctx.ground.micro(k.pos.e, k.pos.n).cover, k.pos);
+    let here_open = s.ctx.ground.exposure(k.pos.e, k.pos.n).map(|x| s.ctx.ground.appreciation_use[1] * x).unwrap_or(0.0);
+    let mut best = (s.ctx.ground.micro(k.pos.e, k.pos.n).cover - here_open, k.pos);
     for ring in 1..=3 {
         for step in 0..12 {
             let b = step as f64 * std::f64::consts::TAU / 12.0;
@@ -290,7 +294,8 @@ fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
             if !s.ctx.ground.contains(p) {
                 continue;
             }
-            let c = s.ctx.ground.micro(p.e, p.n).cover + 0.002 * (s.ctx.ground.height(p.e, p.n) - k.pos.u).clamp(-20.0, 20.0);
+            let open = s.ctx.ground.exposure(p.e, p.n).map(|x| s.ctx.ground.appreciation_use[1] * x).unwrap_or(0.0);
+            let c = s.ctx.ground.micro(p.e, p.n).cover + 0.002 * (s.ctx.ground.height(p.e, p.n) - k.pos.u).clamp(-20.0, 20.0) - open;
             if c > best.0 + 0.05 {
                 best = (c, p);
             }

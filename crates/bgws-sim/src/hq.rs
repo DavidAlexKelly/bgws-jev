@@ -57,6 +57,22 @@ pub struct HqSituation {
     pub reference_points: BTreeMap<String, Geodetic>,
     #[serde(default)]
     pub shareable_means: BTreeMap<String, f64>,
+    /// Key terrain round the force and its objective (the terrain appreciation).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub terrain: Vec<TerrainNote>,
+}
+
+/// A piece of key terrain from the pack's terrain appreciation, as an HQ
+/// is briefed on it: orders may name it by its label.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerrainNote {
+    /// OP1, GAP1, BRIDGE1, …
+    pub label: String,
+    /// observation, chokepoint or crossing.
+    pub kind: String,
+    pub at: Geodetic,
+    pub note: String,
 }
 
 /// A point in an order: a named reference, a bearing and distance from one,

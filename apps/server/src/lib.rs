@@ -352,6 +352,9 @@ fn pack_json(name: &str) -> Option<serde_json::Value> {
     Some(json!({
         "name": folder, "bbox": meta.bbox, "cellM": meta.cell, "basemap": url(&meta.basemap), "dem": url(&meta.dem),
         "preview": url(&Some("preview.png".to_string())), "roadsKm": roads_km, "towns": towns,
+        "analysis": meta.analysis.as_ref().filter(|_| dir.join("exposure.png").exists()).map(|_| json!({
+            "exposure": url(&Some("exposure.png".to_string())), "going": url(&Some("going.png".to_string())), "keyTerrain": url(&Some("keyterrain.json".to_string())),
+        })),
         "sizeKm": [meta.spec.cell * (meta.spec.width - 1) as f64 / 1000.0, meta.spec.cell * (meta.spec.height - 1) as f64 / 1000.0],
     }))
 }
@@ -444,12 +447,12 @@ fn spawn_terrain_build(name: String, bbox: [f64; 4], cell_m: Option<f64>, out: b
             }
         };
         let dir = bgws_run::packs_dir().join(&name);
-        match bgws_geodata::pack::build_pack(&dir, &name, &spec, 3.0, &progress) {
+        match bgws_geodata::pack::build_pack(&dir, &name, &spec, 3.0, &progress).map_err(|e| e.to_string()).and_then(|_| bgws_run::host::analyse_pack(&dir, &progress).map_err(|e| e.to_string())) {
             Ok(_) => {
                 send(json!({ "kind": "terrain", "name": name, "state": "done", "pack": pack_json(&name) }));
                 send(scenarios_json());
             }
-            Err(e) => send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e.to_string() })),
+            Err(e) => send(json!({ "kind": "terrain", "name": name, "state": "failed", "text": e })),
         }
     })
 }

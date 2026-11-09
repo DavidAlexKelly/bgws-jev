@@ -94,6 +94,8 @@ pub fn land_facts() -> Vec<FactInfo> {
         info("self.strength", "Its combat strength", Number, &[], None),
         info("self.cohesion", "Its cohesion", Text, &["steady", "shaken", "broken"], None),
         info("self.inCover", "It is in cover", Boolean, &[], None),
+        info("self.deadGround", "It is in dead ground (little round it can see it)", Boolean, &[], None),
+        info("self.onKeyTerrain", "It is on an observation point", Boolean, &[], None),
         info("enemy.known", "The enemy is known", Boolean, &[], None),
         info("enemy.rangeM", "Range to the enemy", Number, &[], Some("m")),
         info("orders.urgent", "Its new orders are urgent", Boolean, &[], None),
@@ -143,7 +145,7 @@ mod tests {
         assert_eq!(m.fact("c"), None);
         assert_eq!(NoFacts.fact("a"), None);
         assert_eq!(FnFacts(|n: &str| (n == "x").then_some(FactValue::Bool(true))).fact("x"), Some(FactValue::Bool(true)));
-        assert_eq!(land_facts().len(), 7);
+        assert_eq!(land_facts().len(), 9);
         assert_eq!(world_facts().len(), 24);
     }
 }

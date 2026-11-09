@@ -9,6 +9,7 @@
 //! Model code is pure: only `tiles` reads and writes files, and only when
 //! asked to. Every coefficient is a declared figure (`env.*`).
 
+pub mod appreciation;
 pub mod change;
 pub mod landcover;
 pub mod light;
@@ -24,6 +25,7 @@ pub mod thermal;
 pub mod tiles;
 pub mod weather;
 
+pub use appreciation::{Appreciation, AppreciationView, KeyKind, KeyTerrain};
 pub use change::{Change, ChangeKind, ChangeLayer, ChangeParams, ObstacleKind};
 pub use landcover::{CoverProps, LandCover, LandCoverTable, MicroTerrain};
 pub use light::{illuminance, illuminance_at, moon_position, sun_position, Illuminance, LightParams, MoonPosition, SunPosition, TwilightPhase, UtcDateTime};

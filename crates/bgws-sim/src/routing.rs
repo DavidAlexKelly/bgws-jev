@@ -542,17 +542,19 @@ impl Ground {
             let base = if r.urgent { 0.0 } else { p.exposure_baseline[mi] };
             let exposure = p.exposure[mi] * (base + (1.0 - base) * near);
             let off = self.going(e, n, r.class).speed_kmh.min(r.cross_kmh);
+            // Dead ground (the terrain appreciation's) is less open to view, on a road or off it.
+            let open_to_view = self.exposure(e, n).map(|x| self.appreciation_use[0] + (1.0 - self.appreciation_use[0]) * x).unwrap_or(1.0);
             // Across country, a river deeper than the vehicle fords stops it.
             let open = if off >= 1.0 && river[k] <= ford_limit {
                 let conceal = self.cover.props[self.land_cover(e, n) as usize].conceal_mean;
                 let m = if march { p.march_open[ci] } else { 1.0 };
                 let t = 3.6 / off;
-                Some(t * m + exposure * (1.0 - conceal) * t.max(per_m))
+                Some(t * m + exposure * (1.0 - conceal) * open_to_view * t.max(per_m))
             } else {
                 None
             };
             // A road on the ground crosses what it crosses (culverts, causeways, fords).
-            let road = g_road[k].and_then(|(c, _)| road_cost(c, near, exposure));
+            let road = g_road[k].and_then(|(c, _)| road_cost(c, near, exposure * open_to_view));
             match (road, open) {
                 (Some(rv), Some(ov)) if ov < rv => g_spm[k] = ov,
                 (Some(rv), _) => {
@@ -562,7 +564,7 @@ impl Ground {
                 (None, Some(ov)) => g_spm[k] = ov,
                 (None, None) => {}
             }
-            if let Some(dv) = d_road[k].and_then(|(c, _)| road_cost(c, near, exposure)) {
+            if let Some(dv) = d_road[k].and_then(|(c, _)| road_cost(c, near, exposure * open_to_view)) {
                 d_spm[k] = dv;
             }
             best_spm = best_spm.min(g_spm[k]).min(d_spm[k]);
@@ -1000,6 +1002,45 @@ mod tests {
         let assault = plan_from(&g, a, b, VehicleClass::Wheeled, MoveModeS::Assault, &threat);
         assert!(road_share(&march) > road_share(&wary));
         assert!(road_share(&assault) > 0.9);
+    }
+
+    /// Open flat ground where the terrain appreciation marks a band of dead
+    /// ground (a fold) south of the straight line: a stealthy move goes round
+    /// by the fold; an assault goes straight.
+    #[test]
+    fn stealth_uses_the_appreciations_dead_ground() {
+        let f = crate::params::default_figures();
+        let spec = bgws_env::GridSpec::new(201, 201, 40.0, -4_000.0, -4_000.0);
+        let g = Ground::from_terrain(bgws_env::Terrain::flat(bgws_core::Geodetic::new(54.7, 20.5, 0.0), spec, 0.0), 1, &f);
+        let es = bgws_env::GridSpec::new(101, 101, 80.0, -4_000.0, -4_000.0);
+        let exposure = (0..es.len()).map(|k| { let (_, n) = es.pos(k % es.width, k / es.width); if (-1_600.0..=-1_000.0).contains(&n) { 0 } else { 255 } }).collect();
+        let a = bgws_env::Appreciation {
+            version: bgws_env::appreciation::VERSION,
+            exposure_spec: es,
+            exposure,
+            mobility_spec: es,
+            going: [vec![2; es.len()], vec![2; es.len()], vec![2; es.len()]],
+            width_m: [vec![u16::MAX; es.len()], vec![u16::MAX; es.len()], vec![u16::MAX; es.len()]],
+            key: vec![],
+            settings: bgws_env::appreciation::AnalysisSettings { exposure_radius_m: 2_000.0, eye_m: 2.0, corridor_m: 400.0 },
+        };
+        let g = g.with_appreciation(bgws_env::AppreciationView::same_frame(std::sync::Arc::new(a)));
+        let in_fold = |p: &Plan| {
+            let mut from = Enu::new(-3_500.0, 0.0, 0.0);
+            let mut inside = 0.0;
+            for w in &p.waypoints {
+                let mid = from.add(*w).scale(0.5);
+                if g.exposure(mid.e, mid.n).unwrap() < 0.5 {
+                    inside += w.sub(from).horizontal();
+                }
+                from = *w;
+            }
+            inside
+        };
+        let stealth = plan_from(&g, (-3_500.0, 0.0), (3_500.0, 0.0), VehicleClass::Tracked, MoveModeS::Stealth, &[]);
+        let assault = plan_from(&g, (-3_500.0, 0.0), (3_500.0, 0.0), VehicleClass::Tracked, MoveModeS::Assault, &[]);
+        assert!(in_fold(&stealth) > 3_000.0, "stealth keeps to the dead ground: {:.0} m", in_fold(&stealth));
+        assert!(in_fold(&assault) < 500.0, "the assault goes straight: {:.0} m", in_fold(&assault));
     }
 
     #[test]

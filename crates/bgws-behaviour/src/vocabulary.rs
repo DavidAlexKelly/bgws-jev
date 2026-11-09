@@ -73,7 +73,7 @@ mod tests {
     fn builtin_is_the_union() {
         let v = Vocabulary::builtin();
         assert_eq!(v.actions.len(), 53 + 139);
-        assert_eq!(v.facts.len(), 7 + 24);
+        assert_eq!(v.facts.len(), 9 + 24);
         assert!(v.has_action("land.assault") && v.has_fact("roe.weaponsFree"));
         let r = v.restrict_actions(["land.assault"]);
         assert_eq!(r.actions.len(), 1);

@@ -9,7 +9,7 @@ import { eventOverlays, SIDE_RGB, type Mark, type Shot } from "./overlays";
 import type { FrameEntity, FrameSensor, FrameTrack, FrameView, GameEvent, GameInfo, UnitDetail, Viewshed } from "./protocol";
 import { trackIcon, unitIcon } from "./symbols";
 
-export type LayerKey = "labels" | "fire" | "sightings" | "chains" | "tracks" | "sensors" | "spectrum" | "nets";
+export type LayerKey = "labels" | "fire" | "sightings" | "chains" | "tracks" | "sensors" | "spectrum" | "nets" | "deadGround" | "going" | "keyTerrain";
 
 export const LAYERS: { key: LayerKey; label: string; title: string }[] = [
   { key: "labels", label: "names", title: "Unit names under their symbols" },
@@ -20,7 +20,26 @@ export const LAYERS: { key: LayerKey; label: string; title: string }[] = [
   { key: "sensors", label: "sensors", title: "Each unit's longest-reaching sensor" },
   { key: "spectrum", label: "spectrum", title: "Jammers and emitters on the air (and the spectrum strip)" },
   { key: "nets", label: "nets", title: "Comms links to each HQ, by traffic" },
+  { key: "deadGround", label: "dead ground", title: "Terrain analysis: dead ground, which little round it can see (blue), and ground open to view from all round (red), on a theatre pack" },
+  { key: "going", label: "going", title: "Terrain analysis: no-go (dark) and slow-go (amber) for tracked vehicles, on a theatre pack" },
+  { key: "keyTerrain", label: "key terrain", title: "Terrain analysis: observation points, chokepoints and bridges, on a theatre pack" },
 ];
+
+/** A point of key terrain from the pack's terrain analysis (`keyterrain.json`). */
+export interface KeyPoint {
+  kind: "observation" | "chokepoint" | "crossing";
+  lat: number;
+  lon: number;
+  score: number;
+  classes: string[];
+  note: string;
+}
+
+const KEY_STYLE: Record<KeyPoint["kind"], { rgb: [number, number, number]; tag: string; name: string }> = {
+  observation: { rgb: [120, 220, 140], tag: "OP", name: "Observation point" },
+  chokepoint: { rgb: [255, 170, 60], tag: "GAP", name: "Chokepoint" },
+  crossing: { rgb: [235, 235, 235], tag: "BR", name: "River crossing" },
+};
 
 export const DEFAULT_LAYERS: LayerKey[] = ["labels", "fire", "sightings", "chains", "tracks"];
 
@@ -123,6 +142,8 @@ export function buildLayers(args: {
   /** The pack's towns, named on the map (its basemap carries no fonts). */
   towns: { name: string; lat: number; lon: number; radiusM: number }[];
   onPick: (name: string) => void;
+  /** The pack's key terrain, when the layer is on. */
+  keyTerrain?: KeyPoint[];
 }): Layer[] {
   const { frame: f, on } = args;
   const dash = [new PathStyleExtension({ dash: true })];
@@ -153,6 +174,43 @@ export function buildLayers(args: {
         outlineWidth: 3,
         outlineColor: [6, 13, 24, 220],
         characterSet: "auto",
+      }),
+    );
+  }
+  // The pack's terrain analysis, under everything else.
+  const an = args.game?.pack?.analysis;
+  const bbox = args.game?.pack?.bbox;
+  if (an && bbox) {
+    if (on.has("deadGround") && an.exposure) out.push(new BitmapLayer({ id: "dead-ground", image: an.exposure, bounds: bbox, textureParameters: { minFilter: "linear", magFilter: "linear" } }));
+    if (on.has("going") && an.going) out.push(new BitmapLayer({ id: "going", image: an.going, bounds: bbox, textureParameters: { minFilter: "nearest", magFilter: "nearest" } }));
+  }
+  if (on.has("keyTerrain") && args.keyTerrain?.length) {
+    const k = args.keyTerrain;
+    out.push(
+      new ScatterplotLayer({
+        id: "key-terrain",
+        data: k,
+        pickable: true,
+        getPosition: (p: KeyPoint) => at(p.lon, p.lat),
+        getRadius: (p: KeyPoint) => 5 + 4 * p.score,
+        radiusUnits: "pixels",
+        getFillColor: (p: KeyPoint) => [...KEY_STYLE[p.kind].rgb, 200] as [number, number, number, number],
+        getLineColor: [6, 13, 24, 230],
+        lineWidthMinPixels: 1.5,
+        stroked: true,
+      }),
+      new TextLayer({
+        id: "key-terrain-tags",
+        data: k,
+        getPosition: (p: KeyPoint) => at(p.lon, p.lat),
+        getText: (p: KeyPoint) => KEY_STYLE[p.kind].tag,
+        getColor: (p: KeyPoint) => [...KEY_STYLE[p.kind].rgb, 255] as [number, number, number, number],
+        getSize: 10,
+        getPixelOffset: [0, -12],
+        fontFamily: "ui-monospace, monospace",
+        fontSettings: { sdf: true },
+        outlineWidth: 3,
+        outlineColor: [6, 13, 24, 220],
       }),
     );
   }
@@ -486,6 +544,10 @@ export function tooltip(info: { object?: unknown; layer?: { id: string } | null 
     }
     case "chain-fire":
       return `${o.kind}: ${o.stage}`;
+    case "key-terrain": {
+      const p = o as unknown as KeyPoint;
+      return `${KEY_STYLE[p.kind].name}\n${p.note}`;
+    }
   }
   return null;
 }
