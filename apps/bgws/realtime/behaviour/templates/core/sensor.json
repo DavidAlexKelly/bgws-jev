@@ -1,7 +1,0 @@
-{
-  "id": "core/sensor",
-  "version": 1,
-  "name": "Sensor team",
-  "parent": "core/default",
-  "doctrine": "A sensor team watches and reports, and moves when it has been on the air too long."
-}
