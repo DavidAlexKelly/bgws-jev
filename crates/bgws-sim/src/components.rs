@@ -171,6 +171,8 @@ pub enum MoveModeS {
     Tactical,
     Assault,
     Stealth,
+    /// Bounding: a bound at tactical pace, then a halt to cover, and again.
+    Bound,
 }
 
 impl From<MoveModeS> for MoveMode {
@@ -180,6 +182,7 @@ impl From<MoveModeS> for MoveMode {
             MoveModeS::Tactical => MoveMode::Tactical,
             MoveModeS::Assault => MoveMode::Assault,
             MoveModeS::Stealth => MoveMode::Stealth,
+            MoveModeS::Bound => MoveMode::Tactical,
         }
     }
 }
@@ -225,6 +228,18 @@ pub struct Act {
     pub last_shot: Option<SimTime>,
     pub last_event: SimTime,
     pub volleys: u32,
+    /// A firing position it chose against the threat: once it is there and
+    /// still, it counts as hull-down after `sim.exec.occupy_s`.
+    pub fire_position: Option<Enu>,
+    /// Bounding: where this bound began, and the halt it is in (until when).
+    pub bound: Option<(Enu, Option<SimTime>)>,
+}
+
+impl Act {
+    /// Halted between bounds: not moving, though its move goes on.
+    pub fn bound_halted(&self, now: SimTime) -> bool {
+        matches!(self.bound, Some((_, Some(t))) if t > now)
+    }
 }
 
 /// What it has seen itself.

@@ -134,12 +134,13 @@ pub struct Options {
 /// Play a game to `minutes` with `router` and measure it for `side`.
 type Played = (Metrics, BTreeMap<String, usize>, f64, f64, bgws_scenario::record::GameRecord);
 
-fn play(sc: &bgws_scenario::v4::ScenarioV4, seed: u64, minutes: f64, figures: &Figures, side: Side, decider: Option<&Arc<dyn Decider>>) -> Result<Played> {
+/// Sets a game up: `Some(side)` for the game in which `side` has what is
+/// under test, `None` for the baseline.
+pub type Setup = dyn Fn(&mut Host, Option<Side>) + Sync;
+
+fn play(sc: &bgws_scenario::v4::ScenarioV4, seed: u64, minutes: f64, figures: &Figures, side: Side, test: bool, setup: &Setup) -> Result<Played> {
     let mut h = Host::new(sc, Seed(seed), figures.clone(), &HostOptions { deciders: DeciderChoice::Rules, ..Default::default() })?;
-    if let Some(d) = decider {
-        h.router.set_decider(side, QuestionKind::Unit, Route::Jev, d.clone());
-        h.router.set_decider(side, QuestionKind::Entity, Route::Jev, d.clone());
-    }
+    setup(&mut h, test.then_some(side));
     let start = |h: &Host, s: Side| h.sim.side_fit(s);
     let (own0, enemy0) = (start(&h, side), start(&h, side.enemy()));
     // Every vehicle of the side, for survival.
@@ -212,6 +213,30 @@ type BaseKey = (usize, u64, Side);
 /// with the rules baseline. `parallel` games at a time.
 #[allow(clippy::too_many_arguments)]
 pub fn run(entries: &[Entry], seeds: &[u64], decider: Arc<dyn Decider>, name: &str, figures: &Figures, parallel: usize, opts: &Options, progress: &(dyn Fn(&str) + Sync)) -> Result<SuiteRun> {
+    let setup = move |h: &mut Host, side: Option<Side>| {
+        if let Some(side) = side {
+            h.router.set_decider(side, QuestionKind::Unit, Route::Jev, decider.clone());
+            h.router.set_decider(side, QuestionKind::Entity, Route::Jev, decider.clone());
+        }
+    };
+    run_with(entries, seeds, &setup, name, figures, parallel, opts, progress)
+}
+
+/// A planner against another: `test` plans for the side under test, `base`
+/// for the other side and for both sides in the baseline game.
+#[allow(clippy::too_many_arguments)]
+pub fn run_planners(entries: &[Entry], seeds: &[u64], test: Arc<dyn bgws_decide::Planner>, base: Arc<dyn bgws_decide::Planner>, name: &str, figures: &Figures, parallel: usize, opts: &Options, progress: &(dyn Fn(&str) + Sync)) -> Result<SuiteRun> {
+    let setup = move |h: &mut Host, side: Option<Side>| {
+        for s in [Side::Blue, Side::Red] {
+            h.router.set_planner(s, Route::Rules, if Some(s) == side { test.clone() } else { base.clone() });
+        }
+    };
+    run_with(entries, seeds, &setup, name, figures, parallel, opts, progress)
+}
+
+/// The suite with any setup (see [`Setup`]).
+#[allow(clippy::too_many_arguments)]
+pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, figures: &Figures, parallel: usize, opts: &Options, progress: &(dyn Fn(&str) + Sync)) -> Result<SuiteRun> {
     let t0 = std::time::Instant::now();
     let scenarios: Vec<(Entry, bgws_scenario::v4::ScenarioV4)> = entries
         .iter()
@@ -225,7 +250,7 @@ pub fn run(entries: &[Entry], seeds: &[u64], decider: Arc<dyn Decider>, name: &s
         .map(|(i, k)| -> Result<Vec<(BaseKey, Metrics)>> {
             let (e, sc) = &scenarios[i];
             let m = e.minutes.unwrap_or(sc.scope.duration_min);
-            [Side::Blue, Side::Red].into_iter().map(|s| play(sc, k, m, figures, s, None).map(|r| ((i, k, s), r.0))).collect::<Result<Vec<_>>>()
+            [Side::Blue, Side::Red].into_iter().map(|s| play(sc, k, m, figures, s, false, setup).map(|r| ((i, k, s), r.0))).collect::<Result<Vec<_>>>()
         })
         .collect::<Result<Vec<_>>>()?
         .into_iter()
@@ -238,7 +263,7 @@ pub fn run(entries: &[Entry], seeds: &[u64], decider: Arc<dyn Decider>, name: &s
             .map(|&(i, k, side)| -> Result<(Pair, bgws_scenario::record::GameRecord)> {
                 let (e, sc) = &scenarios[i];
                 let m = e.minutes.unwrap_or(sc.scope.duration_min);
-                let (dm, by, cost, ended, record) = play(sc, k, m, figures, side, Some(&decider))?;
+                let (dm, by, cost, ended, record) = play(sc, k, m, figures, side, true, setup)?;
                 let b = base[&(i, k, side)];
                 let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 progress(&format!("[{n}/{}] {} seed {k} {side}: result {:+.0} (baseline {:+.0}), exchange {:+.2} ({:+.2})", jobs.len(), e.scenario, dm.result, b.result, dm.exchange, b.exchange));

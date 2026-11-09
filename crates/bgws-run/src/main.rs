@@ -366,6 +366,11 @@ enum LabCmd {
         /// Keep the decider's N worst games in the lab, to play out their decisions.
         #[arg(long, default_value_t = 0)]
         keep_worst: usize,
+        /// Test the HQ planner instead of a decider: the heuristic planner with
+        /// fire and movement on the side under test, without it everywhere else
+        /// (the rules decide for every unit).
+        #[arg(long)]
+        planner_ab: bool,
     },
     /// Print the wording Jev is asked in (data/jev/wording.json, else the engine's own).
     Wording,
@@ -575,14 +580,23 @@ fn main() -> Result<()> {
                         eprintln!("\n{} questions in {:.0} s, ${:.4}; kept in {}. The template fallback scores {} pass, {} wrong.", items.len(), t0.elapsed().as_secs_f64(), run.cost_usd, p.display(), fb.pass, fb.wrong);
                     }
                 }
-                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst } => {
+                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst, planner_ab } => {
                     let entries: Vec<bgws_run::suite::Entry> = match scenarios {
                         Some(list) => list.split(',').map(|s| bgws_run::suite::Entry { scenario: s.trim().to_string(), minutes: None, note: String::new(), held_out: false }).collect(),
                         None => bgws_run::suite::load_entries()?.into_iter().filter(|e| all || !e.held_out).collect(),
                     };
-                    let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, ("http://127.0.0.1:8080", "local"))?;
                     let opts = bgws_run::suite::Options { keep_worst: (keep_worst > 0).then(|| (lab.dir.clone(), keep_worst)) };
-                    let r = bgws_run::suite::run(&entries, &parse_seeds(&seeds)?, d, &name, &default_figures(), parallel, &opts, &|l| eprintln!("{l}"))?;
+                    let r = if planner_ab {
+                        let f = default_figures();
+                        let mut old = f.clone();
+                        old.set("decide.heuristic.fire_and_movement", 0.0).map_err(|e| anyhow!("{e}"))?;
+                        let test: std::sync::Arc<dyn bgws_decide::Planner> = std::sync::Arc::new(bgws_decide::HeuristicPlanner::from_figures(&f));
+                        let base: std::sync::Arc<dyn bgws_decide::Planner> = std::sync::Arc::new(bgws_decide::HeuristicPlanner::from_figures(&old));
+                        bgws_run::suite::run_planners(&entries, &parse_seeds(&seeds)?, test, base, "heuristic planner: fire and movement", &f, parallel, &opts, &|l| eprintln!("{l}"))?
+                    } else {
+                        let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, ("http://127.0.0.1:8080", "local"))?;
+                        bgws_run::suite::run(&entries, &parse_seeds(&seeds)?, d, &name, &default_figures(), parallel, &opts, &|l| eprintln!("{l}"))?
+                    };
                     let p = bgws_run::suite::save(&lab.dir, &r)?;
                     print!("{}", r.table());
                     eprintln!("kept in {}", p.display());

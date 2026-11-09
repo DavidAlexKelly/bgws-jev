@@ -55,14 +55,20 @@ pub fn posture(s: &mut Sim) {
             None => continue,
         };
         let cover = s.ctx.ground.micro(pos.e, pos.n).cover;
+        let occupy = s.ctx.p.occupy_s;
         let Some(mut a) = s.world.get_mut::<Act>(e) else { continue };
-        let moving = a.activity.moving();
+        let moving = a.activity.moving() && !a.bound_halted(now);
+        // A firing position it chose against the threat: hull-down soon after it gets there.
+        let in_position = a.fire_position.is_some_and(|f| f.sub(pos).horizontal() <= 40.0);
+        if !moving && !in_position && a.fire_position.is_some() {
+            a.fire_position = None;
+        }
         if moving {
             a.posture = Posture::Moving;
             a.still_since = now;
         } else {
             let still = (now - a.still_since).secs();
-            a.posture = if still >= settle + hd && cover > 0.3 {
+            a.posture = if (in_position && still >= occupy) || (still >= settle + hd && cover > 0.3) {
                 Posture::HullDown
             } else if still >= settle {
                 Posture::Settled
@@ -138,6 +144,34 @@ pub fn movement(s: &mut Sim, dt: f64) {
             arrive(s, e);
             continue;
         };
+        // Bounding: halted between bounds, it covers; then the next bound.
+        if mode == MoveModeS::Bound {
+            let pos = s.world.get::<Kin>(e).expect("kin").pos;
+            let (bound_m, halt_s) = (s.ctx.p.bound_m, s.ctx.p.bound_halt_s);
+            let halt = {
+                let mut a = s.world.get_mut::<Act>(e).expect("act");
+                match a.bound {
+                    Some((_, Some(t))) if t > now => true,
+                    Some((_, Some(_))) | None => {
+                        a.bound = Some((pos, None));
+                        false
+                    }
+                    Some((from, None)) if from.sub(pos).horizontal() >= bound_m => {
+                        a.bound = Some((pos, Some(now + bgws_core::SimDuration::from_secs(halt_s))));
+                        true
+                    }
+                    _ => false,
+                }
+            };
+            if halt {
+                if let Some(mut k) = s.world.get_mut::<Kin>(e) {
+                    k.vel = Enu::default();
+                }
+                continue;
+            }
+        } else if let Some(mut a) = s.world.get_mut::<Act>(e) {
+            a.bound = None;
+        }
         let k = *s.world.get::<Kin>(e).expect("kin");
         let going = s.ctx.ground.going(k.pos.e, k.pos.n, class);
         // Ground it cannot otherwise cross (a dense wood, or water it was put

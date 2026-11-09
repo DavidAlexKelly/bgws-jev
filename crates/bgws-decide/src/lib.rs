@@ -67,6 +67,11 @@ pub fn figures() -> Vec<Figure> {
         figure!("decide.heuristic.fires_standoff", 0.5, "fraction", 0.1, 1.0, "default", Default, "Where fire units move up to, as a share of their reach from the objective."),
         figure!("decide.heuristic.enemy_close", 3000.0, "m", 200.0, 20000.0, "default", Default, "A lead unit with a known enemy this close bounds instead of moving tactically."),
         figure!("decide.heuristic.culmination_min_distance", 300.0, "m", 0.0, 5000.0, "default", Default, "An attack on its objective does not culminate; only one still short of it."),
+        figure!("decide.heuristic.fire_and_movement", 1.0, "flag", 0.0, 1.0, "default", Default, "1: an attack with two or more lead units puts one in a support-by-fire position while the others move to a release line and bound onto the objective; badly hurt lead units support by fire and the reserve takes their place. 0: every lead unit advances abreast."),
+        figure!("decide.heuristic.fm_min_units", 3.0, "count", 2.0, 10.0, "default", Low, "Lead units an attack needs before one gives fire while the others assault: with fewer, splitting them only lets the enemy beat them one at a time."),
+        figure!("decide.heuristic.release", 1500.0, "m", 300.0, 5000.0, "default", Low, "How far short of the objective assault units halt on their release line before they bound in."),
+        figure!("decide.heuristic.sbf_reach", 0.7, "fraction", 0.3, 1.0, "default", Low, "Where the support-by-fire unit stands off from the objective, as a share of its weapons' reach."),
+        figure!("decide.heuristic.weak", 0.5, "fraction", 0.1, 0.9, "default", Low, "A lead unit with less than this share of its vehicles left supports by fire instead of assaulting."),
         figure!("decide.heuristic.min_units_for_reserve", 3.0, "count", 2.0, 10.0, "default", Default, "Manoeuvre units needed before one is held back as the reserve."),
     ]
 }

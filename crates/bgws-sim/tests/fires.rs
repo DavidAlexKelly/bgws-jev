@@ -384,3 +384,40 @@ fn a_column_on_a_road_does_not_drive_through_the_unit_ahead() {
     let open = gap_after(false);
     assert!(open < 0.0, "off a road it passes: {open:.0} m");
 }
+
+// ── Execution: bounding ──────────────────────────────────────────────────
+
+/// A troop ordered to bound goes a bound (`sim.exec.bound_m`), halts to
+/// cover (`sim.exec.bound_halt_s`), and goes on: it gets there, later than
+/// one moving straight through, having halted between bounds.
+#[test]
+fn bounding_moves_by_bounds_with_halts() {
+    let sc = vignette(&[("b-tanks", "blue", "generic/mbt", 4, 0.0, -1200.0), ("r-inf", "red", "generic/infantrySection", 1, 0.0, 20_000.0)], json!([]), &[("fires", "off"), ("logistics", "off"), ("medical", "off")], json!([]));
+    let run = |mode: MoveModeS| {
+        let mut s = sim(&sc, 1);
+        let goal = s.ctx.frame.geodetic_to_enu(serde_json::from_value(at(0.0, 0.0)).unwrap());
+        let e = entity(&s, "b-tanks");
+        s.world.get_mut::<Act>(e).unwrap().activity = Activity::Move { route: vec![goal], mode, then: Some(Box::new(Activity::Hold)) };
+        let (mut halts, mut halted, mut arrived) = (0, false, None);
+        for t in 1..=900 {
+            s.run_with_rules(SimTime::from_secs(t as f64));
+            let a = s.world.get::<Act>(e).unwrap();
+            let h = a.bound_halted(s.ctx.now);
+            if h && !halted {
+                halts += 1;
+            }
+            halted = h;
+            if arrived.is_none() && matches!(a.activity, Activity::Hold) {
+                arrived = Some(t);
+            }
+        }
+        (halts, arrived)
+    };
+    let (straight_halts, straight) = run(MoveModeS::Tactical);
+    let (halts, bounding) = run(MoveModeS::Bound);
+    eprintln!("tactical: arrived at {straight:?} s; bounding: {halts} halts, arrived at {bounding:?} s");
+    assert_eq!(straight_halts, 0);
+    assert!((3..=5).contains(&halts), "1.2 km in 250 m bounds: about four halts, got {halts}");
+    let (a, b) = (straight.expect("arrived"), bounding.expect("arrived bounding"));
+    assert!(b as f64 >= a as f64 + 3.0 * 30.0 - 5.0, "the halts cost time: {a} s against {b} s");
+}

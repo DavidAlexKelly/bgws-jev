@@ -449,6 +449,62 @@ fn point_away(s: &Sim, e: bevy_ecs::prelude::Entity, dist: f64) -> Enu {
 }
 
 /// The best covered spot within the search radius (cover first, then height).
+/// A firing position against the threats it knows of (seen in the last
+/// five minutes, or firing from a bearing it has not found): within
+/// `sim.exec.reposition_m`, the spot from which the nearest threat sees its
+/// turret but not its hull (hull-down to it), or failing that one hidden
+/// from all of them; short moves first, and none that close the range for
+/// nothing. The spot, and whether it is a hull-down firing position. With no
+/// threat known, the best cover nearby (`better_spot`).
+fn fire_position(s: &Sim, e: bevy_ecs::prelude::Entity) -> (Enu, bool) {
+    let k = *s.world.get::<Kin>(e).expect("k");
+    let now = s.ctx.now;
+    let i = s.world.get::<Ident>(e).expect("i");
+    let person = i.platform.body.vulnerability == bgws_catalogue::Vulnerability::Personnel;
+    let (hull, top) = if person { (0.4, 1.1) } else { (1.0, 2.6) };
+    let (class, _) = crate::systems::mover_class(i.platform.mover.kind);
+    let aw = s.world.get::<Aware>(e).expect("aw");
+    let mut threats: Vec<Enu> = aw.seen.values().filter(|v| (now - v.last).secs() < 300.0).map(|v| v.at).collect();
+    threats.extend(aw.suspects.values().map(|sp| k.pos.add(Enu::new(sp.bearing.sin() * 1_500.0, sp.bearing.cos() * 1_500.0, 0.0))));
+    threats.sort_by(|a, b| a.sub(k.pos).horizontal().total_cmp(&b.sub(k.pos).horizontal()));
+    threats.truncate(3);
+    if threats.is_empty() {
+        return (better_spot(s, e), false);
+    }
+    let g = &s.ctx.ground;
+    let r = s.ctx.p.reposition_m;
+    let main = threats[0];
+    let d0 = main.sub(k.pos).horizontal();
+    let score = |p: Enu| -> (f64, bool) {
+        let seen = |t: &Enu, agl: f64| g.los(*t, 2.5, p, agl).p_visible;
+        let hull_main = seen(&main, hull);
+        let top_main = seen(&main, top);
+        let hull_down = hull_main < 0.3 && top_main > 0.5;
+        let masked = threats.iter().all(|t| seen(t, top) < 0.3);
+        let exposed = threats.iter().map(|t| seen(t, hull)).sum::<f64>() / threats.len() as f64;
+        let d = p.sub(k.pos).horizontal();
+        let closing = ((d0 - main.sub(p).horizontal()) / r).max(0.0);
+        let v = if hull_down { 1.0 } else { 0.0 } + if masked { 0.6 } else { 0.0 } - 0.5 * exposed + 0.3 * g.micro(p.e, p.n).cover - 0.25 * d / r - 0.4 * closing;
+        (v, hull_down)
+    };
+    let mut best = (score(k.pos), k.pos);
+    for ring in [0.3, 0.6, 1.0] {
+        for step in 0..16 {
+            let b = step as f64 * std::f64::consts::TAU / 16.0;
+            let p = k.pos.add(Enu::new(b.sin() * r * ring, b.cos() * r * ring, 0.0));
+            if !g.contains(p) || g.going(p.e, p.n, class).speed_kmh <= 0.0 {
+                continue;
+            }
+            let p = Enu::new(p.e, p.n, g.height(p.e, p.n));
+            let sc = score(p);
+            if sc.0 > best.0 .0 + 0.05 {
+                best = (sc, p);
+            }
+        }
+    }
+    (best.1, best.0 .1)
+}
+
 fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
     let k = *s.world.get::<Kin>(e).expect("k");
     let r = s.ctx.p.cover_search_m;
@@ -568,6 +624,7 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         let i = s.world.get::<Ident>(e).expect("i");
         i.platform.mounts.iter().filter_map(|m| m.munitions.first()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)
     };
+    let mut chosen_position: Option<Enu> = None;
     let new: Option<Activity> = match action.trim_start_matches("land.") {
         "complyWithOrders" | "resumeOrders" | "resumeOrCarryOn" | "complyWithRequest" => Some(mission_activity),
         "carryOn" | "keepAtIt" | "keepFiring" | "keepHolding" | "keepHoldingHere" | "finishFightFirst" => None,
@@ -586,7 +643,11 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         "holdHere" | "holdAndRecover" | "cannotComply" => Some(Activity::Hold),
         "observe" | "watchLastSeen" => Some(Activity::Observe),
         "overwatchHere" | "partlyOverwatch" => Some(Activity::Overwatch),
-        "betterPosition" | "hullDownThenFire" | "goQuietInCoverMove" => Some(Activity::Move { route: vec![better_spot(s, e)], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) }),
+        "betterPosition" | "hullDownThenFire" | "goQuietInCoverMove" => {
+            let (spot, firing) = fire_position(s, e);
+            chosen_position = firing.then_some(spot);
+            Some(Activity::Move { route: vec![spot], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })
+        }
         "pullBackToFriends" | "joinNearestFriends" | "rejoin" => {
             let to = nearest_friend(s, e).map(|f| f.1).unwrap_or_else(|| point_away(s, e, withdraw_m));
             Some(Activity::Withdraw { route: route_for(s, e, to, MoveModeS::Tactical), then: Some(Box::new(Activity::Overwatch)) })
@@ -613,7 +674,9 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
     };
     if let Some(n) = new {
         if n != current {
-            s.world.get_mut::<Act>(e).expect("a").activity = n;
+            let mut a = s.world.get_mut::<Act>(e).expect("a");
+            a.activity = n;
+            a.fire_position = chosen_position;
         }
     }
     true
@@ -651,7 +714,7 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
             let mode = match ph.mode.as_deref() {
                 Some("march") => MoveModeS::March,
                 Some("assault") => MoveModeS::Assault,
-                Some("bound") => MoveModeS::Stealth,
+                Some("bound") => MoveModeS::Bound,
                 _ => MoveModeS::Tactical,
             };
             match (ph.action.as_str(), to) {

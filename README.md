@@ -721,6 +721,72 @@ vignettes are unchanged. The figures (`sim.appreciation.*`) are judgement
 (confidence low) until checked against a staff's own appreciation of real
 ground.
 
+### How units carry out choices, and how HQs plan an attack
+
+**Execution** (`crates/bgws-sim/src/decide.rs`, `systems.rs`):
+
+- **Firing positions against the threat.** "Better position", "hull down
+  then fire" and "into cover" used to pick the best cover within 400 m,
+  wherever the enemy was. Now they look at the threats the unit knows of
+  (seen in the last five minutes, or firing from a bearing it has not
+  found). Within `sim.exec.reposition_m` (250 m), they pick a spot from
+  which the nearest threat sees the turret but not the hull (hull-down to
+  it), or failing that one hidden from all of them. Short moves come
+  first, and none closes the range for nothing; lines of sight are traced
+  over the ground and the buildings and woods.
+- **Quick hull-down.** In a firing position chosen like that, a unit
+  counts as hull-down after `sim.exec.occupy_s` (30 s), not after the
+  usual settle-plus-hull-down time (4 minutes).
+- **Real bounding.** Orders with mode `bound` used to mean "move
+  stealthily". Now a bounding unit moves a bound (`sim.exec.bound_m`,
+  250 m) at tactical pace, halts to cover (`sim.exec.bound_halt_s`, 30 s,
+  not moving, so it fires as a halted unit), and goes on. Over 1.2 km it
+  halts four times and arrives in 262 s against 142 s moving straight
+  through (a test checks it).
+
+Measured against the previous engine: the calibration vignettes are
+unchanged, and Jev against the doctrine default moved from +0.07 ± 0.10 to
++0.10 ± 0.08 (result, 84 paired games), within the noise. The lab's
+play-outs of "better position" at first contact in the advance to contact
+(27 moments) show what the option costs: units that reposition lose fewer
+vehicles than those that carry on (about 31% of the unit against 40%), but
+they give up the advance (3% of the way to the objective made good
+against 31%). That is a trade-off between survival and momentum, not a
+blunder, and it is the choice a decider should be weighing.
+
+**The HQ planner** (`crates/bgws-decide/src/hq.rs`, `heuristic_plan`)
+used to send every lead unit abreast straight at the objective. With
+`decide.heuristic.fire_and_movement` (on), an attack with at least
+`decide.heuristic.fm_min_units` (3) lead units does this instead:
+
+- The lead unit that reaches farthest **supports by fire**: from an
+  observation point of the terrain analysis in reach of the objective on
+  our side (OP1…), else from a stand-off of `sbf_reach` (70%) of its reach,
+  with weapons free.
+- The others move to a **release line** (`decide.heuristic.release`,
+  1.5 km short of the objective), then **bound** onto it.
+- A lead unit with under half its vehicles (`decide.heuristic.weak`)
+  **supports by fire from where it is**, and the reserve takes its place.
+
+With two lead units it attacks as before: splitting two only lets the
+enemy beat them one at a time (tried first, it cost the small scenarios
+dearly: −0.83 result in the armour duel).
+
+`bgws lab suite --planner-ab` measures a planner against another, per
+side: the new planner plans for the side under test and the old for the
+other side and for both in the baseline game (the rules decide for every
+unit). Over the suite's seven scenarios, both sides:
+
+| seeds | pairs | better / worse | result Δ | exchange Δ |
+|---|---|---|---|---|
+| 1–6 | 84 | 14 / 13 | +0.08 ± 0.06 | +0.02 ± 0.02 |
+| 7–12 (fresh) | 84 | 15 / 8 | +0.05 ± 0.05 | +0.02 ± 0.02 |
+
+It changes only the scenarios with enough units: the combined-arms
+skirmish (+0.58 and +0.33 result), the battalion attack (5 better, 1 worse
+on the fresh seeds) and the mechanised hasty attack. The small ones play as
+before.
+
 ### Urban blocks
 
 When a pack has a sight surface, the town is cut into blocks as the game
