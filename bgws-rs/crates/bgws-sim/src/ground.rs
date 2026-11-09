@@ -445,7 +445,7 @@ impl Ground {
                     i += 1;
                     while i <= BINS {
                         t[i - 1] += v;
-                        i += i & i.wrapping_neg();
+                        i += i.isolate_lowest_one();
                     }
                 };
                 // Length above angle bin `i`: total minus the prefix up to it.
@@ -454,7 +454,7 @@ impl Ground {
                         let mut s = 0.0;
                         while j > 0 {
                             s += t[j - 1];
-                            j -= j & j.wrapping_neg();
+                            j -= j.isolate_lowest_one();
                         }
                         s
                     };
@@ -600,7 +600,9 @@ impl RoadLayer {
             }
             for seg in line.line.windows(2) {
                 let (a, b) = (seg[0], seg[1]);
-                let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.5)).ceil().max(1.0) as usize;
+                // Every cell the line passes through, corners clipped included:
+                // a vehicle on the road's own line is in one of them.
+                let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.1)).ceil().max(1.0) as usize;
                 for k in 0..=steps {
                     let t = k as f64 / steps as f64;
                     let Some((i, j)) = spec.nearest(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t) else { continue };
