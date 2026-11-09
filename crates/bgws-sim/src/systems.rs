@@ -1245,11 +1245,19 @@ pub fn victory(s: &mut Sim) {
             }
         }
     }
-    if result.is_none() && now >= s.ctx.duration_limit() {
-        let b = strength.get(&Side::Blue).copied().unwrap_or(0.0);
-        let r = strength.get(&Side::Red).copied().unwrap_or(0.0);
-        let winner = if (b - r).abs() < 0.05 { None } else if b > r { Some(Side::Blue) } else { Some(Side::Red) };
-        result = Some((winner, "time limit".into()));
+    if result.is_none() && now >= s.ctx.duration_limit() && crate::world::victory(s).is_none() {
+        // A side that had an objective and has not taken it has failed (unless both had one).
+        let has = |side: Side| s.ctx.scenario.victory.iter().any(|v| matches!(v, bgws_scenario::v4::VictoryCondition::Objective { side: x, .. } if *x == side));
+        let (b_obj, r_obj) = (has(Side::Blue), has(Side::Red));
+        result = Some(if b_obj != r_obj {
+            let failed = if b_obj { Side::Blue } else { Side::Red };
+            (Some(failed.enemy()), format!("time limit: {failed} did not take its objective"))
+        } else {
+            let b = strength.get(&Side::Blue).copied().unwrap_or(0.0);
+            let r = strength.get(&Side::Red).copied().unwrap_or(0.0);
+            let winner = if (b - r).abs() < 0.05 { None } else if b > r { Some(Side::Blue) } else { Some(Side::Red) };
+            (winner, "time limit".into())
+        });
     }
     if let Some(r) = crate::world::victory(s) {
         result = result.or(Some(r));

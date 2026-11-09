@@ -40,6 +40,7 @@ fn label(v: &VictoryCondition) -> String {
         V::SeaControl { label, .. } => label.clone().unwrap_or_else(|| "sea control".into()),
         V::Through { label, .. } => label.clone().unwrap_or_else(|| "through".into()),
         V::All { label, .. } => label.clone().unwrap_or_else(|| "all aims".into()),
+        V::Objective { label, .. } => label.clone().unwrap_or_else(|| "the objective".into()),
         V::Breakpoint { .. } => "breakpoint".into(),
     }
 }
@@ -47,7 +48,7 @@ fn label(v: &VictoryCondition) -> String {
 fn side_of(v: &VictoryCondition) -> Option<Side> {
     use VictoryCondition as V;
     match v {
-        V::AirSuperiority { side, .. } | V::TargetSet { side, .. } | V::SeaControl { side, .. } | V::Through { side, .. } | V::All { side, .. } => Some(*side),
+        V::AirSuperiority { side, .. } | V::TargetSet { side, .. } | V::SeaControl { side, .. } | V::Through { side, .. } | V::All { side, .. } | V::Objective { side, .. } => Some(*side),
         V::Breakpoint { .. } => None,
     }
 }
@@ -55,7 +56,7 @@ fn side_of(v: &VictoryCondition) -> Option<Side> {
 /// Seconds a condition must be held (as the TS engine: only the area ones).
 pub fn hold_s(v: &VictoryCondition) -> f64 {
     match v {
-        VictoryCondition::AirSuperiority { hold_s, .. } | VictoryCondition::SeaControl { hold_s, .. } => *hold_s,
+        VictoryCondition::AirSuperiority { hold_s, .. } | VictoryCondition::SeaControl { hold_s, .. } | VictoryCondition::Objective { hold_s, .. } => *hold_s,
         _ => 0.0,
     }
 }
@@ -117,6 +118,12 @@ pub fn judge(s: &Sim, v: &VictoryCondition, through: &mut BTreeMap<String, SimTi
         V::All { of, .. } => {
             let parts: Vec<Judgement> = of.iter().map(|p| judge(s, p, through)).collect();
             Judgement { met: !parts.is_empty() && parts.iter().all(|p| p.met), text: parts.iter().map(|p| p.text.clone()).collect::<Vec<_>>().join("; ") }
+        }
+        V::Objective { side, at, radius_m, .. } => {
+            let land = |i: &Ident, _: &Kin, e: bevy_ecs::prelude::Entity| i.domain == Domain::Land && !i.hq && s.world.get::<crate::components::Health>(e).is_some_and(|h| h.fit > 0);
+            let own = count_in(s, *side, *at, *radius_m, land);
+            let enemy = count_in(s, side.enemy(), *at, *radius_m, land);
+            Judgement { met: own > 0 && enemy == 0, text: format!("{own} own and {enemy} enemy units on it") }
         }
         V::Breakpoint { .. } => Judgement { met: false, text: "judged by the land breakpoint".into() },
     }

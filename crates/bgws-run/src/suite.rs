@@ -238,10 +238,18 @@ pub fn run_planners(entries: &[Entry], seeds: &[u64], test: Arc<dyn bgws_decide:
 #[allow(clippy::too_many_arguments)]
 pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, figures: &Figures, parallel: usize, opts: &Options, progress: &(dyn Fn(&str) + Sync)) -> Result<SuiteRun> {
     let t0 = std::time::Instant::now();
-    let scenarios: Vec<(Entry, bgws_scenario::v4::ScenarioV4)> = entries
-        .iter()
-        .map(|e| crate::load_scenario(&crate::scenario_file(&e.scenario)).map(|s| (e.clone(), s)))
-        .collect::<Result<_>>()?;
+    let mut scenarios: Vec<(Entry, bgws_scenario::v4::ScenarioV4)> = Vec::new();
+    for e in entries {
+        let sc = crate::load_scenario(&crate::scenario_file(&e.scenario))?;
+        // A scenario on a theatre pack this machine does not have is left out.
+        if let Some(p) = &sc.theatre.pack {
+            if !crate::resolve_pack(p).join("pack.json").exists() {
+                progress(&format!("{}: left out (theatre pack {p} is not here; build it with `bgws terrain`)", e.scenario));
+                continue;
+            }
+        }
+        scenarios.push((e.clone(), sc));
+    }
     let jobs: Vec<(usize, u64, Side)> = (0..scenarios.len()).flat_map(|i| seeds.iter().flat_map(move |&k| [Side::Blue, Side::Red].map(|s| (i, k, s)))).collect();
     // Baselines: one rules game per scenario and seed, measured for each side.
     let base: BTreeMap<BaseKey, Metrics> = (0..scenarios.len())

@@ -29,6 +29,7 @@ fn situation(units: Vec<HqUnit>, terrain: Vec<TerrainNote>) -> HqSituation {
         reference_points: Default::default(),
         shareable_means: Default::default(),
         terrain,
+        mission: None,
     }
 }
 

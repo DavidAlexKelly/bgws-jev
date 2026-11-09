@@ -582,13 +582,35 @@ impl Sim {
                 at: Some(self.ctx.frame.enu_to_geodetic(t.position)),
             })
             .collect::<Vec<_>>());
-        // The objective: the enemy's start centroid as briefed (the scenario's intelligence).
-        let enemy: Vec<Geodetic> = self.ctx.scenario.forces_of(side.enemy()).map(|f| f.position).collect();
-        let objective = if enemy.is_empty() {
-            None
-        } else {
-            Some(Geodetic::new(enemy.iter().map(|g| g.lat).sum::<f64>() / enemy.len() as f64, enemy.iter().map(|g| g.lon).sum::<f64>() / enemy.len() as f64, 0.0))
+        // The objective: the scenario's (its own to take, or the enemy's to
+        // deny), else the enemy's start centroid as briefed (the intelligence).
+        let objective_of = |x: Side| {
+            self.ctx.scenario.victory.iter().find_map(|v| match v {
+                bgws_scenario::v4::VictoryCondition::Objective { side, at, .. } if *side == x => Some(*at),
+                _ => None,
+            })
         };
+        let (own_obj, enemy_obj) = (objective_of(side), objective_of(side.enemy()));
+        let enemy: Vec<Geodetic> = self.ctx.scenario.forces_of(side.enemy()).map(|f| f.position).collect();
+        // Farther from the enemy than the side is, as the two start (the
+        // briefing: the mission does not change as the fight moves).
+        let mean = |v: &[Geodetic]| (!v.is_empty()).then(|| Geodetic::new(v.iter().map(|g| g.lat).sum::<f64>() / v.len() as f64, v.iter().map(|g| g.lon).sum::<f64>() / v.len() as f64, 0.0));
+        let own_start: Vec<Geodetic> = self.ctx.scenario.forces_of(side).map(|f| f.position).collect();
+        let behind = |o: Geodetic| match (mean(&enemy), mean(&own_start)) {
+            (Some(ec), Some(oc)) => o.surface_distance(ec) > oc.surface_distance(ec) + 500.0,
+            _ => false,
+        };
+        // Its own objective, or the enemy's, lying behind it: a position to
+        // fall back to (and hold, or deny), not one to take where it stands.
+        let mission = match (own_obj, enemy_obj) {
+            (Some(o), _) | (None, Some(o)) if behind(o) => Some("withdraw".to_string()),
+            (Some(_), _) => Some("attack".to_string()),
+            (None, Some(_)) => Some("defend".to_string()),
+            _ => None,
+        };
+        let objective = own_obj.or(enemy_obj).or_else(|| {
+            (!enemy.is_empty()).then(|| Geodetic::new(enemy.iter().map(|g| g.lat).sum::<f64>() / enemy.len() as f64, enemy.iter().map(|g| g.lon).sum::<f64>() / enemy.len() as f64, 0.0))
+        });
         let mut refs = BTreeMap::new();
         if let Some(o) = objective {
             refs.insert("OBJECTIVE".to_string(), o);
@@ -614,6 +636,7 @@ impl Sim {
             reference_points: refs,
             shareable_means: BTreeMap::new(),
             terrain,
+            mission,
         }
     }
 

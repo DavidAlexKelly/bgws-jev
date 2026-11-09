@@ -409,6 +409,7 @@ pub fn setup(s: &mut Sim, aw: &mut AirWorld) {
                 layer: bgws_scenario::v4::Layer::Entity,
                 echelon: None,
                 concealed: false,
+                dug_in: false,
                 command_rating: None,
                 dummy: false,
                 parent: Some(f.id.clone()),

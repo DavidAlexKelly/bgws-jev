@@ -149,6 +149,11 @@ pub struct HqSituation {
     /// Key terrain round the force and its objective (the terrain appreciation).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub terrain: Vec<TerrainNote>,
+    /// "attack" (take the objective), "withdraw" (fall back to it: it lies
+    /// away from the enemy) or "defend" (hold it against the enemy's attack),
+    /// when the scenario gives the side an objective or the enemy one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<String>,
 }
 
 /// A piece of key terrain from the pack's terrain appreciation, as an HQ
@@ -252,6 +257,12 @@ pub fn land_prompt(s: &HqSituation, side: &str) -> String {
         lines.push(format!("Guidance from {}: {}. Priorities: {}.", g.by, g.aims.join("; "), g.priorities.join(", ")));
     }
     lines.push(format!("Why you are planning now: {}.", s.why));
+    match s.mission.as_deref() {
+        Some("attack") => lines.push("Your mission: take the objective (OBJECTIVE) and hold it; failing to by the time limit loses.".into()),
+        Some("withdraw") => lines.push("Your mission: fall back to the objective (OBJECTIVE), behind you and away from the enemy, and hold it; get there before the enemy does.".into()),
+        Some("defend") => lines.push("Your mission: hold the objective (OBJECTIVE) against the enemy's attack; the enemy must take it, so keeping it until the time limit wins.".into()),
+        _ => {}
+    }
     lines.push(format!("What has reached your HQ:\n{}", picture_words(&s.cop)));
     if !s.terrain.is_empty() {
         lines.push("Key terrain (from the terrain appreciation; orders may use these labels as reference points):".into());
@@ -433,9 +444,32 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
     let fit: u32 = s.units.iter().map(|u| u.vehicles_fit).sum();
     let lost = if total > 0 { 1.0 - fit as f64 / total as f64 } else { 0.0 };
     let culminated = lost >= p.culmination_loss && anchor.surface_distance(objective) > p.culmination_min_distance_m;
-    let attack = !culminated && (enemy == 0.0 || ratio >= p.attack_ratio);
+    // A side told to defend holds, whatever the odds.
+    let defend = s.mission.as_deref() == Some("defend");
+    // Falling back: every unit to the objective, then hold it, whatever the odds.
+    if s.mission.as_deref() == Some("withdraw") {
+        let intent = "fall back to the objective and hold it".to_string();
+        let axis = anchor.bearing_to(objective).to_degrees();
+        let mut orders = Vec::new();
+        let n = units.len();
+        for (i, u) in units.iter().enumerate() {
+            let offset = (i as f64 - (n as f64 - 1.0) / 2.0) * p.frontage_m;
+            let at = objective.destination(deg((axis + 90.0).rem_euclid(360.0)), offset);
+            let (task, hold) = if u.role == UnitRole::Manoeuvre { ("withdraw to the objective and hold it", "overwatch") } else { ("withdraw to the objective", "hold") };
+            orders.push(order(&u.id, vec![phase("fall back to the objective", "withdraw", Some(at), None), phase("hold the objective", hold, None, None)], task, &intent, "engage", "withinShortRange"));
+        }
+        return json!({
+            "by": "heuristic",
+            "plan": format!("{}: {intent}", s.hq),
+            "guidance": {"by": s.hq, "aims": [intent], "priorities": ["the objective", "break contact"], "apportionment": {}, "roe": s.guidance.as_ref().and_then(|g| g.roe.clone()).map(|r| json!(r)).unwrap_or(json!({"weaponsFree": true, "escalationLimit": "conventional"})), "measures": s.guidance.as_ref().map(|g| g.measures.clone()).unwrap_or_default(), "objective": point(objective)},
+            "orders": orders,
+        });
+    }
+    let attack = !defend && !culminated && (enemy == 0.0 || ratio >= p.attack_ratio);
     let r1 = (ratio * 10.0).round() / 10.0;
-    let intent = if culminated {
+    let intent = if defend {
+        format!("hold the objective against the enemy's attack ({r1}:1)")
+    } else if culminated {
         format!("the attack has culminated at {}% losses: hold and consolidate", (lost * 100.0).round())
     } else if attack {
         format!("take the objective and hold it ({} attack, {r1}:1)", s.echelon)

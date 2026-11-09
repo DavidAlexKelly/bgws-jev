@@ -5,5 +5,17 @@
   { "scenario": "skirmish-catalogue-armour-v1", "minutes": 60, "note": "a small armour duel" },
   { "scenario": "m2-mech-company-hasty-attack", "minutes": 90, "note": "a mechanised company's hasty attack on a defended position" },
   { "scenario": "skirmish-symmetric-control-v1", "minutes": 60, "note": "mirror-image forces: only the deciding differs", "heldOut": true },
-  { "scenario": "m3-battalion-attack", "minutes": 120, "note": "a battalion attack: more units and longer", "heldOut": true }
+  { "scenario": "m3-battalion-attack", "minutes": 120, "note": "a battalion attack: more units and longer", "heldOut": true },
+  { "scenario": "gen-company-attack", "minutes": 90, "note": "generated: a company attacks a dug-in platoon position at 3:1 across a river" },
+  { "scenario": "gen-company-attack-even", "minutes": 90, "note": "generated: the same attack at 1.5:1 in overcast" },
+  { "scenario": "gen-company-attack-night", "minutes": 90, "note": "generated: a company attack at night", "heldOut": true },
+  { "scenario": "gen-battalion-attack", "minutes": 120, "note": "generated: a battalion attacks a reinforced company with a tank counter-attack" },
+  { "scenario": "gen-company-defence", "minutes": 90, "note": "generated: blue's dug-in company defends against a 1.5:1 attack" },
+  { "scenario": "gen-battalion-defence-fog", "minutes": 120, "note": "generated: a battalion defence at dawn in fog", "heldOut": true },
+  { "scenario": "gen-meeting-engagement", "minutes": 90, "note": "generated: two companies meet on open ground, both told to take the same place" },
+  { "scenario": "gen-ambush", "minutes": 90, "note": "generated: blue's column advances through red's concealed ambush" },
+  { "scenario": "gen-withdrawal", "minutes": 90, "note": "generated: an outnumbered blue screen falls back and must deny a rear position", "heldOut": true },
+  { "scenario": "gen-kgd-company-attack", "minutes": 90, "note": "generated, Kaliningrad: a company attack on real ground" },
+  { "scenario": "gen-kgd-river-crossing", "minutes": 90, "note": "generated, Kaliningrad: an attack across a real river" },
+  { "scenario": "gen-kgd-urban-attack", "minutes": 120, "note": "generated, Kaliningrad: a battalion attacks into a town", "heldOut": true }
 ]

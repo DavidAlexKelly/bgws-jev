@@ -201,6 +201,9 @@ pub struct Force {
     pub echelon: Option<Echelon>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub concealed: bool,
+    /// Starts in a prepared position: dug in (fights hull-down, entrenched against shellfire).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub dug_in: bool,
     /// A headquarters, and how many subordinates it can activate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command_rating: Option<f64>,
@@ -371,6 +374,18 @@ pub enum VictoryCondition {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         label: Option<String>,
     },
+    /// Take and hold ground: some of `side`'s land units (fit) within
+    /// `radius_m` of `at` and none of the enemy's, held for `hold_s`. A side
+    /// with an objective it has not taken by the time limit has failed: the
+    /// other side wins (unless both have one).
+    Objective {
+        side: Side,
+        at: Geodetic,
+        radius_m: f64,
+        hold_s: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+    },
     /// A side breaks when it has lost this share of its combat strength
     /// (the TS `rules.breakpointPct`); `side` absent applies to both.
     Breakpoint {
@@ -391,7 +406,7 @@ impl VictoryCondition {
     }
     pub fn positions(&self) -> Vec<Geodetic> {
         match self {
-            VictoryCondition::AirSuperiority { at, .. } | VictoryCondition::SeaControl { at, .. } | VictoryCondition::Through { at, .. } => vec![*at],
+            VictoryCondition::AirSuperiority { at, .. } | VictoryCondition::SeaControl { at, .. } | VictoryCondition::Through { at, .. } | VictoryCondition::Objective { at, .. } => vec![*at],
             VictoryCondition::All { of, .. } => of.iter().flat_map(|c| c.positions()).collect(),
             _ => vec![],
         }

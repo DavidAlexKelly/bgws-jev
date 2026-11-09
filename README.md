@@ -787,6 +787,63 @@ skirmish (+0.58 and +0.33 result), the battalion attack (5 better, 1 worse
 on the fresh seeds) and the mechanised hasty attack. The small ones play as
 before.
 
+### Generated scenarios
+
+`bgws lab generate` writes a varied set of scenarios from short specs
+(`crates/bgws-run/src/scengen.rs`) to `data/scenarios/gen-*.json` and
+checks each loads; `--only <name>` writes one, `--spec <file.json>` writes
+your own from a JSON list of specs, such as
+`[{"name": "gen-my-attack", "kind": "attack", "echelon": "company",
+"ratio": 2.0, "gapKm": 4.0, "hour": 6.0, "weather": "rain", "ground":
+{"type": "generated"}, "minutes": 90.0, "seed": 7}]`. A spec names the kind of fight
+(attack, defence, meeting engagement, ambush, withdrawal, river crossing,
+attack into a town), the echelon (company or battalion), the force ratio
+(attacking platoons per defending element), the gap between the forces,
+the local hour, the weather, the ground (flat, generated, or a theatre
+pack, where a river crossing is put across the pack's widest river and an
+urban attack against its largest town) and the time limit. The standard
+twelve are in the suite (four held out):
+
+| scenario | what | rules vs rules, seeds 1–3 |
+|---|---|---|
+| `gen-company-attack` | 8 platoons on a dug-in 3-element position, 3:1, a river between | blue wins 3 of 3, in about 78 min |
+| `gen-company-attack-even` | the same at 1.5:1, overcast | blue wins 3 of 3 |
+| `gen-company-attack-night` (held out) | at night | blue wins 3 of 3 |
+| `gen-battalion-attack` | 12 platoons on a reinforced company with tanks behind | blue wins 3 of 3, 79–104 min |
+| `gen-company-defence` | blue's dug-in company against 1.5:1 | red wins 2, blue holds 1 |
+| `gen-battalion-defence-fog` (held out) | at dawn in fog | red takes it 2, blue holds 1 |
+| `gen-meeting-engagement` | 4 platoons a side, one objective between them | red wins 3 of 3 (the ground favours it) |
+| `gen-ambush` | blue's column past 4 concealed, dug-in elements | blue wins 3 of 3, in 8–11 min |
+| `gen-withdrawal` (held out) | 3 platoons fall back 4.5 km and must deny the position to 6 | red wins 3 of 3, after about an hour |
+| `gen-kgd-company-attack` | on Kaliningrad's ground | blue takes it 1, fails 2 |
+| `gen-kgd-river-crossing` | across a real river | blue wins 1, fails 2 |
+| `gen-kgd-urban-attack` (held out) | a battalion into a town | blue takes it 2, fails 1 |
+
+The pack scenarios are skipped, with a note, where the pack is not
+installed.
+
+Three things came with them:
+
+- **An objective victory** (`{"kind": "objective", "side", "at",
+  "radiusM", "holdS", "label"}`): the side takes it when it has fit land
+  units (HQs aside) within the radius and the enemy has none, and wins when
+  it has held it that long. At the time limit a side that has not taken
+  its objective loses, unless both sides had one (then strength decides).
+- **A mission for each HQ**, from the objectives as briefed at the start:
+  `attack` (its own objective to take), `defend` (the enemy's, on its
+  ground) or `withdraw` (its own or the enemy's, lying behind it, away from
+  the enemy). The heuristic planner holds when defending whatever the
+  odds, and when withdrawing sends every unit back to the objective to
+  hold it; Jev's HQ prompt is told the mission.
+- **Prepared defences** (`"dugIn": true` on a force): the unit starts dug
+  in and hull down, as if it had spent the night digging.
+
+Making them found a fault in generated ground: it kept the terrain but
+dropped the generator's rivers and roads, so every river was impassable
+water with no bridge. Half the 3:1 attack's start line sat behind a stream
+and never moved. Generated ground now keeps both (the roads with their
+bridges), as theatre packs do.
+
 ### Urban blocks
 
 When a pack has a sight surface, the town is cut into blocks as the game

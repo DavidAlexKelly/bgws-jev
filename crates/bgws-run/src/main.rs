@@ -374,6 +374,17 @@ enum LabCmd {
     },
     /// Print the wording Jev is asked in (data/jev/wording.json, else the engine's own).
     Wording,
+    /// Write the generated test scenarios (data/scenarios/gen-*.json): attacks,
+    /// defences, a meeting engagement, an ambush, a withdrawal, and on a pack a
+    /// river crossing and a fight into a town.
+    Generate {
+        /// Only this one (its name).
+        #[arg(long)]
+        only: Option<String>,
+        /// Generate these specs instead (a JSON list of scengen specs).
+        #[arg(long)]
+        spec: Option<PathBuf>,
+    },
     /// Tune Jev's wording: a larger model proposes rewrites from Jev's
     /// failures; the cases and the suite judge them; the held-out cases and
     /// scenarios check the result. Nothing changes until `--accept`.
@@ -614,6 +625,22 @@ fn main() -> Result<()> {
                         eprintln!("kept in {}", lab.dir.join("tune").join(&r.id).display());
                     }
                 },
+                LabCmd::Generate { only, spec } => {
+                    let specs: Vec<bgws_run::scengen::Spec> = match spec {
+                        Some(p) => serde_json::from_slice(&std::fs::read(&p)?)?,
+                        None => bgws_run::scengen::standard(),
+                    };
+                    for spec in specs.into_iter().filter(|s| only.as_ref().is_none_or(|o| &s.name == o)) {
+                        match bgws_run::scengen::write(&spec) {
+                            Ok(p) => {
+                                // Check it loads as the game would.
+                                let ok = load_scenario(&p).map(|_| "ok".to_string()).unwrap_or_else(|e| format!("does not load: {e}"));
+                                eprintln!("{}: {ok}", p.display());
+                            }
+                            Err(e) => eprintln!("{}: skipped ({e})", spec.name),
+                        }
+                    }
+                }
                 LabCmd::Wording => println!("{}", serde_json::to_string_pretty(&bgws_run::jev_wording())?),
                 LabCmd::Case { moment, why } => {
                     let m = lab.moment(&moment)?;

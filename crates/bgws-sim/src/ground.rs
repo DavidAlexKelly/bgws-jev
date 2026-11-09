@@ -98,7 +98,8 @@ impl Ground {
         let seed = fnv1a(seed_text.as_bytes());
         let mut p = SynthParams::new(seed, n, n, cell, figures);
         p.frame_origin = origin;
-        let mut terrain = generate(&p, figures).terrain;
+        let world = generate(&p, figures);
+        let mut terrain = world.terrain;
         // Centre the grid on the frame origin.
         let shift = cell * (n as f64 - 1.0) / 2.0;
         terrain.spec.origin_e -= shift;
@@ -107,7 +108,25 @@ impl Ground {
             r.origin_e = terrain.spec.origin_e;
             r.origin_n = terrain.spec.origin_n;
         }
-        Self::from_terrain(terrain, seed, figures)
+        // Its rivers and roads too (the bridges are the way over the rivers),
+        // moved with the grid.
+        let rivers: Vec<River> = world.rivers.into_iter().map(|r| River { line: r.line.iter().map(|q| (q.0 - shift, q.1 - shift)).collect(), ..r }).collect();
+        let g = &world.roads.graph;
+        let roads: Vec<RoadLine> = g
+            .edge_indices()
+            .filter_map(|ei| {
+                let (a, b) = g.edge_endpoints(ei)?;
+                let w = &g[ei];
+                let (na, nb) = (g[a], g[b]);
+                Some(RoadLine { class: w.class, bridge: w.bridge.is_some(), tunnel: false, edge: ei.index() as u32, from: a.index() as u32, to: b.index() as u32, line: vec![(na.e - shift, na.n - shift), (nb.e - shift, nb.n - shift)] })
+            })
+            .collect();
+        let ground = Self::from_terrain(terrain, seed, figures).with_rivers(&rivers);
+        if roads.is_empty() {
+            ground
+        } else {
+            ground.with_roads(&roads)
+        }
     }
 
     /// Flat open ground (tests, calibration vignettes).

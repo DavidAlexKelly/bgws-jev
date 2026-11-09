@@ -9,6 +9,7 @@ pub mod experiments;
 pub mod geotiff;
 pub mod cases;
 pub mod host;
+pub mod scengen;
 pub mod suite;
 pub mod tune;
 pub mod lab;

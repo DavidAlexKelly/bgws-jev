@@ -172,10 +172,18 @@ pub fn setup(s: &mut Sim, st: &mut FiresWorld) {
         st.obstacles.changes.push(Change { id: k as u64, at: SimTime::ZERO, e: centre.e, n: centre.n, kind: ChangeKind::Obstacle { kind, line: vec![(a.e, a.n), (b.e, b.n)], depth_m: ob.depth_m }, known_to: ob.known_to.clone() });
         st.obstacles.obstacles.push(ob);
     }
+    let dug: std::collections::BTreeSet<String> = s.ctx.scenario.forces.iter().filter(|f| f.dug_in).map(|f| f.id.clone()).collect();
     for &e in &s.ctx.order.clone() {
-        let land = s.world.get::<Ident>(e).map(|i| i.domain == Domain::Land && !super::is_node(&i.platform)).unwrap_or(false);
+        let (land, name) = s.world.get::<Ident>(e).map(|i| (i.domain == Domain::Land && !super::is_node(&i.platform), i.name.clone())).unwrap_or((false, String::new()));
         if land {
-            s.world.entity_mut(e).insert(Dig::default());
+            // A prepared position: dug in from the start.
+            let done = dug.contains(&name);
+            s.world.entity_mut(e).insert(Dig { done, ..Dig::default() });
+            if done {
+                if let Some(mut a) = s.world.get_mut::<crate::components::Act>(e) {
+                    a.posture = crate::components::Posture::HullDown;
+                }
+            }
         }
     }
 }
