@@ -838,6 +838,23 @@ Three things came with them:
 - **Prepared defences** (`"dugIn": true` on a force): the unit starts dug
   in and hull down, as if it had spent the night digging.
 
+First baselines on the twelve (seeds 1–4, both sides, 96 paired games
+each) show what the original seven hid:
+
+| under test | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| planner: fire and movement | 12 / 34 | −0.21 ± 0.08 | −0.05 ± 0.02 |
+| Jev 1.13 (tuned wording) against the doctrine default | 29 / 54 | −0.25 ± 0.11 | −0.04 ± 0.02 |
+
+Fire and movement costs most on Kaliningrad's real ground (−0.75 result
+in the company attack and the river crossing: the support-by-fire unit
+and release line are placed without regard to the river or the town) and
+in the fog defence. Jev does worst attacking a dug-in position (−1.00 in
+both company attacks, 0 better in 8 at even odds) and in the ambush
+(survival −0.16); it does no worse in the urban attack, the Kaliningrad
+company attack and the fog defence. Both were tuned on the seven older
+scenarios, which these now check.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
