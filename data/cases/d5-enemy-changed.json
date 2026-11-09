@@ -1,0 +1,29 @@
+[
+ {
+  "id": "recce-tank-turns-towards-it",
+  "point": "D5",
+  "base": "recce-patrol",
+  "why": "A recce patrol's job is to watch and report, not to fight tanks with a machine gun, even where its rules would let it fire. A tank turning towards its hide: keep still and hidden, or slip away to another hide. Firing first is wrong.",
+  "set": {
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "south",
+    "moving": true,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 1200
+   },
+   "orders.roe": "fire at any enemy in reach"
+  },
+  "acceptable": [
+   "keep",
+   "relocate",
+   "pullBack"
+  ],
+  "wrong": [
+   "fireFirst"
+  ]
+ }
+]

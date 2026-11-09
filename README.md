@@ -129,6 +129,38 @@ the page at `/lab`) measures it.
   often it is near-best), overall and per decision point. The template
   fallback, the rules' choice and what the game chose are yardsticks.
 
+**Decision cases** test a decider faster and more clearly than games do.
+A case is a hand-written situation (the unit's state as the game sends it)
+for a template and decision point, with the options expected to be
+acceptable, the ones that are wrong, and why. Its question is built as the
+game builds one: the template's options after its gates (ROE, weapons,
+cohesion), with its doctrine and leanings. A case can have variations
+(the same case with a fact changed, such as an enemy at 4.5, 3.2, 2.4 and
+1.2 km), each with its own expectations, and a trend: as the variations go
+on, the share the decider puts on some options should not fall. Every case
+is also asked with its options reversed and its unit renamed, and the
+choice should not change.
+
+- `bgws lab test --deciders jev` asks every case (one question per request,
+  eight at a time) and reports pass, wrong and neither per decision point,
+  invariance, trends, and Jev's confidence when right and when wrong. It
+  warns when answers were the fallback (no key, an error). `--prose`,
+  `--model`, `--case`, `--point` narrow or vary it; `--check` only builds
+  the cases and scores the template fallback. Runs are kept in
+  `<lab>/tests/`, and the page's **Cases** tab compares them case by case.
+- The starter set is in `data/cases/`: 16 cases across all 13 decision
+  points (tanks, infantry, an ATGM ambush, a recce patrol), built on the
+  starting states in `bases.json` with `set` changes (dotted paths). After
+  each change, weapon reach and each enemy's `inOurReach` and `canReachUs`
+  are worked out again from the ranges. The expectations are a reading of
+  standard small-unit doctrine: review and correct them. The template
+  fallback (the doctrine default) passes 12 of 23 questions (52%) and is
+  wrong on 9: a decider worth its cost should beat that.
+- **Make it a case** on a lab moment (or `bgws lab case <moment>`) keeps it
+  as a case in `<lab>/cases/`: your best and acceptable options (else the
+  play-outs' near-best) pass, and options the play-outs found clearly worse
+  fail.
+
 The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
 `moments/`, one JSON file each. A first look at three rules games of the
 advance-to-contact skirmish: 6 of 12 played-out moments were decisive, and

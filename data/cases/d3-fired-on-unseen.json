@@ -1,0 +1,24 @@
+[
+ {
+  "id": "tank-fired-on-unseen-in-the-open",
+  "point": "D3",
+  "base": "tank-troop",
+  "why": "Fire from the east, shooter not found, moving across open ground: carrying on blind invites the next round. Take cover from that bearing or search it.",
+  "set": {
+   "firedOnByUnseen": [
+    {
+     "bearing": "east",
+     "agoS": 5
+    }
+   ]
+  },
+  "acceptable": [
+   "cover",
+   "search",
+   "pullBack"
+  ],
+  "wrong": [
+   "keep"
+  ]
+ }
+]

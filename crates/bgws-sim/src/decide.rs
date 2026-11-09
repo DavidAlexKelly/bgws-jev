@@ -303,6 +303,11 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
     prune(json!({
         "unit": {
             "name": i.label, "type": i.platform.name,
+            "class": match i.platform.body.vulnerability {
+                bgws_catalogue::Vulnerability::Armoured => "armoured_vehicle",
+                bgws_catalogue::Vulnerability::Personnel => "foot",
+                _ => "soft_skin",
+            },
             "vehicles": format!("{} of {}", h.fit, h.start), "strengthPct": pct(h.strength()),
             "posture": posture, "suppressionPct": pct(c.suppression.level), "morale": morale,
             "lastFiredS": a.last_shot.map(|t| round((s.ctx.now - t).secs())),

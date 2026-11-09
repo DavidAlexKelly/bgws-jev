@@ -1,0 +1,60 @@
+{
+  "tank-troop": {
+    "template": "core/armour",
+    "state": {
+      "unit": { "name": "Blue 1 Troop", "type": "Challenger 2", "class": "armoured_vehicle", "vehicles": "4 of 4", "strengthPct": 100, "posture": "moving", "suppressionPct": 0, "morale": "steady" },
+      "weapons": [
+        { "weapon": "tankGun", "munition": "charm3", "maxRangeM": 3000, "rounds": 160, "volleysLeft": 160 },
+        { "weapon": "coax", "munition": "ball762", "maxRangeM": 1800, "rounds": 8000, "volleysLeft": 8000 }
+      ],
+      "enemiesSeen": [],
+      "firedOnByUnseen": [],
+      "orders": { "purpose": "advance to the objective and take it", "doing": "moving", "phase": "1 of 2", "urgent": false, "roe": "fire at any enemy in reach", "headingFor": { "distanceM": 3000, "bearing": "north" } },
+      "ground": { "cover": 0.1, "concealment": 0.1, "land": "open", "onRoad": false },
+      "friendsWithin3km": [ { "unit": "Blue 2 Troop", "rangeM": 300, "bearing": "east", "strengthPct": 100 } ]
+    }
+  },
+  "infantry-section": {
+    "template": "core/infantry",
+    "state": {
+      "unit": { "name": "1 Section", "type": "Rifle section", "class": "foot", "vehicles": "8 of 8", "strengthPct": 100, "posture": "in position", "suppressionPct": 0, "morale": "steady" },
+      "weapons": [
+        { "weapon": "rifles", "munition": "ball556", "maxRangeM": 600, "rounds": 2400, "volleysLeft": 2400 },
+        { "weapon": "lmg", "munition": "ball762", "maxRangeM": 1800, "rounds": 1600, "volleysLeft": 1600 },
+        { "weapon": "lightAt", "munition": "heatRpg", "maxRangeM": 500, "rounds": 4, "volleysLeft": 4 }
+      ],
+      "enemiesSeen": [],
+      "firedOnByUnseen": [],
+      "orders": { "purpose": "hold the wood's edge and stop the enemy using the road", "doing": "holding", "phase": "1 of 1", "urgent": false, "roe": "fire at any enemy in reach" },
+      "ground": { "cover": 0.5, "concealment": 0.8, "land": "forestdense", "onRoad": false },
+      "friendsWithin3km": [ { "unit": "2 Section", "rangeM": 150, "bearing": "west", "strengthPct": 100 } ]
+    }
+  },
+  "atgm-team": {
+    "template": "core/atgmTeam",
+    "state": {
+      "unit": { "name": "ATGM Det 1", "type": "Anti-tank guided missile team", "class": "foot", "vehicles": "2 of 2", "strengthPct": 100, "posture": "in position", "suppressionPct": 0, "morale": "steady" },
+      "weapons": [
+        { "weapon": "atgm", "munition": "atgmTandem", "maxRangeM": 4000, "rounds": 6, "volleysLeft": 6 },
+        { "weapon": "rifles", "munition": "ball556", "maxRangeM": 600, "rounds": 600, "volleysLeft": 600 }
+      ],
+      "enemiesSeen": [],
+      "firedOnByUnseen": [],
+      "orders": { "purpose": "ambush: destroy enemy armour on the road in the killing area", "doing": "waiting", "phase": "1 of 1", "urgent": false, "roe": "fire at any enemy in reach" },
+      "ground": { "cover": 0.5, "concealment": 0.85, "land": "forestlight", "onRoad": false },
+      "friendsWithin3km": []
+    }
+  },
+  "recce-patrol": {
+    "template": "core/recce",
+    "state": {
+      "unit": { "name": "Recce 1", "type": "Reconnaissance patrol", "class": "soft_skin", "vehicles": "2 of 2", "strengthPct": 100, "posture": "in position", "suppressionPct": 0, "morale": "steady" },
+      "weapons": [ { "weapon": "mg", "munition": "ball762", "maxRangeM": 1800, "rounds": 2000, "volleysLeft": 2000 } ],
+      "enemiesSeen": [],
+      "firedOnByUnseen": [],
+      "orders": { "purpose": "observe the crossing and report enemy movement; do not get drawn into a fight", "doing": "observing", "phase": "1 of 1", "urgent": false, "roe": "fire only if fired upon" },
+      "ground": { "cover": 0.4, "concealment": 0.85, "land": "forestlight", "onRoad": false },
+      "friendsWithin3km": []
+    }
+  }
+}

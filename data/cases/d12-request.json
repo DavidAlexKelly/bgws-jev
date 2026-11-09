@@ -1,0 +1,30 @@
+[
+ {
+  "id": "tank-asked-to-fire-on-an-enemy-in-reach",
+  "point": "D12",
+  "base": "tank-troop",
+  "why": "A friend asks for fire on a tank at 2.5 km that this troop can see and reach from cover, and nothing is shooting at it. Do it, or at least overwatch; refusing is wrong.",
+  "set": {
+   "unit.posture": "hull-down in cover",
+   "orders.doing": "on overwatch",
+   "ground.cover": 0.7,
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 2500
+   }
+  },
+  "acceptable": [
+   "comply",
+   "partly"
+  ],
+  "wrong": [
+   "cannot"
+  ]
+ }
+]

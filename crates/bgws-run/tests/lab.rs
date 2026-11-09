@@ -105,3 +105,38 @@ fn a_game_added_before_its_questions_are_answered_imports_what_there_is() {
     assert!(!ids.is_empty());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Every shipped decision case builds the way the game builds a question:
+/// its options exist after the gates, its expectations name offered
+/// options, and its variations build too. The rules decider can be judged
+/// against them.
+#[test]
+fn the_shipped_decision_cases_build_and_can_be_judged() {
+    use bgws_run::cases;
+    let dir = tmp("cases");
+    let (bases, list) = cases::load(&cases::case_dirs(&dir)).unwrap();
+    assert!(list.len() >= 15, "a starter set: {}", list.len());
+    let points: std::collections::BTreeSet<&str> = list.iter().map(|c| c.point.as_str()).collect();
+    assert!(points.len() >= 12, "every decision point but a few: {points:?}");
+    let mut b = cases::Builder::new(bases, &default_figures()).unwrap();
+    let items = cases::build_all(&mut b, &list).unwrap();
+    // Each question carries the case's state as fields, and its words.
+    assert!(items.iter().all(|i| i.question.state.is_some() && !i.question.situation.is_empty()));
+    // A case whose enemy closes: the derived fields follow the range.
+    let far = items.iter().find(|i| i.variant.ends_with("4.5 km, out of reach")).unwrap();
+    assert_eq!(far.question.state.as_ref().unwrap()["enemiesSeen"][0]["inOurReach"], false);
+    let fb = cases::judge(&list, &items, &cases::fallback_answers(&items), "template fallback");
+    eprintln!("{}", fb.table());
+    assert_eq!(fb.invariant, fb.invariance_checks, "the fallback does not care about order or names");
+    // The rules decider, asked as Jev would be.
+    let (d, name) = cases::decider(DeciderChoice::Rules, &default_figures(), None, false).unwrap();
+    let run = cases::run(&list, &items, d, &name).unwrap();
+    assert_eq!(run.items.len(), items.len());
+    // A case from a lab moment.
+    let lab = Lab::open(&dir).unwrap();
+    let ids = lab.collect(&scenario(), 1, DeciderChoice::Rules, 40.0, default_figures()).unwrap();
+    let m = lab.label(&ids[0], bgws_run::lab::Label { best: Some(lab.moment(&ids[0]).unwrap().question.options[0].id.clone()), ..Default::default() }).unwrap();
+    let c = cases::case_from_moment(&m, "test").unwrap();
+    assert_eq!(b.items(&c).unwrap()[0].acceptable, c.acceptable);
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -1,0 +1,22 @@
+[
+ {
+  "id": "tank-on-overwatch-loses-its-target",
+  "point": "D7",
+  "base": "tank-troop",
+  "why": "On overwatch with orders to hold the position, its target has dropped out of sight. Chasing it alone off the position breaks its task; watch where it went or carry on with the overwatch.",
+  "set": {
+   "unit.posture": "hull-down in cover",
+   "orders.doing": "on overwatch",
+   "orders.purpose": "hold this ridge: overwatch the valley",
+   "ground.cover": 0.7,
+   "orders.headingFor": null
+  },
+  "acceptable": [
+   "watch",
+   "resume"
+  ],
+  "wrong": [
+   "regain"
+  ]
+ }
+]

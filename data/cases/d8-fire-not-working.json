@@ -1,0 +1,30 @@
+[
+ {
+  "id": "infantry-rifle-fire-on-a-tank",
+  "point": "D8",
+  "base": "infantry-section",
+  "why": "Rifles and a machine gun on a tank at 600 m with its anti-tank rounds spent: the fire cannot hurt it and only shows where the section is. Stop and go quiet, pull back, or shift to a target it can hurt.",
+  "set": {
+   "weapons.2.rounds": 0,
+   "weapons.2.volleysLeft": 0,
+   "enemiesSeen.0": {
+    "what": "T-72B3",
+    "identified": true,
+    "bearing": "north",
+    "moving": false,
+    "seenAgoS": 0,
+    "itsReachM": 3000,
+    "thisDecisionIsAboutIt": true,
+    "rangeM": 600
+   }
+  },
+  "acceptable": [
+   "quiet",
+   "pullBack",
+   "shift"
+  ],
+  "wrong": [
+   "keep"
+  ]
+ }
+]
