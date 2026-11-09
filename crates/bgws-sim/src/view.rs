@@ -47,6 +47,11 @@ pub struct FrameEntity {
     pub status: String,
     pub activity: String,
     pub suppression: f64,
+    /// Where its elements stand (its formation), as [east, north] metres from
+    /// the unit, so they move with it between full frames; empty for a unit
+    /// of one element or off the ground.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub elements: Vec<[f64; 2]>,
 }
 
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -188,6 +193,16 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
             status: status.into(),
             activity: a.map(|a| a.activity.word().to_string()).unwrap_or_default(),
             suppression: c.map(|c| c.suppression.level).unwrap_or(0.0),
+            elements: if h.destroyed {
+                Vec::new()
+            } else {
+                let els = crate::formation::elements(s, e);
+                if els.len() > 1 {
+                    els.iter().map(|q| [(q.e - k.pos.e).round(), (q.n - k.pos.n).round()]).collect()
+                } else {
+                    Vec::new()
+                }
+            },
         });
     }
     // Drones in flight are records of the drones domain, not entities: show them too.
@@ -216,6 +231,7 @@ pub fn frame(s: &Sim, viewer: Viewer) -> FrameView {
             status: "ok".into(),
             activity: "flying".into(),
             suppression: 0.0,
+            elements: Vec::new(),
         });
     }
     let mut tracks = Vec::new();

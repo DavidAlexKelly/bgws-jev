@@ -57,6 +57,7 @@ pub fn all_figures() -> Vec<Figure> {
     v.extend(bgws_ops::figures());
     v.extend(crate::domains::drones::figures());
     v.extend(crate::routing::figures());
+    v.extend(crate::formation::figures());
     v
 }
 
@@ -98,6 +99,7 @@ pub struct Params {
     pub aggregate_m: f64,
     pub quiet_max_jump_s: f64,
     pub ad_quiet_reach_m: f64,
+    pub formation: crate::formation::FormationParams,
 }
 
 impl Params {
@@ -133,6 +135,7 @@ impl Params {
             aggregate_m: f.get("sim.lod.aggregate_m"),
             quiet_max_jump_s: f.get("sim.quiet.max_jump_s"),
             ad_quiet_reach_m: f.get("sim.ad.engaged_reach_m"),
+            formation: crate::formation::FormationParams::from_figures(f),
         }
     }
 }

@@ -378,6 +378,29 @@ export function buildLayers(args: {
   }
   const ground = f.entities.filter((e) => e.domain !== "drone");
   const drones = f.entities.filter((e) => e.domain === "drone");
+  // Each unit's elements where they stand (its formation: a column on the
+  // road, a wedge across country, a line when halted), under its symbol.
+  const elements: { at: [number, number]; side: string }[] = [];
+  for (const e of ground) {
+    if (e.status === "destroyed" || !e.elements) continue;
+    for (const [de, dn] of e.elements) {
+      if (de === 0 && dn === 0) continue;
+      elements.push({ at: [e.lon + de / mLon(e.lat), e.lat + dn / M_LAT], side: e.side });
+    }
+  }
+  out.push(
+    new ScatterplotLayer({
+      id: "elements",
+      data: elements,
+      getPosition: (x: { at: [number, number] }) => at(x.at[0], x.at[1]),
+      getRadius: 3.5,
+      radiusUnits: "pixels",
+      stroked: true,
+      getFillColor: (x: { side: string }) => [...(SIDE_RGB[x.side as keyof typeof SIDE_RGB] ?? SIDE_RGB.neutral), 230] as [number, number, number, number],
+      getLineColor: [6, 13, 24, 220],
+      lineWidthMinPixels: 1,
+    }),
+  );
   out.push(
     new ScatterplotLayer({
       id: "status",

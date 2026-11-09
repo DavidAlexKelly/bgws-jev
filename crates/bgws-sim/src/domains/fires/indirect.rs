@@ -810,9 +810,13 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
         let pos = k_pos.pos;
         let fit = s.world.get::<Health>(e).expect("h").fit;
         let person = platform.body.vulnerability == Vulnerability::Personnel;
-        let w = if person { st.p.spacing_person_m } else { st.p.spacing_vehicle_m } * (fit.max(1) as f64).sqrt();
-        let near: Vec<Enu> = salvo.impacts.iter().copied().filter(|p| p.sub(pos).horizontal() <= reach + w).collect();
-        let blasts = salvo.impacts.iter().filter(|p| p.sub(pos).horizontal() <= felt + w / 2.0).count();
+        // Each element where it stands (the unit's formation), each its own
+        // share of the ground (the element spacing).
+        let w = if person { st.p.spacing_person_m } else { st.p.spacing_vehicle_m };
+        let els = crate::formation::elements(s, e);
+        let dist = |p: &Enu| els.iter().map(|q| p.sub(*q).horizontal()).fold(f64::INFINITY, f64::min);
+        let near: Vec<Enu> = salvo.impacts.iter().copied().filter(|p| dist(p) <= reach + w).collect();
+        let blasts = salvo.impacts.iter().filter(|p| dist(p) <= felt + w / 2.0).count();
         if tside != side && s.world.get::<super::Gun>(e).is_some() && salvo.impacts.iter().any(|p| p.sub(pos).horizontal() <= st.p.near_gun_m) {
             found_guns.push(tid);
         }
@@ -822,15 +826,20 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
         let posture = posture_of(s, e);
         let c = Carleton::for_round(salvo.round, posture, &ip);
         let stay = if platform.body.vulnerability == Vulnerability::Structure { platform.body.staying_power.max(1.0) } else { 1.0 };
-        let mut q = 1.0;
-        for p in &near {
-            // The burst's offset from the element's centre, in (deflection, range).
-            let (r, d) = unframe(salvo.bearing, p.sub(pos));
-            q *= 1.0 - (c.mean_p_kill_area(w, w, (d, r), (0.0, 0.0)) / stay).clamp(0.0, 1.0);
-        }
-        let pk = 1.0 - q;
+        // Each element's chance of being killed by the bursts near it.
+        let pk_of = |el: Enu| {
+            let mut q = 1.0;
+            for p in &near {
+                // The burst's offset from the element, in (deflection, range).
+                let (r, d) = unframe(salvo.bearing, p.sub(el));
+                q *= 1.0 - (c.mean_p_kill_area(w, w, (d, r), (0.0, 0.0)) / stay).clamp(0.0, 1.0);
+            }
+            1.0 - q
+        };
+        let pks: Vec<f64> = (0..fit as usize).map(|j| pk_of(els.get(j).or(els.first()).copied().unwrap_or(pos))).collect();
+        let pk = pks.iter().sum::<f64>() / pks.len().max(1) as f64;
         let mut rng = s.ctx.rng("fires.burst", mid ^ (k << 32), tid.0 as u64);
-        let kills = (0..fit).filter(|_| rng.gen::<f64>() < pk).count() as u32;
+        let kills = pks.iter().filter(|&&p| rng.gen::<f64>() < p).count() as u32;
         if blasts > 0 {
             let mut crew = s.world.get_mut::<Crew>(e).expect("crew");
             crew.blasts_per_min += blasts as f64;

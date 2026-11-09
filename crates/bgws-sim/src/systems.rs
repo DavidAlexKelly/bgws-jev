@@ -178,6 +178,20 @@ pub fn movement(s: &mut Sim, dt: f64) {
             km.vel = if dt > 0.0 { Enu::new((ne - k.pos.e) / dt, (nn - k.pos.n) / dt, 0.0) } else { Enu::default() };
             km.heading = heading;
         }
+        // The track behind it, for its column to follow: about its own length.
+        {
+            let fp = &s.ctx.p.formation;
+            let (step, len) = (fp.trail_step_m, fp.column_vehicle_m.max(fp.column_person_m) * (s.world.get::<Health>(e).map(|h| h.start).unwrap_or(1) as f64 + 1.0));
+            let here = Enu::new(ne, nn, nu);
+            match s.world.get_mut::<crate::formation::Trail>(e) {
+                Some(mut t) => t.note(here, step, len),
+                None => {
+                    let mut t = crate::formation::Trail::default();
+                    t.note(here, step, len);
+                    s.world.entity_mut(e).insert(t);
+                }
+            }
+        }
         if let Some(mut sig) = s.world.get_mut::<SigState>(e) {
             sig.last_moved = Some(now);
             sig.engine_on = platform.mover.kind != MoverKind::Foot;
@@ -235,6 +249,8 @@ struct SenseEnt {
     observer: ObserverState,
     hypothesis: Hypothesis,
     dummy: bool,
+    /// Where its elements stand (the unit's formation), the first at `pos`.
+    elems: Vec<Enu>,
 }
 
 pub(crate) fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
@@ -342,6 +358,7 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
                 },
                 hypothesis: hypothesis_of(p),
                 dummy: i.dummy,
+                elems: crate::formation::elements(s, e),
             })
         })
         .collect()
@@ -493,32 +510,55 @@ pub fn sensing(s: &mut Sim, dt: f64) {
             })
             .collect()
     };
-    // 2. Line of sight for the pairs whose die could still pass, in one batch.
+    // 2. Line of sight for the pairs whose die could still pass, in one batch:
+    // from the observer's position and its element nearest the target, to the
+    // target's elements nearest the observer. The target is in sight if any of
+    // its elements is, seen from the better of the observer's points.
     let live: Vec<usize> = (0..pairs.len()).filter(|&i| best[i].is_some()).collect();
-    let los = {
+    let los: Vec<f64> = {
         prof_span!("sensing.los");
-        let queries: Vec<bgws_gpu::LosQuery> = live
+        let mut queries: Vec<bgws_gpu::LosQuery> = Vec::new();
+        // Per live pair: (first query, observer points, target points).
+        let mut spans: Vec<(usize, usize, usize)> = Vec::with_capacity(live.len());
+        for &i in &live {
+            let (o, t) = (&ents[pairs[i].0], &ents[pairs[i].1]);
+            let mut from = vec![o.pos];
+            if let Some(&near) = crate::formation::nearest(&o.elems, t.pos, 1).first() {
+                if near.sub(o.pos).horizontal() > 1.0 {
+                    from.push(near);
+                }
+            }
+            let to = if t.elems.len() > 1 { crate::formation::nearest(&t.elems, o.pos, 3) } else { vec![t.pos] };
+            spans.push((queries.len(), from.len(), to.len()));
+            for a in &from {
+                for b in &to {
+                    queries.push(bgws_gpu::LosQuery { obs_x: a.e, obs_y: a.n, obs_agl: o.eye_h + o.agl, tgt_x: b.e, tgt_y: b.n, tgt_agl: 1.5 + t.agl });
+                }
+            }
+        }
+        let r = ground.los_batch(&queries);
+        spans
             .iter()
-            .map(|&i| {
-                let (o, t) = (&ents[pairs[i].0], &ents[pairs[i].1]);
-                bgws_gpu::LosQuery { obs_x: o.pos.e, obs_y: o.pos.n, obs_agl: o.eye_h + o.agl, tgt_x: t.pos.e, tgt_y: t.pos.n, tgt_agl: 1.5 + t.agl }
+            .map(|&(q0, nf, nt)| {
+                (0..nf)
+                    .map(|a| 1.0 - (0..nt).map(|b| 1.0 - r[q0 + a * nt + b].p_visible).product::<f64>())
+                    .fold(0.0, f64::max)
             })
-            .collect();
-        ground.los_batch(&queries)
+            .collect()
     };
     // 3. The dice, then recognition and identification for detections.
     let sights: Vec<Sight> = {
         prof_span!("sensing.dice");
         live.par_iter()
             .zip(los.par_iter())
-            .filter_map(|(&i, los)| {
-                if los.p_visible <= 0.0 {
+            .filter_map(|(&i, &p_visible)| {
+                if p_visible <= 0.0 {
                     return None;
                 }
                 let (oi, ti, range) = pairs[i];
                 let (o, t) = (&ents[oi], &ents[ti]);
                 let b = best[i].as_ref()?;
-                let pdet = los.p_visible * hazard_probability(b.rate, dt);
+                let pdet = p_visible * hazard_probability(b.rate, dt);
                 if b.u >= pdet {
                     return None;
                 }
@@ -653,13 +693,21 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         sensors.push(json!({ "sensor": format!("{kind:?}"), "maxRangeM": rmax, "inRange": in_range, "cyclesPerMrad": res, "nightDegraded": night_degraded, "contrast": contrast_json(&contrast), "acquire": det }));
     }
     let los = s.ctx.ground.los_batch(&[bgws_gpu::LosQuery { obs_x: o.pos.e, obs_y: o.pos.n, obs_agl: o.eye_h + o.agl, tgt_x: t.pos.e, tgt_y: t.pos.n, tgt_agl: 1.5 + t.agl }]).pop()?;
-    let p_window = los.p_visible * hazard_probability(best_rate, over_s);
+    // As sensing does: from the observer and its element nearest the target,
+    // to the target's elements nearest the observer.
+    let mut from = vec![o.pos];
+    from.extend(crate::formation::nearest(&o.elems, t.pos, 1).into_iter().filter(|p| p.sub(o.pos).horizontal() > 1.0));
+    let to = if t.elems.len() > 1 { crate::formation::nearest(&t.elems, o.pos, 3) } else { vec![t.pos] };
+    let lines: Vec<bgws_gpu::LosQuery> = from.iter().flat_map(|a| to.iter().map(move |b| (a, b))).map(|(a, b)| bgws_gpu::LosQuery { obs_x: a.e, obs_y: a.n, obs_agl: o.eye_h + o.agl, tgt_x: b.e, tgt_y: b.n, tgt_agl: 1.5 + t.agl }).collect();
+    let r = s.ctx.ground.los_batch(&lines);
+    let p_elements = (0..from.len()).map(|a| 1.0 - (0..to.len()).map(|b| 1.0 - r[a * to.len() + b].p_visible).product::<f64>()).fold(0.0, f64::max);
+    let p_window = p_elements * hazard_probability(best_rate, over_s);
     Some(json!({
         "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
         "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
         "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
-        "lineOfSight": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m },
+        "lineOfSight": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked, "pAnyElement": p_elements, "linesChecked": lines.len() },
         "sensors": sensors,
         "bestRatePerS": best_rate,
         "windowS": over_s,
