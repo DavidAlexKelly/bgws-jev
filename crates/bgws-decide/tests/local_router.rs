@@ -73,7 +73,8 @@ fn logprob_reading_maps_prefixes_and_normalises() {
 #[tokio::test]
 async fn the_router_batches_by_side_and_decider_and_keeps_question_order() {
     let mock = serve(|_, req| {
-        let answers: serde_json::Map<String, Value> = req.body["questions"].as_object().unwrap().keys().map(|k| (k.clone(), json!({"choice": "o0", "confidence": 0.9}))).collect();
+        // Each question's first option, by the key it was sent with.
+        let answers: serde_json::Map<String, Value> = req.body["questions"].as_object().unwrap().iter().map(|(k, q)| (k.clone(), json!({"choice": q["criteria"].as_object().unwrap().keys().next().unwrap(), "confidence": 0.9}))).collect();
         Reply::json(200, json!({"answers": answers})).after(Duration::from_millis(300))
     })
     .await;

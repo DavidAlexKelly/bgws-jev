@@ -65,6 +65,35 @@ Keys come from the environment only: `OPENROUTER_API_KEY` for Jev,
 (`--local-url`, `--local-model`). With no key or no network the template
 fallbacks decide and the log says why.
 
+### What a unit decider is told
+
+Each land unit's question carries its state as named fields
+(`Question::state`), built from the unit's own beliefs only:
+
+- **unit:** name, type, vehicles fit, strength, posture, suppression,
+  morale, when it last fired;
+- **weapons:** each mount's munition, maximum (and minimum) range, rounds
+  and volleys left, and the farthest it can reach now (`weaponReachM`);
+- **enemiesSeen** (nearest six): what it is (only as well as it has been
+  recognised), range, compass bearing, moving, how long ago it was seen,
+  whether it is within our reach, and for an identified enemy how far its
+  weapons reach and whether it can reach us;
+- **firedOnByUnseen:** bearings of fire from shooters it has not found;
+- **orders:** purpose, what it is doing, phase, urgency, ROE in words, and
+  the distance and bearing to where its move leads;
+- **ground:** cover, concealment, land cover, on a road, how open to view
+  and whether dead ground (on a pack with a terrain analysis), the town
+  block it is in, key terrain within 1.5 km;
+- **friendsWithin3km** (nearest four): name, range, bearing, strength.
+
+Jev gets it as the request's `state` (under `units.<name>`), as its
+Decisions API recommends, and the instructions point there instead of
+repeating it in words (`JevConfig::prose` sends both, to compare).
+Options are sent under their own ids (`engageNow`, `keep`) rather than
+`o0`, `o1`. Claude and local models get the same fields after the words.
+A different state is a different cache key, so a remembered answer is only
+reused for the same situation.
+
 ## The workspace (plan §3.1)
 
 | Crate | What it holds |

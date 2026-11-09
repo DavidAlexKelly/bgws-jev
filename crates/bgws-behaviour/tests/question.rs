@@ -24,6 +24,7 @@ fn ctx(trigger: &str, template: &str) -> QuestionContext {
         trigger: trigger.into(),
         template: template.into(),
         situation: "A call for fire has come in from 1 Coy.".into(),
+        state: None,
         reaction: SimDuration::from_secs_i(30),
         summaries: Default::default(),
         expansions: Default::default(),

@@ -53,6 +53,9 @@ pub struct QuestionContext {
     pub template: String,
     /// The agent's beliefs in words (only what reached it).
     pub situation: String,
+    /// The same as named fields, for decision models.
+    #[serde(default)]
+    pub state: Option<serde_json::Value>,
     /// Drawn by the sim from skill, fatigue and drill (§10.1).
     pub reaction: SimDuration,
     /// Option id → the engine's words for it; else the action's label.
@@ -140,6 +143,7 @@ pub fn build_question(walk: &WalkResult, ctx: &QuestionContext, vocab: &Vocabula
         question,
         doctrine,
         situation: ctx.situation.clone(),
+        state: ctx.state.clone(),
         options,
         fallback,
         rules_choice,

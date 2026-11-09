@@ -56,6 +56,12 @@ pub struct Question {
     pub doctrine: Vec<String>,
     /// The agent's beliefs, in words: only what reached it (rule 1).
     pub situation: String,
+    /// The same beliefs as named fields (a land unit's strength, weapons
+    /// against the ranges, threats, orders, ground, friends): what a
+    /// decision model is given as its state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "Record<string, unknown>"))]
+    pub state: Option<serde_json::Value>,
     pub options: Vec<DecisionOption>,
     /// Taken when no decider can answer.
     pub fallback: String,
@@ -80,6 +86,10 @@ impl Question {
         s.push_str(&self.node);
         s.push('|');
         s.push_str(&self.situation);
+        if let Some(v) = &self.state {
+            s.push('|');
+            s.push_str(&v.to_string());
+        }
         for o in &self.options {
             s.push('|');
             s.push_str(&o.id);

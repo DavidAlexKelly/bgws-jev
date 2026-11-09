@@ -86,6 +86,18 @@ pub fn parse_choices(body: &Value, offered: &BTreeMap<String, Vec<String>>) -> B
     out
 }
 
+/// An option's key in the request: its own id when that is a plain word
+/// (`engageNow`, `keep`), which reads better to the model than `o3`;
+/// else `o<index>`. Unique within the question.
+fn option_key(id: &str, index: usize, taken: &[String]) -> String {
+    let plain = !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if plain && !taken.iter().any(|t| t == id) {
+        id.to_string()
+    } else {
+        format!("o{index}")
+    }
+}
+
 /// One question as sent: its key, and option key → option id.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyed {
@@ -96,9 +108,16 @@ pub struct Keyed {
 /// Build one side's request body (`{model, state, questions}`) and the key
 /// maps to read the answers back. Land units are keyed `u0, u1…` and asked as
 /// `jevRealtimeDecider` asks; world entities and HQs `q0, q1…` as
-/// `jevWorldDecider` asks. Option keys are `o<index>` (land "keep" keeps its
-/// own key, as the TypeScript does).
+/// `jevWorldDecider` asks. Option keys are the options' own ids where they
+/// are plain words. A question that carries its agent's state as named
+/// fields (`Question::state`) puts it in the request's `state`, under
+/// `units.<agent>`, and its instructions point there; with `prose`, the
+/// situation in words goes in the instructions as well.
 pub fn build_request(model: &str, side: Side, questions: &[Question], directive: Option<&str>, max_choices: usize) -> (Value, Vec<Keyed>) {
+    build_request_with(model, side, questions, directive, max_choices, false)
+}
+
+pub fn build_request_with(model: &str, side: Side, questions: &[Question], directive: Option<&str>, max_choices: usize, prose: bool) -> (Value, Vec<Keyed>) {
     let directive = directive.map(str::trim).filter(|d| !d.is_empty()).map(|d| format!("{d}\n\n")).unwrap_or_default();
     let mut qs = Map::new();
     let mut keyed = Vec::new();
@@ -113,7 +132,11 @@ pub fn build_request(model: &str, side: Side, questions: &[Question], directive:
             nq += 1;
             format!("q{}", nq - 1)
         };
-        let options: Vec<(String, String)> = q.options.iter().take(max_choices).enumerate().map(|(i, o)| (if is_land && o.id == "keep" { "keep".into() } else { format!("o{i}") }, o.id.clone())).collect();
+        let mut options: Vec<(String, String)> = Vec::new();
+        for (i, o) in q.options.iter().take(max_choices).enumerate() {
+            let taken: Vec<String> = options.iter().map(|(k, _)| k.clone()).collect();
+            options.push((option_key(&o.id, i, &taken), o.id.clone()));
+        }
         let mut criteria = Map::new();
         for ((k, _), o) in options.iter().zip(&q.options) {
             criteria.insert(k.clone(), Value::String(format!("{}{}", o.summary, bias_words(o.bias))));
@@ -122,11 +145,16 @@ pub fn build_request(model: &str, side: Side, questions: &[Question], directive:
         let instructions = if is_land {
             let others: Vec<&str> = land.iter().filter(|o| o.agent != q.agent).map(|o| o.agent.as_str()).collect();
             let title = q.title.to_lowercase();
+            let situation = match &q.state {
+                Some(_) if prose => format!("{} What it knows is under units.{} in the state.", q.situation, q.agent),
+                Some(_) => format!("What it knows is under units.{} in the state: itself, its weapons and how far they reach, the enemy it has seen (and how far they reach), its orders, its ground and its friends.", q.agent),
+                None => q.situation.clone(),
+            };
             format!(
                 "{directive}You lead {}. {BALANCE}\n\n{doctrine}Decision point {}, {title}. {} {} {}The crew has already done its drill (cover, and return fire if it can see the shooter).",
                 q.agent,
                 q.trigger,
-                q.situation,
+                situation,
                 q.question,
                 if others.is_empty() { String::new() } else { format!("Also deciding now, so choose to work together: {}. ", others.join(", ")) }
             )
@@ -138,7 +166,11 @@ pub fn build_request(model: &str, side: Side, questions: &[Question], directive:
         keyed.push(Keyed { key, options });
     }
     let note = if land.is_empty() { WORLD_NOTE } else { LAND_NOTE };
-    let state = json!({ "you": side.as_str(), "note": note });
+    let mut state = json!({ "you": side.as_str(), "note": note });
+    let units: Map<String, Value> = questions.iter().filter_map(|q| q.state.as_ref().map(|s| (q.agent.clone(), s.clone()))).collect();
+    if !units.is_empty() {
+        state["units"] = Value::Object(units);
+    }
     (json!({ "model": model, "state": state, "questions": qs }), keyed)
 }
 
@@ -154,6 +186,8 @@ pub struct JevConfig {
     pub max_choices: usize,
     /// Doctrine or temperament, put in front of every question.
     pub directive: Option<String>,
+    /// Also give a unit's situation in words when its state goes as named fields.
+    pub prose: bool,
 }
 
 impl JevConfig {
@@ -166,6 +200,7 @@ impl JevConfig {
             cache_limit: f.get("decide.jev.cache_limit") as usize,
             max_choices: f.get("decide.jev.max_choices") as usize,
             directive: None,
+            prose: false,
         }
     }
 }
@@ -303,7 +338,7 @@ impl JevClient {
         let Some(key) = &self.key else {
             return batch.iter().map(|q| Answer::fallback(q, format!("Jev unavailable (no OpenRouter key: set {KEY_ENV}) — the fallback stands"))).collect();
         };
-        let (body, keyed) = build_request(&self.cfg.model, side, batch, self.cfg.directive.as_deref(), self.cfg.max_choices);
+        let (body, keyed) = build_request_with(&self.cfg.model, side, batch, self.cfg.directive.as_deref(), self.cfg.max_choices, self.cfg.prose);
         let auth = format!("Bearer {}", key.expose());
         let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
         let reply = match post_json(&self.http, &self.cfg.url, &headers, &body, self.cfg.timeout).await {

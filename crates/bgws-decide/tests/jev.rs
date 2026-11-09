@@ -17,14 +17,23 @@ fn client(url: &str, key: Option<&str>) -> JevClient {
     JevClient::with_http(http(), key.and_then(ApiKey::new), cfg)
 }
 
-/// Answer every question with o0 at this confidence.
+/// Answer every question with its first option at this confidence (0.9 on
+/// it, 0.1 on the second), by the keys it was sent with.
 fn answer_all(confidence: f64) -> impl Fn(usize, &Seen) -> Reply {
     move |_, req| {
         let answers: serde_json::Map<String, Value> = req.body["questions"]
             .as_object()
             .unwrap()
-            .keys()
-            .map(|k| (k.clone(), json!({"type": "choice", "choice": "o0", "probabilities": {"o0": 0.9, "o1": 0.1}, "confidence": confidence})))
+            .iter()
+            .map(|(k, q)| {
+                let keys: Vec<&String> = q["criteria"].as_object().unwrap().keys().collect();
+                let mut p = serde_json::Map::new();
+                p.insert(keys[0].clone(), json!(0.9));
+                if let Some(second) = keys.get(1) {
+                    p.insert((*second).clone(), json!(0.1));
+                }
+                (k.clone(), json!({"type": "choice", "choice": keys[0], "probabilities": p, "confidence": confidence}))
+            })
             .collect();
         Reply::json(200, json!({"answers": answers, "usage": {"cost": 0.002}}))
     }
@@ -48,8 +57,9 @@ async fn asks_one_choice_per_question_in_one_request_and_takes_a_confident_answe
     assert_eq!(q["type"], "choice");
     assert!(q["instructions"].as_str().unwrap().contains("Mass fires"));
     assert!(q["instructions"].as_str().unwrap().contains("You decide for b1, on the blue side."));
-    assert_eq!(q["criteria"]["o0"], "the guns [preferred by its doctrine]");
-    assert!(q["criteria"]["o1"].as_str().unwrap().contains("strongly discouraged"));
+    // Options go by their own ids, which read better than o0, o1.
+    assert_eq!(q["criteria"]["guns"], "the guns [preferred by its doctrine]");
+    assert!(q["criteria"]["hold"].as_str().unwrap().contains("strongly discouraged"));
 
     assert_eq!(answers.iter().map(|a| (a.question.0, a.choice.as_str())).collect::<Vec<_>>(), [(1, "guns"), (2, "guns")]);
     let a = &answers[0];
@@ -74,13 +84,42 @@ async fn land_units_are_asked_as_the_realtime_decider_asks() {
     assert!(text.contains("Decision point D1, new contact. R1 has run into the contact R3"));
     assert!(text.contains("Also deciding now, so choose to work together: R2."));
     assert!(text.ends_with("The crew has already done its drill (cover, and return fire if it can see the shooter)."));
-    // "keep" keeps its own key, as in the TypeScript.
-    assert_eq!(u0["criteria"].as_object().unwrap().keys().collect::<Vec<_>>(), ["keep", "o1", "o2"]);
+    assert_eq!(u0["criteria"].as_object().unwrap().keys().collect::<Vec<_>>(), ["keep", "engage", "pullBack"], "in the template's order");
     assert!(body["questions"]["q0"].is_object());
     assert!(body["state"]["note"].as_str().unwrap().starts_with("Only what each unit believes"));
-    // o0 is not a key of a land question that starts with keep: no readable answer for it.
-    assert!(matches!(answers[0].source, AnswerSource::Fallback { .. }));
+    assert!(body["state"].get("units").is_none(), "no unit sent its state as fields");
+    assert_eq!((answers[0].choice.as_str(), &answers[0].source), ("keep", &AnswerSource::Jev), "the key sent back maps to its option");
     assert_eq!(answers[2].choice, "guns");
+}
+
+/// A unit that carries its state as named fields: the state goes in the
+/// request's `state` under its name, and its instructions point there
+/// instead of repeating it in words (or as well, with `prose`).
+#[tokio::test]
+async fn a_units_state_goes_as_named_fields() {
+    let mock = serve(answer_all(0.8)).await;
+    let mut q = land_question(1, "R1");
+    q.state = Some(json!({ "unit": { "name": "R1", "strengthPct": 75.0 }, "weaponReachM": 2_000.0, "enemiesSeen": [{ "what": "T-72", "rangeM": 1_500.0, "inOurReach": true, "canReachUs": true }] }));
+    let jev = client(&mock.url, Some("k"));
+    let a = jev.decide(Side::Red, vec![q.clone(), land_question(2, "R2")]).await;
+    let body = mock.request(0).body;
+    assert_eq!(body["state"]["units"]["R1"]["enemiesSeen"][0]["canReachUs"], true);
+    assert!(body["state"]["units"].get("R2").is_none(), "R2 sent no fields");
+    let t1 = body["questions"]["u0"]["instructions"].as_str().unwrap();
+    assert!(t1.contains("What it knows is under units.R1 in the state"), "{t1}");
+    assert!(!t1.contains("has run into the contact R3"), "not repeated in words: {t1}");
+    assert!(body["questions"]["u1"]["instructions"].as_str().unwrap().contains("R2 has run into the contact R3"), "R2 in words");
+    assert_eq!(a[0].source, AnswerSource::Jev);
+    // A different state is a different situation: not answered from the cache.
+    let mut q2 = q.clone();
+    q2.state.as_mut().unwrap()["unit"]["strengthPct"] = json!(25.0);
+    assert_ne!(q.cache_key(), q2.cache_key());
+    // With prose, the words go too.
+    let mock2 = serve(answer_all(0.8)).await;
+    let cfg = JevConfig { url: format!("{}/api/alpha/decisions", mock2.url), timeout: Duration::from_millis(500), prose: true, ..JevConfig::default() };
+    JevClient::with_http(http(), ApiKey::new("k"), cfg).decide(Side::Red, vec![q]).await;
+    let t = mock2.request(0).body["questions"]["u0"]["instructions"].as_str().unwrap().to_string();
+    assert!(t.contains("has run into the contact R3") && t.contains("under units.R1"), "{t}");
 }
 
 #[tokio::test]

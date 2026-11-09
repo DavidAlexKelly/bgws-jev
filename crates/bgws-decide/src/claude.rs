@@ -323,6 +323,9 @@ impl ClaudeDecider {
         let mut s = format!("You decide for agents on the {side} side. Each question is raised from what that agent knows, not the truth. Choose within its doctrine.\n");
         for (i, q) in questions.iter().enumerate() {
             s.push_str(&format!("\nq{i}: {} — {}. {} {}\n", q.agent, q.title, q.question, q.situation));
+            if let Some(st) = &q.state {
+                s.push_str(&format!("What it knows, as fields: {st}\n"));
+            }
             if !q.doctrine.is_empty() {
                 s.push_str(&format!("Its doctrine: {}\n", q.doctrine.join(" ")));
             }

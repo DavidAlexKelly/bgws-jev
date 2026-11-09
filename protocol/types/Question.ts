@@ -15,7 +15,13 @@ agent: string, side: Side, trigger: string, template: string, node: string, titl
 /**
  * The agent's beliefs, in words: only what reached it (rule 1).
  */
-situation: string, options: Array<DecisionOption>, 
+situation: string, 
+/**
+ * The same beliefs as named fields (a land unit's strength, weapons
+ * against the ranges, threats, orders, ground, friends): what a
+ * decision model is given as its state.
+ */
+state?: Record<string, unknown>, options: Array<DecisionOption>, 
 /**
  * Taken when no decider can answer.
  */

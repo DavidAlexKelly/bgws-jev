@@ -497,6 +497,7 @@ impl Sim {
             question: format!("Plan the {} side's operation: give each unit its task, intent and phases.", side.as_str()),
             doctrine: vec![self.ctx.scenario.command.side(side).directive.clone()].into_iter().filter(|s| !s.is_empty()).collect(),
             situation: serde_json::to_string(&situation).unwrap_or_default(),
+            state: None,
             options: vec![],
             fallback: "heuristic".into(),
             rules_choice: "heuristic".into(),

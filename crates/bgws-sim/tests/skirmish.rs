@@ -101,3 +101,37 @@ fn viewsheds_follow_the_ground() {
     assert_eq!(mask.len(), n * n);
     assert_eq!(mask[(n / 2) * n + n / 2], 9, "it sees where it stands");
 }
+
+/// A land unit's question carries its state as named fields, from its own
+/// beliefs: its weapons and their reach, the enemy it has seen and what
+/// each can reach, its orders, its ground and its friends.
+#[test]
+fn unit_questions_carry_the_units_state() {
+    let sc = scenario("skirmish-advance-to-contact-v1");
+    let mut sim = Sim::new(&sc, Seed(3), default_figures()).unwrap();
+    let mut found = None;
+    for _ in 0..2_000 {
+        match sim.advance(SimTime::from_secs(3_600.0)) {
+            bgws_sim::Step::NeedsAnswers { questions, .. } => {
+                if let Some(q) = questions.iter().find(|q| q.kind == bgws_core::QuestionKind::Unit && q.state.as_ref().is_some_and(|s| !s["enemiesSeen"].as_array().unwrap().is_empty())) {
+                    found = Some(q.clone());
+                    break;
+                }
+                let a = sim.rules_answers(&questions);
+                sim.answer(a).unwrap();
+            }
+            _ => break,
+        }
+    }
+    let q = found.expect("a unit decided about an enemy it had seen");
+    let st = q.state.as_ref().unwrap();
+    eprintln!("{} {}: {}", q.agent, q.trigger, serde_json::to_string_pretty(st).unwrap());
+    assert!(st["unit"]["strengthPct"].as_f64().unwrap() > 0.0);
+    assert!(!st["weapons"].as_array().unwrap().is_empty(), "its weapons");
+    assert!(st["weaponReachM"].as_f64().unwrap() > 0.0);
+    let e = &st["enemiesSeen"][0];
+    assert!(e["rangeM"].as_f64().unwrap() > 0.0 && e["inOurReach"].is_boolean());
+    assert!(st["orders"]["roe"].is_string() && st["ground"]["cover"].is_number());
+    // The rules decider still answers it.
+    assert_eq!(sim.rules_answers(std::slice::from_ref(&q)).len(), 1);
+}
