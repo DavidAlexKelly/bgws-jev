@@ -19,6 +19,7 @@ pub mod http;
 pub mod jev;
 pub mod key;
 pub mod local;
+pub mod openrouter;
 pub mod recorded;
 pub mod router;
 pub mod rules;

@@ -367,6 +367,32 @@ enum LabCmd {
         #[arg(long, default_value_t = 0)]
         keep_worst: usize,
     },
+    /// Print the wording Jev is asked in (data/jev/wording.json, else the engine's own).
+    Wording,
+    /// Tune Jev's wording: a larger model proposes rewrites from Jev's
+    /// failures; the cases and the suite judge them; the held-out cases and
+    /// scenarios check the result. Nothing changes until `--accept`.
+    Tune {
+        #[arg(long, default_value_t = 3)]
+        rounds: usize,
+        /// Rewrites asked for each round.
+        #[arg(long, default_value_t = 4)]
+        candidates: usize,
+        /// The proposer (an OpenRouter chat model).
+        #[arg(long, default_value = bgws_run::tune::DEFAULT_PROPOSER)]
+        proposer: String,
+        /// Jev's model, else the configured one.
+        #[arg(long)]
+        model: Option<String>,
+        /// Judge on the cases only (no played games).
+        #[arg(long)]
+        no_suite: bool,
+        #[arg(long, default_value = "1-4")]
+        suite_seeds: String,
+        /// Take a run's tuned wording: write it to data/jev/wording.json.
+        #[arg(long)]
+        accept: Option<String>,
+    },
     /// Make a decision case from a lab moment (your label, else its play-outs).
     Case {
         moment: String,
@@ -561,6 +587,20 @@ fn main() -> Result<()> {
                     print!("{}", r.table());
                     eprintln!("kept in {}", p.display());
                 }
+                LabCmd::Tune { rounds, candidates, proposer, model, no_suite, suite_seeds, accept } => match accept {
+                    Some(id) => {
+                        let (p, d) = bgws_run::tune::accept(&lab.dir, &id)?;
+                        println!("{d}");
+                        eprintln!("wrote {}: Jev is asked in the tuned wording from now on (commit the file to keep it)", p.display());
+                    }
+                    None => {
+                        let opts = bgws_run::tune::TuneOptions { rounds, candidates, proposer, jev_model: model, use_suite: !no_suite, suite_seeds: parse_seeds(&suite_seeds)?, ..Default::default() };
+                        let r = bgws_run::tune::tune(&lab.dir, &opts, &default_figures(), &|l| eprintln!("{l}"))?;
+                        println!("{}", r.report());
+                        eprintln!("kept in {}", lab.dir.join("tune").join(&r.id).display());
+                    }
+                },
+                LabCmd::Wording => println!("{}", serde_json::to_string_pretty(&bgws_run::jev_wording())?),
                 LabCmd::Case { moment, why } => {
                     let m = lab.moment(&moment)?;
                     let c = bgws_run::cases::case_from_moment(&m, &why)?;

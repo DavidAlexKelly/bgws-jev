@@ -564,7 +564,7 @@ pub fn decider_for(choice: DeciderChoice, figures: &Figures, model: Option<Strin
     use bgws_decide::{ClaudeConfig, ClaudeDecider, JevClient, JevConfig, LocalConfig, LocalDecider, MessagesClient, RulesDecider};
     Ok(match choice {
         DeciderChoice::Jev => {
-            let mut cfg = JevConfig::from_figures(figures);
+            let mut cfg = JevConfig { wording: crate::jev_wording(), ..JevConfig::from_figures(figures) };
             if let Some(m) = model {
                 cfg.model = m;
             }

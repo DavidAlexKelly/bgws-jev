@@ -1,0 +1,20 @@
+{
+  "land": "{directive}You lead {agent}. {balance}\n\n{doctrine}Decision point {point}, {title}. {situation} {question} {others}The crew has already done its drill (cover, and return fire if it can see the shooter).",
+  "world": "{directive}You decide for {agent}, on the {side} side. {doctrine}{title}. {question}{situation}",
+  "balance": "The intent comes first; keep the unit alive and able to carry it out; take a local opportunity only when it doesn't cost the intent.",
+  "doctrine": "Its doctrine: {text}\n\n",
+  "others": "Also deciding now, so choose to work together: {names}. ",
+  "statePointer": "What it knows is under units.{agent} in the state: itself, its weapons and how far they reach, the enemy it has seen (and how far they reach), its orders, its ground and its friends.",
+  "statePointerProse": "{situation} What it knows is under units.{agent} in the state.",
+  "landNote": "Only what each unit believes. Enemies it has not found are not listed, and their absence is not evidence that they are not there. A lost contact is where an enemy was last seen, not where it is.",
+  "worldNote": "Each question is raised from what that agent knows, not the truth. Choose within its doctrine.",
+  "bias": [
+    " [strongly preferred by its doctrine]",
+    " [preferred by its doctrine]",
+    " [discouraged by its doctrine]",
+    " [strongly discouraged by its doctrine]"
+  ],
+  "optionWords": {},
+  "minConfidence": null,
+  "pointConfidence": {}
+}

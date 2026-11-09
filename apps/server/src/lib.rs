@@ -1245,6 +1245,52 @@ async fn lab_suite(Json(r): Json<SuiteReq>) -> axum::response::Response {
     .await
 }
 
+async fn lab_tune_runs() -> axum::response::Response {
+    lab_reply(lab().map(|l| {
+        let runs: Vec<serde_json::Value> = bgws_run::tune::runs(&l.dir).into_iter().map(|r| json!({ "id": r.id, "report": r.report(), "diff": bgws_run::tune::diff(&r.original, &r.tuned), "run": r })).collect();
+        json!({ "runs": runs, "current": bgws_run::jev_wording() })
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TuneReq {
+    #[serde(default = "three")]
+    rounds: usize,
+    #[serde(default = "four")]
+    candidates: usize,
+    #[serde(default)]
+    proposer: Option<String>,
+    #[serde(default)]
+    no_suite: bool,
+}
+fn three() -> usize {
+    3
+}
+fn four() -> usize {
+    4
+}
+
+/// Tune Jev's wording (minutes: proposals, cases, played games). Nothing changes until accepted.
+async fn lab_tune(Json(r): Json<TuneReq>) -> axum::response::Response {
+    lab_blocking(move || {
+        let l = lab()?;
+        let opts = bgws_run::tune::TuneOptions { rounds: r.rounds.clamp(1, 10), candidates: r.candidates.clamp(1, 8), proposer: r.proposer.unwrap_or_else(|| bgws_run::tune::DEFAULT_PROPOSER.into()), use_suite: !r.no_suite, ..Default::default() };
+        let run = bgws_run::tune::tune(&l.dir, &opts, &default_figures(), &|_| {})?;
+        Ok(json!({ "id": run.id, "report": run.report() }))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct AcceptReq {
+    id: String,
+}
+
+async fn lab_tune_accept(Json(r): Json<AcceptReq>) -> axum::response::Response {
+    lab_reply(lab().and_then(|l| bgws_run::tune::accept(&l.dir, &r.id)).map(|(p, d)| json!({ "wrote": p, "diff": d })))
+}
+
 async fn lab_report() -> axum::response::Response {
     lab_reply(lab().and_then(|l| l.report()))
 }
@@ -1289,6 +1335,8 @@ pub async fn serve(a: Args, ready: impl FnOnce(std::net::SocketAddr)) -> Result<
         .route("/api/lab/report", get(lab_report))
         .route("/api/lab/cases", get(lab_cases))
         .route("/api/lab/suite", get(lab_suite_runs).post(lab_suite))
+        .route("/api/lab/tune", get(lab_tune_runs).post(lab_tune))
+        .route("/api/lab/tune/accept", post(lab_tune_accept))
         .route("/api/lab/test", post(lab_test))
         .route("/api/lab/moments/:id/case", post(lab_make_case))
         .route("/ws", get(ws))

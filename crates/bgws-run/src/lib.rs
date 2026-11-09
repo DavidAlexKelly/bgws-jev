@@ -10,6 +10,7 @@ pub mod geotiff;
 pub mod cases;
 pub mod host;
 pub mod suite;
+pub mod tune;
 pub mod lab;
 pub mod behaviour;
 pub mod editor;
@@ -34,6 +35,19 @@ pub fn scenario_file(s: &str) -> std::path::PathBuf {
         named
     } else {
         p
+    }
+}
+
+/// Jev's wording (`data/jev/wording.json`, from `bgws lab tune --accept`),
+/// else the engine's own. A file that does not read is reported and ignored.
+pub fn jev_wording() -> bgws_decide::jev::Wording {
+    let p = data_dir().join("jev").join("wording.json");
+    match std::fs::read(&p) {
+        Ok(b) => serde_json::from_slice(&b).unwrap_or_else(|e| {
+            eprintln!("{}: {e}; Jev keeps its own wording", p.display());
+            Default::default()
+        }),
+        Err(_) => Default::default(),
     }
 }
 

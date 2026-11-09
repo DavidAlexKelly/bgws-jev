@@ -191,6 +191,42 @@ troop (−1.1), while carrying on, engaging, waiting or watching all win
 shots. That moment is now a case. Near-best ignores score gaps under 0.05
 (`lab::MIN_GAP`), however small the noise.
 
+**Tuning Jev's wording.** Everything Jev is told besides the situation
+itself is in `data/jev/wording.json` (`bgws lab wording` prints it; the
+defaults are the text the engine always sent). It holds the instruction
+templates (with `{placeholders}`), the rule of thumb, the notes, how
+doctrine leanings read, Jev's own description of any option
+(`optionWords`, by action, in place of its short label) and the confidence
+cut-offs (overall and per decision point). `bgws lab tune` improves it:
+
+1. A larger model (Claude Opus 5.5 through OpenRouter, `--proposer`) is
+   shown the current wording, the training cases Jev gets wrong (the
+   state, the options as worded, Jev's probabilities, the answers expected
+   and why), the suite's results and earlier rounds, and proposes a few
+   rewrites (`--candidates`, 4).
+2. Each rewrite is checked first: every placeholder kept, no text too
+   long, option descriptions only for real actions, and nothing naming a
+   case (case ids, unit, platform and enemy names from the cases) and no
+   number of three or more digits, so it can only help through general
+   wording. The proposer may not touch the cut-offs.
+3. The ones left are asked the training cases and must keep every
+   consistency check and trend the current wording keeps, and beat it by
+   more than 0.02 (passes less wrongs, as a share).
+4. The best is played on the suite (the scenarios not held out) and taken
+   only if it is not worse in games beyond one standard error.
+5. After the rounds (`--rounds`, 3), the confidence cut-off is chosen from
+   the training answers (Jev's raw picks are kept, so no re-asking).
+6. Last, the original and the tuned wording are compared on what tuning
+   never saw: about 30% of the cases (fixed by a hash of their ids) and the
+   suite's held-out scenarios.
+
+A run is kept in `<lab>/tune/<id>/` (`report.md`, `run.json`,
+`wording.json`), and the lab's **Tune** tab shows it. Nothing changes the
+game until it is accepted: `bgws lab tune --accept <id>` (or the tab's
+button) writes `data/jev/wording.json` and prints the diff; commit the file
+to keep it. A run costs well under a dollar: Jev's questions are a
+fraction of a cent each, and the proposer is a few cents a round.
+
 The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
 `moments/`, one JSON file each. A first look at three rules games of the
 advance-to-contact skirmish: 6 of 12 played-out moments were decisive, and

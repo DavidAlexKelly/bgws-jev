@@ -71,7 +71,7 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     let heuristic = HeuristicPlanner::from_figures(figures);
     r.set_planner(Side::Blue, Route::Rules, Arc::new(heuristic.clone()));
     r.set_planner(Side::Red, Route::Rules, Arc::new(heuristic.clone()));
-    let jev = Arc::new(JevClient::from_env(JevConfig::from_figures(figures)));
+    let jev = Arc::new(JevClient::from_env(JevConfig { wording: crate::jev_wording(), ..JevConfig::from_figures(figures) }));
     let mut ccfg = ClaudeConfig::from_figures(figures);
     if let Some(m) = opts.claude_model.clone().or_else(|| (!scenario.command.model.is_empty()).then(|| scenario.command.model.clone())) {
         ccfg.model = m;
