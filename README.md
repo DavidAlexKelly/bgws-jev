@@ -240,6 +240,28 @@ An earlier run held out only 2 cases, which is too few: the split now
 holds out a fixed 30%. The confidence cut-off stayed at 0.25 because the
 tuned wording left Jev nothing below it to rescue.
 
+**In use now.** Two runs' wordings were compared with the engine's own over
+168 paired games each (all 7 suite scenarios, held-out ones included, both
+sides): seeds 1–6, then fresh seeds 7–12 that no tuning used.
+`BGWS_JEV_WORDING=<file>` points the game and the lab at a wording file
+without installing it, so these comparisons need no edits.
+
+| wording | cases (18) | seeds 1–6: result Δ / exchange Δ | seeds 7–12 (fresh) | all 168 |
+|---|---|---|---|---|
+| the engine's | 19 pass, 4 wrong | −0.14 ± 0.08 / −0.06 ± 0.03 | −0.02 ± 0.08 / −0.06 ± 0.03 | −0.08 / −0.06 |
+| run 1 (`tune-1794253290`) | 25 pass, 0 wrong | +0.14 ± 0.10 / +0.05 ± 0.03 | −0.02 ± 0.09 / −0.02 ± 0.03 | +0.06 / +0.02 |
+| run 2 (`tune-1794254133`) | 22 pass, 1 wrong | −0.05 ± 0.10 / −0.04 ± 0.03 | – | – |
+
+Run 1's wording is the one in `data/jev/wording.json`. Part of its gain on
+seeds 1–4 was fitting those seeds (they are what it was tuned on), but on
+fresh seeds it still trades better than the engine's wording (exchange
+−0.02 against −0.06, and 26 pairs better and 28 worse against 20 and 32),
+with the same results. It is worse in one place: the mechanised hasty
+attack (M2), where it loses more of its own (exchange −0.09 and −0.13).
+That is the place to look next, with `--keep-worst`. On the cases its
+consistency is a little lower (32/36 against 35/36): near-tied options
+sometimes flip when reordered.
+
 A run is kept in `<lab>/tune/<id>/` (`report.md`, `run.json`,
 `wording.json`), and the lab's **Tune** tab shows it. Nothing changes the
 game until it is accepted: `bgws lab tune --accept <id>` (or the tab's
