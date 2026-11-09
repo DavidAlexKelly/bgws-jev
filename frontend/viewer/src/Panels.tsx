@@ -560,6 +560,14 @@ export function Inspector(props: {
           ))}
         </>
       )}
+      {u.block && (
+        <>
+          <div className="group">Ground</div>
+          <Line label="in a block">
+            {u.block.material}, {u.block.floors} floor{u.block.floors === 1 ? "" : "s"} · {pct(u.block.density)} built over · {pct(u.block.standing)} standing
+          </Line>
+        </>
+      )}
       <div className="group">What it knows</div>
       {!u.knows?.length && <div className="subtle">No enemy seen.</div>}
       {u.knows?.slice(0, 8).map((k, i) =>

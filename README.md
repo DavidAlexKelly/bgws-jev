@@ -448,10 +448,75 @@ line to the enemy), swinging about its first site. Before, each one moved it
 1.5 km further back, so over a few hours they drifted out of their area.
 
 Next steps:
-- exposure from believed threats' viewsheds;
-- mines, craters and blown bridges cutting the road graph;
-- columns on roads and formations off them;
 - calibration of road march rates and of where units leave the road.
+
+### Urban blocks
+
+When a pack has a sight surface, the town is cut into blocks as the game
+loads (`crates/bgws-sim/src/urban.rs`): built-over 30 m cells joined to
+their neighbours and broken wherever a road crosses, so a block is the
+ground between streets. Packs need no rebuild. Each block keeps its
+footprint, area and density, its buildings' mean and greatest height,
+floors (3 m a storey), an estimated material, and how much of it stands.
+OSM rarely says what a building is made of, so the material is a rule of
+thumb by height: under 7.5 m light (houses, timber, thin brick), under 15 m
+masonry, above that reinforced concrete. Over Kaliningrad that gives 4,999
+blocks (1,157 light, 3,205 masonry, 637 concrete), worked out in under a
+second.
+
+- **Cover and concealment:** a unit in a block has its material's cover
+  (`sim.urban.cover_*`: 0.6, 0.8, 0.9) against direct fire and suppression,
+  and concealment 0.85, where its land cover gives less.
+- **Indirect fire:** troops halted in a block are under roofs. A burst's
+  lethality on an element there falls by the material's protection
+  (`sim.urban.protect_*`: 0.5, 0.75, 0.9) times the share still standing.
+- **Upper floors:** troops settled in a block watch from its upper floors,
+  up to the fourth (`sim.urban.observe_floors`). Their eye height is
+  `(floors − 1) × 3 m + 1.5 m`, so a section in a five-storey block sees
+  over the roofs of the houses round it.
+- **Damage and rubble:** each 152/155 mm shell or heavy rocket that lands in
+  a block brings down 60 m² of light buildings, half that of masonry and a
+  quarter of concrete (`sim.urban.rubble_m2_per_heavy_round`,
+  `resist_*`). Sight lines see its buildings lower by the share fallen,
+  rubble slows the going through it (up to 60% for vehicles, half that on
+  foot), and there is less roof left to shelter under. Each salvo logs
+  `urban.damage` with what still stands. On Kaliningrad, 40 rounds on one
+  central block leave 76% of it standing and its tallest roof 12.9 m, from
+  17 m.
+
+The unit panel shows the block a unit is in. The figures are estimates
+(confidence low) until they are checked against trials or history. The
+calibration vignettes are on open ground, so blocks do not move them.
+
+### Units occupy space
+
+A unit keeps one position and one decision maker, but its surviving
+elements (vehicles, teams) stand in a formation by what it is doing
+(`crates/bgws-sim/src/formation.rs`):
+
+- **column** on a road or a march, and when withdrawing: nose to tail along
+  the track the unit has driven, so the column bends with the road;
+- **wedge** across country: the lead in front, the rest echeloned back;
+- **line** when halted: abreast across the nearest threat it knows of.
+
+Spacing is `sim.formation.*` (50 m between vehicles, 8 m between teams; 50 m
+and 5 m in a column). A vehicle that would stand in water or a block of
+buildings is drawn in toward the unit. Sensing looks from the unit and its
+element nearest the target, at the target's three nearest elements, so a
+unit half behind a wood is seen by its exposed half. Indirect fire strikes
+each element where it stands: a burst on a dispersed company hits fewer
+vehicles than one on a bunched column. The viewer draws each element as a
+small dot round the unit's symbol (`FrameEntity.elements`, east and north
+metre offsets).
+
+Formations moved detect-to-strike-networked into band (4.9 min, from 5.35)
+and counter-battery survival from 0.895 to 0.900. A battery that stays put
+under counter-battery fire now survives more often (24 of 32 games, from 19)
+because its guns stand 50 m apart rather than as one bunched target; the
+`fires` test guards the gap to shoot-and-scoot (32 of 32), not a fixed rate. The `c4` integration
+test's pooled detect-to-strike median swings with the seeds (362 s on seeds
+1–8, 90 s on 9–24; the code before this change failed the old guard on
+seeds 9–24 too), so its guard is a wide sanity band and `D2S_SEEDS` picks the seeds.
 
 Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
 cover derived from it are derived databases). Mapterhorn asks for

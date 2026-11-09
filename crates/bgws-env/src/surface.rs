@@ -93,17 +93,28 @@ pub struct SightView {
     pub surface: Arc<SightSurface>,
     /// (e, n) in the scenario's frame → [a·e + b·n + c, d·e + f·n + g] in the pack's.
     pub to_pack: [f64; 6],
+    /// What still stands of the buildings, by place in the scenario's frame
+    /// (×255; none: all of them): a building's height is scaled by it.
+    pub standing: Option<Arc<crate::Raster<u8>>>,
 }
 
 impl SightView {
     /// The surface in the frame it was built in.
     pub fn same_frame(surface: Arc<SightSurface>) -> Self {
-        Self { surface, to_pack: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0] }
+        Self::new(surface, [1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+    }
+
+    pub fn new(surface: Arc<SightSurface>, to_pack: [f64; 6]) -> Self {
+        Self { surface, to_pack, standing: None }
     }
 
     pub fn at(&self, e: f64, n: f64) -> (f64, Option<LandCover>) {
         let m = &self.to_pack;
-        self.surface.at(m[0] * e + m[1] * n + m[2], m[3] * e + m[4] * n + m[5])
+        let (h, tree) = self.surface.at(m[0] * e + m[1] * n + m[2], m[3] * e + m[4] * n + m[5]);
+        match &self.standing {
+            Some(r) if h > 0.0 => (h * r.spec.nearest(e, n).map(|(i, j)| r.data[r.spec.idx(i, j)] as f64 / 255.0).unwrap_or(1.0), tree),
+            _ => (h, tree),
+        }
     }
 
     /// The surface's cell, metres: how finely lines through it are stepped.
@@ -133,7 +144,7 @@ mod tests {
         assert_eq!(r.at(e, n).1, Some(LandCover::ForestDense));
         assert_eq!(r.at(-1_000.0, 0.0), (0.0, None));
         // Shifted 100 m east: the scenario's (e, n) is the pack's (e + 100, n).
-        let v = SightView { surface: Arc::new(r), to_pack: [1.0, 0.0, 100.0, 0.0, 1.0, 0.0] };
+        let v = SightView::new(Arc::new(r), [1.0, 0.0, 100.0, 0.0, 1.0, 0.0]);
         let (pe, pn) = spec.pos(10, 10);
         assert_eq!(v.at(pe - 100.0, pn).0, 18.0);
         let _ = std::fs::remove_file(path);

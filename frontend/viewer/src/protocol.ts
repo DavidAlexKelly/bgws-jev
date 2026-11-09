@@ -128,6 +128,8 @@ export interface UnitDetail {
     lastFiredOnBy: string | null;
   } | null;
   mounts?: { weapon: string; munition: string; rounds: number }[];
+  /** The urban block it stands in (its buildings, estimated material, what still stands). */
+  block?: { id: number; floors: number; material: "light" | "masonry" | "concrete"; meanHeightM: number; density: number; footprintM2: number; standing: number } | null;
   knows?: { id?: number; name?: string; level?: string; rangeM?: number | null; agoS: number; moving?: boolean; suspect?: boolean; bearingDeg?: number }[];
   decisions?: { t: number; text: string; data: GameEvent["data"] }[];
   recent?: { t: number; kind: string; text: string }[];
