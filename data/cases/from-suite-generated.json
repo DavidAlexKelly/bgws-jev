@@ -513,5 +513,689 @@
    "pullBack"
   ],
   "source": "suite-gen-battalion-attack-s4-blue-typesafejev113-q23"
+ },
+ {
+  "id": "tank-sees-static-unknown-2200m-low-odds-on-team",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/armour",
+  "state": {
+   "unit": {
+    "name": "Blue 1 tanks",
+    "type": "Main battle tank troop",
+    "class": "armoured_vehicle",
+    "vehicles": "4 of 4",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "tankGun",
+     "munition": "apfsds120",
+     "maxRangeM": 3000.0,
+     "rounds": 400,
+     "volleysLeft": 400
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 16000,
+     "volleysLeft": 16000
+    }
+   ],
+   "weaponReachM": 3000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 2241.0,
+     "bearing": "north",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "ifWeFire": {
+      "weapon": "tankGun",
+      "volleyHitPctIfVehicle": 83.0,
+      "volleyHitPctIfTeamInCover": 4.0
+     },
+     "onOurObjective": true,
+     "fromOurObjectiveM": 315.0
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (company attack, 7:1)",
+    "doing": "moving",
+    "phase": "1 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 823.0,
+     "bearing": "north",
+     "etaMin": 2.0
+    },
+    "gameTimeLeftMin": 85.0
+   },
+   "ground": {
+    "cover": 0.11,
+    "concealment": 0.0,
+    "land": "open",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 3 tanks",
+     "rangeM": 348.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 2 mech",
+     "rangeM": 595.0,
+     "bearing": "south-east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 5 tanks",
+     "rangeM": 615.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 4 mech",
+     "rangeM": 630.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "keep"
+  ],
+  "wrong": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "source": "gen-company-attack-even-s1-rules-q5"
+ },
+ {
+  "id": "tank-sees-static-unknown-2300m-low-odds-on-team",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/armour",
+  "state": {
+   "unit": {
+    "name": "Blue 1 tanks",
+    "type": "Main battle tank troop",
+    "class": "armoured_vehicle",
+    "vehicles": "4 of 4",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "tankGun",
+     "munition": "apfsds120",
+     "maxRangeM": 3000.0,
+     "rounds": 400,
+     "volleysLeft": 400
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 16000,
+     "volleysLeft": 16000
+    }
+   ],
+   "weaponReachM": 3000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 2298.0,
+     "bearing": "north",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "ifWeFire": {
+      "weapon": "tankGun",
+      "volleyHitPctIfVehicle": 81.0,
+      "volleyHitPctIfTeamInCover": 4.0
+     },
+     "onOurObjective": true,
+     "fromOurObjectiveM": 315.0
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (company attack, 7:1)",
+    "doing": "moving",
+    "phase": "1 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 881.0,
+     "bearing": "north",
+     "etaMin": 2.0
+    },
+    "gameTimeLeftMin": 86.0
+   },
+   "ground": {
+    "cover": 0.04,
+    "concealment": 0.21,
+    "land": "crops",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 3 tanks",
+     "rangeM": 350.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 2 mech",
+     "rangeM": 548.0,
+     "bearing": "south-east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 4 mech",
+     "rangeM": 632.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 5 tanks",
+     "rangeM": 634.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "keep"
+  ],
+  "wrong": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "source": "gen-company-attack-even-s2-rules-q5"
+ },
+ {
+  "id": "ifv-sees-static-unknown-out-of-reach",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/ifv",
+  "state": {
+   "unit": {
+    "name": "Blue 4 mech",
+    "type": "Infantry fighting vehicle platoon",
+    "class": "soft_skin",
+    "vehicles": "3 of 3",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "cannon30",
+     "munition": "apfsds30",
+     "maxRangeM": 2000.0,
+     "rounds": 1500,
+     "volleysLeft": 500
+    },
+    {
+     "weapon": "atgm",
+     "munition": "atgmTandem",
+     "maxRangeM": 4000.0,
+     "minRangeM": 65.0,
+     "rounds": 18,
+     "volleysLeft": 18
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 6000,
+     "volleysLeft": 6000
+    }
+   ],
+   "weaponReachM": 4000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 2088.0,
+     "bearing": "north-west",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "onOurObjective": false,
+     "fromOurObjectiveM": 907.0
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (company attack, 7:1)",
+    "doing": "moving",
+    "phase": "1 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 482.0,
+     "bearing": "north",
+     "etaMin": 1.0
+    },
+    "gameTimeLeftMin": 85.0
+   },
+   "ground": {
+    "cover": 0.13,
+    "concealment": 0.02,
+    "land": "open",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 5 tanks",
+     "rangeM": 215.0,
+     "bearing": "south-west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 3 tanks",
+     "rangeM": 305.0,
+     "bearing": "west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 1 tanks",
+     "rangeM": 622.0,
+     "bearing": "west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 2 mech",
+     "rangeM": 891.0,
+     "bearing": "south",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "keep"
+  ],
+  "wrong": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "source": "gen-company-attack-even-s4-rules-q9"
+ },
+ {
+  "id": "tank-sees-static-unknown-1700m-off-objective",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/armour",
+  "state": {
+   "unit": {
+    "name": "Blue 5 tanks",
+    "type": "Main battle tank troop",
+    "class": "armoured_vehicle",
+    "vehicles": "4 of 4",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "tankGun",
+     "munition": "apfsds120",
+     "maxRangeM": 3000.0,
+     "rounds": 400,
+     "volleysLeft": 400
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 16000,
+     "volleysLeft": 16000
+    }
+   ],
+   "weaponReachM": 3000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 1702.0,
+     "bearing": "north-east",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "ifWeFire": {
+      "weapon": "tankGun",
+      "volleyHitPctIfVehicle": 94.0,
+      "volleyHitPctIfTeamInCover": 8.0
+     },
+     "onOurObjective": false,
+     "fromOurObjectiveM": 960.0,
+     "friendsFiringOnIt": 1
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (battalion attack, 18:1)",
+    "doing": "moving",
+    "phase": "2 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 1267.0,
+     "bearing": "north",
+     "etaMin": 4.0
+    },
+    "gameTimeLeftMin": 138.0
+   },
+   "ground": {
+    "cover": 0.16,
+    "concealment": 0.0,
+    "land": "open",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 6 mech",
+     "rangeM": 294.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 4 mech",
+     "rangeM": 422.0,
+     "bearing": "south-west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 7 tanks",
+     "rangeM": 600.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 9 tanks",
+     "rangeM": 707.0,
+     "bearing": "south-west",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "keep"
+  ],
+  "wrong": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "source": "gen-battalion-attack-s1-rules-q25"
+ },
+ {
+  "id": "ifv-sees-static-unknown-1650m-off-objective",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/ifv",
+  "state": {
+   "unit": {
+    "name": "Blue 6 mech",
+    "type": "Infantry fighting vehicle platoon",
+    "class": "soft_skin",
+    "vehicles": "3 of 3",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "cannon30",
+     "munition": "apfsds30",
+     "maxRangeM": 2000.0,
+     "rounds": 1500,
+     "volleysLeft": 500
+    },
+    {
+     "weapon": "atgm",
+     "munition": "atgmTandem",
+     "maxRangeM": 4000.0,
+     "minRangeM": 65.0,
+     "rounds": 18,
+     "volleysLeft": 18
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 6000,
+     "volleysLeft": 6000
+    }
+   ],
+   "weaponReachM": 4000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 1651.0,
+     "bearing": "north-east",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "ifWeFire": {
+      "weapon": "cannon30",
+      "volleyHitPctIfVehicle": 83.0,
+      "volleyHitPctIfTeamInCover": 5.0
+     },
+     "onOurObjective": false,
+     "fromOurObjectiveM": 665.0
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (battalion attack, 18:1)",
+    "doing": "moving",
+    "phase": "2 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 1369.0,
+     "bearing": "north",
+     "etaMin": 4.0
+    },
+    "gameTimeLeftMin": 139.0
+   },
+   "ground": {
+    "cover": 0.01,
+    "concealment": 0.02,
+    "land": "open",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 7 tanks",
+     "rangeM": 295.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 5 tanks",
+     "rangeM": 303.0,
+     "bearing": "west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 8 mech",
+     "rangeM": 642.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 4 mech",
+     "rangeM": 649.0,
+     "bearing": "south-west",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "keep"
+  ],
+  "wrong": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "source": "gen-battalion-attack-s2-rules-q21"
+ },
+ {
+  "id": "tank-static-unknown-1500m-on-objective-stop",
+  "point": "D1",
+  "why": "First contact on an attack, played out 8 times per option with what the unit now knows of its shot: a volley would very likely hit a vehicle but has a few per cent against a team in cover, which an unidentified, static contact usually is.",
+  "template": "core/armour",
+  "state": {
+   "unit": {
+    "name": "Blue 7 tanks",
+    "type": "Main battle tank troop",
+    "class": "armoured_vehicle",
+    "vehicles": "4 of 4",
+    "strengthPct": 100.0,
+    "posture": "moving",
+    "suppressionPct": 0.0,
+    "morale": "steady"
+   },
+   "weapons": [
+    {
+     "weapon": "tankGun",
+     "munition": "apfsds120",
+     "maxRangeM": 3000.0,
+     "rounds": 400,
+     "volleysLeft": 400
+    },
+    {
+     "weapon": "coax",
+     "munition": "ball762",
+     "maxRangeM": 1800.0,
+     "rounds": 16000,
+     "volleysLeft": 16000
+    }
+   ],
+   "weaponReachM": 3000.0,
+   "enemiesSeen": [
+    {
+     "what": "something",
+     "identified": false,
+     "rangeM": 1541.0,
+     "bearing": "north",
+     "moving": false,
+     "seenAgoS": 0.0,
+     "inOurReach": true,
+     "thisDecisionIsAboutIt": true,
+     "ifWeFire": {
+      "weapon": "tankGun",
+      "volleyHitPctIfVehicle": 96.0,
+      "volleyHitPctIfTeamInCover": 9.0
+     },
+     "onOurObjective": true,
+     "fromOurObjectiveM": 236.0
+    }
+   ],
+   "firedOnByUnseen": [],
+   "orders": {
+    "purpose": "attack: take the objective: take the objective and hold it (battalion attack, 18:1)",
+    "doing": "moving",
+    "phase": "1 of 3",
+    "urgent": false,
+    "roe": "fire within short range",
+    "headingFor": {
+     "distanceM": 149.0,
+     "bearing": "north-east",
+     "etaMin": 0.0
+    },
+    "gameTimeLeftMin": 139.0
+   },
+   "ground": {
+    "cover": 0.0,
+    "concealment": 0.11,
+    "land": "open",
+    "onRoad": false,
+    "keyTerrainNear": []
+   },
+   "friendsWithin3km": [
+    {
+     "unit": "Blue 6 mech",
+     "rangeM": 238.0,
+     "bearing": "west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 8 mech",
+     "rangeM": 283.0,
+     "bearing": "east",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 5 tanks",
+     "rangeM": 459.0,
+     "bearing": "west",
+     "strengthPct": 100.0
+    },
+    {
+     "unit": "Blue 4 mech",
+     "rangeM": 831.0,
+     "bearing": "south-west",
+     "strengthPct": 100.0
+    }
+   ]
+  },
+  "acceptable": [
+   "engage",
+   "wait",
+   "better",
+   "observe",
+   "pullBack"
+  ],
+  "wrong": [
+   "keep"
+  ],
+  "source": "gen-battalion-attack-s2-rules-q17"
  }
 ]
