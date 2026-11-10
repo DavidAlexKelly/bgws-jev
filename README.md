@@ -988,6 +988,63 @@ On this engine the doctrine default plays the unit-level decisions better
 than Jev 1.13 does, and rewording what Jev is told no longer closes the
 gap.
 
+### How Jev is asked: request styles
+
+TypeSafe's guidance for System One models (its skill file and docs) says
+to send each item as its own question, keep every field of the state
+relevant to it, ask plainly (no preamble; options described in the
+criteria), not gate on confidence, and above all not to ask the model
+what an agent should do next: break the decision into the judgments it
+depends on and write the decision in code. The client had done the
+opposite on most counts, so it now has three styles, chosen with
+`BGWS_JEV_STYLE`:
+
+- `legacy`: as before (one request per side with every unit's state, a
+  templated instruction with the balance rule and doctrine, a confidence
+  cut-off).
+- `plain` (the default): each land unit in its own request, sent in
+  parallel; its state cut to what the decision point needs
+  (`jev_ask::trim_state`: the enemy it is about and two others, ground,
+  orders; weapons only for D8, friends only where help is an option);
+  one plain question; each option described by its action's one
+  sentence, the doctrine's lean as a short tag; no cut-off. World and HQ
+  questions are asked as before. The pinned model is now Jev 1.14.
+- `judge`: judgments from Jev, decisions in code (`jev_judge`). At D1, D2,
+  D6, D8 and D10 a truth table reads the exact facts from the unit's state
+  (range, reach, the chance a volley hits, orders, posture, cover) and
+  asks Jev only the yes/no questions a row turns on and the state cannot
+  settle; every other point takes the doctrine default without asking.
+
+The tables were fitted to 179 played-out moments on the engine where
+missiles hit. What they found is mostly the doctrine: carry on at a new
+contact (engage only an identified or judged vehicle within 600 m that can
+reach the unit), answer a shooter you can see (pull back when you cannot
+hurt it and stand in the open), keep firing after a volley, take a better
+position when halted and a volley has under 10%, resume orders that still
+lead somewhere. On those moments they cost, per decision against the best
+option, D1 0.075 (doctrine 0.078), D2 0.088 (0.089), D6 0.097 (0.097),
+D8 0.038 (0.047); Jev choosing the whole action cost 0.17–0.90. The one
+judgment that splits a row is whether a close, unidentified contact is a
+vehicle. Another tried, whether the enemy has spotted the unit, read the
+same (0.27) where engaging won and where it lost, so it is not asked.
+
+Measured on fresh seeds (5–12, all nineteen, 304 pairs each, against the
+doctrine default):
+
+| style | better / worse | result Δ | exchange Δ | cost |
+|---|---|---|---|---|
+| legacy, Jev 1.13 | 64 / 131 | −0.12 ± 0.03 | −0.06 ± 0.01 | $0.41 |
+| plain, Jev 1.14 | 96 / 117 | +0.02 ± 0.04 | −0.02 ± 0.01 | $0.26 |
+| judge, Jev 1.14 | 34 / 51 | −0.00 ± 0.02 | −0.01 ± 0.01 | $0.012 |
+
+On the cases: legacy 80% (invariance 75/76; its wording was tuned on
+them), plain 62% (65/76), judge 71% (76/76). Both new styles take Jev
+from clearly behind the doctrine to level with it; neither is ahead.
+`plain` still lets Jev choose and differs from the doctrine in two games
+of three; `judge` plays nearly as the doctrine does, in a way that can be
+read and tested, at a twentieth of the cost. Jev 1.14 is no better than
+1.13 on the cases.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
