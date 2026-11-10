@@ -947,6 +947,29 @@ ten-second flight to 1.9 km gives an ATGM team about 1% a volley against
 a tank. A missile's guidance should take that error away; until it does,
 defenders' missiles hardly count, which favours every attacker.
 
+**Fixed.** A guided round fired direct (an ATGM) now reaches its target
+with `direct.guided.ph` (0.8, a stated default: the reference gives no
+figure), less what the gunner's suppression costs: up to 60% when the
+gunner flies it to the end (wire, laser, joystick, fibre), 15% for fire
+and forget (`direct.guided.suppression_operator`, `…_self`). Penetration,
+zone, top attack, ERA and APS work as before, and a miss still suppresses.
+Fights are far shorter: most generated scenarios end in 8–30 minutes
+rather than 30–150, and the meeting engagement turns to blue. The
+calibration vignettes are unchanged, as none has a missile in it; one
+should be added when a reference figure for ATGM hit rates is found.
+
+Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
+
+| under test | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| planner: fire and movement | 34 / 26 | +0.02 ± 0.05 | +0.02 ± 0.02 |
+| Jev against the doctrine default | 31 / 61 | −0.08 ± 0.05 | −0.05 ± 0.01 |
+
+The planner is where it was. Jev is clearly behind now: with missiles
+that hit, its departures from doctrine cost more (the generated battalion
+attack is worse in all 8 pairs). Its cases, wording and tuning all predate
+this engine.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
