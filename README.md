@@ -958,6 +958,31 @@ rather than 30–150, and the meeting engagement turns to blue. The
 calibration vignettes are unchanged, as none has a missile in it; one
 should be added when a reference figure for ATGM hit rates is found.
 
+**Weapon choice and missile flight.** A unit used to fire the first of
+its mounts that had rounds, and held fire when the target was beyond that
+mount's reach: an IFV whose 30 mm cannon is listed first never fired its
+4 km missile. It now fires, at the ordered or nearest target any of its
+weapons reaches, the mount most likely to knock it out (the chance a round
+lands, by the error budget or a missile's guidance, times the chance a hit
+kills, by what the target is and what the round does to it); a missile is
+kept for when it is clearly better (a gun at least `sim.fire.missile_keep`,
+0.7, as likely is used instead). A guided missile volley is now launched
+and lands range ÷ speed later (2–11 s at 0.4–2 km); guided by the gunner
+to the end (wire, laser, joystick, fibre) it needs the gunner able to fire
+and still seeing the target when it lands, and the gunner stays put until
+then; fire and forget needs only the target there.
+
+A new vignette, `atgm-engagement`, plays a dug-in ATGM team against a tank
+platoon advancing over open ground and measures the share of missiles
+launched that hit: 0.81 (200 runs), inside a 50–90% band. The band is
+low-confidence: no combat data was found, only a TOW test figure (73.5% at
+3,500 m for a good gunner) and unsourced Javelin claims (over 90% in
+tests, over 80% in combat). Every other vignette is unchanged. The
+planner A/B is where it was (+0.01 ± 0.05 result, seeds 1–4), and Jev
+(plain) on fresh seeds 5–12 is +0.03 ± 0.04, exchange −0.01 ± 0.01,
+against the doctrine default (before: +0.02 and −0.02). Most generated
+fights end as before; the ambush is quicker (5–7 min).
+
 Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
 
 | under test | better / worse | result Δ | exchange Δ |
