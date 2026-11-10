@@ -167,6 +167,11 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
 }
 
 /// Where a move leads: the end of the current move, else of the next one in its orders.
+/// A contact this close to where a unit's orders end is on its objective, m.
+const OBJECTIVE_NEAR_M: f64 = 600.0;
+/// A tactical move's pace as a share of the vehicle's cross-country speed (for the ETA).
+const ETA_PACE: f64 = 0.6;
+
 /// Farther than this from where its orders lead, a unit still has a move to make.
 pub(crate) const MOVE_LEFT_M: f64 = 150.0;
 
@@ -181,6 +186,31 @@ pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
 /// The farthest any of a platform's direct weapons reaches, m (0 none).
 fn reach_m(s: &Sim, p: &bgws_catalogue::Platform) -> f64 {
     p.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)
+}
+
+/// What firing on a target `range` m off would do, by the engine's own sums:
+/// the weapon it would fire (its first direct mount with rounds, as direct
+/// fire picks), the chance one volley hits a target presenting `pres`
+/// (bias averaged out), and that round's penetration at the range, mm, and
+/// whether it is a shaped charge (against chemical-energy armour) or not.
+fn volley_odds(s: &Sim, e: bevy_ecs::prelude::Entity, range: f64, pres: &bgws_models::direct_fire::Presented) -> Option<(String, f64, f64, bool)> {
+    use bgws_models::direct_fire as df;
+    let (i, h, a, c, arms) = (s.world.get::<Ident>(e)?, s.world.get::<Health>(e)?, s.world.get::<Act>(e)?, s.world.get::<Crew>(e)?, s.world.get::<Arms>(e)?);
+    let m = arms.mounts.iter().find(|m| m.rounds > 0 && !crate::domains::fires::indirect_mount(&i.platform, m.index))?;
+    let mun = s.ctx.catalogue.munition(&m.munition)?;
+    if range > mun.max_range_m || range < mun.min_range_m {
+        return None;
+    }
+    let mount = i.platform.mounts.get(m.index)?;
+    let p = &s.ctx.p.direct;
+    let fc = df::FireControl::from_quality(mount.fire_control.quality, p);
+    let gun = if mun.kind == bgws_catalogue::MunitionKind::SmallArms { p.rifle } else { df::Gun { muzzle_velocity_mps: mun.speed_ms.max(100.0), ..p.mbt_gun } };
+    let moving = a.posture == Posture::Moving && !mount.fire_control.stabilised;
+    let shot = df::Shot { range_m: range, firer_moving: moving, target_crossing_mps: 0.0, skill_mult: c.skill.error_mult(&s.ctx.p.people), suppression: c.suppression.level };
+    let ph = df::ph_expected(pres, &df::error_budget(&gun, &fc, &shot, p));
+    let rounds = ((h.fit as f64 * s.ctx.p.rounds_per_volley).round().max(1.0)).min(m.rounds as f64);
+    let chemical = matches!(mun.kind, bgws_catalogue::MunitionKind::Heat | bgws_catalogue::MunitionKind::Atgm);
+    Some((mount.id.clone(), 1.0 - (1.0 - ph).powf(rounds), mun.penetration_at(range), chemical))
 }
 
 /// What a land unit believes, as named fields for a decision model: the
@@ -231,6 +261,31 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
         })
         .unwrap_or_default();
     let my_reach = s.world.get::<Arms>(e).map(|ar| ar.mounts.iter().filter(|m| m.rounds > 0).filter_map(|m| s.ctx.catalogue.munition(&m.munition)).map(|m| m.max_range_m).fold(0.0, f64::max)).unwrap_or(0.0);
+    // Where its orders end: the last point any of its moves leads to.
+    let objective = a.mission.phases.iter().rev().find_map(|x| match x {
+        Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
+        _ => None,
+    });
+    // Friends already firing on each enemy.
+    let mut engaged: BTreeMap<EntityId, u32> = BTreeMap::new();
+    for &f in &s.ctx.order {
+        if f == e || !alive(s, f) || s.world.get::<Ident>(f).is_none_or(|fi| fi.side != i.side) {
+            continue;
+        }
+        if let Some(Activity::Engage { target, .. }) = s.world.get::<Act>(f).map(|x| &x.activity) {
+            *engaged.entry(*target).or_default() += 1;
+        }
+    }
+    // What a volley of ours would do, against a vehicle or a team in cover.
+    let dp = &s.ctx.p.direct;
+    let pct0 = |x: f64| (x * 100.0).round();
+    let vehicle = |(length_m, width_m, height_m): (f64, f64, f64), hull_down: bool| {
+        let dims = bgws_models::direct_fire::VehicleDims { length_m: length_m.max(3.0), width_m: width_m.max(2.0), hull_height_m: (height_m * 0.6).max(1.0), turret_height_m: (height_m * 0.4).max(0.3) };
+        bgws_models::direct_fire::presented_vehicle(&dims, 0.0, if hull_down { bgws_models::direct_fire::VehiclePosture::HullDown } else { bgws_models::direct_fire::VehiclePosture::Exposed }, dp)
+    };
+    // An unidentified contact: a typical vehicle (a tank's size), or a team dug in.
+    let typical = (7.0, 3.5, 2.4);
+    let team = bgws_models::direct_fire::presented_person(bgws_models::direct_fire::PersonPosture::Prone, 0.5, dp);
     // Enemies it has seen itself, nearest first.
     let mut seen: Vec<(&EntityId, &Seen)> = aw.seen.iter().collect();
     seen.sort_by(|x, y| x.1.at.sub(k.pos).horizontal().total_cmp(&y.1.at.sub(k.pos).horizontal()).then(x.0.cmp(y.0)));
@@ -242,6 +297,21 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             let range = d.horizontal();
             let known = (v.level >= 2).then(|| s.world.get::<Ident>(s.ctx.entity(**id))).flatten();
             let their_reach = known.map(|x| reach_m(s, &x.platform)).filter(|r| *r > 0.0);
+            // Our volley against it: against what it is, when identified; else both ways.
+            let odds = match known {
+                Some(x) if x.platform.body.vulnerability == bgws_catalogue::Vulnerability::Personnel => volley_odds(s, e, range, &team).map(|(w, p, _, _)| json!({ "weapon": w, "volleyHitPct": pct0(p) })),
+                Some(x) => volley_odds(s, e, range, &vehicle((x.platform.body.length_m, x.platform.body.width_m, x.platform.body.height_m), !v.moving)).map(|(w, p, pen, chemical)| {
+                    let z = crate::systems::armour_zones(&x.platform);
+                    let front = if chemical { z.ce_mm[0] } else { z.ke_mm[0] };
+                    json!({ "weapon": w, "volleyHitPct": pct0(p), "penetratesFront": pen > front })
+                }),
+                None => {
+                    let as_vehicle = volley_odds(s, e, range, &vehicle(typical, !v.moving));
+                    let as_team = volley_odds(s, e, range, &team);
+                    as_vehicle.zip(as_team).map(|((w, pv, _, _), (_, pt, _, _))| json!({ "weapon": w, "volleyHitPctIfVehicle": pct0(pv), "volleyHitPctIfTeamInCover": pct0(pt) }))
+                }
+            };
+            let from_objective = objective.map(|o| v.at.sub(o).horizontal());
             json!({
                 "what": match v.level { 0 => "something".to_string(), 1 => "a vehicle or team".to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
                 "identified": v.level >= 2,
@@ -251,15 +321,21 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
                 "itsReachM": their_reach.map(round),
                 "canReachUs": their_reach.map(|r| range <= r),
                 "thisDecisionIsAboutIt": Some(**id) == about,
+                "ifWeFire": odds,
+                "onOurObjective": from_objective.map(|d| d <= OBJECTIVE_NEAR_M),
+                "fromOurObjectiveM": from_objective.map(round),
+                "friendsFiringOnIt": engaged.get(id).copied().filter(|n| *n > 0),
             })
         })
         .collect();
     let unseen_fire: Vec<serde_json::Value> = aw.suspects.values().map(|v| json!({ "bearing": compass(v.bearing), "agoS": round((s.ctx.now - v.last).secs()) })).collect();
     // Its orders and where they lead.
+    let speed_ms = (i.platform.mover.cross_country_kmh.max(1.0) / 3.6) * ETA_PACE;
     let goal = heading_for(a).map(|g| {
         let d = g.sub(k.pos);
-        json!({ "distanceM": round(d.horizontal()), "bearing": compass(d.bearing()) })
+        json!({ "distanceM": round(d.horizontal()), "bearing": compass(d.bearing()), "etaMin": round(d.horizontal() / speed_ms / 60.0) })
     });
+    let time_left_min = round((s.ctx.duration_limit() - s.ctx.now).secs().max(0.0) / 60.0);
     let orders = json!({
         "purpose": if a.mission.purpose.is_empty() { "none" } else { &a.mission.purpose },
         "doing": a.activity.word(),
@@ -267,6 +343,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
         "urgent": a.mission.urgent,
         "roe": match a.roe { RoeS::Never => "weapons hold", RoeS::IfFiredUpon => "fire only if fired upon", RoeS::WithinShortRange => "fire within short range", RoeS::Always => "fire at any enemy in reach" },
         "headingFor": goal,
+        "gameTimeLeftMin": time_left_min,
     });
     // Its ground.
     let g = &s.ctx.ground;

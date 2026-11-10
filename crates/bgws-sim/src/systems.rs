@@ -812,7 +812,7 @@ fn warhead_of(m: &bgws_catalogue::Munition) -> Warhead {
     }
 }
 
-fn armour_zones(p: &bgws_catalogue::Platform) -> ArmourZones {
+pub(crate) fn armour_zones(p: &bgws_catalogue::Platform) -> ArmourZones {
     let a = &p.body.armour;
     let z = |name: &str, ke: f64, ce: f64| a.zones.get(name).map(|z| (z.ke.front.max(ke), z.ce.front.max(ce))).unwrap_or((ke, ce));
     let (tf_ke, tf_ce) = z("turret", a.ke.front * 1.2, a.ce.front * 1.2);
