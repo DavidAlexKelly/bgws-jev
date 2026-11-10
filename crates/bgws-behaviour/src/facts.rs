@@ -99,6 +99,7 @@ pub fn land_facts() -> Vec<FactInfo> {
         info("enemy.known", "The enemy is known", Boolean, &[], None),
         info("enemy.rangeM", "Range to the enemy", Number, &[], Some("m")),
         info("orders.urgent", "Its new orders are urgent", Boolean, &[], None),
+        info("orders.moveLeft", "Its orders still have a move to make (a point ahead it has not reached)", Boolean, &[], None),
     ]
 }
 

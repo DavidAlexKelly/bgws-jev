@@ -215,6 +215,7 @@ fn facts_and_gates(st: &Value) -> (BTreeMap<String, FactValue>, Gates) {
     f.insert("enemy.known".into(), FactValue::Bool(nearest.is_some()));
     f.insert("enemy.rangeM".into(), nearest.map(|r| FactValue::Num(r.round())).unwrap_or(FactValue::Null));
     f.insert("orders.urgent".into(), FactValue::Bool(b("/orders/urgent").unwrap_or(false)));
+    f.insert("orders.moveLeft".into(), FactValue::Bool(n("/orders/headingFor/distanceM").is_some_and(|d| d > 150.0)));
     for w in bgws_behaviour::facts::world_facts() {
         f.entry(w.name.to_string()).or_insert(FactValue::Null);
     }

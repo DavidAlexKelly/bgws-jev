@@ -79,6 +79,8 @@ fn facts(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> BTre
     m.insert("enemy.known".into(), FactValue::Bool(enemy.is_some()));
     m.insert("enemy.rangeM".into(), enemy.map(|v| FactValue::Num(v.at.sub(k.pos).horizontal().round())).unwrap_or(FactValue::Null));
     m.insert("orders.urgent".into(), FactValue::Bool(a.mission.urgent));
+    // Its orders still lead somewhere: a move it has not finished, now or in a later step.
+    m.insert("orders.moveLeft".into(), FactValue::Bool(heading_for(a).is_some_and(|g| g.sub(k.pos).horizontal() > MOVE_LEFT_M)));
     // World facts default to null for land units; the world layer fills its own.
     for f in bgws_behaviour::facts::world_facts() {
         m.entry(f.name.to_string()).or_insert(FactValue::Null);
@@ -165,6 +167,9 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
 }
 
 /// Where a move leads: the end of the current move, else of the next one in its orders.
+/// Farther than this from where its orders lead, a unit still has a move to make.
+pub(crate) const MOVE_LEFT_M: f64 = 150.0;
+
 pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
     let end = |x: &Activity| match x {
         Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
