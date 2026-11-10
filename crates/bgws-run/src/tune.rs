@@ -231,12 +231,23 @@ fn jev(w: &Wording, figures: &Figures, model: &Option<String>) -> (Arc<dyn Decid
 }
 
 /// The proposer's reply: rewrites, from an OpenRouter chat model.
+/// Room for the proposer's reply: several whole wordings, each a few thousand tokens.
+const PROPOSER_MAX_TOKENS: u32 = 32_000;
+
 fn propose(proposer: &str, prompt: &str, rt: &tokio::runtime::Runtime) -> Result<(Vec<(String, Wording)>, f64)> {
     let system = "You improve how a fast decision model is asked to make small-unit tactical decisions in a wargame. You rewrite general wording only. Reply with one JSON object and nothing else.";
-    let (text, cost) = rt.block_on(bgws_decide::openrouter::chat(proposer, system, prompt, 16_000, std::time::Duration::from_secs(600))).map_err(|e| anyhow!("proposer: {e}"))?;
+    let (text, cost) = rt.block_on(bgws_decide::openrouter::chat(proposer, system, prompt, PROPOSER_MAX_TOKENS, std::time::Duration::from_secs(900))).map_err(|e| anyhow!("proposer: {e}"))?;
     // The JSON object in the reply (it may come fenced).
     let (a, b) = (text.find('{').ok_or_else(|| anyhow!("proposer: no JSON in its reply"))?, text.rfind('}').ok_or_else(|| anyhow!("proposer: no JSON in its reply"))?);
-    let v: Value = serde_json::from_str(&text[a..=b]).context("proposer: its JSON does not read")?;
+    let v: Value = match serde_json::from_str(&text[a..=b]) {
+        Ok(v) => v,
+        Err(e) => {
+            // Kept for a look: usually a reply cut off at the token limit.
+            let p = std::env::temp_dir().join("bgws-proposer-unreadable.txt");
+            let _ = std::fs::write(&p, &text);
+            return Err(anyhow!("proposer: its JSON does not read ({e}; {} characters, kept in {})", text.len(), p.display()));
+        }
+    };
     let mut out = Vec::new();
     for c in v.get("candidates").and_then(Value::as_array).into_iter().flatten() {
         let rationale = c.get("rationale").and_then(Value::as_str).unwrap_or("").to_string();
