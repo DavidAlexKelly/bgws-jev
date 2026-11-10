@@ -970,6 +970,24 @@ that hit, its departures from doctrine cost more (the generated battalion
 attack is worse in all 8 pairs). Its cases, wording and tuning all predate
 this engine.
 
+Play-outs of its six worst games here put its cost per decision above the
+doctrine default's at every point measured: new contact 0.17 against 0.07,
+fired on 0.22 against 0.16, after a volley 0.90 against 0.30. After a
+volley it fires and moves in 92–95% of answers, where an IFV pressing an
+advance should keep its fire on (cost 2.1 and 3.1); a hidden ATGM team
+fires at first sight; an ATGM team under tank fire pulls back instead of
+answering. Seven of these are cases (`from-suite-generated.json`, the
+last seven). Two tune runs on this engine (the first cut short when the
+proposer's replies overran its token limit, now 32,000) found no rewrite
+that held up: the best scored 30 of 34 training cases, no better than the
+wording now, and every one broke consistency checks. Sending "after a
+volley" to the doctrine default instead (a point cut-off of 1) gave
+−0.05 ± 0.04 against −0.08 ± 0.05, within the noise.
+
+On this engine the doctrine default plays the unit-level decisions better
+than Jev 1.13 does, and rewording what Jev is told no longer closes the
+gap.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
