@@ -914,6 +914,39 @@ stop short) and nothing measurable as Jev's fallback (+0.01 ± 0.04 against
 are checked against the TypeScript golden scenes), so it was left out; the
 fact is there for user templates.
 
+**What firing would do.** Play-outs of first contacts showed carrying on
+and engaging best in situations that looked the same in Jev's state, so it
+now gets, for each enemy it has seen, `ifWeFire`: the weapon the engine
+would fire and the chance one volley hits, from the engine's own sums
+(error budget and presented area, bias averaged out). Identified: against
+that platform, with `penetratesFront`; unidentified: both ways,
+`volleyHitPctIfVehicle` and `volleyHitPctIfTeamInCover`. Also
+`onOurObjective`/`fromOurObjectiveM` (within 600 m of where its orders
+end), `friendsFiringOnIt`, and in its orders `headingFor.etaMin` and
+`gameTimeLeftMin`. At 1.7–2.5 km a tank gun or a 30 mm cannon gives 80–95%
+a volley against a vehicle and 3–9% against a team in cover.
+
+Re-played with it, first contacts on the generated attacks favour carrying
+on in 15 of 23 (by up to 1.45; IFVs as much as tanks), and stopping only
+closer in (1.5 km, on the objective). Six of these are cases. With the new
+state and the wording unchanged Jev gets five of them right (it carries on
+past a far unknown it can barely hurt); a tune run found no rewrite that
+held up on unseen cases (training 27 of 29, held out 8 of 9 already).
+
+In games it changes nothing measurable. Over 256 pairs on fresh seeds
+(5–12, the sixteen scenarios not on a theatre pack), the version with the
+new state against the one without: result +0.000 ± 0.025, exchange
++0.001 ± 0.007 (paired). Jev's answers barely move (new contact: carry on
+67% either way), because the decisive first contacts are a few
+decisions in hundreds per game. It stays, being what a crew would know.
+
+**Found on the way: guided missiles are resolved as gun rounds.** Land
+direct fire puts every round, ATGMs included, through the gun error
+budget, with the missile's flight speed as muzzle velocity. At 180 m/s the
+ten-second flight to 1.9 km gives an ATGM team about 1% a volley against
+a tank. A missile's guidance should take that error away; until it does,
+defenders' missiles hardly count, which favours every attacker.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
