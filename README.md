@@ -846,10 +846,19 @@ each) show what the original seven hid:
 | planner: fire and movement | 12 / 34 | −0.21 ± 0.08 | −0.05 ± 0.02 |
 | Jev 1.13 (tuned wording) against the doctrine default | 29 / 54 | −0.25 ± 0.11 | −0.04 ± 0.02 |
 
-Fire and movement costs most on Kaliningrad's real ground (−0.75 result
-in the company attack and the river crossing: the support-by-fire unit
-and release line are placed without regard to the river or the town) and
-in the fog defence. Jev does worst attacking a dug-in position (−1.00 in
+Fire and movement cost most on Kaliningrad's real ground (−0.75 result
+in the company attack and the river crossing). The cause was not the plan
+but the engine: a phase's route was planned when the order arrived, from
+where the unit stood, so starting the next phase (the bound after the
+release line), or resuming orders after any interruption, sent the unit
+back towards its old position first. On flat ground a route is one
+straight leg, which hid it; on real ground the attack wandered for 90
+minutes. A phase's move is now planned afresh when it starts or resumes.
+After the fix the planner A/B over all nineteen scenarios (seeds 1–4) is
+33 better, 29 worse, result +0.03 ± 0.04, exchange +0.02 ± 0.01: the
+Kaliningrad attacks now gain from it (exchange +0.11 and +0.03), the
+fog defence still loses a little (−0.10), and the calibration vignettes
+are unchanged. Jev does worst attacking a dug-in position (−1.00 in
 both company attacks, 0 better in 8 at even odds) and in the ambush
 (survival −0.16); it does no worse in the urban attack, the Kaliningrad
 company attack and the fog defence. Both were tuned on the seven older
