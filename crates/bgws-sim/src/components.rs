@@ -233,6 +233,8 @@ pub struct Act {
     pub fire_position: Option<Enu>,
     /// Bounding: where this bound began, and the halt it is in (until when).
     pub bound: Option<(Enu, Option<SimTime>)>,
+    /// Guiding a missile it launched: it stays put until then.
+    pub guiding_until: Option<SimTime>,
 }
 
 impl Act {

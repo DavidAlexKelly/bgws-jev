@@ -194,9 +194,22 @@ fn reach_m(s: &Sim, p: &bgws_catalogue::Platform) -> f64 {
 /// (bias averaged out), and that round's penetration at the range, mm, and
 /// whether it is a shaped charge (against chemical-energy armour) or not.
 fn volley_odds(s: &Sim, e: bevy_ecs::prelude::Entity, range: f64, pres: &bgws_models::direct_fire::Presented) -> Option<(String, f64, f64, bool)> {
-    use bgws_models::direct_fire as df;
     let (i, h, a, c, arms) = (s.world.get::<Ident>(e)?, s.world.get::<Health>(e)?, s.world.get::<Act>(e)?, s.world.get::<Crew>(e)?, s.world.get::<Arms>(e)?);
-    let m = arms.mounts.iter().find(|m| m.rounds > 0 && !crate::domains::fires::indirect_mount(&i.platform, m.index))?;
+    // The mount the engine would choose: of those that reach, the most likely to hit.
+    let mut best: Option<(String, f64, f64, bool)> = None;
+    for m in arms.mounts.iter().filter(|m| m.rounds > 0 && !crate::domains::fires::indirect_mount(&i.platform, m.index)) {
+        if let Some(o) = mount_odds(s, i, h, a, c, m, range, pres) {
+            if best.as_ref().is_none_or(|b| o.1 > b.1) {
+                best = Some(o);
+            }
+        }
+    }
+    best
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mount_odds(s: &Sim, i: &Ident, h: &Health, a: &Act, c: &Crew, m: &MountState, range: f64, pres: &bgws_models::direct_fire::Presented) -> Option<(String, f64, f64, bool)> {
+    use bgws_models::direct_fire as df;
     let mun = s.ctx.catalogue.munition(&m.munition)?;
     if range > mun.max_range_m || range < mun.min_range_m {
         return None;

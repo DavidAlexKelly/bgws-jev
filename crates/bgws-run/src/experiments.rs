@@ -61,6 +61,41 @@ pub fn mbt_engagement(f: &Figures, seed: Seed) -> Value {
     Some(if e.fire(&pres, &b, &p, &mut r).hit { 1.0 } else { 0.0 })
 }
 
+/// ATGM engagement [no primary source]: a dug-in ATGM team against a tank
+/// platoon advancing on it over open, flat ground from about 4 km, played in
+/// the sim with the rules (the missiles' flight, the gunner keeping sight
+/// of the target, suppression from the tanks' fire). The share of the
+/// missiles launched that hit.
+pub fn atgm_engagement(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-company-attack")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let mut v = crate::scengen::build(&spec).ok()?;
+    let keep = ["b-1", "b-hq", "r-at-2", "r-hq"];
+    v["forces"].as_array_mut()?.retain(|x| x["id"].as_str().is_some_and(|i| keep.contains(&i)));
+    for h in v["command"]["hqs"].as_array_mut()? {
+        let sub = if h["side"] == "blue" { "b-1" } else { "r-at-2" };
+        h["subordinates"] = serde_json::json!([sub]);
+    }
+    v["victory"] = serde_json::json!([]);
+    let sc = ScenarioV4::from_json(&v.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(40.0 * 60.0));
+    let (mut launched, mut hit) = (0.0, 0.0);
+    for e in sim.drain_events() {
+        let d = &e.data;
+        let atgm = d.get("munition").and_then(serde_json::Value::as_str).is_some_and(|m| m.starts_with("atgm"));
+        if !atgm {
+            continue;
+        }
+        match e.kind.as_str() {
+            "fire.launch" => launched += d.get("rounds").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
+            "fire.hit" | "fire.kill" => hit += d.get("hits").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
+            _ => {}
+        }
+    }
+    (launched > 0.0).then(|| hit / launched)
+}
+
 /// FPV strike by a skilled crew: of the hits, did it fail to destroy? [P9]
 pub fn fpv(f: &Figures, seed: Seed) -> Value {
     use bgws_ops::drones::*;
@@ -416,6 +451,7 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
         };
         let r = match v.id.as_str() {
             "mbt-engagement" => check(&mbt_engagement),
+            "atgm-engagement" => check(&atgm_engagement),
             "fpv-effectiveness" => check(&fpv),
             "shahed-raid" => check(&shahed),
             "ballistic-missile-defence" => check(&bmd),
@@ -469,6 +505,7 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
     let exp: Box<ExperimentFn> = match id {
         "mbt-engagement" => Box::new(mbt_engagement),
+        "atgm-engagement" => Box::new(atgm_engagement),
         "fpv-effectiveness" => Box::new(fpv),
         "shahed-raid" => Box::new(shahed),
         "ballistic-missile-defence" => Box::new(bmd),

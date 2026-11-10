@@ -41,7 +41,7 @@ pub struct QuietState {
 
 /// No contact, nothing in flight, no question, trigger or report waiting.
 pub fn quiet_now(s: &Sim) -> bool {
-    if s.ctx.over.is_some() || !s.ctx.triggers.is_empty() || !s.ctx.reports.is_empty() || s.ctx.pending.values().any(|p| !p.answered) {
+    if s.ctx.over.is_some() || !s.ctx.triggers.is_empty() || !s.ctx.reports.is_empty() || !s.ctx.missiles.is_empty() || s.ctx.pending.values().any(|p| !p.answered) {
         return false;
     }
     if crate::world::fast_active(s) || crate::world::air_active(s) {

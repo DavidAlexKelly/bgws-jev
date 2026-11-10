@@ -152,6 +152,8 @@ pub struct Ctx {
     /// The obstacles on the ground and the sides that know of them, for the
     /// route planner (refreshed by the engineers' tick).
     pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
+    /// Guided missile volleys in flight.
+    pub missiles: Vec<crate::systems::InFlight>,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,
     pub(crate) reports: Vec<(SimTime, Side, bgws_know::Detection)>,
     pub(crate) last_plan: BTreeMap<Side, Plan>,
@@ -271,6 +273,7 @@ impl Sim {
             by_name: BTreeMap::new(),
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
             route_obstacles: Vec::new(),
+            missiles: Vec::new(),
             last_asked: BTreeMap::new(),
             reports: Vec::new(),
             last_plan: BTreeMap::new(),
@@ -871,6 +874,7 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 volleys: 0,
                 fire_position: None,
                 bound: None,
+                guiding_until: None,
             },
             Aware::default(),
             SigState { engine_on: domain != Domain::Land || platform.mover.kind != bgws_catalogue::MoverKind::Foot, ..Default::default() },
