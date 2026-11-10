@@ -6,14 +6,16 @@
 mod common;
 use bgws_core::{AnswerSource, Side};
 use bgws_decide::jev::{bias_words, parse_choices};
+use bgws_decide::jev_ask::Style;
 use bgws_decide::{ApiKey, Decider, JevClient, JevConfig};
 use common::*;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+/// The legacy style: one request per side, templated instructions, a cut-off.
 fn client(url: &str, key: Option<&str>) -> JevClient {
-    let cfg = JevConfig { url: format!("{url}/api/alpha/decisions"), timeout: Duration::from_millis(500), ..JevConfig::default() };
+    let cfg = JevConfig { url: format!("{url}/api/alpha/decisions"), timeout: Duration::from_millis(500), style: Style::Legacy, ..JevConfig::default() };
     JevClient::with_http(http(), key.and_then(ApiKey::new), cfg)
 }
 
@@ -49,7 +51,7 @@ async fn asks_one_choice_per_question_in_one_request_and_takes_a_confident_answe
     assert_eq!((req.method.as_str(), req.path.as_str()), ("POST", "/api/alpha/decisions"));
     assert_eq!(req.header("authorization"), Some("Bearer sk-or-test"));
     assert_eq!(req.header("x-title"), Some("BGWS"));
-    assert_eq!(req.body["model"], "typesafe/jev-1.13");
+    assert_eq!(req.body["model"], bgws_decide::jev::JEV_MODEL);
     assert_eq!(req.body["state"]["you"], "blue");
     let qs = req.body["questions"].as_object().unwrap();
     assert_eq!(qs.keys().collect::<Vec<_>>(), ["q0", "q1"]);
@@ -116,7 +118,7 @@ async fn a_units_state_goes_as_named_fields() {
     assert_ne!(q.cache_key(), q2.cache_key());
     // With prose, the words go too.
     let mock2 = serve(answer_all(0.8)).await;
-    let cfg = JevConfig { url: format!("{}/api/alpha/decisions", mock2.url), timeout: Duration::from_millis(500), prose: true, ..JevConfig::default() };
+    let cfg = JevConfig { url: format!("{}/api/alpha/decisions", mock2.url), timeout: Duration::from_millis(500), prose: true, style: Style::Legacy, ..JevConfig::default() };
     JevClient::with_http(http(), ApiKey::new("k"), cfg).decide(Side::Red, vec![q]).await;
     let t = mock2.request(0).body["questions"]["u0"]["instructions"].as_str().unwrap().to_string();
     assert!(t.contains("has run into the contact R3") && t.contains("under units.R1"), "{t}");
@@ -200,4 +202,33 @@ fn parsing_is_tolerant_but_never_invents() {
     assert!(parse_choices(&not_offered, &offered).is_empty());
     assert_eq!(bias_words(0), "");
     assert_eq!(bias_words(-1), " [discouraged by its doctrine]");
+}
+
+/// The plain style: each land unit with a state in its own request, its
+/// state cut to what the decision point needs, one plain question, the
+/// options described by their actions, and no confidence cut-off; world
+/// questions still go together.
+#[tokio::test]
+async fn the_plain_style_asks_each_unit_on_its_own() {
+    let mock = serve(answer_all(0.1)).await;
+    let cfg = JevConfig { url: format!("{}/api/alpha/decisions", mock.url), timeout: Duration::from_millis(500), style: Style::Plain, ..JevConfig::default() };
+    let jev = JevClient::with_http(http(), ApiKey::new("k"), cfg);
+    let mut a = land_question(1, "R1");
+    a.state = Some(json!({ "unit": { "name": "R1" }, "orders": { "doing": "moving" }, "weapons": [1], "friendsWithin3km": [{ "unit": "R2" }], "enemiesSeen": [{ "rangeM": 1_500.0, "thisDecisionIsAboutIt": true }] }));
+    let mut b = a.clone();
+    b.id = bgws_core::QuestionId(2);
+    b.agent = "R2".into();
+    let answers = jev.decide(Side::Red, vec![a, b, world_question(3)]).await;
+    assert_eq!(mock.calls(), 3, "one request per unit, and one for the world question");
+    let unit_reqs: Vec<Value> = (0..3).map(|i| mock.request(i).body).filter(|b| b["questions"].get("next").is_some()).collect();
+    assert_eq!(unit_reqs.len(), 2);
+    let body = &unit_reqs[0];
+    assert!(body["state"].get("weapons").is_none() && body["state"].get("friendsWithin3km").is_none(), "cut to what D1 needs: {}", body["state"]);
+    assert!(body["state"]["knowledge"].as_str().unwrap().starts_with("Only what this unit believes"));
+    let q = &body["questions"]["next"];
+    let text = q["instructions"].as_str().unwrap();
+    assert!(!text.contains("intent comes first") && text.contains("`unit`"), "plain: {text}");
+    assert!(q["criteria"]["engage"].as_str().unwrap().len() > 10, "described by its action");
+    // No cut-off: a peaked-low answer still stands.
+    assert!(answers.iter().all(|x| x.source == AnswerSource::Jev), "{answers:?}");
 }

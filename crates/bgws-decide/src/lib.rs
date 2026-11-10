@@ -17,6 +17,7 @@ pub mod decider;
 pub mod hq;
 pub mod http;
 pub mod jev;
+pub mod jev_ask;
 pub mod key;
 pub mod local;
 pub mod openrouter;

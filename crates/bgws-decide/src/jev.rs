@@ -24,7 +24,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 /// The pinned model: `-latest` would make yesterday's experiment unrepeatable.
-pub const JEV_MODEL: &str = "typesafe/jev-1.13";
+pub const JEV_MODEL: &str = "typesafe/jev-1.14";
 /// OpenRouter's Decisions API (alpha).
 pub const OPENROUTER_DECISIONS_URL: &str = "https://openrouter.ai/api/alpha/decisions";
 /// The environment variable the key is read from.
@@ -89,7 +89,7 @@ pub fn parse_choices(body: &Value, offered: &BTreeMap<String, Vec<String>>) -> B
 /// An option's key in the request: its own id when that is a plain word
 /// (`engageNow`, `keep`), which reads better to the model than `o3`;
 /// else `o<index>`. Unique within the question.
-fn option_key(id: &str, index: usize, taken: &[String]) -> String {
+pub(crate) fn option_key(id: &str, index: usize, taken: &[String]) -> String {
     let plain = !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     if plain && !taken.iter().any(|t| t == id) {
         id.to_string()
@@ -293,6 +293,8 @@ pub struct JevConfig {
     pub prose: bool,
     /// How questions are worded (and the confidence cut-offs a tuned wording sets).
     pub wording: Wording,
+    /// How Jev is asked (`BGWS_JEV_STYLE`): see [`crate::jev_ask::Style`].
+    pub style: crate::jev_ask::Style,
 }
 
 impl JevConfig {
@@ -307,6 +309,7 @@ impl JevConfig {
             directive: None,
             prose: false,
             wording: Wording::default(),
+            style: crate::jev_ask::Style::from_env(),
         }
     }
 }
@@ -333,6 +336,7 @@ struct JevChoiceById {
 
 /// The Jev client: a [`Decider`] for one or both sides.
 pub struct JevClient {
+    vocab: bgws_behaviour::Vocabulary,
     http: reqwest::Client,
     key: Option<ApiKey>,
     cfg: JevConfig,
@@ -354,7 +358,8 @@ impl JevClient {
     /// With a given HTTP client (tests pass one without a proxy).
     pub fn with_http(http: reqwest::Client, key: Option<ApiKey>, cfg: JevConfig) -> JevClient {
         let name = cfg.model.clone();
-        JevClient { http, key, cfg, cache: Mutex::new(Cache::default()), spent: Mutex::new(BTreeMap::new()), name }
+        let name = if cfg.style == crate::jev_ask::Style::Legacy { name } else { format!("{name}+{}", cfg.style.word()) };
+        JevClient { vocab: bgws_behaviour::Vocabulary::builtin(), http, key, cfg, cache: Mutex::new(Cache::default()), spent: Mutex::new(BTreeMap::new()), name }
     }
 
     /// What this client has spent for a side, as OpenRouter reported it.
@@ -387,9 +392,12 @@ impl JevClient {
         }
     }
 
-    /// Turn an answer by id into an Answer, applying the threshold.
+    /// Turn an answer by id into an Answer, applying the threshold (the
+    /// legacy style only: confidence measures how peaked the answer is, not
+    /// how likely it is to be right).
     fn answer(&self, q: &Question, c: &JevChoiceById, source: AnswerSource, latency_ms: Option<u64>, cost: Option<f64>) -> Answer {
-        if c.confidence >= self.cfg.wording.threshold(&q.trigger, self.cfg.min_confidence) && q.has_option(&c.choice) {
+        let cut = if self.cfg.style == crate::jev_ask::Style::Legacy { self.cfg.wording.threshold(&q.trigger, self.cfg.min_confidence) } else { 0.0 };
+        if c.confidence >= cut && q.has_option(&c.choice) {
             Answer {
                 question: q.id,
                 choice: c.choice.clone(),
@@ -424,10 +432,23 @@ impl Decider for JevClient {
                 None => ask.push(i),
             }
         }
-        if !ask.is_empty() {
-            let batch: Vec<Question> = ask.iter().map(|&i| questions[i].clone()).collect();
+        // Land units one per request (plain, judge); the rest together.
+        let (single, together): (Vec<usize>, Vec<usize>) = if self.cfg.style == crate::jev_ask::Style::Legacy {
+            (Vec::new(), ask)
+        } else {
+            ask.into_iter().partition(|&i| questions[i].kind == QuestionKind::Unit && questions[i].state.is_some())
+        };
+        if !single.is_empty() {
+            let qs: Vec<Question> = single.iter().map(|&i| questions[i].clone()).collect();
+            let answers = self.ask_each(side, &qs).await;
+            for (i, a) in single.into_iter().zip(answers) {
+                out[i] = Some(a);
+            }
+        }
+        if !together.is_empty() {
+            let batch: Vec<Question> = together.iter().map(|&i| questions[i].clone()).collect();
             let answers = self.ask(side, &batch).await;
-            for (i, a) in ask.into_iter().zip(answers) {
+            for (i, a) in together.into_iter().zip(answers) {
                 out[i] = Some(a);
             }
         }
@@ -447,7 +468,45 @@ impl JevClient {
         let (body, keyed) = build_request_worded(&self.cfg.model, side, batch, self.cfg.directive.as_deref(), self.cfg.max_choices, self.cfg.prose, &self.cfg.wording);
         let auth = format!("Bearer {}", key.expose());
         let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
-        let reply = match post_json(&self.http, &self.cfg.url, &headers, &body, self.cfg.timeout).await {
+        let reply = post_json(&self.http, &self.cfg.url, &headers, &body, self.cfg.timeout).await;
+        self.read(side, batch, &keyed, reply)
+    }
+
+    /// Each land unit's question in its own request, all at once.
+    async fn ask_each(&self, side: Side, qs: &[Question]) -> Vec<Answer> {
+        let Some(key) = &self.key else {
+            return qs.iter().map(|q| Answer::fallback(q, format!("Jev unavailable (no OpenRouter key: set {KEY_ENV}) — the fallback stands"))).collect();
+        };
+        let mut set = tokio::task::JoinSet::new();
+        let mut keyed: Vec<Keyed> = Vec::new();
+        for (i, q) in qs.iter().enumerate() {
+            let (body, k) = crate::jev_ask::plain_request(&self.cfg.model, q, self.cfg.max_choices, &self.vocab);
+            keyed.push(k);
+            let (http, url, auth, timeout) = (self.http.clone(), self.cfg.url.clone(), format!("Bearer {}", key.expose()), self.cfg.timeout);
+            set.spawn(async move {
+                let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
+                (i, post_json(&http, &url, &headers, &body, timeout).await)
+            });
+        }
+        let mut replies: Vec<Option<Result<crate::http::Reply, HttpError>>> = (0..qs.len()).map(|_| None).collect();
+        while let Some(done) = set.join_next().await {
+            if let Ok((i, r)) = done {
+                replies[i] = Some(r);
+            }
+        }
+        qs.iter()
+            .zip(keyed)
+            .zip(replies)
+            .map(|((q, k), r)| match r {
+                Some(r) => self.read(side, std::slice::from_ref(q), std::slice::from_ref(&k), r).pop().unwrap_or_else(|| Answer::fallback(q, "Jev gave no answer")),
+                None => Answer::fallback(q, "Jev's request did not finish — the fallback stands"),
+            })
+            .collect()
+    }
+
+    /// Read one reply's answers for its questions.
+    fn read(&self, side: Side, batch: &[Question], keyed: &[Keyed], reply: Result<crate::http::Reply, HttpError>) -> Vec<Answer> {
+        let reply = match reply {
             Ok(r) => r,
             Err(e) => {
                 let why = match &e {
@@ -470,7 +529,7 @@ impl JevClient {
         let share = cost.map(|c| c / batch.len() as f64);
         batch
             .iter()
-            .zip(&keyed)
+            .zip(keyed)
             .map(|(q, k)| match parsed.get(&k.key) {
                 Some(c) => {
                     let id_of = |key: &str| k.options.iter().find(|(ok, _)| ok == key).map(|(_, id)| id.clone());
