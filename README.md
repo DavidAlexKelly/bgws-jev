@@ -864,6 +864,31 @@ both company attacks, 0 better in 8 at even odds) and in the ambush
 company attack and the fog defence. Both were tuned on the seven older
 scenarios, which these now check.
 
+**Tuning Jev on them.** Play-outs of Jev's worst games on the generated
+training scenarios gave two patterns, now four cases. A unit halted part
+way through its orders with ground still to cover chose overwatch where
+resuming was 0.5–1.6 better (`d10-step-done.json`). On the even-odds
+attack's first contact, a tank troop moving on step 1 of 3 stopped to
+engage an unidentified, stationary contact at 2.4 km where carrying on was
+0.7–1.4 better (`from-suite-generated.json`). A tune run (3 rounds, 12
+rewrites) took none: the two best passed all 22 training cases (against
+19) but each lost one of 30 consistency checks. The better of them, which
+only rewrites the option descriptions (resume is right while steps remain;
+hold and overwatch stall an unfinished plan; fire only at what is in
+reach), was then played on all nineteen scenarios against the wording it
+replaces (seeds 1–4, 152 paired games each against the doctrine default):
+
+| wording | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| before | 42 / 71 | −0.09 ± 0.05 | −0.02 ± 0.01 |
+| now (`data/jev/wording.json`) | 43 / 71 | −0.01 ± 0.03 | −0.02 ± 0.01 |
+
+Most of the gain is the even-odds attack (−1.00 to −0.25); the held-out
+fog defence (−0.12 to +0.12) and withdrawal (−0.25 to 0.00, exchange
++0.08) improve too. It is still level with the doctrine default rather than
+ahead, and it still engages on the first-contact cases (held out, so no
+rewrite saw them).
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream
