@@ -26,5 +26,57 @@
    "keep"
   ],
   "wrong": []
+ },
+ {
+  "id": "tank-idle-mid-attack-nothing-seen",
+  "point": "D10",
+  "base": "tank-troop",
+  "why": "Halted part way through its orders (step 1 of 2, its next point 1.4 km off), nothing in sight for ten minutes: the attack only moves if it does. Resume the orders; staying put stalls the attack.",
+  "set": {
+   "orders.phase": "1 of 2",
+   "orders.doing": "on overwatch",
+   "orders.purpose": "attack: take the objective and hold it",
+   "orders.headingFor": {
+    "distanceM": 1400,
+    "bearing": "north-east"
+   },
+   "unit.posture": "hull-down in cover",
+   "unit.lastFiredS": 600,
+   "ground.cover": 0.4,
+   "ground.concealment": 0.4,
+   "ground.land": "forestlight"
+  },
+  "acceptable": [
+   "resume"
+  ],
+  "wrong": [
+   "overwatch",
+   "hold",
+   "keep"
+  ]
+ },
+ {
+  "id": "infantry-idle-mid-advance-nothing-seen",
+  "point": "D10",
+  "base": "infantry-section",
+  "why": "An infantry section stopped on the way to its objective (step 1 of 3, 900 m to go), no enemy seen: carry on with its orders.",
+  "set": {
+   "orders.phase": "1 of 3",
+   "orders.doing": "holding",
+   "orders.purpose": "attack: take the objective",
+   "orders.headingFor": {
+    "distanceM": 900,
+    "bearing": "north"
+   },
+   "unit.posture": "halted"
+  },
+  "acceptable": [
+   "resume"
+  ],
+  "wrong": [
+   "overwatch",
+   "hold",
+   "keep"
+  ]
  }
 ]
