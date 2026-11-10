@@ -207,7 +207,11 @@ fn volley_odds(s: &Sim, e: bevy_ecs::prelude::Entity, range: f64, pres: &bgws_mo
     let gun = if mun.kind == bgws_catalogue::MunitionKind::SmallArms { p.rifle } else { df::Gun { muzzle_velocity_mps: mun.speed_ms.max(100.0), ..p.mbt_gun } };
     let moving = a.posture == Posture::Moving && !mount.fire_control.stabilised;
     let shot = df::Shot { range_m: range, firer_moving: moving, target_crossing_mps: 0.0, skill_mult: c.skill.error_mult(&s.ctx.p.people), suppression: c.suppression.level };
-    let ph = df::ph_expected(pres, &df::error_budget(&gun, &fc, &shot, p));
+    let ph = if crate::systems::is_guided_direct(mun) {
+        df::guided_ph(crate::systems::operator_guided(mun), c.suppression.level, p)
+    } else {
+        df::ph_expected(pres, &df::error_budget(&gun, &fc, &shot, p))
+    };
     let rounds = ((h.fit as f64 * s.ctx.p.rounds_per_volley).round().max(1.0)).min(m.rounds as f64);
     let chemical = matches!(mun.kind, bgws_catalogue::MunitionKind::Heat | bgws_catalogue::MunitionKind::Atgm);
     Some((mount.id.clone(), 1.0 - (1.0 - ph).powf(rounds), mun.penetration_at(range), chemical))

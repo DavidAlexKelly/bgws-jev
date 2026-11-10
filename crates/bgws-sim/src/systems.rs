@@ -812,6 +812,18 @@ fn warhead_of(m: &bgws_catalogue::Munition) -> Warhead {
     }
 }
 
+/// A guided munition fired direct (an anti-tank missile): resolved by its
+/// guidance, not the gun error budget.
+pub(crate) fn is_guided_direct(m: &bgws_catalogue::Munition) -> bool {
+    m.guidance != bgws_catalogue::Guidance::None && matches!(m.kind, bgws_catalogue::MunitionKind::Atgm)
+}
+
+/// Guided by the gunner to the end (wire, laser, a joystick, fibre): the
+/// gunner's suppression degrades it more than a fire-and-forget seeker's.
+pub(crate) fn operator_guided(m: &bgws_catalogue::Munition) -> bool {
+    matches!(m.guidance, bgws_catalogue::Guidance::Wire | bgws_catalogue::Guidance::Laser | bgws_catalogue::Guidance::Operator | bgws_catalogue::Guidance::Fibre)
+}
+
 pub(crate) fn armour_zones(p: &bgws_catalogue::Platform) -> ArmourZones {
     let a = &p.body.armour;
     let z = |name: &str, ke: f64, ce: f64| a.zones.get(name).map(|z| (z.ke.front.max(ke), z.ce.front.max(ce))).unwrap_or((ke, ce));
@@ -934,8 +946,21 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     let armour = armour_zones(&tplat);
     let prot = Protection { era: tplat.body.era, aps: tplat.body.aps.is_some() };
     let pen = mun.penetration_at(range);
+    // A guided missile is flown onto the target: its chance of arriving is
+    // the guidance's, not a gun's dispersion over a long flight.
+    let guided = is_guided_direct(mun);
+    let operator_guided = operator_guided(mun);
     for _ in 0..rounds {
-        let r = engagement.fire(&pres, &budget, &p, &mut rng);
+        let r = if guided {
+            let ph = df::guided_ph(operator_guided, supp, &p);
+            let hit = rng.gen::<f64>() < ph;
+            let (fx, fy) = (rng.gen_range(0.3..0.7), rng.gen_range(0.3..0.7));
+            // A miss still lands close by (and suppresses).
+            let off = if hit { 0.0 } else { pres.width_m.max(1.0) };
+            df::RoundResult { hit, x_m: off, y_m: 0.0, x_frac: fx, y_frac: fy, ph }
+        } else {
+            engagement.fire(&pres, &budget, &p, &mut rng)
+        };
         ph_last = r.ph;
         if !r.hit {
             if r.x_m.abs() < p.near_miss_radius_m * 3.0 && r.y_m.abs() < p.near_miss_radius_m * 3.0 {

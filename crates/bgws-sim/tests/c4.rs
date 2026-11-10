@@ -235,10 +235,12 @@ fn kill_zone_depth_from_link_budgets() {
 
 #[test]
 fn out_of_comms_units_keep_to_their_intent() {
-    let sc = scenario("m3-battalion-attack");
+    // The C2 over an hour, not who wins: no side's breakpoint ends it early.
+    let mut sc = scenario("m3-battalion-attack");
+    sc.victory.clear();
     let mut sim = Sim::new(&sc, Seed(4), default_figures()).unwrap();
     sim.run_with_rules(SimTime::from_secs(120.0));
-    let unit = id(&sim, "b-a-1");
+    let unit = id(&sim, "b-b-2");
     let e = sim.ctx.entity(unit);
     let mission0 = sim.world.get::<bgws_sim::components::Act>(e).unwrap().mission.clone();
     assert!(mission0.purpose.starts_with("attack"), "{:?}", mission0.purpose);
@@ -314,8 +316,12 @@ fn same_seed_same_game_and_threads_do_not_matter() {
 
 #[test]
 fn hq_situation_uses_the_cop_and_seats_answer() {
-    let sc = scenario("m3-battalion-attack");
-    let mut sim = Sim::new(&sc, Seed(2), default_figures()).unwrap();
+    let mut sc = scenario("m3-battalion-attack");
+    sc.victory.clear();
+    // A half-hour battle rhythm, so a plan starts in the window whatever the fight does.
+    let mut f = default_figures();
+    f.set("sim.c2.rhythm_h", 0.5).unwrap();
+    let mut sim = Sim::new(&sc, Seed(2), f).unwrap();
     sim.set_seat(Side::Red, bgws_sim::SeatKind::Rules);
     sim.run_with_rules(SimTime::from_secs(40.0 * 60.0));
     let sit = sim.hq_situation(Side::Red, "test");
