@@ -440,7 +440,7 @@ impl Decider for JevClient {
         };
         if !single.is_empty() {
             let qs: Vec<Question> = single.iter().map(|&i| questions[i].clone()).collect();
-            let answers = self.ask_each(side, &qs).await;
+            let answers = if self.cfg.style == crate::jev_ask::Style::Judge { self.judge(&qs).await } else { self.ask_each(side, &qs).await };
             for (i, a) in single.into_iter().zip(answers) {
                 out[i] = Some(a);
             }
@@ -500,6 +500,63 @@ impl JevClient {
             .map(|((q, k), r)| match r {
                 Some(r) => self.read(side, std::slice::from_ref(q), std::slice::from_ref(&k), r).pop().unwrap_or_else(|| Answer::fallback(q, "Jev gave no answer")),
                 None => Answer::fallback(q, "Jev's request did not finish — the fallback stands"),
+            })
+            .collect()
+    }
+
+    /// The judge style: each unit's decision from its point's table, with
+    /// Jev asked only for the judgments a row turns on (all at once); a
+    /// point without a table takes the doctrine default.
+    async fn judge(&self, qs: &[Question]) -> Vec<Answer> {
+        use crate::jev_judge::{decide, judge_request, judgments, parse_nouls, read, Facts};
+        let facts: Vec<Facts> = qs.iter().map(|q| q.state.as_ref().map(Facts::from_state).unwrap_or_default()).collect();
+        let mut set = tokio::task::JoinSet::new();
+        for (i, (q, f)) in qs.iter().zip(&facts).enumerate() {
+            let js = judgments(&q.trigger, f);
+            let Some(key) = self.key.as_ref().filter(|_| !js.is_empty()) else { continue };
+            let body = judge_request(&self.cfg.model, q, &js);
+            let (http, url, auth, timeout) = (self.http.clone(), self.cfg.url.clone(), format!("Bearer {}", key.expose()), self.cfg.timeout);
+            set.spawn(async move {
+                let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
+                (i, post_json(&http, &url, &headers, &body, timeout).await)
+            });
+        }
+        let mut replies: Vec<Option<crate::http::Reply>> = (0..qs.len()).map(|_| None).collect();
+        while let Some(done) = set.join_next().await {
+            if let Ok((i, Ok(r))) = done {
+                replies[i] = Some(r);
+            }
+        }
+        qs.iter()
+            .zip(&facts)
+            .zip(replies)
+            .map(|((q, f), reply)| {
+                let nouls = reply.as_ref().map(|r| parse_nouls(&r.body)).unwrap_or_default();
+                let cost = reply.as_ref().and_then(|r| r.body.pointer("/usage/cost").and_then(Value::as_f64));
+                if let (Some(c), Ok(mut m)) = (cost, self.spent.lock()) {
+                    *m.entry(q.side).or_insert(0.0) += c;
+                }
+                let judged = |k: &str| read(nouls.get(k).copied());
+                let said: Vec<String> = nouls.iter().map(|(k, p)| format!("{k} {:.0}%", p * 100.0)).collect();
+                let (choice, why) = match decide(&q.trigger, f, &judged) {
+                    Some((prefer, row)) => match prefer.iter().find(|id| q.has_option(id)) {
+                        Some(id) => (id.to_string(), format!("table {}: {row}", q.trigger)),
+                        None => (q.rules_choice.clone(), format!("table {} ({row}) offers none of its options here: the doctrine's choice", q.trigger)),
+                    },
+                    None => (q.rules_choice.clone(), "no table at this point: the doctrine's choice".to_string()),
+                };
+                let choice = if q.has_option(&choice) { choice } else { q.fallback.clone() };
+                Answer {
+                    question: q.id,
+                    choice,
+                    probabilities: None,
+                    confidence: None,
+                    source: if reply.is_some() { AnswerSource::Jev } else { AnswerSource::Rules },
+                    plan: None,
+                    cost_usd: cost,
+                    latency_ms: reply.as_ref().map(|r| r.latency_ms),
+                    rationale: Some(if said.is_empty() { why } else { format!("{why} (Jev judged: {})", said.join(", ")) }),
+                }
             })
             .collect()
     }

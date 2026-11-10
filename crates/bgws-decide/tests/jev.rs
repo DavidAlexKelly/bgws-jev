@@ -232,3 +232,28 @@ async fn the_plain_style_asks_each_unit_on_its_own() {
     // No cut-off: a peaked-low answer still stands.
     assert!(answers.iter().all(|x| x.source == AnswerSource::Jev), "{answers:?}");
 }
+
+/// The judge style: a decision the facts settle is made in code with no
+/// request; one that turns on a judgment asks Jev that Noul alone, and the
+/// table reads the answer.
+#[tokio::test]
+async fn the_judge_style_asks_only_for_judgments() {
+    let mock = serve(|_, _| Reply::json(200, json!({"answers": {"vehicle": {"type": "noul", "noul": 0.9}}, "usage": {"cost": 0.0003}}))).await;
+    let cfg = JevConfig { url: format!("{}/api/alpha/decisions", mock.url), timeout: Duration::from_millis(500), style: Style::Judge, ..JevConfig::default() };
+    let jev = JevClient::with_http(http(), ApiKey::new("k"), cfg);
+    let unit = |id: u64, range: f64| {
+        let mut q = land_question(id, "R1");
+        q.state = Some(json!({ "unit": { "posture": "moving" }, "orders": { "headingFor": { "distanceM": 900.0 } }, "ground": { "cover": 0.1 },
+            "enemiesSeen": [{ "rangeM": range, "identified": false, "inOurReach": true, "thisDecisionIsAboutIt": true }] }));
+        q
+    };
+    let answers = jev.decide(Side::Red, vec![unit(1, 2_300.0), unit(2, 450.0)]).await;
+    assert_eq!(mock.calls(), 1, "only the close, unidentified contact needs a judgment");
+    let body = mock.request(0).body;
+    assert_eq!(body["questions"]["vehicle"]["type"], "noul");
+    assert_eq!(answers[0].choice, "keep", "far: carry on, from the facts");
+    assert_eq!(answers[0].source, AnswerSource::Rules);
+    assert_eq!(answers[1].choice, "engage", "close and judged a vehicle: engage");
+    assert_eq!(answers[1].source, AnswerSource::Jev);
+    assert!(answers[1].rationale.as_deref().unwrap().contains("vehicle 90%"));
+}
