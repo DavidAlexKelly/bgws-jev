@@ -889,6 +889,31 @@ fog defence (−0.12 to +0.12) and withdrawal (−0.25 to 0.00, exchange
 ahead, and it still engages on the first-contact cases (held out, so no
 rewrite saw them).
 
+A second tune run, with three more first-contact cases from the other
+games (two landing in training), did take a rewrite: option descriptions
+that say carrying on is usually right for a far, unidentified, static or
+silent contact while orders still have ground to cover; that engaging is
+right only when a weapon that can hurt the target reaches it; and that
+light weapons do not hurt armour. Training cases 22 to 24 of 24; held-out
+cases 4 right and 3 wrong to 7 right and 0 wrong of 8; held-out games
+−0.07 to −0.00. Over all nineteen scenarios it is level with the wording
+before it (−0.01 ± 0.03, 30 better and 61 worse): the even-odds attack
+improves (exchange −0.15 to −0.04) and the held-out withdrawal is worse
+(exchange +0.08 to −0.10). On the cases it is clearly better; in games,
+Jev now matches the doctrine default rather than beating it.
+
+**Not changed: the doctrine at D10.** The default template answers "order
+step done" with overwatch whether or not the unit has ground left to
+cover. A branch on a new fact, `orders.moveLeft` (its orders still lead
+somewhere over 150 m off), was tried: resume when they do. Measured with
+`examples/template_ab.rs` (the patch on one side only, paired with the
+doctrine everywhere) it changed nothing under the rules (+0.00 ± 0.01
+over 152 pairs: the rules carry on at first contact, so their units seldom
+stop short) and nothing measurable as Jev's fallback (+0.01 ± 0.04 against
+−0.01 ± 0.03). Shipped templates are kept free of conditions (their walks
+are checked against the TypeScript golden scenes), so it was left out; the
+fact is there for user templates.
+
 Making them found a fault in generated ground: it kept the terrain but
 dropped the generator's rivers and roads, so every river was impassable
 water with no bridge. Half the 3:1 attack's start line sat behind a stream

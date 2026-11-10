@@ -146,7 +146,7 @@ mod tests {
         assert_eq!(m.fact("c"), None);
         assert_eq!(NoFacts.fact("a"), None);
         assert_eq!(FnFacts(|n: &str| (n == "x").then_some(FactValue::Bool(true))).fact("x"), Some(FactValue::Bool(true)));
-        assert_eq!(land_facts().len(), 9);
+        assert_eq!(land_facts().len(), 10);
         assert_eq!(world_facts().len(), 24);
     }
 }
