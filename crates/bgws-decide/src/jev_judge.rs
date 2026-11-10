@@ -168,13 +168,7 @@ pub fn decide(trigger: &str, f: &Facts, judged: &dyn Fn(&str) -> Option<bool>) -
                 (vec!["keep"], "keep at it")
             }
         }
-        "D10" => {
-            if f.move_left {
-                (vec!["resume", "nextPhase"], "its orders still lead on: resume")
-            } else {
-                return None;
-            }
-        }
+        "D10" if f.move_left => (vec!["resume", "nextPhase"], "its orders still lead on: resume"),
         _ => return None,
     })
 }
