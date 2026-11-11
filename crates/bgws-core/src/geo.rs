@@ -13,7 +13,14 @@ pub const EARTH_RADIUS: f64 = 6_371_008.8;
 /// Effective radius factor for radar and radio refraction (the 4/3-Earth model).
 pub const K_RADIO: f64 = 4.0 / 3.0;
 
-/// Latitude and longitude in degrees, height above the ellipsoid in metres.
+/// Latitude and longitude in degrees (WGS-84), height in metres.
+///
+/// The conversions here treat `h` as height above the WGS-84 ellipsoid, but
+/// inside the sim heights are above mean sea level: the terrain comes from
+/// elevation data that is, and the two differ by the geoid undulation (about
+/// 29 m at the Baltic theatre's origin). Inside one game that offset is the
+/// same everywhere and harmless. Where positions leave the sim (DIS, HLA),
+/// `bgws-interop` adds the undulation (EGM96) to get true ellipsoidal heights.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct Geodetic {
     pub lat: f64,

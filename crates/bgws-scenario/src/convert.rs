@@ -370,6 +370,7 @@ pub fn convert_v3(v3: &ScenarioV3, catalogue: Option<&Catalogue>, opts: &Convert
         events,
         notes: v3.caveats.clone(),
         converted_from: None,
+        interop: None,
     };
     // The theatre: the scope's area round the origin, enlarged to hold every position.
     let frame = EnuFrame::new(origin);

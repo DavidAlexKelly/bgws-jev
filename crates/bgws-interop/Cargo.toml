@@ -1,0 +1,17 @@
+[package]
+name = "bgws-interop"
+description = "Interoperability with other simulations: DIS (IEEE 1278.1) now, HLA 4 later (docs/design/INTEROP_PLAN.md)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bgws-core.workspace = true
+bgws-catalogue.workspace = true
+bgws-scenario.workspace = true
+bgws-sim.workspace = true
+dis-rs = "0.14.0"
+bytes = "1"
+serde.workspace = true
+serde_json.workspace = true

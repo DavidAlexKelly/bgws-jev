@@ -678,6 +678,59 @@ pub struct ScenarioV4 {
     pub notes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub converted_from: Option<Provenance>,
+    /// How the game appears to other simulations (DIS, HLA); none for a game
+    /// that is not connected to any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interop: Option<InteropSpec>,
+}
+
+/// A game's identity on a DIS exercise or HLA federation
+/// (docs/design/INTEROP_PLAN.md).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteropSpec {
+    /// The DIS exercise identifier (1-255).
+    #[serde(default = "one_u8")]
+    pub exercise: u8,
+    /// This simulation's DIS site and application numbers.
+    #[serde(default = "one_u16")]
+    pub site: u16,
+    #[serde(default = "one_u16")]
+    pub application: u16,
+    /// The country (SISO-REF-010) each side's generic platforms are shown
+    /// as; a side not listed is 0, Other.
+    #[serde(default)]
+    pub country: BTreeMap<Side, u16>,
+    /// The DIS force each side is (SISO-REF-010 Force ID); by default blue 1
+    /// Friendly, red 2 Opposing, neutral 3 Neutral.
+    #[serde(default)]
+    pub force: BTreeMap<Side, u8>,
+}
+
+fn one_u8() -> u8 {
+    1
+}
+fn one_u16() -> u16 {
+    1
+}
+
+impl Default for InteropSpec {
+    fn default() -> Self {
+        InteropSpec { exercise: 1, site: 1, application: 1, country: BTreeMap::new(), force: BTreeMap::new() }
+    }
+}
+
+impl InteropSpec {
+    pub fn country_of(&self, side: Side) -> u16 {
+        self.country.get(&side).copied().unwrap_or(0)
+    }
+    pub fn force_of(&self, side: Side) -> u8 {
+        self.force.get(&side).copied().unwrap_or(match side {
+            Side::Blue => 1,
+            Side::Red => 2,
+            Side::Neutral => 3,
+        })
+    }
 }
 
 impl ScenarioV4 {
