@@ -27,8 +27,11 @@ Phase 1 as built differs from this plan in four places:
 Phase 3 as built differs from this plan in these places:
 - **No real RTI was available here.** Everything was tested against a mock
   Federate Protocol server with a small RTI behind it (`hla/mock.rs`,
-  `bgws mock-rti`), written from FedProClient's session code. Checking
-  against pRTI and a third-party RPR federate is still to do.
+  `bgws mock-rti`), written from FedProClient's session code.
+  - Pitch's own Java client (FedProClient's Chat sample) runs against the
+    mock end to end: `tools/fedpro-chat-check.sh`.
+  - Our client against pRTI, and against a third-party RPR federate, is
+    still to do.
 - **The RPR FOM files are not vendored.** SISO publishes no licence terms
   for them, so `--fom` passes the federation's own. The class, attribute and
   parameter names and the datatypes are coded from RPR 2.0/3.0, and should

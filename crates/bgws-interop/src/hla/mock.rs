@@ -357,6 +357,15 @@ macro_rules! has_data {
 }
 has_data!(p::ObjectClassHandle, p::AttributeHandle, p::ObjectInstanceHandle, p::InteractionClassHandle, p::ParameterHandle, p::LogicalTime, p::LogicalTimeInterval);
 
+/// HLAreliable's handle as Federate Protocol clients know it (four octets,
+/// 1; HLAbestEffort is 2): a real RTI names the transport of every
+/// reflection and interaction, and clients refuse one without it.
+pub const RELIABLE: [u8; 4] = [0, 0, 0, 1];
+
+fn reliable() -> Option<p::TransportationTypeHandle> {
+    Some(p::TransportationTypeHandle { data: RELIABLE.to_vec() })
+}
+
 fn och(h: u64) -> Option<p::ObjectClassHandle> {
     Some(p::ObjectClassHandle { data: handle_bytes(h) })
 }
@@ -547,7 +556,7 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
                             object_instance: r.object_instance.clone(),
                             parameter_values: r.parameter_values.clone(),
                             user_supplied_tag: r.user_supplied_tag.clone(),
-                            transportation_type: None,
+                            transportation_type: reliable(),
                             producing_federate: fed_handle(me),
                         }),
                     )
@@ -752,7 +761,7 @@ fn reflect(g: &mut State, fx: &str, me: u64, inst: Option<p::ObjectInstanceHandl
             object_instance: inst.clone(),
             attribute_values: Some(v.clone()),
             user_supplied_tag: tag.clone(),
-            transportation_type: None,
+            transportation_type: reliable(),
             producing_federate: fed_handle(me),
             optional_sent_regions: None,
         });
@@ -761,7 +770,7 @@ fn reflect(g: &mut State, fx: &str, me: u64, inst: Option<p::ObjectInstanceHandl
                 object_instance: inst.clone(),
                 attribute_values: Some(v.clone()),
                 user_supplied_tag: tag.clone(),
-                transportation_type: None,
+                transportation_type: reliable(),
                 producing_federate: fed_handle(me),
                 optional_sent_regions: None,
                 time: lt(time.unwrap_or(0.0)),
@@ -786,7 +795,7 @@ fn interaction(g: &mut State, fx: &str, me: u64, class: Option<p::InteractionCla
             interaction_class: class.clone(),
             parameter_values: values.clone(),
             user_supplied_tag: tag.clone(),
-            transportation_type: None,
+            transportation_type: reliable(),
             producing_federate: fed_handle(me),
             optional_sent_regions: None,
         });
@@ -795,7 +804,7 @@ fn interaction(g: &mut State, fx: &str, me: u64, class: Option<p::InteractionCla
                 interaction_class: class.clone(),
                 parameter_values: values.clone(),
                 user_supplied_tag: tag.clone(),
-                transportation_type: None,
+                transportation_type: reliable(),
                 producing_federate: fed_handle(me),
                 optional_sent_regions: None,
                 time: lt(time.unwrap_or(0.0)),

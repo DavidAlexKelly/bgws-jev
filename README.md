@@ -1558,9 +1558,21 @@ Without `--time-managed` the game plays in real time, as on DIS.
 - **By hand:** the mock RTI as its own process. A federate joined through the
   CLI, time-managed, played 4 minutes in 1 s, and `bgws replay` matched.
 
-**Not yet checked:** against pRTI or any other real RTI, and against a
-third-party RPR federate. The mock RTI was written from the same reading of
-the protocol as the client, so only a real RTI can show a misreading.
+- **Pitch's own client against our mock RTI** (`tools/fedpro-chat-check.sh
+  <FedProClient checkout>`): two copies of FedProClient's Java Chat sample,
+  compiled with `javac` from Pitch's sources. They:
+  - join through `bgws mock-rti`;
+  - see each other join;
+  - swap public messages, and private ones as directed interactions;
+  - see each other leave.
+
+  This is an independent check of our session layer and server side. It
+  found one fault, now fixed: callbacks must name their transport (`0,0,0,1`
+  is HLAreliable), and Pitch's client refuses a callback without one.
+
+**Not yet checked:** BGWS's own client against a real RTI (pRTI or any
+other), and against a third-party RPR federate. Pitch's client checks our
+server side, but our client has only met our own server.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
 on markings longer than 11 bytes (in a release build it loops until memory
