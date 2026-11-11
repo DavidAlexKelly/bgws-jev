@@ -110,5 +110,5 @@ pub fn one_side(sc: &bgws_scenario::v4::ScenarioV4, side: bgws_core::Side) -> an
     if let Some(vc) = v.get_mut("victory").and_then(|x| x.as_array_mut()) {
         vc.retain(|c| c["kind"] == "objective");
     }
-    Ok(bgws_scenario::v4::ScenarioV4::from_json(&v.to_string()).map_err(|e| anyhow::anyhow!("{e}"))?)
+    bgws_scenario::v4::ScenarioV4::from_json(&v.to_string()).map_err(|e| anyhow::anyhow!("{e}"))
 }
