@@ -5,4 +5,8 @@
 //! UDP, with dead reckoning, and converts heights to the WGS-84 ellipsoid
 //! at the boundary.
 
+pub mod geo;
 pub mod geoid;
+pub mod model;
+pub mod dr;
+pub mod dis;

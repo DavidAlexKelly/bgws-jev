@@ -75,7 +75,7 @@ impl Geoid {
         if data.len() != width * height * 2 {
             return Err(err("sample count does not match width × height"));
         }
-        let samples = data.chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect();
+        let samples = data.as_chunks::<2>().0.iter().map(|c| u16::from_be_bytes(*c)).collect();
         Ok(Geoid { width, height, offset: offset.ok_or_else(|| err("no Offset"))?, scale: scale.ok_or_else(|| err("no Scale"))?, samples })
     }
 

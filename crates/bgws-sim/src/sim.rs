@@ -336,12 +336,28 @@ impl Sim {
         crate::domains::lod::quiet::next_interesting_time(self)
     }
 
+    /// Advance without waiting on decisions (real time, docs/design/INTEROP_PLAN.md
+    /// §3.4): stop only to hand out questions not handed out before; a unit
+    /// whose question is out carries on with what it was doing, and its
+    /// answer, given with [`Sim::answer`] whenever it comes back, applies no
+    /// sooner than the crew's reaction time after the question.
+    pub fn advance_nonblocking(&mut self, until: SimTime) -> Step {
+        let skip = self.ctx.scenario.scope.time.map(|t| t.skip_quiet).unwrap_or(false);
+        self.advance_inner(until, skip, false)
+    }
+
     fn advance_with(&mut self, until: SimTime, skip_quiet: bool) -> Step {
+        self.advance_inner(until, skip_quiet, true)
+    }
+
+    fn advance_inner(&mut self, until: SimTime, skip_quiet: bool, wait: bool) -> Step {
         loop {
             if let Some(o) = &self.ctx.over {
                 return Step::Over(o.clone());
             }
-            let waiting: Vec<Question> = self.ctx.pending.values().filter(|p| !p.answered).map(|p| p.q.clone()).collect();
+            // Waiting: every question not answered. Not waiting: only those
+            // not handed out yet (to hand them out).
+            let waiting: Vec<Question> = self.ctx.pending.values().filter(|p| !p.answered && (wait || !p.handed_out)).map(|p| p.q.clone()).collect();
             if !waiting.is_empty() {
                 for p in self.ctx.pending.values_mut() {
                     p.handed_out = true;
