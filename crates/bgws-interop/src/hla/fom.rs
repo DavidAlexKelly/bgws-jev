@@ -24,8 +24,31 @@ pub const FEDERATION: &str = "HLAobjectRoot.HLAmanager.HLAfederation";
 pub const FEDERATE: &str = "HLAobjectRoot.HLAmanager.HLAfederate";
 
 /// The MIM attributes the RTI keeps up to date (a subset of IEEE 1516.1's).
-pub const FEDERATION_ATTRIBUTES: [&str; 3] = ["HLAfederationName", "HLAfederatesInFederation", "HLAtimeImplementationName"];
-pub const FEDERATE_ATTRIBUTES: [&str; 7] = ["HLAfederateHandle", "HLAfederateName", "HLAfederateType", "HLAtimeRegulating", "HLAtimeConstrained", "HLAlogicalTime", "HLAlookahead"];
+pub const FEDERATION_ATTRIBUTES: [&str; 7] = ["HLAfederationName", "HLAfederatesInFederation", "HLAtimeImplementationName", "HLARTIversion", "HLAMIMdesignator", "HLAFOMmoduleDesignatorList", "HLAcurrentFDD"];
+pub const FEDERATE_ATTRIBUTES: [&str; 22] = [
+    "HLAfederateHandle",
+    "HLAfederateName",
+    "HLAfederateType",
+    "HLAtimeRegulating",
+    "HLAtimeConstrained",
+    "HLAlogicalTime",
+    "HLAlookahead",
+    "HLARTIversion",
+    "HLAFOMmoduleDesignatorList",
+    "HLAtimeManagerState",
+    "HLAGALT",
+    "HLALITS",
+    "HLAROlength",
+    "HLATSOlength",
+    "HLAupdatesSent",
+    "HLAreflectionsReceived",
+    "HLAinteractionsSent",
+    "HLAinteractionsReceived",
+    "HLAobjectInstancesRegistered",
+    "HLAobjectInstancesDiscovered",
+    "HLAobjectInstancesDeleted",
+    "HLAobjectInstancesRemoved",
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Class {
@@ -244,6 +267,30 @@ impl Fom {
         Ok(())
     }
 
+    /// The merged object model as OMT XML (classes, attributes, interactions
+    /// and parameters only): the MIM's HLAcurrentFDD.
+    pub fn to_xml(&self) -> String {
+        fn tree(t: &Tree, c: usize, class_tag: &str, member_tag: &str, depth: usize, out: &mut String) {
+            let pad = "  ".repeat(depth);
+            let short = t.classes[c].name.rsplit('.').next().unwrap_or_default();
+            out.push_str(&format!("{pad}<{class_tag}><name>{}</name>", escape(short)));
+            for &m in &t.classes[c].members {
+                out.push_str(&format!("<{member_tag}><name>{}</name></{member_tag}>", escape(&t.members[m].1)));
+            }
+            out.push('\n');
+            for k in (0..t.classes.len()).filter(|&k| t.classes[k].parent == Some(c)) {
+                tree(t, k, class_tag, member_tag, depth + 1, out);
+            }
+            out.push_str(&format!("{pad}</{class_tag}>\n"));
+        }
+        let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<objectModel xmlns=\"http://standards.ieee.org/IEEE1516-2025\">\n<objects>\n");
+        tree(&self.objects, 0, "objectClass", "attribute", 1, &mut out);
+        out.push_str("</objects>\n<interactions>\n");
+        tree(&self.interactions, 0, "interactionClass", "parameter", 1, &mut out);
+        out.push_str("</interactions>\n</objectModel>\n");
+        out
+    }
+
     /// An object class by name (added if permissive).
     pub fn object_class(&mut self, name: &str) -> Option<usize> {
         self.objects.class(name).or_else(|| self.permissive.then(|| self.objects.add_class(&full(OBJECT_ROOT, name))))
@@ -267,6 +314,10 @@ impl Default for Fom {
     fn default() -> Self {
         Fom::new(true)
     }
+}
+
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 fn full(root: &str, name: &str) -> String {

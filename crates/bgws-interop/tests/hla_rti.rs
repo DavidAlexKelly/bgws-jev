@@ -148,3 +148,81 @@ fn a_bad_fom_is_refused() {
     let bad = FomFile { name: "bad.xml".into(), content: b"<objectModel><objects><objectClass><name>Thing</name></objectClass></objects></objectModel>".to_vec() };
     assert!(matches!(r.create_federation("fx", &[bad]), Err(RtiError::Hla { name, .. }) if name == "ErrorReadingFDD"));
 }
+
+#[test]
+fn unsubscribing_and_unpublishing_stop_the_flow() {
+    let rti = MockRti::start().unwrap();
+    let a = join(&rti, "a", &[fom()]);
+    let b = join(&rti, "b", &[]);
+    let gv = a.object_class("GroundVehicle").unwrap();
+    let ty = a.attribute(&gv, "EntityType").unwrap();
+    let fire = a.interaction_class("WeaponFire").unwrap();
+    // Registering or sending what is not published is refused.
+    assert!(matches!(a.register(&gv), Err(RtiError::Hla { name, .. }) if name == "ObjectClassNotPublished"));
+    assert!(matches!(a.send_interaction(&fire, &[], None), Err(RtiError::Hla { name, .. }) if name == "InteractionClassNotPublished"));
+    a.publish_object(&gv, std::slice::from_ref(&ty)).unwrap();
+    a.publish_interaction(&fire).unwrap();
+    b.subscribe_object(&gv, std::slice::from_ref(&ty)).unwrap();
+    b.subscribe_interaction(&fire).unwrap();
+    let tank = a.register(&gv).unwrap();
+    a.update(&tank, &[(ty.clone(), vec![1])], None).unwrap();
+    a.send_interaction(&fire, &[], None).unwrap();
+    assert!(b.wait_for(W, |c| reflected(c).is_some()).is_some());
+    assert!(b.wait_for(W, |c| matches!(c, Cb::ReceiveInteraction(_))).is_some());
+    // Unsubscribed: nothing more comes.
+    b.unsubscribe_object(&gv).unwrap();
+    b.unsubscribe_interaction(&fire).unwrap();
+    a.update(&tank, &[(ty.clone(), vec![2])], None).unwrap();
+    a.send_interaction(&fire, &[], None).unwrap();
+    assert!(b.wait_for(Duration::from_millis(300), |c| reflected(c).is_some() || matches!(c, Cb::ReceiveInteraction(_))).is_none());
+    // Unpublished: refused again.
+    a.unpublish_interaction(&fire).unwrap();
+    assert!(a.send_interaction(&fire, &[], None).is_err());
+}
+
+#[test]
+fn the_management_objects_count_what_a_federate_does() {
+    let rti = MockRti::start().unwrap();
+    let a = join(&rti, "a", &[fom()]);
+    let b = join(&rti, "b", &[]);
+    let class = b.object_class("HLAmanager.HLAfederate").unwrap();
+    let (name, sent, fdd) = (b.attribute(&class, "HLAfederateName").unwrap(), b.attribute(&class, "HLAupdatesSent").unwrap(), b.attribute(&class, "HLAFOMmoduleDesignatorList").unwrap());
+    b.subscribe_object(&class, &[name.clone(), sent.clone(), fdd.clone()]).unwrap();
+    let gv = a.object_class("GroundVehicle").unwrap();
+    let ty = a.attribute(&gv, "EntityType").unwrap();
+    a.publish_object(&gv, std::slice::from_ref(&ty)).unwrap();
+    let tank = a.register(&gv).unwrap();
+    for i in 0..5u8 {
+        a.update(&tank, &[(ty.clone(), vec![i])], None).unwrap();
+    }
+    // Counts come within the report period (a second).
+    std::thread::sleep(Duration::from_millis(1100));
+    a.update(&tank, &[(ty.clone(), vec![9])], None).unwrap();
+    let mut a_obj = None;
+    let mut a_sent = 0;
+    let mut modules = vec![];
+    let end = std::time::Instant::now() + W;
+    while std::time::Instant::now() < end && a_sent < 6 {
+        for c in b.callbacks() {
+            let (h, v) = match &c {
+                Cb::ReflectAttributeValues(r) => (Handle(r.object_instance.clone().unwrap().data), reflected(&c).unwrap()),
+                _ => continue,
+            };
+            if v.get(&name).is_some_and(|n| Dec::new(n).unicode().unwrap() == "a") {
+                a_obj = Some(h.clone());
+                if let Some(m) = v.get(&fdd) {
+                    let mut d = Dec::new(m);
+                    modules = (0..d.u32().unwrap()).map(|_| d.unicode().unwrap()).collect();
+                }
+            }
+            if Some(&h) == a_obj.as_ref() {
+                if let Some(n) = v.get(&sent) {
+                    a_sent = Dec::new(n).i32().unwrap();
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(a_sent, 6, "a's HLAupdatesSent");
+    assert!(modules.is_empty(), "a joined with no module of its own (it created the federation with one): {modules:?}");
+}

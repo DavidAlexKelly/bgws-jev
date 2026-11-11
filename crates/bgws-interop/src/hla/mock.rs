@@ -23,8 +23,9 @@
 //!   (handle, name, type, regulating, constrained, time, lookahead), kept up
 //!   to date for any federate that subscribes.
 //!
-//! Not served: ownership transfer, regions, save and restore, retraction,
-//! zero lookahead, unsubscribe and unpublish, MOM interactions and most MOM
+//! Also unpublish and unsubscribe, and publication checked on register and
+//! send. Not served: ownership transfer, regions, save and restore,
+//! retraction, zero lookahead, MOM interactions and the rest of the MOM
 //! attributes; those calls answer `RTIinternalError`.
 
 use super::encoding::Enc;
@@ -90,6 +91,25 @@ struct Federate {
     /// Messages its time order holds back: (time, sender, sender's order) → callback.
     held: BTreeMap<(OrdF64, String, u64), Cb>,
     sent: u64,
+    /// Object class → attributes published.
+    published: BTreeMap<usize, BTreeSet<usize>>,
+    published_interactions: BTreeSet<usize>,
+    /// The FOM modules it joined with.
+    modules: Vec<String>,
+    counts: Counts,
+}
+
+/// What a federate has done, for its management object.
+#[derive(Default, Clone, Copy)]
+struct Counts {
+    updates_sent: i32,
+    reflections_received: i32,
+    interactions_sent: i32,
+    interactions_received: i32,
+    registered: i32,
+    discovered: i32,
+    deleted: i32,
+    removed: i32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -127,6 +147,8 @@ struct Federation {
     /// Its HLAmanager.HLAfederation object.
     mom: u64,
     federates: BTreeMap<u64, Federate>,
+    /// When its management objects were last brought up to date.
+    mom_at: Option<std::time::Instant>,
     instances: BTreeMap<u64, Instance>,
     reserved: BTreeSet<String>,
     /// Synchronization points: label → (the federates in it, those that achieved it).
@@ -329,6 +351,14 @@ fn serve(st: Arc<Mutex<State>>, mut c: TcpStream) {
                     g.callback(to, cb);
                 }
                 grant_all(&mut g);
+                // The management objects, at most once a second per federation.
+                if let Some((fx, _)) = joined(&g, session) {
+                    if g.federations.get(&fx).is_some_and(|f| f.mom_at.is_none_or(|t| t.elapsed() >= MOM_PERIOD)) {
+                        for (to, cb) in mom_refresh(&mut g, &fx) {
+                            g.callback(to, cb);
+                        }
+                    }
+                }
             }
             Kind::TerminateSession => {
                 for (to, cb) in resign(&mut g, session) {
@@ -407,6 +437,16 @@ fn fed_handle(h: u64) -> Option<p::FederateHandle> {
 fn lt(t: f64) -> Option<p::LogicalTime> {
     Some(p::LogicalTime { data: time_bytes(t) })
 }
+
+fn attr_set(s: Option<p::AttributeHandleSet>) -> BTreeSet<usize> {
+    s.map(|a| a.attribute_handle.iter().filter_map(|x| index_of(K_ATTR, handle_of(&x.data))).collect()).unwrap_or_default()
+}
+
+/// How often the management objects' counts are brought up to date.
+const MOM_PERIOD: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The version the management objects report.
+const RTI_VERSION: &str = concat!("BGWS RTI ", env!("CARGO_PKG_VERSION"));
 
 fn values_of(m: Option<p::AttributeHandleValueMap>) -> Vec<(usize, Vec<u8>)> {
     m.map(|m| m.attribute_handle_value.into_iter().filter_map(|a| Some((index_of(K_ATTR, hb(&a.attribute_handle))?, a.value))).collect()).unwrap_or_default()
@@ -496,6 +536,7 @@ fn join(g: &mut State, session: u64, name: String, kind: String, federation: Str
     if f.federates.values().any(|x| x.name == name) {
         return (exception("FederateNameAlreadyInUse", name), vec![]);
     }
+    let names: Vec<String> = modules.iter().map(|m| m.name.clone()).collect();
     for m in modules {
         if let Err(e) = f.fom.merge(m) {
             return (exception("InconsistentFOM", e.0), vec![]);
@@ -503,7 +544,7 @@ fn join(g: &mut State, session: u64, name: String, kind: String, federation: Str
     }
     let class = f.fom.objects.class(fom::FEDERATE).unwrap();
     f.instances.insert(mom, Instance { class, owner: RTI_OWNER, name: format!("HLAfederate-{name}"), values: BTreeMap::new() });
-    f.federates.insert(h, Federate { session, name, kind, mom, ..Default::default() });
+    f.federates.insert(h, Federate { session, name, kind, mom, modules: names, ..Default::default() });
     let time_impl = f.time_impl.clone();
     g.sessions.get_mut(&session).unwrap().joined = Some((federation.clone(), h));
     let out = mom_refresh(g, &federation);
@@ -530,9 +571,13 @@ fn resign(g: &mut State, session: u64) -> Vec<(u64, Cb)> {
 
 fn delete_instance(f: &mut Federation, h: u64, by: u64, tag: Vec<u8>) -> Vec<(u64, Cb)> {
     f.instances.remove(&h);
+    if let Some(b) = f.federates.get_mut(&by) {
+        b.counts.deleted += 1;
+    }
     let mut out = vec![];
     for fed in f.federates.values_mut() {
         if fed.known.remove(&h).is_some() {
+            fed.counts.removed += 1;
             out.push((fed.session, Cb::RemoveObjectInstance(p::RemoveObjectInstance { object_instance: inst_h(h), user_supplied_tag: tag.clone(), producing_federate: fed_handle(by) })));
         }
     }
@@ -574,7 +619,9 @@ fn discover_for(f: &mut Federation, to: u64, h: u64) -> Vec<(u64, Cb)> {
             ));
         }
     }
-    f.federates.get_mut(&to).unwrap().known.insert(h, known);
+    let fed = f.federates.get_mut(&to).unwrap();
+    fed.known.insert(h, known);
+    fed.counts.discovered += 1;
     out
 }
 
@@ -600,6 +647,7 @@ fn deliver(f: &mut Federation, me: u64, to: u64, time: Option<f64>, now: Cb, tim
 fn reflect(f: &mut Federation, me: u64, h: u64, values: Vec<(usize, Vec<u8>)>, tag: Vec<u8>, time: Option<f64>) -> Vec<(u64, Cb)> {
     if let Some(m) = f.federates.get_mut(&me) {
         m.sent += 1;
+        m.counts.updates_sent += 1;
     }
     let targets: Vec<(u64, Values)> = f
         .federates
@@ -614,6 +662,7 @@ fn reflect(f: &mut Federation, me: u64, h: u64, values: Vec<(usize, Vec<u8>)>, t
         .collect();
     let mut out = vec![];
     for (to, v) in targets {
+        f.federates.get_mut(&to).unwrap().counts.reflections_received += 1;
         let now = Cb::ReflectAttributeValues(p::ReflectAttributeValues {
             object_instance: inst_h(h),
             attribute_values: attr_map(&v),
@@ -647,11 +696,13 @@ fn reflect(f: &mut Federation, me: u64, h: u64, values: Vec<(usize, Vec<u8>)>, t
 fn interaction(f: &mut Federation, me: u64, class: usize, params: Vec<(usize, Vec<u8>)>, tag: Vec<u8>, time: Option<f64>) -> Vec<(u64, Cb)> {
     if let Some(m) = f.federates.get_mut(&me) {
         m.sent += 1;
+        m.counts.interactions_sent += 1;
     }
     let lineage = f.fom.interactions.lineage(class);
     let targets: Vec<(u64, usize)> = f.federates.iter().filter(|(&fh, _)| fh != me).filter_map(|(&fh, fed)| lineage.iter().find(|c| fed.interactions.contains(c)).map(|&c| (fh, c))).collect();
     let mut out = vec![];
     for (to, as_class) in targets {
+        f.federates.get_mut(&to).unwrap().counts.interactions_received += 1;
         let v: Vec<(usize, Vec<u8>)> = params.iter().filter(|(pm, _)| f.fom.interactions.has_member(as_class, *pm)).cloned().collect();
         let now = Cb::ReceiveInteraction(p::ReceiveInteraction {
             interaction_class: ich(as_class),
@@ -699,6 +750,17 @@ fn mom_time(t: f64) -> Vec<u8> {
 /// changed to their subscribers.
 fn mom_refresh(g: &mut State, fx: &str) -> Vec<(u64, Cb)> {
     let Some(f) = g.federations.get_mut(fx) else { return vec![] };
+    f.mom_at = Some(std::time::Instant::now());
+    let strings = |v: &[String]| {
+        let mut e = Enc::new();
+        e.u32(v.len() as u32);
+        for s in v {
+            e.unicode(s);
+        }
+        e.done()
+    };
+    let count = |n: usize| Enc::new().i32(n as i32).done();
+    let unicode = |s: &str| Enc::new().unicode(s).done();
     let a = |f: &Fom, class: &str, name: &str| f.objects.member_at(f.objects.class(class).unwrap(), name).unwrap();
     let mut want: Vec<(u64, Values)> = vec![];
     let mut list = Enc::new();
@@ -713,8 +775,13 @@ fn mom_refresh(g: &mut State, fx: &str) -> Vec<(u64, Cb)> {
             (a(&f.fom, fom::FEDERATION, "HLAfederationName"), Enc::new().unicode(fx).done()),
             (a(&f.fom, fom::FEDERATION, "HLAfederatesInFederation"), list.done()),
             (a(&f.fom, fom::FEDERATION, "HLAtimeImplementationName"), Enc::new().unicode(&f.time_impl).done()),
+            (a(&f.fom, fom::FEDERATION, "HLARTIversion"), unicode(RTI_VERSION)),
+            (a(&f.fom, fom::FEDERATION, "HLAMIMdesignator"), unicode("HLAstandardMIM")),
+            (a(&f.fom, fom::FEDERATION, "HLAFOMmoduleDesignatorList"), strings(&f.fom.modules)),
+            (a(&f.fom, fom::FEDERATION, "HLAcurrentFDD"), unicode(&f.fom.to_xml())),
         ],
     ));
+    let promises: Vec<(u64, Option<f64>)> = f.federates.iter().map(|(&h, x)| (h, x.promise())).collect();
     for (&h, fed) in &f.federates {
         let at = |n: &str| a(&f.fom, fom::FEDERATE, n);
         want.push((
@@ -727,6 +794,22 @@ fn mom_refresh(g: &mut State, fx: &str) -> Vec<(u64, Cb)> {
                 (at("HLAtimeConstrained"), mom_bool(fed.constrained)),
                 (at("HLAlogicalTime"), mom_time(fed.time)),
                 (at("HLAlookahead"), mom_time(fed.regulating.unwrap_or(0.0))),
+                (at("HLARTIversion"), unicode(RTI_VERSION)),
+                (at("HLAFOMmoduleDesignatorList"), strings(&fed.modules)),
+                // HLAtimeState: 0 granted, 1 advancing.
+                (at("HLAtimeManagerState"), count(fed.requested.is_some() as usize)),
+                (at("HLAGALT"), mom_time(promises.iter().filter(|(o, _)| *o != h).filter_map(|(_, p)| *p).fold(f64::MAX, f64::min))),
+                (at("HLALITS"), mom_time(fed.next_held().unwrap_or(f64::MAX))),
+                (at("HLAROlength"), count(0)),
+                (at("HLATSOlength"), count(fed.held.len())),
+                (at("HLAupdatesSent"), count(fed.counts.updates_sent as usize)),
+                (at("HLAreflectionsReceived"), count(fed.counts.reflections_received as usize)),
+                (at("HLAinteractionsSent"), count(fed.counts.interactions_sent as usize)),
+                (at("HLAinteractionsReceived"), count(fed.counts.interactions_received as usize)),
+                (at("HLAobjectInstancesRegistered"), count(fed.counts.registered as usize)),
+                (at("HLAobjectInstancesDiscovered"), count(fed.counts.discovered as usize)),
+                (at("HLAobjectInstancesDeleted"), count(fed.counts.deleted as usize)),
+                (at("HLAobjectInstancesRemoved"), count(fed.counts.removed as usize)),
             ],
         ));
     }
@@ -956,14 +1039,82 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
         }
         // ---- declarations ----
         Rq::PublishObjectClassAttributesRequest(r) => {
-            let (fx, _) = fed!();
-            class_of!(fx, r.object_class);
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            let attrs = attr_set(r.attributes);
+            let f = g.federations.get_mut(&fx).unwrap();
+            if let Some(bad) = attrs.iter().find(|&&a| !f.fom.objects.has_member(class, a)) {
+                return (exception("AttributeNotDefined", format!("{bad}")), none);
+            }
+            f.federates.get_mut(&me).unwrap().published.entry(class).or_default().extend(attrs);
             (Rs::PublishObjectClassAttributesResponse(p::PublishObjectClassAttributesResponse {}), none)
         }
         Rq::PublishInteractionClassRequest(r) => {
-            let (fx, _) = fed!();
-            iclass_of!(fx, r.interaction_class);
+            let (fx, me) = fed!();
+            let c = iclass_of!(fx, r.interaction_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().published_interactions.insert(c);
             (Rs::PublishInteractionClassResponse(p::PublishInteractionClassResponse {}), none)
+        }
+        Rq::UnpublishObjectClassRequest(r) => {
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().published.remove(&class);
+            (Rs::UnpublishObjectClassResponse(p::UnpublishObjectClassResponse {}), none)
+        }
+        Rq::UnpublishObjectClassAttributesRequest(r) => {
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            let attrs = attr_set(r.attributes);
+            let fed = g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap();
+            if let Some(set) = fed.published.get_mut(&class) {
+                set.retain(|a| !attrs.contains(a));
+                if set.is_empty() {
+                    fed.published.remove(&class);
+                }
+            }
+            (Rs::UnpublishObjectClassAttributesResponse(p::UnpublishObjectClassAttributesResponse {}), none)
+        }
+        Rq::UnpublishInteractionClassRequest(r) => {
+            let (fx, me) = fed!();
+            let c = iclass_of!(fx, r.interaction_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().published_interactions.remove(&c);
+            (Rs::UnpublishInteractionClassResponse(p::UnpublishInteractionClassResponse {}), none)
+        }
+        Rq::UnsubscribeObjectClassRequest(r) => {
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().subscribed.remove(&class);
+            (Rs::UnsubscribeObjectClassResponse(p::UnsubscribeObjectClassResponse {}), none)
+        }
+        Rq::UnsubscribeObjectClassAttributesRequest(r) => {
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            let attrs = attr_set(r.attributes);
+            let fed = g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap();
+            if let Some(set) = fed.subscribed.get_mut(&class) {
+                set.retain(|a| !attrs.contains(a));
+                if set.is_empty() {
+                    fed.subscribed.remove(&class);
+                }
+            }
+            (Rs::UnsubscribeObjectClassAttributesResponse(p::UnsubscribeObjectClassAttributesResponse {}), none)
+        }
+        Rq::UnsubscribeInteractionClassRequest(r) => {
+            let (fx, me) = fed!();
+            let c = iclass_of!(fx, r.interaction_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().interactions.remove(&c);
+            (Rs::UnsubscribeInteractionClassResponse(p::UnsubscribeInteractionClassResponse {}), none)
+        }
+        Rq::UnsubscribeObjectClassDirectedInteractionsRequest(r) => {
+            let (fx, me) = fed!();
+            let class = class_of!(fx, r.object_class);
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().directed.remove(&class);
+            (Rs::UnsubscribeObjectClassDirectedInteractionsResponse(p::UnsubscribeObjectClassDirectedInteractionsResponse {}), none)
+        }
+        Rq::UnpublishObjectClassDirectedInteractionsRequest(r) => {
+            let (fx, _) = fed!();
+            class_of!(fx, r.object_class);
+            (Rs::UnpublishObjectClassDirectedInteractionsResponse(p::UnpublishObjectClassDirectedInteractionsResponse {}), none)
         }
         Rq::SubscribeObjectClassAttributesRequest(r) => {
             let (fx, me) = fed!();
@@ -1013,8 +1164,12 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
         Rq::RegisterObjectInstanceRequest(r) => {
             let (fx, me) = fed!();
             let class = class_of!(fx, r.object_class);
+            if !g.federations[&fx].federates[&me].published.contains_key(&class) {
+                return (exception("ObjectClassNotPublished", g.federations[&fx].fom.objects.classes[class].name.clone()), none);
+            }
             let h = g.next(K_INSTANCE);
             let f = g.federations.get_mut(&fx).unwrap();
+            f.federates.get_mut(&me).unwrap().counts.registered += 1;
             f.instances.insert(h, Instance { class, owner: me, name: format!("HLAobjectRoot-{}", h & 0xFFFF_FFFF), values: BTreeMap::new() });
             let feds: Vec<u64> = f.federates.keys().copied().collect();
             let out = feds.into_iter().flat_map(|to| discover_for(f, to, h)).collect();
@@ -1023,8 +1178,12 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
         Rq::RegisterObjectInstanceWithNameRequest(r) => {
             let (fx, me) = fed!();
             let class = class_of!(fx, r.object_class);
+            if !g.federations[&fx].federates[&me].published.contains_key(&class) {
+                return (exception("ObjectClassNotPublished", g.federations[&fx].fom.objects.classes[class].name.clone()), none);
+            }
             let h = g.next(K_INSTANCE);
             let f = g.federations.get_mut(&fx).unwrap();
+            f.federates.get_mut(&me).unwrap().counts.registered += 1;
             if !f.reserved.remove(&r.object_instance_name) {
                 return (exception("ObjectInstanceNameNotReserved", r.object_instance_name), none);
             }
@@ -1102,12 +1261,18 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
         Rq::SendInteractionRequest(r) => {
             let (fx, me) = fed!();
             let c = iclass_of!(fx, r.interaction_class);
+            if !g.federations[&fx].federates[&me].published_interactions.contains(&c) {
+                return (exception("InteractionClassNotPublished", g.federations[&fx].fom.interactions.classes[c].name.clone()), none);
+            }
             let out = interaction(g.federations.get_mut(&fx).unwrap(), me, c, params_of(r.parameter_values), r.user_supplied_tag, None);
             (Rs::SendInteractionResponse(p::SendInteractionResponse {}), out)
         }
         Rq::SendInteractionWithTimeRequest(r) => {
             let (fx, me) = fed!();
             let c = iclass_of!(fx, r.interaction_class);
+            if !g.federations[&fx].federates[&me].published_interactions.contains(&c) {
+                return (exception("InteractionClassNotPublished", g.federations[&fx].fom.interactions.classes[c].name.clone()), none);
+            }
             let out = interaction(g.federations.get_mut(&fx).unwrap(), me, c, params_of(r.parameter_values), r.user_supplied_tag, Some(time_of(&r.time.unwrap_or_default().data)));
             (Rs::SendInteractionWithTimeResponse(p::SendInteractionWithTimeResponse { result: Some(p::MessageRetractionReturn { retraction_handle_is_valid: false, message_retraction_handle: None }) }), out)
         }

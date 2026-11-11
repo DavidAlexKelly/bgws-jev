@@ -1590,17 +1590,26 @@ trying federates on one machine, and for small exercises:
 - **Time:** time-advance and next-message requests. A next-message request
   is granted at the earliest message, if that comes before the time asked
   for.
-- **Management objects:** `HLAmanager.HLAfederation` (name, federates, time
-  implementation) and `HLAmanager.HLAfederate` (handle, name, type,
-  regulating, constrained, time, lookahead), kept up to date for any
-  federate that subscribes.
+- **Declarations:** publish, subscribe, unpublish and unsubscribe for object
+  classes (whole or by attribute), interactions and directed interactions.
+  Registering an unpublished class, or sending an unpublished interaction,
+  is refused.
+- **Management objects:**
+  - `HLAmanager.HLAfederation`: name, federates, time implementation, RTI
+    version, MIM designator, FOM modules, and the merged FDD as XML;
+  - `HLAmanager.HLAfederate`: handle, name, type, RTI version, FOM modules,
+    regulating, constrained, time, lookahead, time-manager state, GALT,
+    LITS, queue lengths, and counts of updates, reflections, interactions
+    and objects registered, discovered, deleted and removed.
+
+  They're reported to subscribers when federates join or leave and when
+  time changes, and counts at most once a second.
 - **Also:**
   - synchronization points and member lists;
   - names and handles both ways;
   - directed interactions and requests for attribute values.
 - **Not served:** ownership transfer, regions, save and restore, retraction,
-  zero lookahead, unsubscribe and unpublish, MOM interactions and most MOM
-  attributes.
+  zero lookahead, MOM interactions, and the rest of the MOM attributes.
 
 Tests cover discovery and reflection at a superclass, interaction delivery
 to a superclass, FOM names refused, next-message grants and the management

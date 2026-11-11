@@ -301,6 +301,26 @@ impl Rti {
         Ok(())
     }
 
+    pub fn unsubscribe_object(&self, class: &Handle) -> Result<()> {
+        expect!(self.call(Rq::UnsubscribeObjectClassRequest(p::UnsubscribeObjectClassRequest { object_class: Some(p::ObjectClassHandle { data: class.0.clone() }) }))?, UnsubscribeObjectClassResponse);
+        Ok(())
+    }
+
+    pub fn unsubscribe_interaction(&self, class: &Handle) -> Result<()> {
+        expect!(self.call(Rq::UnsubscribeInteractionClassRequest(p::UnsubscribeInteractionClassRequest { interaction_class: Some(p::InteractionClassHandle { data: class.0.clone() }) }))?, UnsubscribeInteractionClassResponse);
+        Ok(())
+    }
+
+    pub fn unpublish_object(&self, class: &Handle) -> Result<()> {
+        expect!(self.call(Rq::UnpublishObjectClassRequest(p::UnpublishObjectClassRequest { object_class: Some(p::ObjectClassHandle { data: class.0.clone() }) }))?, UnpublishObjectClassResponse);
+        Ok(())
+    }
+
+    pub fn unpublish_interaction(&self, class: &Handle) -> Result<()> {
+        expect!(self.call(Rq::UnpublishInteractionClassRequest(p::UnpublishInteractionClassRequest { interaction_class: Some(p::InteractionClassHandle { data: class.0.clone() }) }))?, UnpublishInteractionClassResponse);
+        Ok(())
+    }
+
     /// Ask for the next timestamped message, or `t` if none comes sooner.
     pub fn next_message_request(&self, t: f64) -> Result<()> {
         expect!(self.call(Rq::NextMessageRequestRequest(p::NextMessageRequestRequest { time: Some(p::LogicalTime { data: float_time(t) }) }))?, NextMessageRequestResponse);
