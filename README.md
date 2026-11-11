@@ -1376,6 +1376,18 @@ attribution. `pack.json` carries both.
   spot and lands 54 m off when a screen crosses the line, or when the
   target sees the launch and smokes itself.
 
+**Validation** (200 runs each, against the stored baselines): all 20
+vignettes stay in band. Three moved, none significantly:
+- ATGM engagement hit share: 0.754 to 0.753. Some tanks now smoke
+  themselves when a missile comes, and a gunner who loses sight loses the
+  missile.
+- Detect-to-strike: 3.40 to 3.47 min networked, and 23.15 to 23.45 min by
+  voice (KS p 0.99). Smoke screens and dischargers now delay some
+  sightings.
+
+The other 17 are unchanged, because their vignettes have no armoured
+vehicle under missile fire and no unit calling smoke.
+
 ## Game records
 
 A record (`--record`, or *Save* on the server) holds the scenario, seed,
