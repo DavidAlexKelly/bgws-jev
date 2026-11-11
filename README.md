@@ -394,7 +394,8 @@ to reach openrouter.ai.
   DuckDB is a feature because it compiles from C++.
 - **Missile and air-defence models** work at the engagement level: kinematic
   flights, per-shot kill probabilities and kill chains. They do not model
-  guidance laws or seekers.
+  guidance laws or seekers. The exception is semi-active laser homing, which
+  needs its designator's spot (see *Smoke and laser designation*).
 - **Drones:** drones in flight are records in the drones module, not ECS
   entities, so the air-defence kill chains and WTA do not see them. The
   counter-drone loop engages them instead, and units with a short- or
@@ -1320,6 +1321,61 @@ Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
 cover derived from it are derived databases). Mapterhorn asks for
 attribution. `pack.json` carries both.
 
+### Smoke and laser designation
+
+**Smoke** (`crates/bgws-sim/src/smoke.rs`).
+- **The model:** each screen is a set of obscurant puffs (`bgws-models`
+  `SmokeCloud`). They drift on the surface wind, spread and thin out.
+- **What it blocks:** every optical sighting is multiplied by the share of
+  light that gets through the smoke in its sensor's band: visible for eyes
+  and day sights, far infrared for thermal sights. Phosphorus smoke blinds a
+  day sight almost completely, while a thermal sight sees through it far
+  better.
+- **Cost:** a sight line is checked only where it crosses a screen.
+- **In the breakdown:** `explain_detection` reports the smoke factor for a
+  pair.
+- **Smoke comes from two places:**
+  - **Vehicle dischargers.** An armoured land vehicle (frontal KE armour of
+    at least `smoke.vehicle.armour_mm`) fires a salvo between itself and a
+    missile launched at it, ground ATGM or air-launched. Its crew does so
+    at once if it knows where the launcher is, otherwise with
+    `smoke.vehicle.warning_p`. It carries `smoke.vehicle.salvos` salvos.
+  - **Artillery and mortar smoke rounds** (155 mm, 120, 81 and 82 mm, white
+    or red phosphorus; masses approximate, from public descriptions). Guns
+    and mortars carry them on a separate mount, so they are never fired as
+    HE. A unit fired on by an enemy it cannot answer, or while moving,
+    calls a screen on that enemy. That is a priority call of
+    `smoke.screen.rounds` rounds, at most every `smoke.screen.cooldown_s`
+    per unit and enemy. Each round becomes a puff where it lands and hurts
+    no one.
+- **Effects that follow:** a gunner guiding a wire or beam-riding missile
+  must still see the target when it arrives, so smoke that blinds the
+  gunner makes the missile miss. No extra rule is needed.
+
+**Laser designation** (`crates/bgws-sim/src/designation.rs`).
+- **Which munition:** the Hellfire-class AGM is semi-active laser homing,
+  and its launcher designates for it.
+- **Each second:** the spot follows the target. The designation holds while
+  three things are true:
+  - the designator is alive;
+  - it has the target in sight (on the ground, a sighting in the last 5 s;
+    in the air, a clear line over the ground);
+  - the laser's near infrared gets through any smoke, there and back.
+- **At impact:** a missile with its spot homes on the target where it is.
+  One that lost it flies on unguided and lands `laser.lost_cep_m` about
+  its aim. A target that sees the launch may smoke itself, and so break
+  the spot.
+- Events: `laser.designate`, `laser.lost`.
+
+**Checked** (`crates/bgws-sim/tests/smoke.rs`):
+- **A screen across a sight line:** visible light falls below 5% of clear,
+  and a thermal sight does better.
+- **In the battalion attack:** vehicles fire their dischargers (never more
+  salvos than they carry), units call screens, and smoke rounds land.
+- **An AGM** lands 1.1 m from its target over a clear line. It loses its
+  spot and lands 54 m off when a screen crosses the line, or when the
+  target sees the launch and smokes itself.
+
 ## Game records
 
 A record (`--record`, or *Save* on the server) holds the scenario, seed,
@@ -1727,10 +1783,27 @@ Tests cover a partner elevation (and the geoid step for ellipsoidal
 heights), land cover with a hole from GeoJSON and from a shapefile, and a
 partner road reaching the pack's road graph.
 
+**Smoke and laser designation** (now in the sim, above) go out too:
+- each laser designation as Designator PDUs each second while it lasts (10
+  W at 1.064 µm, the spot on the target), and once more with no power when
+  it ends; over HLA as the RPR `EmbeddedSystem.Designator`;
+- each smoke screen as an Environmental Process PDU (a sphere record at its
+  drifted centre with its reach) on release and every 10 s, and once marked
+  last when it has thinned away. dis-rs has no builder for this PDU, so it
+  is written by hand like the Minefield State PDU, and should be checked
+  the same way;
+- smoke rounds fired are white phosphorus in their munition descriptors.
+
+Tested: a designation goes out lasing and then with no power when the
+missile lands, and a screen goes out as a 72-octet Environmental Process
+PDU with its sphere record.
+
 **Not built:**
-- **Smoke (Environmental Process PDUs) and laser designation (Designator
-  PDUs).** The simulation has neither smoke screens nor laser designators
-  yet, so there is nothing to publish. Each needs the sim feature first.
+- **Smoke over HLA.** We know of no standard RPR object for an obscurant
+  cloud to publish it as.
+- **Other simulations' designations and smoke** are not taken in: our
+  laser munitions are designated by their own launchers, and partner smoke
+  does not yet cut our sight lines.
 - **Buildings from a partner** are not taken in.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows

@@ -194,6 +194,64 @@ pub fn minefield_pdu(sim: &Sim, spec: &InteropSpec, m: &MinefieldTruth, sequence
     b
 }
 
+/// The laser's wavelength (Nd:YAG), µm, and its output, W.
+pub const LASER_WAVELENGTH_UM: f32 = 1.064;
+pub const LASER_POWER_W: f32 = 10.0;
+
+/// A Designator PDU: the spot on the target (power 0 once it ends).
+pub fn designator_pdu(sim: &Sim, spec: &InteropSpec, d: &extras::DesignationTruth, on: bool) -> Pdu {
+    let target_pos = d.target.map(|t| pos_of(sim, t));
+    let rel = target_pos.map(|t| VectorF32::new((d.spot.e - t.e) as f32, (d.spot.n - t.n) as f32, (d.spot.u - t.u) as f32)).unwrap_or_default();
+    let body = dis_rs::designator::model::Designator::builder()
+        .with_designating_entity_id(dis_id_of(sim, spec, Some(d.designator)))
+        .with_system_name(DesignatorSystemName::from(0u16))
+        .with_designated_entity_id(dis_id_of(sim, spec, d.target))
+        .with_code(DesignatorCode::from(d.code))
+        .with_power(if on && d.lasing { LASER_POWER_W } else { 0.0 })
+        .with_wavelength(LASER_WAVELENGTH_UM)
+        .with_spot_wrt_designated_entity(rel)
+        .with_spot_location(location(sim, d.spot))
+        .with_dead_reckoning_algorithm(DeadReckoningAlgorithm::StaticNonmovingEntity)
+        .build()
+        .into_pdu_body();
+    finish(spec, PduType::Designator, body, sim.ctx.now.secs())
+}
+
+/// An Environmental Process PDU (type 41, family 9) for a smoke screen,
+/// written by hand (dis-rs has no builder): header (12), process ID (6),
+/// environment type (8), model type (1), status (1: bit 0 last, bit 1 on),
+/// number of records (2), sequence number (2), then one Sphere Record 1
+/// (record type 851968; record length 2 octets, in octets; index 1; one
+/// octet of padding; centroid 3 × 64-bit floats; radius 32-bit float;
+/// padding to 64 bits): 72 octets in all.
+pub fn environment_pdu(sim: &Sim, spec: &InteropSpec, s: &extras::ScreenTruth, sequence: u16, last: bool) -> Vec<u8> {
+    let placed = place(&sim.ctx.frame, Geoid::egm96(), s.centre);
+    let mut b: Vec<u8> = Vec::with_capacity(72);
+    b.extend_from_slice(&[7, spec.exercise, 41, 9]);
+    b.extend_from_slice(&crate::dis::relative_timestamp(sim.ctx.now.secs()).to_be_bytes());
+    b.extend_from_slice(&[0, 0, 0, 0]);
+    for v in [spec.site, spec.application, (s.id.min(u16::MAX as u64)) as u16] {
+        b.extend_from_slice(&v.to_be_bytes());
+    }
+    // Environment type: kind 4 (environmental), the rest unspecified.
+    b.extend_from_slice(&[4, 0, 0, 0, 0, 0, 0, 0]);
+    b.push(0); // model type: no statement
+    b.push(if last { 0b01 } else { 0b10 });
+    b.extend_from_slice(&1u16.to_be_bytes());
+    b.extend_from_slice(&sequence.to_be_bytes());
+    b.extend_from_slice(&851_968u32.to_be_bytes());
+    b.extend_from_slice(&40u16.to_be_bytes());
+    b.extend_from_slice(&[1, 0]);
+    for c in placed.ecef {
+        b.extend_from_slice(&c.to_be_bytes());
+    }
+    b.extend_from_slice(&(s.radius_m as f32).to_be_bytes());
+    b.extend_from_slice(&[0; 4]);
+    let len = b.len() as u16;
+    b[8..10].copy_from_slice(&len.to_be_bytes());
+    b
+}
+
 /// What was last sent of each item, for heartbeats and changes.
 #[derive(Default)]
 pub struct ExtrasBook {
@@ -203,6 +261,8 @@ pub struct ExtrasBook {
     minefield_seq: BTreeMap<u16, (usize, u16)>,
     messages_after: SimTime,
     event: u16,
+    designating: BTreeMap<u64, extras::DesignationTruth>,
+    screens: BTreeMap<u64, (extras::ScreenTruth, u16)>,
 }
 
 impl ExtrasBook {
@@ -264,6 +324,34 @@ impl ExtrasBook {
             } else if self.aggregated.remove(&a.number) {
                 self.last.remove(&format!("a{}", a.number));
                 out.push(crate::dis::encode(&aggregate_pdu(sim, spec, &a, false)));
+            }
+        }
+        // Designations: each second while lasing, once more (no power) when done.
+        let now_d: BTreeMap<u64, extras::DesignationTruth> = extras::designations(sim, spec).into_iter().map(|d| (d.id, d)).collect();
+        for (id, d) in &now_d {
+            out.push(crate::dis::encode(&designator_pdu(sim, spec, d, true)));
+            self.designating.insert(*id, d.clone());
+        }
+        let ended: Vec<u64> = self.designating.keys().filter(|k| !now_d.contains_key(k)).copied().collect();
+        for id in ended {
+            if let Some(d) = self.designating.remove(&id) {
+                out.push(crate::dis::encode(&designator_pdu(sim, spec, &d, false)));
+            }
+        }
+        // Smoke screens: on release and every 10 s, once more (last) when gone.
+        let now_s: BTreeMap<u64, extras::ScreenTruth> = extras::screens(sim).into_iter().map(|s| (s.id, s)).collect();
+        for (id, s) in &now_s {
+            let seq = self.screens.get(id).map(|x| x.1.wrapping_add(1)).unwrap_or(1);
+            if self.due(format!("s{id}"), now, String::new(), 10.0) {
+                out.push(environment_pdu(sim, spec, s, seq, false));
+                self.screens.insert(*id, (s.clone(), seq));
+            }
+        }
+        let gone: Vec<u64> = self.screens.keys().filter(|k| !now_s.contains_key(k)).copied().collect();
+        for id in gone {
+            if let Some((s, seq)) = self.screens.remove(&id) {
+                self.last.remove(&format!("s{id}"));
+                out.push(environment_pdu(sim, spec, &s, seq.wrapping_add(1), true));
             }
         }
         for m in extras::minefields(sim) {

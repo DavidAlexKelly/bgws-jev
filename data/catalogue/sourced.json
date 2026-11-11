@@ -764,6 +764,16 @@
      "reloadS": 10
     },
     {
+     "id": "smokeMortar",
+     "kind": "mortar",
+     "munitions": [
+      "smoke81Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 12,
+     "reloadS": 10
+    },
+    {
      "id": "smallArms",
      "kind": "smallArms",
      "munitions": [
@@ -777,7 +787,8 @@
    "stores": {
     "ammo": {
      "he81Mortar": 120,
-     "ball556": 2400
+     "ball556": 2400,
+     "smoke81Mortar": 24
     }
    },
    "mover": {
@@ -1255,6 +1266,16 @@
      "reloadS": 10
     },
     {
+     "id": "smokeMortar",
+     "kind": "mortar",
+     "munitions": [
+      "smoke81Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 12,
+     "reloadS": 10
+    },
+    {
      "id": "smallArms",
      "kind": "smallArms",
      "munitions": [
@@ -1268,7 +1289,8 @@
    "stores": {
     "ammo": {
      "he81Mortar": 120,
-     "ball556": 2400
+     "ball556": 2400,
+     "smoke81Mortar": 24
     }
    },
    "class": "dismounted",
@@ -1441,6 +1463,16 @@
      "reloadS": 10
     },
     {
+     "id": "smokeMortar",
+     "kind": "mortar",
+     "munitions": [
+      "smoke82Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 12,
+     "reloadS": 10
+    },
+    {
      "id": "smallArms",
      "kind": "smallArms",
      "munitions": [
@@ -1454,7 +1486,8 @@
    "stores": {
     "ammo": {
      "he82Mortar": 120,
-     "ball556": 2400
+     "ball556": 2400,
+     "smoke82Mortar": 24
     }
    },
    "class": "dismounted",

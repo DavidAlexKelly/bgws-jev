@@ -161,6 +161,9 @@ pub struct Munition {
     pub guidance: Guidance,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seeker: Option<Seeker>,
+    /// A smoke round: what it releases where it lands (no blast).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obscurant: Option<Obscurant>,
     pub flight: FlightProfile,
     /// Average speed in flight, m/s (0 for rounds resolved in the tick).
     pub speed_ms: f64,
@@ -198,6 +201,26 @@ pub struct Munition {
     /// Its DIS munition type (SISO-REF-010), for interoperability.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dis: Option<crate::types::DisEntityType>,
+}
+
+/// The obscurant a smoke round releases.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ObscurantKind {
+    /// Hexachloroethane: visual screening.
+    Hc,
+    /// White or red phosphorus: visual and some infrared.
+    Wp,
+    /// Flakes or graphite: visual, infrared and some millimetre wave.
+    Multispectral,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Obscurant {
+    pub kind: ObscurantKind,
+    /// Obscurant released per round, g.
+    pub mass_g: f64,
 }
 
 impl Munition {
@@ -251,6 +274,7 @@ mod tests {
             family: "tank120".into(),
             guidance: Guidance::None,
             seeker: None,
+            obscurant: None,
             flight: FlightProfile::None,
             speed_ms: 1650.0,
             min_range_m: 0.0,

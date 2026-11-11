@@ -2089,6 +2089,16 @@
      "salvo": 2,
      "magazine": 60,
      "reloadS": 10
+    },
+    {
+     "id": "smokeMortar",
+     "kind": "mortar",
+     "munitions": [
+      "smoke120Mortar"
+     ],
+     "salvo": 2,
+     "magazine": 12,
+     "reloadS": 10
     }
    ],
    "radios": [
@@ -2106,7 +2116,8 @@
    ],
    "stores": {
     "ammo": {
-     "he120Mortar": 120
+     "he120Mortar": 120,
+     "smoke120Mortar": 24
     },
     "medical": 0,
     "spares": 0,
@@ -2670,6 +2681,16 @@
      "reloadS": 12
     },
     {
+     "id": "smoke155",
+     "kind": "howitzer",
+     "munitions": [
+      "smoke155"
+     ],
+     "salvo": 4,
+     "magazine": 12,
+     "reloadS": 12
+    },
+    {
      "id": "precision155",
      "kind": "howitzer",
      "munitions": [
@@ -2695,7 +2716,8 @@
    ],
    "stores": {
     "ammo": {
-     "he155": 120
+     "he155": 120,
+     "smoke155": 24
     },
     "medical": 0,
     "spares": 0,

@@ -304,6 +304,8 @@ impl Sim {
         let mut sim = Sim { world, ctx };
         crate::world::setup(&mut sim);
         crate::dismount::setup(&mut sim);
+        crate::smoke::setup(&mut sim);
+        crate::designation::setup(&mut sim);
         if opts.plan_at_start && !scenario.scope.planners.is_empty() {
             for side in Side::PLAYERS {
                 if sim.ctx.scenario.forces_of(side).next().is_some() {
@@ -418,6 +420,8 @@ impl Sim {
             {
                 prof_span!("world.base");
                 crate::world::base(self, 1.0);
+                crate::smoke::base(self);
+                crate::designation::update(self);
             }
             if sense {
                 prof_span!("sensing");

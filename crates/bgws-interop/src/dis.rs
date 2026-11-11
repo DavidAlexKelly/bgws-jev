@@ -106,6 +106,8 @@ pub fn munition_codes(sim: &Sim, spec: &InteropSpec, firer: Option<EntityId>, mu
     use bgws_catalogue::MunitionKind as K;
     // SISO-REF-010 Munition Descriptor-Warhead and -Fuse.
     let warhead: u16 = match m.map(|m| m.kind) {
+        // Smoke rounds: white phosphorus (SISO-REF-010 Warhead 2005).
+        _ if m.is_some_and(|m| m.obscurant.is_some()) => 2005,
         Some(K::Ke | K::SmallArms) => 5000,
         Some(K::Heat | K::Atgm | K::Fpv | K::Loitering) => 1600,
         _ => 1000,

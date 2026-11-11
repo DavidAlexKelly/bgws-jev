@@ -567,6 +567,21 @@ impl HlaLink {
                 n += self.delete_extra(&key)?;
             }
         }
+        let mut designating = BTreeSet::new();
+        for d in extras::designations(sim, &spec) {
+            let host = self.name_of(sim, Some(d.designator));
+            let target = self.name_of(sim, d.target);
+            let key = format!("designator:{}", d.id);
+            let attrs = rpr_extras::designator_attributes(&d, (ext(d.designator), &host), &target, place(&sim.ctx.frame, Geoid::egm96(), d.spot).ecef);
+            let name = rpr_extras::designator_name(&host, d.id);
+            let sig = format!("{:.0}:{:.0}:{}", d.spot.e, d.spot.n, d.lasing);
+            n += self.update_extra(&key, rpr_extras::DESIGNATOR, &name, sig, 1.0, now, attrs, stamp)?;
+            designating.insert(key);
+        }
+        let ended: Vec<String> = self.extras_out.instances.keys().filter(|k| k.starts_with("designator:") && !designating.contains(*k)).cloned().collect();
+        for key in ended {
+            n += self.delete_extra(&key)?;
+        }
         for m in extras::minefields(sim) {
             let placed = place(&sim.ctx.frame, Geoid::egm96(), bgws_core::Enu::new(m.centre.e, m.centre.n, sim.ctx.ground.height(m.centre.e, m.centre.n)));
             let o = crate::geo::dis_orientation(&placed.axes, m.bearing, 0.0, 0.0).map(|x| x as f32);

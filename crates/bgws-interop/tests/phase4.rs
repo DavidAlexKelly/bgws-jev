@@ -157,3 +157,77 @@ fn aggregated_formations_go_out_where_their_members_are() {
         assert!(at.sub(t.centre).horizontal() < 200.0 + t.radius_m, "aggregate {number} published {:.0} m from its members' centre", at.sub(t.centre).horizontal());
     }
 }
+
+#[test]
+fn a_laser_designation_and_a_smoke_screen_go_out() {
+    use bgws_core::{Enu, Side};
+    let mut f = default_figures();
+    f.set("smoke.vehicle.salvos", 0.0).unwrap();
+    let path = format!("{}/../../data/scenarios/gen-company-attack.json", env!("CARGO_MANIFEST_DIR"));
+    let mut s = Sim::new(&ScenarioV4::from_json(&std::fs::read_to_string(path).unwrap()).unwrap(), Seed(1), f).unwrap();
+    // A red unit that has a blue armoured vehicle in sight lases it for a
+    // Hellfire-class missile; a screen goes up elsewhere.
+    let mut pair = None;
+    for t in 1..=1800 {
+        s.run_with_rules(SimTime::from_secs(t as f64));
+        pair = s.ctx.order.iter().find_map(|&e| {
+            let i = s.world.get::<bgws_sim::components::Ident>(e)?;
+            let aw = s.world.get::<bgws_sim::components::Aware>(e)?;
+            (i.side == Side::Red).then(|| aw.seen.iter().find(|(t, x)| (s.ctx.now - x.last).secs() <= 1.0 && bgws_sim::smoke::has_dischargers(&s, **t)).map(|(t, _)| (i.id, *t))).flatten()
+        });
+        if pair.is_some() {
+            break;
+        }
+    }
+    let (red, blue) = pair.expect("a red unit sees a blue vehicle");
+    let t0 = s.ctx.now.secs();
+    let p = |id: bgws_core::EntityId| s.world.get::<bgws_sim::components::Kin>(s.ctx.entity(id)).unwrap().pos;
+    let (from, to) = (p(red), p(blue));
+    let spec_l = bgws_sim::domains::air::LaunchSpec {
+        side: Side::Red,
+        launcher: Some(red),
+        munition: "agm".into(),
+        from: Enu::new(from.e, from.n, from.u + 10.0),
+        to,
+        target: Some(blue),
+        purpose: bgws_sim::domains::air::Purpose::Strike,
+        track: None,
+        pk: 0.75,
+    };
+    bgws_sim::domains::air::flight::launch_munition(&mut s, spec_l).unwrap();
+    bgws_sim::smoke::release(&mut s, Side::Blue, None, bgws_sim::smoke::Source::Artillery, bgws_models::signature::SmokeKind::Wp, &[Enu::new(to.e + 500.0, to.n, 0.0)], 1.0, 5000.0);
+    let rx = UdpSocket::bind("127.0.0.1:0").unwrap();
+    rx.set_read_timeout(Some(std::time::Duration::from_millis(100))).unwrap();
+    let spec = InteropSpec { exercise: 4, site: 5, application: 6, ..Default::default() };
+    let mut publisher = DisPublisher::new(&rx.local_addr().unwrap().to_string(), spec, DrSettings::default()).unwrap();
+    let (mut powers, mut env) = (vec![], vec![]);
+    let mut buf = [0u8; 8192];
+    for k in 1..=20u32 {
+        s.run_with_rules(SimTime::from_secs(t0 + k as f64));
+        let events = s.drain_events();
+        publisher.publish(&s, &events).unwrap();
+        while let Ok(n) = rx.recv(&mut buf) {
+            match buf[2] {
+                41 => {
+                    assert_eq!((buf[3], n), (9, 72), "an Environmental Process PDU");
+                    assert_eq!(u16::from_be_bytes([buf[8], buf[9]]) as usize, n);
+                    assert_eq!(u32::from_be_bytes(buf[32..36].try_into().unwrap()), 851_968, "a sphere record");
+                    env.push(buf[27]);
+                }
+                24 => {
+                    for p in dis_rs::parse(&buf[..n]).expect("a Designator PDU parses") {
+                        if let PduBody::Designator(d) = p.body {
+                            assert!((d.wavelength - 1.064).abs() < 1e-6);
+                            powers.push(d.power);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    eprintln!("designator powers {powers:?}; environment status bits {env:?}");
+    assert!(powers.iter().any(|&p| p > 0.0), "lasing");
+    assert_eq!(powers.last(), Some(&0.0), "a last one with no power when it ends");
+    assert!(env.contains(&0b10), "the screen is on");
+}

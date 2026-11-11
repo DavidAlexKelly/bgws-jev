@@ -176,3 +176,45 @@ pub fn aggregates(sim: &Sim, spec: &InteropSpec) -> Vec<AggregateTruth> {
     }
     out
 }
+
+/// A laser designation one of ours is keeping.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DesignationTruth {
+    pub id: u64,
+    pub designator: EntityId,
+    pub target: Option<EntityId>,
+    /// East, north, height above mean sea level.
+    pub spot: Enu,
+    pub code: u16,
+    pub lasing: bool,
+}
+
+/// Our designations now.
+pub fn designations(sim: &Sim, spec: &InteropSpec) -> Vec<DesignationTruth> {
+    let Some(d) = sim.world.get_resource::<bgws_sim::designation::Designations>() else { return vec![] };
+    d.active.iter().filter(|x| ours(sim, spec, x.designator)).map(|x| DesignationTruth { id: x.id, designator: x.designator, target: x.target, spot: x.spot, code: x.code, lasing: x.lasing }).collect()
+}
+
+/// A smoke screen in the world (each is ours: we released it).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScreenTruth {
+    pub id: u64,
+    pub side: Side,
+    /// Its centre now (drifted), on the ground.
+    pub centre: Enu,
+    /// How far it reaches, m.
+    pub radius_m: f64,
+    pub mass_g: f64,
+    pub kind: bgws_models::signature::SmokeKind,
+}
+
+pub fn screens(sim: &Sim) -> Vec<ScreenTruth> {
+    let Some(st) = sim.world.get_resource::<bgws_sim::smoke::SmokeState>() else { return vec![] };
+    st.screens
+        .iter()
+        .map(|s| {
+            let (c, r) = s.extent(sim.ctx.now, &st.sig);
+            ScreenTruth { id: s.id, side: s.side, centre: Enu::new(c.e, c.n, sim.ctx.ground.height(c.e, c.n)), radius_m: r, mass_g: s.mass_g, kind: s.kind }
+        })
+        .collect()
+}

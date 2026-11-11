@@ -28,9 +28,10 @@ pub const RADAR_BEAM: &str = "HLAobjectRoot.EmitterBeam.RadarBeam";
 pub const JAMMER_BEAM: &str = "HLAobjectRoot.EmitterBeam.JammerBeam";
 pub const AGGREGATE: &str = "HLAobjectRoot.BaseEntity.AggregateEntity";
 pub const MINEFIELD: &str = "HLAobjectRoot.Minefield";
+pub const DESIGNATOR: &str = "HLAobjectRoot.EmbeddedSystem.Designator";
 pub const RAW_BINARY_SIGNAL: &str = "HLAinteractionRoot.RadioSignal.RawBinaryRadioSignal";
 
-pub const CLASSES: [&str; 6] = [RADIO_TRANSMITTER, EMITTER_SYSTEM, RADAR_BEAM, JAMMER_BEAM, AGGREGATE, MINEFIELD];
+pub const CLASSES: [&str; 7] = [RADIO_TRANSMITTER, EMITTER_SYSTEM, RADAR_BEAM, JAMMER_BEAM, AGGREGATE, MINEFIELD, DESIGNATOR];
 
 pub fn attributes_for(class: &str) -> Vec<&'static str> {
     match class {
@@ -38,6 +39,18 @@ pub fn attributes_for(class: &str) -> Vec<&'static str> {
         EMITTER_SYSTEM => vec!["EntityIdentifier", "HostObjectIdentifier", "EmitterIndex", "EmitterFunctionCode", "EmitterType"],
         RADAR_BEAM | JAMMER_BEAM => vec!["EmitterSystemIdentifier", "BeamIdentifier", "BeamFunctionCode", "EmissionFrequency", "FrequencyRange", "EffectiveRadiatedPower", "PulseRepetitionFrequency", "PulseWidth"],
         AGGREGATE => vec!["EntityIdentifier", "EntityType", "Spatial", "ForceIdentifier", "AggregateMarking", "AggregateState", "Dimensions", "EntityIdentifiers", "Formation"],
+        DESIGNATOR => vec![
+            "EntityIdentifier",
+            "HostObjectIdentifier",
+            "CodeName",
+            "DesignatedObjectIdentifier",
+            "DesignatorCode",
+            "DesignatorEmissionWavelength",
+            "DesignatorOutputPower",
+            "DesignatorSpotLocation",
+            "DeadReckoningAlgorithm",
+            "SpotLinearAccelerationVector",
+        ],
         MINEFIELD => vec!["MinefieldIdentifier", "ForceIdentifier", "MinefieldType", "MinefieldLocation", "MinefieldOrientation", "PerimeterPointCoordinates", "ActiveStatus", "Lane", "ProtocolMode"],
         _ => vec![],
     }
@@ -190,6 +203,27 @@ pub fn minefield_attributes(m: &MinefieldTruth, id: [u16; 3], force: u8, ecef: [
         ("ActiveStatus", octet(1)),
         ("Lane", octet((m.lanes > 0) as u8)),
         ("ProtocolMode", octet(0)),
+    ]
+}
+
+pub fn designator_name(host: &str, id: u64) -> String {
+    format!("{host}-designator-{id}")
+}
+
+/// A laser designation's attributes: `host` its designator, `target` the
+/// designated entity's instance name.
+pub fn designator_attributes(d: &crate::extras::DesignationTruth, host: ([u16; 3], &str), target: &str, spot_ecef: [f64; 3]) -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        ("EntityIdentifier", entity_identifier(host.0)),
+        ("HostObjectIdentifier", unicode(host.1)),
+        ("CodeName", u16v(0)),
+        ("DesignatedObjectIdentifier", unicode(target)),
+        ("DesignatorCode", u16v(d.code)),
+        ("DesignatorEmissionWavelength", f32v(crate::dis_extras::LASER_WAVELENGTH_UM)),
+        ("DesignatorOutputPower", f32v(if d.lasing { crate::dis_extras::LASER_POWER_W } else { 0.0 })),
+        ("DesignatorSpotLocation", world_location(spot_ecef)),
+        ("DeadReckoningAlgorithm", octet(1)),
+        ("SpotLinearAccelerationVector", Enc::new().f32(0.0).f32(0.0).f32(0.0).done()),
     ]
 }
 

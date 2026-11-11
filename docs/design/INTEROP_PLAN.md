@@ -16,10 +16,13 @@ Status: **phases 1–4 built**, except where noted below. See the README's
   Terrain from a partner's elevation, land cover and roads.
 
 Phase 4 as built differs from this plan in these places:
-- **Smoke and laser designation are not built.** The simulation has no
-  smoke screens and no laser designators, so there is nothing for
-  Environmental Process or Designator PDUs to carry. Each needs its sim
-  feature first.
+- **Smoke and laser designation** were added to the simulation first (see the
+  README's *Smoke and laser designation*), then published:
+  - Designator PDUs and the RPR `Designator` object;
+  - smoke as Environmental Process PDUs, written by hand, DIS only, since
+    we know of no standard RPR object for it.
+
+  Neither is taken in from other simulations yet.
 - **The RPR objects' names and datatypes** are from the RPR FOM 2.0
   modules as we read them, and are tested only on the BGWS RTI. Check them
   against the partner's FOM on first use.
