@@ -835,7 +835,22 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
     let template = ctx.scenario.behaviours.assign.get(&f.id).cloned().unwrap_or_else(|| platform.template.clone());
     let quality = f.quality.rating();
     let count = if f.count > 0 { f.count } else { platform.body.count.max(1) };
-    let skill = Skill { base: (quality as f64 - 1.0) / 5.0, experience: 0.0 };
+    // Crews vary about their troop quality: skill and leadership are drawn
+    // for each unit (`sim.people.skill_spread`, `leadership_spread`).
+    let (skill_base, leadership) = {
+        use rand::Rng;
+        let mean = (quality as f64 - 1.0) / 5.0;
+        let mut rng = ctx.rng("crew", id.0 as u64, 0);
+        let mut normal = || {
+            // Box–Muller: one standard normal.
+            let (u1, u2): (f64, f64) = (rng.gen::<f64>().max(1e-12), rng.gen());
+            (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+        };
+        let a = normal();
+        let b = normal();
+        ((mean + ctx.p.skill_spread * a).clamp(0.0, 1.0), (mean + ctx.p.leadership_spread * b).clamp(0.0, 1.0))
+    };
+    let skill = Skill { base: skill_base, experience: 0.0 };
     let arms = Arms {
         mounts: platform
             .mounts
@@ -872,6 +887,9 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 new_casualties: 0.0,
                 last_incoming: None,
                 success: false,
+                leadership,
+                losses_seen: 0,
+                leaderless_until: None,
             },
             arms,
             Act {

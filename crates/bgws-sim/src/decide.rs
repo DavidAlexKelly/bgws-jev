@@ -39,6 +39,10 @@ pub fn raise(s: &mut Sim) {
                 continue;
             }
         }
+        // Its leader just hit: it carries on until the second takes over.
+        if s.world.get::<Crew>(e).is_some_and(|c| c.leaderless_until.is_some()) && t.point != "D11" {
+            continue;
+        }
         // A broken unit runs itself.
         let morale = s.world.get::<Crew>(e).map(|c| c.morale.state).unwrap_or(MoraleState::Steady);
         if matches!(morale, MoraleState::Broken | MoraleState::Routed) && t.point != "D11" {
@@ -66,6 +70,8 @@ const UNDER_FIRE_S: f64 = 30.0;
 /// - D6, after a volley: a unit holding ground, under fire from a shooter it
 ///   has seen, fires and moves to another position (its alternate) before
 ///   the enemy's fire is adjusted onto it.
+/// - D11, rallied: back to its orders if no longer under fire, else hold
+///   and recover.
 fn doctrine_rule(s: &Sim, e: bevy_ecs::prelude::Entity, t: &Trigger) -> RulesChoice {
     let (Some(k), Some(a), Some(c), Some(i)) = (s.world.get::<Kin>(e), s.world.get::<Act>(e), s.world.get::<Crew>(e), s.world.get::<Ident>(e)) else { return RulesChoice::Fallback };
     let now = s.ctx.now;
@@ -95,6 +101,12 @@ fn doctrine_rule(s: &Sim, e: bevy_ecs::prelude::Entity, t: &Trigger) -> RulesCho
             } else {
                 RulesChoice::Fallback
             }
+        }
+        "D11" => {
+            // Rallied: back to its orders once no longer under fire (holding
+            // to recover would drop them for good); under fire, hold.
+            let quiet = c.last_incoming.is_none_or(|(at, _)| (now - at).secs() > 2.0 * UNDER_FIRE_S);
+            option(if quiet { "resume" } else { "hold" })
         }
         _ => RulesChoice::Fallback,
     }
@@ -310,7 +322,7 @@ fn mount_odds(s: &Sim, i: &Ident, h: &Health, a: &Act, c: &Crew, m: &MountState,
     let moving = a.posture == Posture::Moving && !mount.fire_control.stabilised;
     let shot = df::Shot { range_m: range, firer_moving: moving, target_crossing_mps: 0.0, skill_mult: c.skill.error_mult(&s.ctx.p.people), suppression: c.suppression.level };
     let ph = if crate::systems::is_guided_direct(mun) {
-        df::guided_ph(crate::systems::operator_guided(mun), c.suppression.level, p)
+        df::guided_ph(crate::systems::operator_guided(mun), c.suppression.level, p) * (1.0 - s.ctx.p.missile_fail_p)
     } else {
         df::ph_expected(pres, &df::error_budget(&gun, &fc, &shot, p))
     };
@@ -532,6 +544,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             "vehicles": format!("{} of {}", h.fit, h.start), "strengthPct": pct(h.strength()),
             "posture": posture, "suppressionPct": pct(c.suppression.level), "morale": morale,
             "lastFiredS": a.last_shot.map(|t| round((s.ctx.now - t).secs())),
+            "leaderReplacedInS": c.leaderless_until.map(|t| round((t - s.ctx.now).secs())),
             "infantryAboard": s.world.get::<crate::dismount::Troops>(e).map(|t| t.aboard(h)).filter(|n| *n > 0).map(|n| format!("{n} sections")),
         },
         "weapons": weapons,
@@ -888,7 +901,10 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
             chosen_position = firing.then_some(spot);
             Some(Activity::Move { route: vec![spot], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })
         }
-        "pullBackToFriends" | "joinNearestFriends" | "rejoin" => {
+        // Rejoin (as the vocabulary says): resume its orders; with no
+        // phases of orders, carry on with what it was doing.
+        "rejoin" => s.world.get::<Act>(e).filter(|a| !a.mission.phases.is_empty()).map(|_| mission_activity.clone()),
+        "pullBackToFriends" | "joinNearestFriends" => {
             let to = nearest_friend(s, e).map(|f| f.1).unwrap_or_else(|| point_away(s, e, withdraw_m));
             Some(Activity::Withdraw { route: route_for(s, e, to, MoveModeS::Tactical), then: Some(Box::new(Activity::Overwatch)) })
         }

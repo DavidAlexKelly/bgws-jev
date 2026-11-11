@@ -40,8 +40,7 @@ fn play(name: &str, seed: u64, minutes: f64) -> (Sim, Vec<LogEvent>) {
 /// Play as the host and the vignettes do: each question's rules choice, and
 /// the heuristic planner for HQ plans (it positions fire and drone teams by
 /// their reach, where the sim's own rules plan only sends the attack in).
-fn play_planned(name: &str, seed: u64, minutes: f64) -> (Sim, Vec<LogEvent>) {
-    let sc = scenario(name);
+fn play_planned_sc(sc: ScenarioV4, seed: u64, minutes: f64) -> (Sim, Vec<LogEvent>) {
     let mut list = bgws_sim::all_figures();
     list.extend(bgws_decide::figures());
     let figures = bgws_core::Figures::from_list(list).unwrap();
@@ -131,8 +130,21 @@ fn detect_to_strike_and_fpv_effectiveness_emerge_in_band() {
     let (mut e_hit, mut e_kill) = (0.0, 0.0);
     // 16 seeds by default (8 gave as few as 7 attacks); more: D2S_SEEDS=1-24.
     let seeds: Vec<u64> = std::env::var("D2S_SEEDS").ok().and_then(|v| { let (a, b) = v.split_once('-')?; Some((a.parse().ok()?..=b.parse().ok()?).collect()) }).unwrap_or((1..=16).collect());
+    // The drones' strike chain, without blue's tank and IFV: attacking at
+    // will they knock out the red infantry at 3 km before the drones reach
+    // it, leaving too few strikes to measure.
+    let path = format!("{}/../../data/scenarios/m4-drone-line.json", env!("CARGO_MANIFEST_DIR"));
+    let mut v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let armour: Vec<String> = v["forces"].as_array().unwrap().iter().filter(|f| f["side"] == "blue" && (f["platform"] == "generic/mbt" || f["platform"] == "generic/ifv")).map(|f| f["id"].as_str().unwrap().to_string()).collect();
+    v["forces"].as_array_mut().unwrap().retain(|f| !armour.iter().any(|a| f["id"] == a.as_str()));
+    for h in v.get_mut("command").and_then(|c| c.get_mut("hqs")).and_then(|h| h.as_array_mut()).into_iter().flatten() {
+        if let Some(subs) = h.get_mut("subordinates").and_then(|x| x.as_array_mut()) {
+            subs.retain(|x| !armour.iter().any(|a| x == a.as_str()));
+        }
+    }
+    let line = ScenarioV4::from_json(&v.to_string()).unwrap();
     for seed in seeds {
-        let (sim, _) = play_planned("m4-drone-line", seed, 180.0);
+        let (sim, _) = play_planned_sc(line.clone(), seed, 180.0);
         for r in drones::records(&sim) {
             if !matches!(r.kind, DroneType::FpvRf | DroneType::FpvFibre) {
                 continue;

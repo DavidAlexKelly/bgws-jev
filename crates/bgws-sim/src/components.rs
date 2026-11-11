@@ -91,6 +91,12 @@ pub struct Crew {
     /// Who last fired at it, and when.
     pub last_incoming: Option<(SimTime, EntityId)>,
     pub success: bool,
+    /// Its leaders' quality 0..1 (drawn about its troop quality).
+    pub leadership: f64,
+    /// Losses already looked at for a leader hit.
+    pub losses_seen: usize,
+    /// Its leader was hit: no new decisions until the second takes over.
+    pub leaderless_until: Option<SimTime>,
 }
 
 /// One weapon mount's state.

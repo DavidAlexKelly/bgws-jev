@@ -940,7 +940,7 @@ fn volley_kill_odds(s: &Sim, e: Entity, fit: u32, cat_mount: &bgws_catalogue::Mo
     let (pres, budget, soft, tplat) = aim(s, e, cat_mount, mun, te, range);
     let p = &s.ctx.p.direct;
     let supp = s.world.get::<Crew>(e).map(|c| c.suppression.level).unwrap_or(0.0);
-    let ph = if is_guided_direct(mun) { df::guided_ph(operator_guided(mun), supp, p) } else { df::ph_expected(&pres, &budget) };
+    let ph = if is_guided_direct(mun) { df::guided_ph(operator_guided(mun), supp, p) * (1.0 - s.ctx.p.missile_fail_p) } else { df::ph_expected(&pres, &budget) };
     let pen = mun.penetration_at(range);
     let blast = blast_of(mun);
     if soft {
@@ -1431,7 +1431,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         launch_missiles(s, e, id, side, mount_i, mun, cat_mount, tid, range, rounds);
         return;
     }
-    let (mut hits, mut kills, mut near, mut blasts) = (0u32, 0u32, 0.0f64, 0.0f64);
+    let (mut hits, mut kills, mut near, mut blasts, mut failed) = (0u32, 0u32, 0.0f64, 0.0f64, 0u32);
     let blast = blast_of(mun);
     let shield = 1.0 - s.ctx.ground.micro(tk.pos.e, tk.pos.n).cover;
     let share = blast.map(|b| blast_share(&b, &budget, s.ctx.p.team_front_m, s.ctx.p.team_depth_m) * shield).unwrap_or(0.0);
@@ -1446,6 +1446,13 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     for _ in 0..rounds {
         let r = if guided {
             let ph = df::guided_ph(operator_guided, supp, &p);
+            // A missile can fail in flight (motor, guidance, wire, fuze): it
+            // falls short, wide of the target.
+            if rng.gen::<f64>() < s.ctx.p.missile_fail_p {
+                failed += 1;
+                ph_last = ph;
+                continue;
+            }
             let hit = rng.gen::<f64>() < ph;
             let (fx, fy) = (rng.gen_range(0.3..0.7), rng.gen_range(0.3..0.7));
             // A miss still lands close by (and suppresses).
@@ -1515,6 +1522,15 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
                 m.ready_at = now + bgws_core::SimDuration::from_secs(cat_mount.reload_s.max(4.0));
             }
         }
+        // A gun can jam or misfire: the mount is out until it is cleared.
+        if !guided && rng.gen::<f64>() < s.ctx.p.gun_stoppage_p {
+            let clear = s.ctx.p.stoppage_s;
+            if let Some(m) = s.world.get_mut::<Arms>(e).expect("arms").mounts.iter_mut().find(|m| m.index == mount_i) {
+                m.ready_at += bgws_core::SimDuration::from_secs(clear);
+            }
+            let text = format!("{}'s {} has a stoppage ({:.0} s to clear)", name(s, id), cat_mount.id, clear);
+            s.ctx.log.push(now, "fire.stoppage").side(side).entity(id).text(text).data(serde_json::json!({ "mount": cat_mount.id, "clearS": clear }));
+        }
         {
             let mut a = s.world.get_mut::<Act>(e).expect("act");
             a.last_shot = Some(now);
@@ -1531,9 +1547,12 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     } else if hits > 0 {
         s.world.get_mut::<Act>(e).expect("act").volleys = 0;
     }
-    // Effects on the target.
+    // Effects on the target; a crew that knocks something out learns.
     let mut destroyed_now = false;
     if kills > 0 {
+        if let Some(mut c) = s.world.get_mut::<Crew>(e) {
+            c.skill.after_engagement(true);
+        }
         let mut h = s.world.get_mut::<Health>(te).expect("h");
         let k = kills.min(h.fit);
         h.fit -= k;
@@ -1561,7 +1580,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         range,
         hits,
         kills
-    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills, "blasts": blasts })); }
+    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills, "blasts": blasts, "failed": failed })); }
     if destroyed_now {
         { let __text = format!("{} is destroyed", name(s, tid)); s.ctx.log.push(now, "unit.destroyed").side(side.enemy()).entity(tid).text(__text); }
         s.world.get_mut::<Crew>(e).expect("crew").success = true;
@@ -1609,18 +1628,39 @@ pub fn people(s: &mut Sim, dt: f64) {
         let pos = s.world.get::<Kin>(e).expect("k").pos;
         let cover = s.ctx.ground.micro(pos.e, pos.n).cover;
         let isolated = !friends.any_within(idx, side, pos, iso);
-        let q = UnitQuality { leadership: (quality as f64 - 1.0) / 5.0, training: (quality as f64 - 1.0) / 5.0 };
         let mut rng = s.ctx.rng("morale", id.0 as u64, 0);
         let observed = crate::domains::drones::drone_observed(s, id);
+        // Losses since last look: one of them may have been its leader's
+        // vehicle or team (the chance is the share of the unit lost).
+        let (lost_now, fit_now) = {
+            let h = s.world.get::<Health>(e).expect("health");
+            let seen = s.world.get::<Crew>(e).expect("crew").losses_seen;
+            (h.losses.len().saturating_sub(seen), h.fit)
+        };
+        let leader_hit = lost_now > 0 && {
+            let mut lr = s.ctx.rng("leader", id.0 as u64, 0);
+            lr.gen::<f64>() < lost_now as f64 / (fit_now as usize + lost_now) as f64
+        };
+        let replace = s.ctx.p.leader_replace_s;
         let change = {
             let mut c = s.world.get_mut::<Crew>(e).expect("crew");
+            c.losses_seen += lost_now;
+            if leader_hit && replace > 0.0 {
+                c.leaderless_until = Some(now + bgws_core::SimDuration::from_secs(replace));
+            }
+            if c.leaderless_until.is_some_and(|t| t <= now) {
+                c.leaderless_until = None;
+            }
+            let leaderless = c.leaderless_until.is_some();
+            let q = UnitQuality { leadership: c.leadership, training: (quality as f64 - 1.0) / 5.0 };
             let incoming = IncomingFire { near_misses_per_min: c.near_misses_per_min, blasts_per_min: c.blasts_per_min };
             c.suppression.step(dt, &incoming, cover, &pp);
             // Fire felt this tick fades over a minute.
             let fade = (-dt / 60.0f64).exp();
             c.near_misses_per_min *= fade;
             c.blasts_per_min *= fade;
-            let inputs = StressInputs { new_casualties: c.new_casualties, suppression: c.suppression.level, isolated, surprised: false, drone_observed: observed, success: c.success };
+            // A leader lost is a shock (counted as surprise) until replaced.
+            let inputs = StressInputs { new_casualties: c.new_casualties, suppression: c.suppression.level, isolated, surprised: leaderless, drone_observed: observed, success: c.success };
             c.new_casualties = 0.0;
             c.success = false;
             if c.last_incoming.map(|(t, _)| (now - t).secs() > 120.0).unwrap_or(false) {
@@ -1628,6 +1668,10 @@ pub fn people(s: &mut Sim, dt: f64) {
             }
             c.morale.step(dt, &inputs, &q, &pp, &mut rng)
         };
+        if leader_hit && replace > 0.0 {
+            let text = format!("{}'s leader is hit: no new orders for {:.0} s", name(s, id), replace);
+            s.ctx.log.push(now, "people.leader").side(side).entity(id).text(text);
+        }
         if let Some(ch) = change {
             { let __text = format!("{} is {:?} (was {:?})", name(s, id), ch.to, ch.from); s.ctx.log.push(now, "people.morale").side(side).entity(id).text(__text).data(serde_json::json!({ "stress": ch.stress, "casualties": ch.casualties })); }
             match ch.to {

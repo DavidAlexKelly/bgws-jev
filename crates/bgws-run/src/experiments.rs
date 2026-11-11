@@ -96,6 +96,69 @@ pub fn atgm_engagement(f: &Figures, seed: Seed) -> Value {
     (launched > 0.0).then(|| hit / launched)
 }
 
+/// Two tank platoons meet on open ground (the meeting engagement's tanks,
+/// flat ground): the range of the first volley either fires, m.
+pub fn tank_engagement_range(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-meeting-engagement")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let mut v = crate::scengen::build(&spec).ok()?;
+    let keep = ["b-1", "b-hq", "r-1", "r-hq"];
+    v["forces"].as_array_mut()?.retain(|x| x["id"].as_str().is_some_and(|i| keep.contains(&i)));
+    for h in v["command"]["hqs"].as_array_mut()? {
+        let sub = if h["side"] == "blue" { "b-1" } else { "r-1" };
+        h["subordinates"] = serde_json::json!([sub]);
+    }
+    v["victory"] = serde_json::json!([]);
+    let sc = ScenarioV4::from_json(&v.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(40.0 * 60.0));
+    sim.drain_events()
+        .into_iter()
+        .find(|e| matches!(e.kind.as_str(), "fire.hit" | "fire.kill" | "fire.miss" | "fire.launch"))
+        .and_then(|e| e.data.get("rangeM").and_then(serde_json::Value::as_f64))
+}
+
+/// Troops in the open (or light cover) under a minute of machine-gun fire,
+/// 10–40 near misses a minute: how long after the fire stops until their
+/// suppression has faded (below 0.1), s. The people model the game uses.
+pub fn suppression_recovery(f: &Figures, seed: Seed) -> Value {
+    use bgws_models::people::{IncomingFire, PeopleParams, Suppression};
+    let p = PeopleParams::from_figures(f);
+    let mut r = rng(seed, "v.suppression");
+    let fire = IncomingFire { near_misses_per_min: r.gen_range(10.0..40.0), blasts_per_min: 0.0 };
+    let cover = r.gen_range(0.0..0.3);
+    let mut s = Suppression::default();
+    for _ in 0..60 {
+        s.step(1.0, &fire, cover, &p);
+    }
+    let quiet = IncomingFire { near_misses_per_min: 0.0, blasts_per_min: 0.0 };
+    for t in 1..=1800 {
+        s.step(1.0, &quiet, cover, &p);
+        if s.level < 0.1 {
+            return Some(t as f64);
+        }
+    }
+    Some(1800.0)
+}
+
+/// The company attack on flat ground with the rules: how long a contact
+/// report takes from the sighting to its HQ's picture, min (the game's
+/// median over the reports that arrive).
+pub fn spot_report_latency(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-company-attack")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let sc = ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(30.0 * 60.0));
+    let c4 = sim.world.get_resource::<bgws_sim::domains::drones::C4>()?;
+    let mut l: Vec<f64> = c4.c2.latency.iter().map(|x| x.latency_s / 60.0).collect();
+    if l.is_empty() {
+        return None;
+    }
+    l.sort_by(f64::total_cmp);
+    Some(l[l.len() / 2])
+}
+
 /// FPV strike by a skilled crew: of the hits, did it fail to destroy? [P9]
 pub fn fpv(f: &Figures, seed: Seed) -> Value {
     use bgws_ops::drones::*;
@@ -452,6 +515,9 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
         let r = match v.id.as_str() {
             "mbt-engagement" => check(&mbt_engagement),
             "atgm-engagement" => check(&atgm_engagement),
+            "tank-engagement-range" => check(&tank_engagement_range),
+            "suppression-recovery" => check(&suppression_recovery),
+            "spot-report-latency" => check(&spot_report_latency),
             "fpv-effectiveness" => check(&fpv),
             "shahed-raid" => check(&shahed),
             "ballistic-missile-defence" => check(&bmd),
@@ -506,6 +572,9 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let exp: Box<ExperimentFn> = match id {
         "mbt-engagement" => Box::new(mbt_engagement),
         "atgm-engagement" => Box::new(atgm_engagement),
+        "tank-engagement-range" => Box::new(tank_engagement_range),
+        "suppression-recovery" => Box::new(suppression_recovery),
+        "spot-report-latency" => Box::new(spot_report_latency),
         "fpv-effectiveness" => Box::new(fpv),
         "shahed-raid" => Box::new(shahed),
         "ballistic-missile-defence" => Box::new(bmd),

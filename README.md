@@ -1083,6 +1083,38 @@ unchanged except the even company attack, which blue now wins in all six
 sooner (the battalion attack's longest game 135 → 33 min) while the
 company defence lasts longer (23–55 min, from 23–33).
 
+**Variance: crews, weapons and leaders.** Every crew of one troop quality
+was the same, and nothing ever failed.
+- Crews differ. Each unit draws its skill and its leadership about its troop
+  quality's (1σ `sim.people.skill_spread`, `leadership_spread`, 0.1 on a 0..1
+  scale), from the game's seed, so a replay draws the same crews (tested).
+  Skill sets aim and reaction time; leadership sets how morale holds. A
+  crew that knocks something out gains experience.
+- Weapons fail. A gun or machine-gun volley jams or misfires with chance
+  `sim.fire.gun_stoppage_p` (1%), out for `sim.fire.stoppage_s` (30 s). A
+  guided missile fails in flight with chance `sim.fire.missile_fail_p` (6%,
+  from the roughly 94% reliability claimed for current ATGMs). The odds
+  units choose weapons by allow for it.
+- Leaders are hit. Losses can take a unit's leader (the chance is the share
+  of the unit lost). It then asks no new decisions for
+  `sim.people.leader_replace_s` (2 min) until the second in command takes
+  over, carries on with what it was doing, and feels the shock in its
+  morale. The unit state shows `leaderReplacedInS`.
+
+Two doctrine gaps showed once crews differed:
+- A unit that rallied (D11) held to recover, which dropped its orders for
+  good; tanks shaken while waiting at a minefield never went through the
+  lane. Rallied and no longer under fire, the doctrine now rejoins.
+- "Rejoin" did not resume orders as its description says; it withdrew to
+  the nearest friends. Fixed.
+
+The counter-battery test needed 32 seeds, not 16, to show its contrast. A
+fast enemy crew can now catch a scooting battery in its two minutes out of
+action, and a poorly led battery can break at the first hit. Over 32 seeds
+a battery that stays survives 69% and loses 14 guns; one that scoots
+survives 84% and loses 7. The guard is now "at least twice" rather than
+"more than twice".
+
 Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
 
 | under test | better / worse | result Δ | exchange Δ |

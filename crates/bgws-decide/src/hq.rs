@@ -560,7 +560,9 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
             }
             phases.push(phase("bound onto the objective under covering fire", "move", Some(target), Some("bound")));
             phases.push(phase("hold the objective on overwatch", "overwatch", None, None));
-            orders.push(order(&u.id, phases, "attack: take the objective", &intent, "engage", "withinShortRange"));
+            // Attacking armour engages at its weapons' greatest effective
+            // range; holding fire to short range is for a defence or an ambush.
+            orders.push(order(&u.id, phases, "attack: take the objective", &intent, "engage", "always"));
             continue;
         }
         if !attack {
@@ -576,7 +578,7 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
             "attack: take the objective",
             &intent,
             "engage",
-            "withinShortRange",
+            "always",
         ));
     }
     if let Some(r) = &reserve {

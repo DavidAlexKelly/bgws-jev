@@ -66,7 +66,9 @@ fn an_ifvs_infantry_get_out_and_strength_never_rises() {
     // at long range before anyone closes.
     let spec = standard().into_iter().find(|s| s.name == "gen-company-attack").unwrap();
     assert!(!matches!(spec.ground, GroundSpec::Pack { .. }), "needs no theatre pack");
-    let sc = ScenarioV4::from_json(&build(&spec).unwrap().to_string()).unwrap();
+    let mut sc = ScenarioV4::from_json(&build(&spec).unwrap().to_string()).unwrap();
+    // The fight, not who wins: the objectives stay, no breakpoint ends it.
+    sc.victory.retain(|v| matches!(v, bgws_scenario::v4::VictoryCondition::Objective { .. }));
     let (mut out, mut busy) = (0, 0);
     for seed in 1..=3 {
         // Out at first contact (the mechanism, not the drill's distances).
@@ -108,4 +110,21 @@ fn an_ifvs_infantry_get_out_and_strength_never_rises() {
     assert!(out > 0, "no infantry got out");
     // Some get out just before the end; most go on with the fight.
     assert!(busy * 2 >= out, "{busy} of {out} foot units fired or moved");
+}
+
+/// Crews of one troop quality differ (skill and leadership are drawn for
+/// each unit), and the same seed draws the same crews.
+#[test]
+fn crews_vary_and_replay_the_same() {
+    let spec = standard().into_iter().find(|s| s.name == "gen-company-attack").unwrap();
+    let sc = ScenarioV4::from_json(&build(&spec).unwrap().to_string()).unwrap();
+    let crews = |seed: u64| {
+        let sim = Sim::new(&sc, Seed(seed), bgws_run::default_figures()).unwrap();
+        sim.ctx.order.iter().filter_map(|&e| sim.world.get::<bgws_sim::components::Crew>(e).map(|c| (c.skill.base, c.leadership))).collect::<Vec<_>>()
+    };
+    let (a, b, c) = (crews(1), crews(1), crews(2));
+    assert_eq!(a, b, "the same seed, the same crews");
+    assert_ne!(a, c, "another seed, other crews");
+    let skills: std::collections::BTreeSet<u64> = a.iter().map(|x| x.0.to_bits()).collect();
+    assert!(skills.len() > a.len() / 2, "crews of one quality all alike");
 }
