@@ -51,6 +51,44 @@ pace the sim to the wall clock without pausing for decisions; a notion of
 an entity the sim does not own; and a place in the game record for what
 arrives from outside.
 
+One thing is wrong for interoperability today: heights.
+- `Geodetic` treats height as above the WGS-84 ellipsoid, which DIS and RPR
+  expect. But the elevation the terrain is built from (Mapterhorn) gives
+  height above mean sea level (the geoid), and nothing converts between
+  the two.
+- Inside a game everything is offset alike, so it does no harm. Published,
+  every entity would be off by the geoid undulation, about 30 m near the
+  theatre origin (54.2° N, 18.6° E): buried or floating in a partner's
+  world.
+- Phase 1 fixes this at the boundary (section 4, task 4).
+
+### Terrain does not match between simulations
+
+DIS and HLA exchange where things are, never the ground. Each simulation
+keeps its own terrain, and the databases differ in:
+- **source** (our open data, or synthetic ground for generated scenarios,
+  against a partner's DTED, imagery or survey data);
+- **resolution** (our 30 m cells against a simulator's individual buildings
+  and trees);
+- **processing** (smoothing, canopy correction, roads cut into the ground,
+  water and bridges);
+- **height reference** (above).
+
+The symptoms: vehicles floating or buried; line of sight one side has and
+the other does not; cover that exists in one world only; movement through
+rivers or buildings that exist in one world only; and disagreeing pitch
+and roll.
+
+The plan handles this in four ways:
+1. **Clamp** remote ground entities to our ground (phase 2).
+2. **Test correlation** with a partner's terrain at sample points and
+   along sight lines (phase 2).
+3. **Require real-world terrain packs** for interoperable scenarios (phase 2).
+4. **Build packs from a partner's terrain data** when a federation agrees
+   a common source (phase 4).
+
+What still differs is documented in the after-action review.
+
 ## 3. Architecture
 
 A new crate, `crates/bgws-interop`, in three layers. The sim stays free of
@@ -166,18 +204,30 @@ Tasks:
    - Damage state from strength: none, slight, moderate, destroyed.
    - Appearance bits: destroyed, smoke, hatch, and the engine on or off
      (from `SigState`).
-4. **Dead reckoning.** Extrapolation and send thresholds as figures
+4. **Height datum at the boundary.**
+   - Add a geoid model (EGM2008, or EGM96 as a smaller fallback) to
+     `bgws-core::geo`: the undulation N at a latitude and longitude, by
+     bilinear interpolation of a gridded model at 2.5′ or 15′.
+   - Convert going out: ellipsoidal height h = MSL height H + N, before ECEF.
+   - Convert coming in: H = h − N, before placing a remote entity.
+   - Inside the sim nothing changes: terrain and positions stay in MSL
+     heights, so games and replays are unaffected.
+   - The grid is vendored, or downloaded once, as its licence allows; the
+     NGA models are public.
+   - Name the convention in `Geodetic`'s documentation: inside the sim,
+     height is above mean sea level; the interop boundary converts.
+5. **Dead reckoning.** Extrapolation and send thresholds as figures
    (`interop.dr.position_m` 1, `interop.dr.orientation_deg` 3,
    `interop.dis.heartbeat_s` 5), and algorithm FPW for moving entities.
-5. **DIS encoding.**
+6. **DIS encoding.**
    - The PDU header and the Entity State PDU, written by hand (fixed
      big-endian layout).
    - First check whether an existing Rust DIS crate (for example `dis-rs`)
      is correct and maintained enough to use instead; decide by testing it
      against our fixtures.
-6. **UDP sender.** Broadcast or unicast (multicast in phase 2), port 3000
+7. **UDP sender.** Broadcast or unicast (multicast in phase 2), port 3000
    by default. It is a `tokio` task fed by the host after each tick.
-7. **Real-time pacing** in the host, with the non-blocking questions of
+8. **Real-time pacing** in the host, with the non-blocking questions of
    section 3.4: a `bgws play --realtime --dis <addr>` command and a server
    option.
 
@@ -187,6 +237,11 @@ Tests and acceptance:
   checked by Wireshark's DIS dissector (the captures are committed).
 - A geodesy check: a published ECEF position converts back to the
   entity's latitude, longitude and height within 0.1 m.
+- Geoid: the undulation at reference points matches NGA's published
+  values within 0.1 m (EGM2008) or 1 m (EGM96). A vehicle on our ground at
+  the theatre origin is published at H + N, not H.
+- By hand: our vehicles sit on the ground (not 30 m above or below it) in a
+  DIS viewer using real-world elevation.
 - Dead reckoning: a recorded track sent through the DR filter never strays
   past the thresholds, and sends far fewer PDUs than one per tick.
 - A real-time run keeps to the wall clock within 5% over 10 minutes, with
@@ -238,6 +293,25 @@ Tasks:
    `bgws replay` replays them with no network.
 7. **Multicast**, and an option to receive DIS v6 Entity State PDUs if a
    partner needs it.
+8. **Terrain correlation.**
+   - A `bgws terrain correlate <pack> <partner-dem> [--features <file>]`
+     command that compares our ground with a partner's elevation (GeoTIFF;
+     we already read GeoTIFF) and, where given, their features:
+     - sample points on a grid and along roads: the height difference;
+     - sight lines between sampled pairs: does each world see through?
+   - The report gives:
+     - the height error distribution, and places beyond a tolerance
+       (2 m by default, a figure);
+     - the share of sight lines that disagree;
+     - a map of where they differ.
+   - In a run, a remote ground entity whose reported height is more than
+     the tolerance off our ground is logged (`interop.terrain_mismatch`),
+     so the AAR shows where the worlds differ.
+9. **Real-world terrain for interoperable scenarios.**
+   - A scenario with an `interop` block must use a real-world terrain pack;
+     the loader refuses synthetic ground unless the scenario says every
+     simulation in the exercise uses the same generated terrain (it is
+     exported for them as GeoTIFF elevation plus land-cover rasters).
 
 Tests and acceptance:
 
@@ -251,13 +325,20 @@ Tests and acceptance:
   no network.
 - **Remote immunity:** a remote entity is never moved, decided for or
   damaged by our own systems (unit tests on each system's filter).
+- **Correlation tool:**
+  - correlating a pack with its own exported elevation reports zero height
+    error and no disagreeing sight lines;
+  - correlating it with the same elevation shifted 3 m, or with a ridge
+    removed, reports the shift and exactly the sight lines the ridge
+    blocked.
 - **By hand:** against at least one third-party DIS simulation or generator.
 
 Risks:
 
-- **Terrain does not match between simulations.** Land entities are clamped
-  to our ground and line of sight is ours; the AAR documents the
-  difference.
+- **Terrain does not match between simulations** (section 2). Land entities
+  are clamped to our ground and line of sight is ours. The correlation tool
+  (task 8) measures the difference before an exercise, and the
+  mismatch log shows it during one.
 - **Remote tanks move only on their owner's updates.** At long heartbeats
   they jump. Mitigated by dead reckoning and a smoothing step on correction.
 - **Misbehaving partners** (duplicate IDs, bad codes). These are logged and
@@ -359,6 +440,13 @@ Each piece is independent; order them by partner need.
 - **Environment.** Environmental Process PDUs for smoke screens.
 - **Designator.** Designator PDUs for laser designation (for
   laser-guided munitions).
+- **Terrain from a partner's data.** When a federation agrees a common
+  terrain source, `bgws terrain build` takes it in place of our open
+  sources, so every simulation starts from the same ground:
+  - elevation as GeoTIFF;
+  - land cover and features as vector files (GeoPackage or shapefile);
+  - roads and buildings.
+  - OGC CDB or OpenFlight import only if a partner gives nothing simpler.
 
 ## 8. Cross-cutting
 
@@ -396,6 +484,8 @@ Each piece is independent; order them by partner need.
   RPR FOM version and any FOM extensions.
 - Which RTIs your partners run, and whether they serve the Federate
   Protocol.
+- Which terrain source each federation uses, and whether partners can
+  share it (elevation and features) for a common build.
 - The country codes to give each side when scenarios are not about a real
   nation (default 0, "Other").
 - Whether remote entities should count toward victory conditions in mixed
