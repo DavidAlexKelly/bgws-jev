@@ -108,6 +108,14 @@ pub fn movement(s: &mut Sim, dt: f64) {
         Vec::new()
     };
     let gap = s.ctx.ground.route_params.column_gap_m;
+    // Pinned land units, for mutual support: a friend advancing near one
+    // halts and covers it rather than press on alone.
+    let support = s.ctx.p.mutual_support_m;
+    let pinned: Vec<(Side, Enu, Entity)> = s.ctx.order.iter().copied()
+        .filter(|&e| alive(s, e) && is_land(s, e))
+        .filter(|&e| s.world.get::<Crew>(e).is_some_and(|c| c.suppression.effects(&s.ctx.p.people).pinned))
+        .filter_map(|e| Some((s.world.get::<Ident>(e)?.side, s.world.get::<Kin>(e)?.pos, e)))
+        .collect();
     for &e in &s.ctx.order.clone() {
         // Aggregated formations move by their formation mover (domains::lod).
         if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
@@ -151,6 +159,17 @@ pub fn movement(s: &mut Sim, dt: f64) {
             arrive(s, e);
             continue;
         };
+        // Mutual support: advancing by bounds or tactically, it holds while
+        // a friend close by is pinned (and fires to cover it).
+        if matches!(mode, MoveModeS::Bound | MoveModeS::Tactical) && !withdrawing && support > 0.0 {
+            let (side, pos) = (s.world.get::<Ident>(e).expect("ident").side, s.world.get::<Kin>(e).expect("kin").pos);
+            if pinned.iter().any(|(ps, pp, pe)| *ps == side && *pe != e && pp.sub(pos).horizontal() <= support) {
+                if let Some(mut k) = s.world.get_mut::<Kin>(e) {
+                    k.vel = Enu::default();
+                }
+                continue;
+            }
+        }
         // Bounding: halted between bounds, it covers; then the next bound.
         if mode == MoveModeS::Bound {
             let pos = s.world.get::<Kin>(e).expect("kin").pos;

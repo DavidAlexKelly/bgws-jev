@@ -1018,6 +1018,71 @@ without). Jev (plain) on seeds 5–12 is +0.01 ± 0.04, exchange
 −0.01 ± 0.01, against the doctrine default; before it was +0.03 ± 0.04,
 so the extra facts have not yet shown up in results.
 
+**Fire effects: the right round, blast, suppression.** Three gaps in
+direct fire are closed.
+- A mount fired only the first of its rounds. It now loads the one with
+  the best volley kill odds: a tank's HEAT or an IFV's HE for troops and
+  soft targets, sabot for armour. Changing rounds costs one reload.
+- An HE or HEAT miss used to do nothing to troops. A burst now kills the
+  share of a section (`sim.fire.team_front_m` × `team_depth_m`, 50 × 20 m)
+  inside the round's Carleton lethal area, averaged over the fall of shot
+  and reduced by cover; the whole element is lost with that chance, so the
+  expected losses are right. A burst is felt as a blast (suppression). An HE
+  hit kills a soft-skinned vehicle.
+- Suppressive fire. Suppression already slowed, blinded and spoiled the aim
+  of whoever felt it, but only aimed rounds caused it. Now a halted unit
+  with nothing to aim at fires to suppress:
+  - where it lost an enemy within the last minute
+    (`sim.fire.suppress_memory_s`);
+  - or, while a friend within 1.5 km (`sim.fire.support_m`) is moving, on an
+    enemy its picture places within 200 m (`sim.fire.support_error_m`):
+    support by fire.
+
+  It uses cheap rounds only (`sim.fire.suppress_max_cost_usd`: bullets and
+  cannon HE, not main-gun rounds or missiles), keeps a magazine, follows its
+  rules of engagement, and never fires within 150 m of a friend
+  (`sim.fire.danger_close_m`): fire lifts and shifts.
+
+**Dismounts.** The catalogue gave an IFV platoon three infantry sections,
+which never appeared in a game. They now ride with it (a vehicle lost takes
+its share). The carrier is asked `dismountPoint` (here, in cover close by,
+or stay mounted) when:
+- an enemy is seen within 500 m (`sim.dismount.contact_m`);
+- it is within 400 m of the end of the last phase of its move
+  (`sim.dismount.objective_m`);
+- it is in a town.
+
+The doctrine gets out here in cover or with the enemy within 300 m, else in
+the best cover within 150 m. After the drill (`sim.dismount.time_s`, 30 s)
+the sections are a foot unit with the carrier's orders, rules of
+engagement, sightings and HQ, and the carrier supports by fire. Troops
+aboard count in their side's strength from the start, so it never jumps
+when they get out (tested). Remounting is not modelled. The unit state
+shows `infantryAboard`.
+
+**Doctrine drills.** At three decision points the doctrine (the rules
+decider, and the default Jev is measured against) carried on where a drill
+says otherwise:
+- D3, fired on by an unseen shooter: in the open, get into cover from the
+  bearing; in cover, search along it.
+- D2, shooter located: return fire, but a vehicle in the open goes hull-down
+  first, and a shooter beyond all its weapons' reach is left by pulling out
+  of its sight.
+- D6, after a volley: a unit holding ground under fire from a shooter it
+  has seen fires and moves to another position.
+
+Mutual support: a unit advancing by bounds or tactically halts while a
+friend within 600 m (`sim.doctrine.mutual_support_m`) is pinned, and covers
+it.
+
+Measured: every vignette passes as before; networked detect-to-strike is
+5.22 min, still just over its band and on the backlog. Over seeds 1–6 of
+the generated scenarios with the rules on both sides, the winners are
+unchanged except the even company attack, which blue now wins in all six
+(it lost one in 90 minutes before), and fights against dug-in infantry end
+sooner (the battalion attack's longest game 135 → 33 min) while the
+company defence lasts longer (23–55 min, from 23–33).
+
 Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
 
 | under test | better / worse | result Δ | exchange Δ |
