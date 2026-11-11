@@ -163,6 +163,8 @@ pub struct DisPublisher {
     pub spec: InteropSpec,
     pub dr: DeadReckoner,
     pub fires: FireBook,
+    /// Radios, emitters, minefields and aggregates (phase 4).
+    pub extras: crate::dis_extras::ExtrasBook,
     /// PDUs sent so far.
     pub sent: u64,
 }
@@ -173,7 +175,7 @@ impl DisPublisher {
         let dest = dest.to_socket_addrs()?.next().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "no address"))?;
         let socket = UdpSocket::bind(if dest.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" })?;
         socket.set_broadcast(true)?;
-        Ok(DisPublisher { socket, dest, spec, dr: DeadReckoner::new(settings), fires: FireBook::default(), sent: 0 })
+        Ok(DisPublisher { socket, dest, spec, dr: DeadReckoner::new(settings), fires: FireBook::default(), extras: Default::default(), sent: 0 })
     }
 
     /// Send raw bytes (an acknowledgement).
@@ -203,6 +205,11 @@ impl DisPublisher {
             let bytes = encode(&entity_state(&t, self.spec.exercise, now));
             self.socket.send_to(&bytes, self.dest)?;
             self.dr.sent(now, &t);
+            n += 1;
+        }
+        let spec = self.spec.clone();
+        for bytes in self.extras.pdus(sim, &spec) {
+            self.socket.send_to(&bytes, self.dest)?;
             n += 1;
         }
         self.sent += n as u64;

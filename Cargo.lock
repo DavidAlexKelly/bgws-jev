@@ -748,6 +748,7 @@ version = "0.1.0"
 dependencies = [
  "bgws-catalogue",
  "bgws-core",
+ "bgws-ops",
  "bgws-scenario",
  "bgws-sim",
  "bytes",

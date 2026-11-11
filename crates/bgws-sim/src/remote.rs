@@ -102,6 +102,37 @@ pub enum ExternalInput {
     },
     /// The exercise was stopped (frozen) or started again.
     Freeze { frozen: bool },
+    /// A remote entity's emitter came on, changed, or (`None`) went off.
+    /// `slot` is (source, number): 0 for a Transmitter PDU's radio number,
+    /// 1 for an Electromagnetic Emission PDU's system and beam.
+    #[serde(rename_all = "camelCase")]
+    Emitter { key: ExternalKey, slot: (u8, u16), emitter: Option<RemoteEmitter> },
+}
+
+/// What a remote emitter is, for our electronic warfare.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EmitterKind {
+    /// A radio while it transmits: our ESM can hear it.
+    Radio,
+    /// A radar: our ESM can hear it.
+    Radar,
+    /// A jammer: it jams our receivers in its bands, and our ESM can hear it.
+    Jammer,
+}
+
+/// One of a remote entity's emitters (from a DIS Transmitter or
+/// Electromagnetic Emission PDU).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteEmitter {
+    pub what: EmitterKind,
+    pub freq_hz: f64,
+    pub bw_hz: f64,
+    /// Effective radiated power, W.
+    pub erp_w: f64,
+    /// Share of the time it radiates.
+    pub duty: f64,
 }
 
 /// Marks an entity as another simulation's.
@@ -113,6 +144,8 @@ pub struct Remote {
     pub damage: u8,
     /// Taken off (removed by its owner, or timed out).
     pub gone: bool,
+    /// Its emitters now: (source, number) → emitter.
+    pub emitters: std::collections::BTreeMap<(u8, u16), RemoteEmitter>,
     /// When a terrain mismatch was last noted for it.
     pub mismatch_noted: Option<SimTime>,
 }
@@ -193,6 +226,26 @@ pub fn apply(s: &mut Sim, input: ExternalInput) {
             }
             crate::systems::external_detonation(s, firer.and_then(|k| entity_of(s, k)), target, &munition, at, result, rounds, event);
         }
+        ExternalInput::Emitter { key, slot, emitter } => {
+            let Some(id) = entity_of(s, key) else { return };
+            let e = s.ctx.entity(id);
+            let Some(mut r) = s.world.get_mut::<Remote>(e) else { return };
+            let before = r.emitters.get(&slot).copied();
+            match emitter {
+                Some(x) => r.emitters.insert(slot, x),
+                None => r.emitters.remove(&slot),
+            };
+            let jammers: Vec<RemoteEmitter> = r.emitters.values().filter(|x| x.what == EmitterKind::Jammer).copied().collect();
+            if before.map(|b| b.what) == Some(EmitterKind::Jammer) || emitter.is_some_and(|x| x.what == EmitterKind::Jammer) {
+                set_jammers(s, id, &jammers);
+            }
+            if before.is_none() && emitter.is_some() {
+                let what = emitter.map(|x| format!("{:?}", x.what).to_lowercase()).unwrap_or_default();
+                let text = format!("{} ({key}) radiates: {what}", crate::systems::name(s, id));
+                let side = s.world.get::<Ident>(e).map(|i| i.side).unwrap_or(Side::Neutral);
+                s.ctx.log.push(now, "interop.emitter").side(side).entity(id).text(text).data(serde_json::json!({ "what": what, "freqHz": emitter.map(|x| x.freq_hz) }));
+            }
+        }
         ExternalInput::Freeze { frozen } => {
             s.ctx.frozen = frozen;
             let text = if frozen { "the exercise is stopped (frozen)" } else { "the exercise starts again" };
@@ -235,7 +288,7 @@ fn spawn(s: &mut Sim, key: ExternalKey, platform: &str, side: Side, label: &str,
     s.ctx.order.push(e);
     s.ctx.by_name.insert(force.id.clone(), id);
     s.ctx.remote.insert(key, id);
-    s.world.entity_mut(e).insert(Remote { key, last_update: now, damage: 0, gone: false, mismatch_noted: None });
+    s.world.entity_mut(e).insert(Remote { key, last_update: now, damage: 0, gone: false, mismatch_noted: None, emitters: Default::default() });
     if let Some(mut a) = s.world.get_mut::<Act>(e) {
         // Its owner decides what it does; here it only stands for it.
         a.activity = Activity::Hold;
@@ -285,6 +338,23 @@ fn set_health(s: &mut Sim, e: Entity) {
     }
 }
 
+/// A remote entity's jammers as our EW model's: they jam our receivers in
+/// their bands while their owner says they are on.
+fn set_jammers(s: &mut Sim, id: EntityId, jammers: &[RemoteEmitter]) {
+    let Some(side) = s.world.get::<Ident>(s.ctx.entity(id)).map(|i| i.side) else { return };
+    let Some(mut c4) = crate::domains::drones::take(s) else { return };
+    c4.ew.jammers.retain(|j| j.entity != id);
+    if let Some(p) = c4.ew.ew.clone() {
+        for j in jammers {
+            let band = bgws_ops::ew::JamBand { centre_hz: j.freq_hz, width_hz: j.bw_hz.max(1.0), weight: 1.0 };
+            let mut jam = bgws_ops::ew::Jammer::new(j.erp_w.max(0.0), bgws_ops::ew::AntennaPattern::Omni { gain_dbi: 0.0 }, vec![band], &p);
+            jam.duty_cycle = j.duty.clamp(0.0, 1.0);
+            c4.ew.jammers.push(crate::domains::drones::ew::JammerRec { entity: id, side, jam, bands: vec![], agl: 5.0, radius_m: 30_000.0 });
+        }
+    }
+    crate::domains::drones::put(s, c4);
+}
+
 fn take_off(s: &mut Sim, e: Entity, why: &str) {
     let now = s.ctx.now;
     if let Some(mut r) = s.world.get_mut::<Remote>(e) {
@@ -292,6 +362,10 @@ fn take_off(s: &mut Sim, e: Entity, why: &str) {
             return;
         }
         r.gone = true;
+        r.emitters.clear();
+    }
+    if let Some(id) = s.world.get::<Ident>(e).map(|i| i.id) {
+        set_jammers(s, id, &[]);
     }
     set_health(s, e);
     let (id, side) = s.world.get::<Ident>(e).map(|i| (i.id, i.side)).unwrap_or((EntityId(0), Side::Neutral));
@@ -300,10 +374,29 @@ fn take_off(s: &mut Sim, e: Entity, why: &str) {
 }
 
 /// 1 Hz: dead-reckon remote entities between updates (a land entity on our
-/// ground), hold their health to their owner's, and take off any that went
-/// quiet.
+/// ground), hold their health to their owner's, take off any that went
+/// quiet, and put their radios and radars on the air for our ESM (their
+/// jammers are already among our EW model's).
 pub fn base(s: &mut Sim, dt: f64) {
     let now = s.ctx.now;
+    let mut on_air = vec![];
+    for &id in s.ctx.remote.values() {
+        let e = s.ctx.entity(id);
+        let (Some(r), Some(i)) = (s.world.get::<Remote>(e), s.world.get::<Ident>(e)) else { continue };
+        if r.gone {
+            continue;
+        }
+        for x in r.emitters.values().filter(|x| x.what != EmitterKind::Jammer) {
+            let what = if x.what == EmitterKind::Radio { "radio" } else { "radar" };
+            on_air.push(crate::domains::drones::ew::TxEmission { entity: id, side: i.side, freq_hz: x.freq_hz, bw_hz: x.bw_hz.max(1.0), erp_w: x.erp_w, on_air_s: dt, duty: x.duty, what });
+        }
+    }
+    if !on_air.is_empty() {
+        if let Some(mut c4) = crate::domains::drones::take(s) {
+            c4.ew.tx.extend(on_air);
+            crate::domains::drones::put(s, c4);
+        }
+    }
     let ids: Vec<EntityId> = s.ctx.remote.values().copied().collect();
     for id in ids {
         let e = s.ctx.entity(id);
