@@ -31,7 +31,8 @@ pub fn raise(s: &mut Sim) {
             continue;
         }
         let e = s.ctx.entity(t.entity);
-        if !alive(s, e) || s.world.get::<Act>(e).map(|a| a.deciding).unwrap_or(true) {
+        // Another simulation decides for its entities.
+        if !alive(s, e) || crate::remote::is_remote(s, e) || s.world.get::<Act>(e).map(|a| a.deciding).unwrap_or(true) {
             continue;
         }
         if let Some(last) = s.ctx.last_asked.get(&t.entity) {

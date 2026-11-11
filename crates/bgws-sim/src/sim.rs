@@ -154,6 +154,12 @@ pub struct Ctx {
     pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
     /// Guided missile volleys in flight.
     pub missiles: Vec<crate::systems::InFlight>,
+    /// Entities another simulation owns, by their external key.
+    pub remote: BTreeMap<crate::remote::ExternalKey, EntityId>,
+    /// Detonations already judged (the firing simulation's event IDs).
+    pub detonations_seen: std::collections::BTreeSet<(u16, u16, u16)>,
+    /// The exercise is stopped (a DIS Stop/Freeze): a real-time host holds the clock.
+    pub frozen: bool,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,
     pub(crate) reports: Vec<(SimTime, Side, bgws_know::Detection)>,
     pub(crate) last_plan: BTreeMap<Side, Plan>,
@@ -274,6 +280,9 @@ impl Sim {
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
             route_obstacles: Vec::new(),
             missiles: Vec::new(),
+            remote: BTreeMap::new(),
+            detonations_seen: Default::default(),
+            frozen: false,
             last_asked: BTreeMap::new(),
             reports: Vec::new(),
             last_plan: BTreeMap::new(),
@@ -425,6 +434,10 @@ impl Sim {
                 crate::dismount::base(self);
             }
             {
+                prof_span!("remote");
+                crate::remote::base(self, 1.0);
+            }
+            {
                 prof_span!("people");
                 crate::systems::people(self, 1.0);
             }
@@ -463,6 +476,12 @@ impl Sim {
             }
             other => crate::world::scheduled(self, other),
         }
+    }
+
+    /// Apply one input from another simulation (docs/design/INTEROP_PLAN.md
+    /// §3.2), at a tick boundary; the host records it.
+    pub fn apply_external(&mut self, input: crate::remote::ExternalInput) {
+        crate::remote::apply(self, input);
     }
 
     /// Hand back answers to the questions `advance` returned.
@@ -752,7 +771,7 @@ impl Sim {
         let mut fit: BTreeMap<Side, (f64, f64)> = BTreeMap::new();
         for &e in &self.ctx.order {
             let (Some(i), Some(h)) = (self.world.get::<Ident>(e), self.world.get::<Health>(e)) else { continue };
-            if i.dummy || i.side == Side::Neutral || !crate::domains::air::counts_for_strength(&i.platform) {
+            if i.dummy || i.side == Side::Neutral || !crate::domains::air::counts_for_strength(&i.platform) || crate::remote::is_remote(self, e) {
                 continue;
             }
             let s = fit.entry(i.side).or_insert((0.0, 0.0));

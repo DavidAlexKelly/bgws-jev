@@ -118,7 +118,7 @@ pub fn movement(s: &mut Sim, dt: f64) {
         .collect();
     for &e in &s.ctx.order.clone() {
         // Aggregated formations move by their formation mover (domains::lod).
-        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
+        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated || crate::remote::is_remote(s, e) {
             continue;
         }
         let (platform, can_move) = {
@@ -336,6 +336,8 @@ struct SenseEnt {
     /// Where friends have reported enemies (its share of the side's
     /// picture): a target within one of these is searched for cued.
     cues: Vec<(Enu, f64)>,
+    /// Another simulation's: a target here, never an observer.
+    remote: bool,
 }
 
 impl SenseEnt {
@@ -453,6 +455,7 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
                 dummy: i.dummy,
                 elems: crate::formation::elements(s, e),
                 cues: cues.remove(&i.id).unwrap_or_default(),
+                remote: crate::remote::is_remote(s, e),
             })
         })
         .collect()
@@ -520,6 +523,9 @@ fn candidate_pairs(s: &Sim, ents: &[SenseEnt], max_r: f64) -> Vec<(usize, usize,
         .into_iter()
         .filter_map(|c| {
             let (oi, ti) = (c.observer as usize, c.target as usize);
+            if ents[oi].remote {
+                return None;
+            }
             let r = ents[ti].pos.sub(ents[oi].pos).horizontal();
             (r <= reach[oi]).then_some((oi, ti, r))
         })
@@ -1093,7 +1099,8 @@ pub fn direct_fire(s: &mut Sim) {
     for (k, &e) in order.iter().enumerate() {
         let Some((could_fire, fit0)) = start[k] else { continue };
         // Aggregated and Far units do not fight individually (§6.4).
-        if !could_fire || !is_land(s, e) || lod(s, e) != Lod::Entity {
+        // Another simulation fires its own entities.
+        if !could_fire || !is_land(s, e) || lod(s, e) != Lod::Entity || crate::remote::is_remote(s, e) {
             continue;
         }
         // Nothing seen in the last 3 s means no target: the same test as the
@@ -1274,6 +1281,11 @@ fn suppressive_fire(s: &mut Sim, e: Entity, fit: u32) {
     let mut felt = 0usize;
     let mut total_kills = 0u32;
     for (te, eid, tpos) in enemies {
+        // A remote entity's owner judges what our fire does to it.
+        if crate::remote::is_remote(s, te) {
+            felt += 1;
+            continue;
+        }
         let off = tpos.sub(spot);
         // The share of the rounds that fall among it (its footprint, wider by a burst's reach).
         let reach = blast.map(|b| b.bx_m.max(b.by_m)).unwrap_or(s.ctx.p.direct.near_miss_radius_m);
@@ -1547,9 +1559,12 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     } else if hits > 0 {
         s.world.get_mut::<Act>(e).expect("act").volleys = 0;
     }
-    // Effects on the target; a crew that knocks something out learns.
+    // Effects on the target; a crew that knocks something out learns. A
+    // remote target's damage is its owner's to judge (from our detonation):
+    // nothing is applied here.
+    let remote_target = crate::remote::is_remote(s, te);
     let mut destroyed_now = false;
-    if kills > 0 {
+    if kills > 0 && !remote_target {
         if let Some(mut c) = s.world.get_mut::<Crew>(e) {
             c.skill.after_engagement(true);
         }
@@ -1566,7 +1581,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         let frac = k as f64 / h.start as f64;
         s.world.get_mut::<Crew>(te).expect("crew").new_casualties += frac;
     }
-    {
+    if !remote_target {
         let mut c = s.world.get_mut::<Crew>(te).expect("crew");
         c.near_misses_per_min += near * 60.0 / 10.0;
         c.blasts_per_min += blasts * 60.0 / 10.0;
@@ -1580,7 +1595,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         range,
         hits,
         kills
-    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills, "blasts": blasts, "failed": failed })); }
+    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills, "blasts": blasts, "failed": failed, "remote": remote_target })); }
     if destroyed_now {
         { let __text = format!("{} is destroyed", name(s, tid)); s.ctx.log.push(now, "unit.destroyed").side(side.enemy()).entity(tid).text(__text); }
         s.world.get_mut::<Crew>(e).expect("crew").success = true;
@@ -1607,6 +1622,172 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     }
 }
 
+/// Fired upon by `by`: remembered, located if it has seen the firer (D2),
+/// else a bearing to search (D3).
+pub(crate) fn fired_upon(s: &mut Sim, te: Entity, by: EntityId) {
+    let now = s.ctx.now;
+    let Some(tid) = s.world.get::<Ident>(te).map(|i| i.id) else { return };
+    if let Some(mut c) = s.world.get_mut::<Crew>(te) {
+        c.last_incoming = Some((now, by));
+    }
+    let located = s.world.get::<Aware>(te).map(|a| a.seen.contains_key(&by)).unwrap_or(false);
+    if !located {
+        let (Some(tk), Some(fk)) = (s.world.get::<Kin>(te).map(|k| k.pos), s.world.get::<Kin>(s.ctx.entity(by)).map(|k| k.pos)) else { return };
+        if let Some(mut aw) = s.world.get_mut::<Aware>(te) {
+            let bearing = fk.sub(tk).bearing();
+            let entry = aw.suspects.entry(by).or_insert(Suspect { bearing, since: now, last: now });
+            entry.last = now;
+            entry.bearing = bearing;
+        }
+    }
+    s.ctx.triggers.push(Trigger { entity: tid, point: if located { "D2" } else { "D3" }, about: Some(by) });
+}
+
+/// A detonation another simulation reports (docs/design/INTEROP_PLAN.md
+/// §3.2): what it does to our entities is ours to judge, with our models.
+/// - An impact on one of ours: each round strikes it, through a random
+///   aspect (front, side, rear; the roof for top attack), against its armour
+///   as our own fire would; troops lose an element to a hit as to ours.
+/// - A burst (any result, for a round with a blast): our troops near it lose
+///   the share of a section inside its lethal area, as for our own HE; all
+///   of ours within three blast radii feel it (suppression).
+///
+/// The firing simulation's event ID makes sure no detonation is judged twice.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn external_detonation(s: &mut Sim, firer: Option<EntityId>, target: Option<EntityId>, munition: &str, at: Enu, result: crate::remote::DetonationResult, rounds: u32, event: (u16, u16, u16)) {
+    use crate::remote::DetonationResult as R;
+    let now = s.ctx.now;
+    let Some(mun) = s.ctx.catalogue.munition(munition).cloned() else {
+        let text = format!("a detonation of {munition}, which the catalogue lacks: not judged");
+        s.ctx.log.push(now, "interop.unknown").text(text);
+        return;
+    };
+    let p = s.ctx.p.direct.clone();
+    let (front, depth) = (s.ctx.p.team_front_m, s.ctx.p.team_depth_m);
+    let blast = blast_of(&mun);
+    let reach = blast.map(|b| 3.0 * b.bx_m.max(b.by_m)).unwrap_or(0.0);
+    let mut rng = s.ctx.rng("interop.detonation", ((event.0 as u64) << 16) | event.1 as u64, event.2 as u64);
+    // Who it touches: the target it hit, and with a blast our land entities near it.
+    let target_e = target.filter(|t| t.index() < s.ctx.order.len()).map(|t| s.ctx.entity(t)).filter(|&e| alive(s, e) && !crate::remote::is_remote(s, e));
+    let mut touched: Vec<(Entity, bool)> = Vec::new();
+    if let (Some(e), R::Impact) = (target_e, result) {
+        touched.push((e, true));
+    }
+    if reach > 0.0 {
+        for &e in &s.ctx.order {
+            if touched.iter().any(|t| t.0 == e) || !alive(s, e) || !is_land(s, e) || crate::remote::is_remote(s, e) {
+                continue;
+            }
+            if s.world.get::<Kin>(e).is_some_and(|k| k.pos.sub(at).horizontal() <= reach + front / 2.0) {
+                touched.push((e, false));
+            }
+        }
+    }
+    let pen = mun.penetration_at(0.0);
+    let mut total = 0u32;
+    for (e, impact) in touched {
+        let (tid, tside, tplat) = {
+            let i = s.world.get::<Ident>(e).expect("ident");
+            (i.id, i.side, i.platform.clone())
+        };
+        let tpos = s.world.get::<Kin>(e).expect("kin").pos;
+        let personnel = matches!(tplat.body.vulnerability, Vulnerability::Personnel);
+        let shield = 1.0 - s.ctx.ground.micro(tpos.e, tpos.n).cover;
+        let mut kills = 0u32;
+        for _ in 0..rounds.max(1) {
+            let killed = if impact {
+                if personnel {
+                    rng.gen::<f64>() < mun.pk.max(0.3)
+                } else if matches!(tplat.body.vulnerability, Vulnerability::Soft) && (blast.is_some() || pen > 50.0) || matches!(tplat.body.vulnerability, Vulnerability::Light) && pen > 50.0 {
+                    rng.gen::<f64>() < 0.8
+                } else {
+                    let zone = if mun.top_attack {
+                        Zone::Roof
+                    } else {
+                        match rng.gen_range(0..10) {
+                            0..=3 => Zone::HullFront,
+                            4..=5 => Zone::TurretFront,
+                            6..=7 => Zone::HullSide,
+                            8 => Zone::TurretSide,
+                            _ => Zone::Rear,
+                        }
+                    };
+                    let prot = Protection { era: tplat.body.era, aps: tplat.body.aps.is_some() };
+                    let odds = df::strike_odds(warhead_of(&mun), pen, zone, &armour_zones(&tplat), &prot, if mun.top_attack { 45.0 } else { 0.0 }, &p);
+                    match df::roll_strike(&odds, &mut rng) {
+                        StrikeOutcome::Penetrated(kt) => {
+                            let mut h = s.world.get_mut::<Health>(e).expect("h");
+                            if kt.catastrophic || kt.crew || (kt.firepower && kt.mobility) {
+                                true
+                            } else {
+                                if kt.mobility {
+                                    h.mobility_kills += 1;
+                                }
+                                if kt.firepower {
+                                    h.firepower_kills += 1;
+                                }
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                }
+            } else if let (true, Some(b)) = (personnel, blast) {
+                // A burst near troops: the share of a section its lethal area covers, falling off with distance.
+                let d = tpos.sub(at).horizontal();
+                let share = (b.lethal_area_m2() / ((front + 2.0 * b.bx_m) * (depth + 2.0 * b.by_m))).min(1.0);
+                let fall = if d <= front / 2.0 { 1.0 } else { (-((d - front / 2.0) / b.bx_m.max(1.0)).powi(2)).exp() };
+                rng.gen::<f64>() < share * fall * shield
+            } else {
+                false
+            };
+            if killed {
+                kills += 1;
+            }
+        }
+        {
+            let mut c = s.world.get_mut::<Crew>(e).expect("crew");
+            if blast.is_some() {
+                c.blasts_per_min += rounds.max(1) as f64 * 60.0 / 10.0;
+            } else {
+                c.near_misses_per_min += rounds.max(1) as f64 * p.near_miss_radius_m.max(1.0) * 6.0;
+            }
+        }
+        let mut destroyed = false;
+        if kills > 0 {
+            let mut h = s.world.get_mut::<Health>(e).expect("h");
+            let k = kills.min(h.fit);
+            h.fit -= k;
+            for _ in 0..k {
+                h.losses.push(now);
+            }
+            if h.fit == 0 {
+                h.destroyed = true;
+                destroyed = true;
+            }
+            let frac = k as f64 / h.start.max(1) as f64;
+            s.world.get_mut::<Crew>(e).expect("crew").new_casualties += frac;
+            total += k;
+        }
+        if destroyed {
+            let text = format!("{} is destroyed", name(s, tid));
+            s.ctx.log.push(now, "unit.destroyed").side(tside).entity(tid).text(text);
+        } else if let Some(f) = firer {
+            fired_upon(s, e, f);
+        }
+    }
+    let side = firer.and_then(|f| s.world.get::<Ident>(s.ctx.entity(f)).map(|i| i.side)).unwrap_or(Side::Neutral);
+    let text = format!("a {munition} detonation from another simulation ({result:?}): {total} knocked out");
+    let mut ev = s.ctx.log.push(now, "interop.detonation").side(side);
+    if let Some(f) = firer {
+        ev = ev.entity(f);
+    }
+    if let Some(t) = target {
+        ev = ev.target(t);
+    }
+    ev.text(text).data(serde_json::json!({ "munition": munition, "result": result, "rounds": rounds, "kills": total, "event": [event.0, event.1, event.2] }));
+}
+
 /// People (§8.10): suppression from incoming fire, morale from casualties,
 /// suppression, isolation and success; cohesion changes run the unit itself.
 pub fn people(s: &mut Sim, dt: f64) {
@@ -1618,7 +1799,7 @@ pub fn people(s: &mut Sim, dt: f64) {
     let pp = s.ctx.p.people.clone();
     for (idx, &e) in order.iter().enumerate() {
         // An aggregated formation carries its people as distributions (§6.4).
-        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated {
+        if !alive(s, e) || !is_land(s, e) || lod(s, e) == Lod::Aggregated || crate::remote::is_remote(s, e) {
             continue;
         }
         let (id, side, quality) = {
@@ -1756,7 +1937,7 @@ pub fn fatigue(s: &mut Sim, dt: f64) {
 pub fn autopilot_events(s: &mut Sim) {
     let now = s.ctx.now;
     for &e in &s.ctx.order.clone() {
-        if !alive(s, e) || !is_land(s, e) {
+        if !alive(s, e) || !is_land(s, e) || crate::remote::is_remote(s, e) {
             continue;
         }
         let id = s.world.get::<Ident>(e).expect("i").id;
