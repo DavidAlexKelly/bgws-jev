@@ -195,6 +195,9 @@ pub struct Munition {
     pub decoy: bool,
     #[serde(default)]
     pub source: String,
+    /// Its DIS munition type (SISO-REF-010), for interoperability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dis: Option<crate::types::DisEntityType>,
 }
 
 impl Munition {
@@ -265,6 +268,7 @@ mod tests {
             structural_hits: 0.03,
             decoy: false,
             source: String::new(),
+            dis: None,
         }
     }
 

@@ -88,7 +88,13 @@
    "costUsd": 1000000000,
    "rationale": "Attacking an airbase cut sortie output by 35–40% in an illustrative study.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 5,
+    "domain": 1,
+    "category": 10
+   },
+   "$dis": "SISO-REF-010 v35 Cultural Feature (land) category 10 Runway"
   },
   {
    "id": "generic/cyberCell",
@@ -149,7 +155,8 @@
      "kind": "reference",
      "ref": "R5.5, P21"
     }
-   }
+   },
+   "$dis": "No physical presence: not published."
   },
   {
    "id": "generic/depot",
@@ -238,7 +245,13 @@
      "kind": "reference",
      "ref": "R7, P18"
     }
-   }
+   },
+   "dis": {
+    "kind": 5,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Cultural Feature (land) category 2 Building"
   },
   {
    "id": "generic/port",
@@ -323,7 +336,13 @@
    "costUsd": 2000000000,
    "rationale": "Sevastopol's lesson: a port within reach is a port lost.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 5,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Cultural Feature (land) category 2 Building"
   },
   {
    "id": "generic/railhead",
@@ -406,7 +425,13 @@
      "kind": "reference",
      "ref": "R7, P18"
     }
-   }
+   },
+   "dis": {
+    "kind": 5,
+    "domain": 1,
+    "category": 13
+   },
+   "$dis": "SISO-REF-010 v35 Cultural Feature (land) category 13 Railyard"
   }
  ]
 }

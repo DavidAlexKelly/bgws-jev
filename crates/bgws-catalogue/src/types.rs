@@ -970,6 +970,38 @@ pub struct CrewDefaults {
     pub night_trained: bool,
 }
 
+// ── Interoperability ────────────────────────────────────────────────────
+
+/// A DIS entity type (IEEE 1278.1 §6.2.30; values from SISO-REF-010): what
+/// a platform or munition is, as other simulations read it. Generic records
+/// carry the category and leave the country to the scenario (the side's);
+/// subcategory, specific and extra are 0 unless the record names a real
+/// type or a finer class (a life form's equipment class).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisEntityType {
+    pub kind: u8,
+    pub domain: u8,
+    /// The country, when the record is a real nation's type; none to take
+    /// the side's country from the scenario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<u16>,
+    pub category: u8,
+    #[serde(default)]
+    pub subcategory: u8,
+    #[serde(default)]
+    pub specific: u8,
+    #[serde(default)]
+    pub extra: u8,
+}
+
+impl DisEntityType {
+    /// The seven fields with a country filled in.
+    pub fn with_country(&self, side_country: u16) -> [u16; 7] {
+        [self.kind as u16, self.domain as u16, self.country.unwrap_or(side_country), self.category as u16, self.subcategory as u16, self.specific as u16, self.extra as u16]
+    }
+}
+
 // ── The record ──────────────────────────────────────────────────────────
 
 /// A resolved platform record.
@@ -1008,6 +1040,10 @@ pub struct Platform {
     #[serde(default)]
     pub carried: Carried,
     pub crew: CrewDefaults,
+    /// Its DIS entity type (SISO-REF-010), for interoperability; none for
+    /// what has no body to show (a cyber cell).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dis: Option<DisEntityType>,
     /// One platform, US dollars (cost-exchange report).
     pub cost_usd: f64,
     /// How the guesses were made.

@@ -58,7 +58,13 @@
    "costUsd": 10000000000,
    "rationale": "Modelled as one service; jamming lowers it by area.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 13
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 13 Satellite - Navigation"
   },
   {
    "id": "generic/missileWarning",
@@ -124,7 +130,13 @@
    "costUsd": 1500000000,
    "rationale": "Warning in the first minute of a boost.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 16
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 16 Satellite - Earth Observation (infrared launch detection)"
   },
   {
    "id": "generic/satcomGeo",
@@ -187,7 +199,13 @@
    "costUsd": 1000000000,
    "rationale": "One footprint covers the theatre.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 12
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 12 Satellite - Communication"
   },
   {
    "id": "generic/satcomLeo",
@@ -233,7 +251,13 @@
    "costUsd": 10000000000,
    "rationale": "Starlink-like: 25–100 ms, ~10 Mbps a terminal when crowded [P7]; modelled as one service.",
    "source": "P7",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 12
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 12 Satellite - Communication"
   },
   {
    "id": "generic/satEo",
@@ -295,7 +319,13 @@
    "costUsd": 300000000,
    "rationale": "Sun-synchronous at 500 km; a swath a few hundred km wide.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 16
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 16 Satellite - Earth Observation"
   },
   {
    "id": "generic/satSar",
@@ -359,7 +389,13 @@
    "costUsd": 200000000,
    "rationale": "Sees through weather; coarser identity.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 5,
+    "category": 16
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Space Category 16 Satellite - Earth Observation"
   }
  ]
 }

@@ -159,7 +159,13 @@
    "costUsd": 200000000,
    "rationale": "Small, fast, short on defence.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 3,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Surface Category 50 Frigate (including Corvette)"
   },
   {
    "id": "generic/destroyer",
@@ -362,7 +368,13 @@
      "kind": "reference",
      "ref": "R6.2, P28 (default)"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 3,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Surface Category 4 Guided Missile Destroyer (DDG)"
   },
   {
    "id": "generic/frigate",
@@ -556,7 +568,13 @@
    "costUsd": 900000000,
    "rationale": "A towed array makes it the better submarine hunter.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 3,
+    "category": 6
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Surface Category 6 Guided Missile Frigate (FFG)"
   },
   {
    "id": "generic/merchant",
@@ -653,7 +671,13 @@
    "costUsd": 50000000,
    "rationale": "A bulk carrier at 15 knots.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 3,
+    "category": 81
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Surface Category 81 Dry Cargo Ship (Group 2 Merchant)"
   },
   {
    "id": "generic/ssk",
@@ -768,7 +792,13 @@
    "costUsd": 500000000,
    "rationale": "Quietest on batteries; noise rises with speed.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 4,
+    "category": 5
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Subsurface Category 5 SS (Conventional Attack - Torpedo, Patrol)"
   },
   {
    "id": "generic/ssn",
@@ -890,7 +920,13 @@
    "costUsd": 3000000000,
    "rationale": "Unlimited endurance; a towed array.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 4,
+    "category": 3
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Subsurface Category 3 SSN (Nuclear Attack - Torpedo)"
   },
   {
    "id": "generic/usv",
@@ -979,7 +1015,13 @@
    "costUsd": 250000,
    "rationale": "Magura-like: 300 kg of explosive, steered over LEO SATCOM.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 3,
+    "category": 19
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Surface Category 19 Unmanned Surface Vehicle (USV)"
   }
  ]
 }

@@ -95,7 +95,13 @@
    "costUsd": 25000,
    "rationale": "Heavy agricultural-hexacopter conversions: night bombing at 5–10 km, several kilograms a sortie.",
    "source": "synthetic; R5.1 for drone volume",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/fixedWingIsr",
@@ -159,7 +165,13 @@
    "costUsd": 100000,
    "rationale": "Petrol engine, 10 h aloft, a gimballed camera; the artillery's eyes.",
    "source": "synthetic; R4.3 (artillery is sensor-limited)",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/fpvFibre",
@@ -245,7 +257,13 @@
      "kind": "reference",
      "ref": "R4, P8"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/fpvRf",
@@ -338,7 +356,13 @@
      "kind": "reference",
      "ref": "R5.1, P9"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/interceptorDrone",
@@ -407,7 +431,13 @@
    "costUsd": 6000,
    "rationale": "Interceptor drones cost $1.4–16k each [P11]; fast enough to catch a Shahed.",
    "source": "P11",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/loiter",
@@ -494,7 +524,13 @@
    "costUsd": 35000,
    "rationale": "Lancet-like.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/male",
@@ -605,7 +641,13 @@
    "costUsd": 5000000,
    "rationale": "TB2/Reaper-like; slow, and easy prey for air defence.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/owaDecoy",
@@ -664,7 +706,13 @@
    "costUsd": 10000,
    "rationale": "Gerbera-like: cheap foam, no warhead.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/owaDrone",
@@ -744,7 +792,13 @@
      "kind": "reference",
      "ref": "R5.2, P10"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   },
   {
    "id": "generic/quadIsr",
@@ -830,7 +884,13 @@
    "costUsd": 3000,
    "rationale": "Mavic-class: 40 minutes aloft.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 50 Unmanned"
   }
  ]
 }
