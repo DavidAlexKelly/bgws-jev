@@ -42,8 +42,10 @@ pub struct Facts {
     /// The enemy the decision is about (else the nearest).
     pub range_m: Option<f64>,
     pub identified: bool,
-    /// What it is, when identified.
+    /// What it is: the type when identified, the kind when recognised.
     pub what: String,
+    /// What friends have reported it as, when the unit has not identified it.
+    pub reported_as: String,
     pub in_reach: bool,
     pub can_reach_us: Option<bool>,
     /// The chance a volley hits it: identified, against what it is; else as a vehicle and as a team in cover.
@@ -65,6 +67,7 @@ impl Facts {
             range_m: n(&e, "/rangeM"),
             identified: e.get("identified").and_then(Value::as_bool).unwrap_or(false),
             what: e.get("what").and_then(Value::as_str).unwrap_or("").to_string(),
+            reported_as: e.pointer("/reportedAs/what").and_then(Value::as_str).unwrap_or("").to_string(),
             in_reach: e.get("inOurReach").and_then(Value::as_bool).unwrap_or(false),
             can_reach_us: e.get("canReachUs").and_then(Value::as_bool),
             hit_pct: n(&e, "/ifWeFire/volleyHitPct"),
@@ -73,13 +76,16 @@ impl Facts {
         }
     }
 
-    /// An identified contact that is a vehicle (not a team on foot).
+    /// Whether the contact is a vehicle, when the unit knows: identified
+    /// (its type), recognised (its kind: an armoured or soft-skinned vehicle,
+    /// a team on foot), or reported by friends.
     fn known_vehicle(&self) -> Option<bool> {
-        const ON_FOOT: [&str; 6] = ["rifle", "infantry section", "anti-tank", "team", "engineer", "sniper"];
-        self.identified.then(|| {
-            let w = self.what.to_lowercase();
-            !ON_FOOT.iter().any(|f| w.contains(f))
-        })
+        const ON_FOOT: [&str; 7] = ["rifle", "infantry", "anti-tank", "team", "engineer", "sniper", "on foot"];
+        let foot = |w: &str| ON_FOOT.iter().any(|f| w.to_lowercase().contains(f));
+        if self.identified || self.what.ends_with("vehicle") || self.what == "a team on foot" {
+            return Some(!foot(&self.what));
+        }
+        (!self.reported_as.is_empty()).then(|| !foot(&self.reported_as))
     }
 
     /// The chance a volley lands, on what it is (or on the likelier reading).
@@ -123,7 +129,7 @@ pub const VEHICLE: Judgment = Judgment {
 pub fn judgments(trigger: &str, f: &Facts) -> Vec<Judgment> {
     match trigger {
         // Whether a close, unidentified contact is a vehicle decides whether to engage it.
-        "D1" if !f.identified && f.in_reach && f.range_m.is_some_and(|r| r <= CLOSE_M) => vec![VEHICLE],
+        "D1" if f.known_vehicle().is_none() && f.in_reach && f.range_m.is_some_and(|r| r <= CLOSE_M) => vec![VEHICLE],
         _ => Vec::new(),
     }
 }

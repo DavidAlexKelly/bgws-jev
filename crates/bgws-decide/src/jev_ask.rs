@@ -79,6 +79,7 @@ pub fn trim_state(trigger: &str, st: &Value) -> Value {
             }
         }
         copy(&mut out, "weaponReachM");
+        copy(&mut out, "reportedByFriends");
     }
     if matches!(trigger, "D3" | "D2") {
         copy(&mut out, "firedOnByUnseen");

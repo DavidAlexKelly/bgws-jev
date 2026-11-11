@@ -20,6 +20,7 @@ pub fn figures() -> Vec<Figure> {
         // C2.
         figure!("sim.c2.heartbeat_s", 600.0, "s", 60.0, 3_600.0, "default", Default, "an HQ repeats its intent to its subordinates this often"),
         figure!("sim.c2.out_of_comms_s", 1_200.0, "s", 120.0, 7_200.0, "default", Default, "a unit that has heard nothing from its HQ this long is out of comms"),
+        figure!("sim.c2.picture_lag_s", 60.0, "s", 0.0, 1_800.0, "default", Default, "a unit on its HQ's net has the HQ's enemy picture as it stood this long ago (a battle management system's refresh, or voice relay)"),
         figure!("sim.c2.emit_limit_s", 1_800.0, "s", 60.0, 7_200.0, "R1", Low, "time on the air after which a command post may be found (CPs are drone and fires targets)"),
         figure!("sim.c2.ccir_new_contacts", 4.0, "1", 1.0, 50.0, "default", Default, "new enemy contacts in the COP since the last plan that fire the 'major enemy force found' CCIR"),
         figure!("sim.c2.ccir_min_gap_s", 1_800.0, "s", 60.0, 14_400.0, "default", Default, "least time between two plans started by contact CCIRs"),
@@ -104,6 +105,7 @@ pub struct C4Params {
     pub ground_antenna_m: f64,
     pub heartbeat_s: f64,
     pub out_of_comms_s: f64,
+    pub picture_lag_s: f64,
     pub emit_limit_s: f64,
     pub ccir_new_contacts: u32,
     pub ccir_min_gap_s: f64,
@@ -191,6 +193,7 @@ impl C4Params {
             ground_antenna_m: f.get("sim.comms.ground_antenna_m"),
             heartbeat_s: f.get("sim.c2.heartbeat_s"),
             out_of_comms_s: f.get("sim.c2.out_of_comms_s"),
+            picture_lag_s: f.get("sim.c2.picture_lag_s"),
             emit_limit_s: f.get("sim.c2.emit_limit_s"),
             ccir_new_contacts: f.get("sim.c2.ccir_new_contacts").round().max(1.0) as u32,
             ccir_min_gap_s: f.get("sim.c2.ccir_min_gap_s"),

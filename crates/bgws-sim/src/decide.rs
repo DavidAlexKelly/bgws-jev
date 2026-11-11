@@ -167,6 +167,38 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
 }
 
 /// Where a move leads: the end of the current move, else of the next one in its orders.
+/// A friend's report is of a contact this unit sees when it lies this close (or within twice its error), m.
+const REPORT_MATCH_M: f64 = 300.0;
+/// Reported contacts this far from the unit are listed, m.
+const REPORT_REACH_M: f64 = 4_000.0;
+/// A report's view of what a contact is counts at this belief or more.
+const REPORT_SURE: f64 = 0.6;
+
+/// What a contact is, in words, as its side's picture has it.
+fn hypothesis_words(h: bgws_know::Hypothesis) -> &'static str {
+    use bgws_know::Hypothesis as H;
+    match h {
+        H::Mbt => "a tank",
+        H::Ifv => "an infantry fighting vehicle",
+        H::Apc => "an armoured personnel carrier",
+        H::Truck => "a truck",
+        H::Artillery => "artillery",
+        H::Infantry => "infantry or an anti-tank team",
+        H::LandDecoy => "a decoy",
+        _ => "something not on the ground",
+    }
+}
+
+/// What recognising a contact (short of identifying it) tells: its kind.
+fn recognised_as(s: &Sim, id: EntityId) -> &'static str {
+    match s.world.get::<Ident>(s.ctx.entity(id)).map(|i| i.platform.body.vulnerability) {
+        Some(bgws_catalogue::Vulnerability::Personnel) => "a team on foot",
+        Some(bgws_catalogue::Vulnerability::Armoured) => "an armoured vehicle",
+        Some(_) => "a soft-skinned vehicle",
+        None => "a vehicle or team",
+    }
+}
+
 /// A contact this close to where a unit's orders end is on its objective, m.
 const OBJECTIVE_NEAR_M: f64 = 600.0;
 /// A tactical move's pace as a share of the vehicle's cross-country speed (for the ETA).
@@ -330,7 +362,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             };
             let from_objective = objective.map(|o| v.at.sub(o).horizontal());
             json!({
-                "what": match v.level { 0 => "something".to_string(), 1 => "a vehicle or team".to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
+                "what": match v.level { 0 => "something".to_string(), 1 => recognised_as(s, **id).to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
                 "identified": v.level >= 2,
                 "rangeM": round(range), "bearing": compass(d.bearing()),
                 "moving": v.moving, "seenAgoS": round((s.ctx.now - v.last).secs()),
@@ -345,6 +377,39 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             })
         })
         .collect();
+    // What friends have reported (the unit's share of its side's picture):
+    // what it makes of the contacts this unit sees but has not identified,
+    // and the contacts it cannot see itself.
+    let shared = crate::domains::drones::c2::picture_for(s, i.id);
+    let near_track = |at: Enu| shared.iter().filter(|t| t.pos.sub(at).horizontal() <= (2.0 * t.error_m).max(REPORT_MATCH_M)).min_by(|a, b| a.pos.sub(at).horizontal().total_cmp(&b.pos.sub(at).horizontal()));
+    let reported_as = |at: Enu| {
+        near_track(at).and_then(|t| t.class.filter(|c| c.1 >= REPORT_SURE).map(|c| json!({ "what": hypothesis_words(c.0), "surePct": pct(c.1), "ageS": round(t.age_s), "by": t.by.map(|b| name(s, b)) })))
+    };
+    let enemies: Vec<serde_json::Value> = enemies
+        .into_iter()
+        .zip(seen.iter().take(6))
+        .map(|(mut j, (_, v))| {
+            if j.get("identified").and_then(serde_json::Value::as_bool) != Some(true) {
+                if let Some(r) = reported_as(v.at) {
+                    j["reportedAs"] = r;
+                }
+            }
+            j
+        })
+        .collect();
+    let mut beyond: Vec<(f64, serde_json::Value)> = shared
+        .iter()
+        .filter(|t| !seen.iter().any(|(_, v)| t.pos.sub(v.at).horizontal() <= (2.0 * t.error_m).max(REPORT_MATCH_M)))
+        .filter_map(|t| {
+            let d = t.pos.sub(k.pos);
+            let r = d.horizontal();
+            (r <= REPORT_REACH_M).then(|| {
+                (r, json!({ "what": t.class.filter(|c| c.1 >= REPORT_SURE).map(|c| hypothesis_words(c.0)).unwrap_or("unknown"), "rangeM": round(r), "bearing": compass(d.bearing()), "ageS": round(t.age_s), "errorM": round(t.error_m), "by": t.by.map(|b| name(s, b)) }))
+            })
+        })
+        .collect();
+    beyond.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let reported_by_friends: Vec<serde_json::Value> = beyond.into_iter().take(4).map(|x| x.1).collect();
     let unseen_fire: Vec<serde_json::Value> = aw.suspects.values().map(|v| json!({ "bearing": compass(v.bearing), "agoS": round((s.ctx.now - v.last).secs()) })).collect();
     // Its orders and where they lead.
     let speed_ms = (i.platform.mover.cross_country_kmh.max(1.0) / 3.6) * ETA_PACE;
@@ -414,6 +479,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
         "weapons": weapons,
         "weaponReachM": round(my_reach),
         "enemiesSeen": enemies,
+        "reportedByFriends": reported_by_friends,
         "firedOnByUnseen": unseen_fire,
         "orders": orders,
         "ground": ground,

@@ -129,8 +129,8 @@ fn detect_to_strike_and_fpv_effectiveness_emerge_in_band() {
     let mut kills = 0usize;
     let mut sorties = 0usize;
     let (mut e_hit, mut e_kill) = (0.0, 0.0);
-    // More seeds than the default: D2S_SEEDS=1-24.
-    let seeds: Vec<u64> = std::env::var("D2S_SEEDS").ok().and_then(|v| { let (a, b) = v.split_once('-')?; Some((a.parse().ok()?..=b.parse().ok()?).collect()) }).unwrap_or((1..=8).collect());
+    // 16 seeds by default (8 gave as few as 7 attacks); more: D2S_SEEDS=1-24.
+    let seeds: Vec<u64> = std::env::var("D2S_SEEDS").ok().and_then(|v| { let (a, b) = v.split_once('-')?; Some((a.parse().ok()?..=b.parse().ok()?).collect()) }).unwrap_or((1..=16).collect());
     for seed in seeds {
         let (sim, _) = play_planned("m4-drone-line", seed, 180.0);
         for r in drones::records(&sim) {

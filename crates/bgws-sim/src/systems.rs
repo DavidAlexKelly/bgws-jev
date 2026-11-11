@@ -314,6 +314,16 @@ struct SenseEnt {
     dummy: bool,
     /// Where its elements stand (the unit's formation), the first at `pos`.
     elems: Vec<Enu>,
+    /// Where friends have reported enemies (its share of the side's
+    /// picture): a target within one of these is searched for cued.
+    cues: Vec<(Enu, f64)>,
+}
+
+impl SenseEnt {
+    /// Is its search for `t` cued: seen it already, or told where to look.
+    fn cued_on(&self, t: &SenseEnt, seen: bool) -> bool {
+        seen || self.cues.iter().any(|(p, r)| p.sub(t.pos).horizontal() <= *r)
+    }
 }
 
 pub(crate) fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
@@ -354,6 +364,7 @@ pub(crate) fn hypothesis_of(p: &bgws_catalogue::Platform) -> Hypothesis {
 /// observe nor are observed here, §6.4).
 fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
     let now = s.ctx.now;
+    let mut cues = crate::domains::drones::c2::cue_spots(s);
     s.ctx
         .order
         .iter()
@@ -422,6 +433,7 @@ fn snapshot_for_sensing(s: &Sim) -> Vec<SenseEnt> {
                 hypothesis: hypothesis_of(p),
                 dummy: i.dummy,
                 elems: crate::formation::elements(s, e),
+                cues: cues.remove(&i.id).unwrap_or_default(),
             })
         })
         .collect()
@@ -521,7 +533,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
     let p = &s.ctx.p;
     let seed = s.ctx.seed;
     let world = &s.world;
-    let cued = |o: &SenseEnt, t: &SenseEnt| world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false);
+    let cued = |o: &SenseEnt, t: &SenseEnt| o.cued_on(t, world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
     // 1. The best sensor per pair and its first die (no terrain yet).
     let best: Vec<Option<Best>> = {
         prof_span!("sensing.acquire");
@@ -723,7 +735,7 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
     let lux = bgws_env::illuminance_at(&s.ctx.start.at(now), lat, lon, w.cloud_cover, &p.light).total_lux;
     let night = lux < p.night_lux;
-    let cued = s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false);
+    let cued = o.cued_on(t, s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
     let tau_mult = tau_multiplier(&o.observer, &p.observer);
     let mut sensors = Vec::new();
     let mut best_rate = 0.0f64;
