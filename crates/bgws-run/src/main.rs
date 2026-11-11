@@ -503,7 +503,7 @@ fn main() -> Result<()> {
                     host.play_realtime(until, Some(speed), |sim| {
                         progress(sim);
                         if let Some(p) = publisher.as_mut() {
-                            if let Err(e) = p.publish(sim) {
+                            if let Err(e) = p.publish(sim, &[]) {
                                 failed.get_or_insert(e);
                             }
                         }

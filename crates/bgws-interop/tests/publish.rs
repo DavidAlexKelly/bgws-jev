@@ -31,17 +31,37 @@ fn a_company_attack_published_over_dis() {
     let mut worst_gap: f64 = 0.0;
     let mut worst_ground: f64 = 0.0;
     let mut received = 0usize;
+    let mut fires = std::collections::BTreeSet::new();
+    let mut detonations = Vec::new();
     let mut buf = [0u8; 2048];
+    // The approach in one go (the first shots come at about 390 s), then
+    // 150 s of the fight, published each second.
+    let start = 360;
+    sim.run_with_rules(SimTime::from_secs(start as f64));
+    sim.drain_events();
     let seconds = 150;
-    for t in 1..=seconds {
+    for t in start + 1..=start + seconds {
         sim.run_with_rules(SimTime::from_secs(t as f64));
-        publisher.publish(&sim).unwrap();
+        let events = sim.drain_events();
+        publisher.publish(&sim, &events).unwrap();
         // Drain what arrived this second.
         while let Ok((n, _)) = rx.recv_from(&mut buf) {
             let pdus = dis_rs::parse(&buf[..n]).expect("a valid PDU");
             for p in pdus {
-                let dis_rs::model::PduBody::EntityState(es) = p.body else { panic!("only entity states") };
                 assert_eq!(p.header.exercise_id, 3);
+                let es = match p.body {
+                    dis_rs::model::PduBody::EntityState(es) => es,
+                    dis_rs::model::PduBody::Fire(f) => {
+                        assert_eq!((f.firing_entity_id.simulation_address.site_id, f.event_id.simulation_address.site_id), (5, 5));
+                        fires.insert(f.event_id.event_id);
+                        continue;
+                    }
+                    dis_rs::model::PduBody::Detonation(d) => {
+                        detonations.push(d.event_id.event_id);
+                        continue;
+                    }
+                    other => panic!("unexpected PDU {other:?}"),
+                };
                 assert_eq!((es.entity_id.simulation_address.site_id, es.entity_id.simulation_address.application_id), (5, 6));
                 received += 1;
                 let id = es.entity_id.entity_id;
@@ -58,6 +78,11 @@ fn a_company_attack_published_over_dis() {
         }
     }
     assert_eq!(last_heard.len(), entities, "every entity was published");
+    // Shots went out as Fire and Detonation PDUs, each detonation with the
+    // event of a fire sent before it.
+    assert!(!fires.is_empty() && !detonations.is_empty(), "{} fires, {} detonations", fires.len(), detonations.len());
+    assert!(detonations.iter().all(|d| fires.contains(d)), "a detonation with no fire before it");
+    eprintln!("{} fires, {} detonations", fires.len(), detonations.len());
     // The 5 s heartbeat (plus a second's tick).
     assert!(worst_gap <= 6.0, "an entity went {worst_gap} s without a state");
     // Ground vehicles stand on the ground once the geoid is taken off (the

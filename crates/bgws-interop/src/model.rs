@@ -117,8 +117,8 @@ impl EntityTruth {
 /// How far either side of an entity the ground slope is sampled, m.
 const SLOPE_M: f64 = 5.0;
 
-/// Every entity a game publishes, now: each with a DIS type (a cyber cell
-/// has none), alive or wrecked.
+/// Every entity a game publishes, now: each of ours with a DIS type (a
+/// cyber cell has none), alive or wrecked; not another simulation's.
 pub fn truths(sim: &Sim, spec: &InteropSpec) -> Vec<EntityTruth> {
     let geoid = Geoid::egm96();
     let frame = &sim.ctx.frame;
@@ -126,6 +126,10 @@ pub fn truths(sim: &Sim, spec: &InteropSpec) -> Vec<EntityTruth> {
     for (idx, &e) in sim.ctx.order.iter().enumerate() {
         let (Some(i), Some(k), Some(h)) = (sim.world.get::<Ident>(e), sim.world.get::<Kin>(e), sim.world.get::<Health>(e)) else { continue };
         let Some(dis) = i.platform.dis else { continue };
+        // Another simulation's entity is its owner's to publish.
+        if bgws_sim::remote::is_remote(sim, e) {
+            continue;
+        }
         let id = EntityId(idx as u32);
         let Some(external) = ExternalId::ours(spec, id) else { continue };
         let act = sim.world.get::<Act>(e);

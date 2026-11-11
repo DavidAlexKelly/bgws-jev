@@ -1376,7 +1376,7 @@ fn suppressive_fire(s: &mut Sim, e: Entity, fit: u32) {
     if let Some(t) = tid {
         ev = ev.target(t);
     }
-    ev.text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "ageS": age, "sigmaM": sigma, "felt": felt, "kills": total_kills }));
+    ev.text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "ageS": age, "sigmaM": sigma, "felt": felt, "kills": total_kills, "spotE": spot.e, "spotN": spot.n }));
 }
 
 /// Load `munition` in a mount if another round is loaded: the loaded rounds

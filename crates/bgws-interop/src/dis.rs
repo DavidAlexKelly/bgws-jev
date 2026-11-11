@@ -1,10 +1,19 @@
-//! DIS (IEEE 1278.1-2012, version 7): Entity State PDUs over UDP.
+//! DIS (IEEE 1278.1-2012, version 7): Entity State, Fire and Detonation PDUs
+//! over UDP.
 //!
 //! The PDUs are built and serialised with `dis-rs` (MIT); the byte layout is
 //! checked against the standard's own offsets in this module's tests.
 
 use crate::dr::{Algorithm, DeadReckoner, DrSettings};
-use crate::model::{truths, EntityTruth};
+use crate::events::{DetonationOut, FireBook, FireOut, Outgoing};
+use crate::geo::place;
+use crate::geoid::Geoid;
+use crate::model::{truths, EntityTruth, ExternalId};
+use bgws_core::{EntityId, LogEvent};
+use dis_rs::detonation::model::{Detonation, DetonationDescriptor};
+use dis_rs::enumerations::{DetonationResult, MunitionDescriptorFuse, MunitionDescriptorWarhead};
+use dis_rs::fire::model::{Fire, FireDescriptor};
+use dis_rs::model::{EventId, MunitionDescriptor, SimulationAddress};
 use bgws_scenario::v4::InteropSpec;
 use bgws_sim::Sim;
 use bytes::BytesMut;
@@ -69,6 +78,70 @@ pub fn entity_state(t: &EntityTruth, exercise: u8, sim_s: f64) -> Pdu {
     Pdu::finalize_from_parts(PduHeader::new_v7(exercise, PduType::EntityState), body, Timestamp::new(relative_timestamp(sim_s)))
 }
 
+/// The DIS identity of any entity in the game: ours from the scenario's
+/// site and application, another simulation's from its key; none for "no
+/// entity" (0:0:0).
+pub fn dis_id_of(sim: &Sim, spec: &InteropSpec, id: Option<EntityId>) -> DisId {
+    let Some(id) = id else { return DisId::new(0, 0, 0) };
+    let Some(&e) = sim.ctx.order.get(id.index()) else { return DisId::new(0, 0, 0) };
+    if let Some(r) = sim.world.get::<bgws_sim::remote::Remote>(e) {
+        return DisId::new(r.key.site, r.key.application, r.key.entity);
+    }
+    ExternalId::ours(spec, id).map(|x| DisId::new(x.site, x.application, x.entity)).unwrap_or(DisId::new(0, 0, 0))
+}
+
+/// A munition's descriptor: its DIS type (the firer's side's country for a
+/// generic round), warhead and fuse by kind, the rounds.
+fn munition_descriptor(sim: &Sim, spec: &InteropSpec, firer: Option<EntityId>, munition: &str, rounds: u32) -> MunitionDescriptor {
+    let m = sim.ctx.catalogue.munition(munition);
+    let side = firer.and_then(|f| sim.ctx.order.get(f.index())).and_then(|&e| sim.world.get::<bgws_sim::components::Ident>(e)).map(|i| i.side);
+    let country = side.map(|s| spec.country_of(s)).unwrap_or(0);
+    let ty = m.and_then(|m| m.dis).map(|d| d.with_country(country)).unwrap_or([2, 0, country, 0, 0, 0, 0]);
+    use bgws_catalogue::MunitionKind as K;
+    // SISO-REF-010 Munition Descriptor-Warhead and -Fuse.
+    let warhead: u16 = match m.map(|m| m.kind) {
+        Some(K::Ke | K::SmallArms) => 5000,
+        Some(K::Heat | K::Atgm | K::Fpv | K::Loitering) => 1600,
+        _ => 1000,
+    };
+    MunitionDescriptor { entity_type: dis_type(&ty), warhead: MunitionDescriptorWarhead::from(warhead), fuse: MunitionDescriptorFuse::from(1100u16), quantity: rounds.min(u16::MAX as u32) as u16, rate: 0 }
+}
+
+fn ecef_of(sim: &Sim, pos: bgws_core::Enu) -> Location {
+    let p = place(&sim.ctx.frame, Geoid::egm96(), pos);
+    Location { x_coordinate: p.ecef[0], y_coordinate: p.ecef[1], z_coordinate: p.ecef[2] }
+}
+
+/// A Fire PDU.
+pub fn fire_pdu(sim: &Sim, spec: &InteropSpec, f: &FireOut) -> Pdu {
+    let body = Fire::builder()
+        .with_firing_entity_id(dis_id_of(sim, spec, Some(f.firer)))
+        .with_target_entity_id(dis_id_of(sim, spec, f.target))
+        .with_entity_id(DisId::new(0, 0, 0))
+        .with_event_id(EventId { simulation_address: SimulationAddress::new(spec.site, spec.application), event_id: f.event })
+        .with_location_in_world(ecef_of(sim, f.from))
+        .with_descriptor(FireDescriptor::Munition(munition_descriptor(sim, spec, Some(f.firer), &f.munition, f.rounds)))
+        .with_range(f.range_m as f32)
+        .build()
+        .into_pdu_body();
+    Pdu::finalize_from_parts(PduHeader::new_v7(spec.exercise, PduType::Fire), body, Timestamp::new(relative_timestamp(sim.ctx.now.secs())))
+}
+
+/// A Detonation PDU.
+pub fn detonation_pdu(sim: &Sim, spec: &InteropSpec, d: &DetonationOut) -> Pdu {
+    let body = Detonation::builder()
+        .with_source_entity_id(dis_id_of(sim, spec, d.firer))
+        .with_target_entity_id(dis_id_of(sim, spec, d.target))
+        .with_exploding_entity_id(DisId::new(0, 0, 0))
+        .with_event_id(EventId { simulation_address: SimulationAddress::new(spec.site, spec.application), event_id: d.event })
+        .with_world_location(ecef_of(sim, d.at))
+        .with_descriptor(DetonationDescriptor::Munition(munition_descriptor(sim, spec, d.firer, &d.munition, d.rounds)))
+        .with_detonation_result(DetonationResult::from(d.result as u8))
+        .build()
+        .into_pdu_body();
+    Pdu::finalize_from_parts(PduHeader::new_v7(spec.exercise, PduType::Detonation), body, Timestamp::new(relative_timestamp(sim.ctx.now.secs())))
+}
+
 /// A PDU on the wire.
 pub fn encode(pdu: &Pdu) -> Vec<u8> {
     let mut buf = BytesMut::with_capacity(pdu.pdu_length() as usize);
@@ -83,6 +156,7 @@ pub struct DisPublisher {
     dest: SocketAddr,
     pub spec: InteropSpec,
     pub dr: DeadReckoner,
+    pub fires: FireBook,
     /// PDUs sent so far.
     pub sent: u64,
 }
@@ -93,13 +167,22 @@ impl DisPublisher {
         let dest = dest.to_socket_addrs()?.next().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "no address"))?;
         let socket = UdpSocket::bind(if dest.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" })?;
         socket.set_broadcast(true)?;
-        Ok(DisPublisher { socket, dest, spec, dr: DeadReckoner::new(settings), sent: 0 })
+        Ok(DisPublisher { socket, dest, spec, dr: DeadReckoner::new(settings), fires: FireBook::default(), sent: 0 })
     }
 
-    /// Send the states due now; returns how many were sent.
-    pub fn publish(&mut self, sim: &Sim) -> std::io::Result<usize> {
+    /// Send the states due now, and a Fire and Detonation for each of our
+    /// shots in `events` (this tick's); returns how many PDUs were sent.
+    pub fn publish(&mut self, sim: &Sim, events: &[LogEvent]) -> std::io::Result<usize> {
         let now = sim.ctx.now.secs();
         let mut n = 0;
+        for o in self.fires.from_events(sim, events) {
+            let pdu = match &o {
+                Outgoing::Fire(f) => fire_pdu(sim, &self.spec, f),
+                Outgoing::Detonation(d) => detonation_pdu(sim, &self.spec, d),
+            };
+            self.socket.send_to(&encode(&pdu), self.dest)?;
+            n += 1;
+        }
         for t in truths(sim, &self.spec) {
             if self.dr.due(now, &t).is_none() {
                 continue;
