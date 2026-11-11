@@ -37,7 +37,13 @@
    "costUsd": 8000,
    "structuralHits": 0.03,
    "decoy": false,
-   "source": "synthetic; TS tankGun 600 mm"
+   "source": "synthetic; TS tankGun 600 mm",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "id": "atgmTandem",
@@ -76,7 +82,13 @@
    "costUsd": 180000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "synthetic; ranges R4.1"
+   "source": "synthetic; ranges R4.1",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "id": "he120Mortar",
@@ -105,7 +117,13 @@
    "costUsd": 1500,
    "structuralHits": 0.03,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "id": "he155",
@@ -134,7 +152,13 @@
    "costUsd": 3000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "synthetic; P12 for consumption"
+   "source": "synthetic; P12 for consumption",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "id": "pgm155",
@@ -163,7 +187,13 @@
    "costUsd": 100000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "P15 (Pk falls under jamming)"
+   "source": "P15 (Pk falls under jamming)",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 1 Guided"
   },
   {
    "id": "gmlrs",
@@ -192,7 +222,13 @@
    "costUsd": 160000,
    "structuralHits": 0.15,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 1 Guided"
   },
   {
    "id": "samLong",
@@ -223,7 +259,13 @@
    "costUsd": 4200000,
    "structuralHits": 0.1,
    "decoy": false,
-   "source": "P11 (cost), P29 (Pk)"
+   "source": "P11 (cost), P29 (Pk)",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "samMedium",
@@ -254,7 +296,13 @@
    "costUsd": 1000000,
    "structuralHits": 0.08,
    "decoy": false,
-   "source": "P11"
+   "source": "P11",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "samShort",
@@ -285,7 +333,13 @@
    "costUsd": 150000,
    "structuralHits": 0.04,
    "decoy": false,
-   "source": "R4.1 (4–6 km)"
+   "source": "R4.1 (4–6 km)",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "adShell30",
@@ -311,7 +365,13 @@
    "costUsd": 2000,
    "structuralHits": 0.01,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 2 Ballistic"
   },
   {
    "id": "shot12g",
@@ -336,7 +396,13 @@
    "costUsd": 5,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 2 Ballistic"
   },
   {
    "id": "interceptorDrone",
@@ -367,7 +433,13 @@
    "costUsd": 6000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "P11 ($1.4–16k)"
+   "source": "P11 ($1.4–16k)",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "aamBvr",
@@ -397,7 +469,13 @@
    "costUsd": 1100000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "R6.4 (Pk 0.4–0.6)"
+   "source": "R6.4 (Pk 0.4–0.6)",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "aamWvr",
@@ -427,7 +505,13 @@
    "costUsd": 450000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 1 Anti-Air; Munition Category 1 Guided"
   },
   {
    "id": "agm",
@@ -463,7 +547,13 @@
    "costUsd": 150000,
    "structuralHits": 0.25,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "id": "glideBomb",
@@ -492,7 +582,13 @@
    "costUsd": 30000,
    "structuralHits": 1.2,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 11,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 11 Tactical; Munition Category 1 Guided"
   },
   {
    "id": "arm",
@@ -523,7 +619,13 @@
    "costUsd": 900000,
    "structuralHits": 0.3,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 4,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 4 Anti-Radar; Munition Category 1 Guided"
   },
   {
    "id": "cruiseLand",
@@ -553,7 +655,13 @@
    "costUsd": 2000000,
    "structuralHits": 1.2,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 11,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 11 Tactical; Munition Category 1 Guided"
   },
   {
    "id": "srbm",
@@ -583,7 +691,13 @@
    "costUsd": 3000000,
    "structuralHits": 1.5,
    "decoy": false,
-   "source": "P20, P29"
+   "source": "P20, P29",
+   "dis": {
+    "kind": 2,
+    "domain": 11,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 11 Tactical; Munition Category 1 Guided"
   },
   {
    "id": "owaWarhead",
@@ -612,7 +726,13 @@
    "costUsd": 40000,
    "structuralHits": 0.3,
    "decoy": false,
-   "source": "P10, P11"
+   "source": "P10, P11",
+   "dis": {
+    "kind": 2,
+    "domain": 11,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 11 Tactical; Munition Category 1 Guided"
   },
   {
    "id": "fpvHeat",
@@ -642,7 +762,13 @@
    "costUsd": 500,
    "structuralHits": 0.02,
    "decoy": false,
-   "source": "P9 (30–50% hit, 60–80% fail to destroy)"
+   "source": "P9 (30–50% hit, 60–80% fail to destroy)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "id": "loiterHeat",
@@ -677,7 +803,13 @@
    "costUsd": 35000,
    "structuralHits": 0.06,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "id": "ascm",
@@ -707,7 +839,13 @@
    "costUsd": 1500000,
    "structuralHits": 1,
    "decoy": false,
-   "source": "R6.1"
+   "source": "R6.1",
+   "dis": {
+    "kind": 2,
+    "domain": 6,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 6 Anti-Ship; Munition Category 1 Guided"
   },
   {
    "id": "heavyTorpedo",
@@ -738,7 +876,13 @@
    "costUsd": 3500000,
    "structuralHits": 2,
    "decoy": false,
-   "source": "R6.3 (38–50 km Mk 48)"
+   "source": "R6.3 (38–50 km Mk 48)",
+   "dis": {
+    "kind": 2,
+    "domain": 7,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 7 Anti-Submarine; Munition Category 1 Guided"
   },
   {
    "id": "ciws20",
@@ -764,7 +908,13 @@
    "costUsd": 10000,
    "structuralHits": 0.01,
    "decoy": false,
-   "source": "P28 (1.5–2 km layer)"
+   "source": "P28 (1.5–2 km layer)",
+   "dis": {
+    "kind": 2,
+    "domain": 3,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 3 Anti-Guided Weapon; Munition Category 2 Ballistic"
   },
   {
    "id": "he127",
@@ -795,7 +945,13 @@
    "costUsd": 2000,
    "structuralHits": 0.05,
    "decoy": false,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "id": "fpvFibre",
@@ -825,7 +981,13 @@
    "costUsd": 500,
    "structuralHits": 0.02,
    "decoy": false,
-   "source": "P8 (spools ≤20 km typical, 41 km record)"
+   "source": "P8 (spools ≤20 km typical, 41 km record)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "warheadKg": 1.5,
@@ -859,7 +1021,13 @@
     "land"
    ],
    "costUsd": 5000,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -889,7 +1057,13 @@
     "land"
    ],
    "costUsd": 8000,
-   "source": "[SIM] L6 bgws_capability_profile best_pen_mm_1000m, read 2026-09-13; templated across most rows"
+   "source": "[SIM] L6 bgws_capability_profile best_pen_mm_1000m, read 2026-09-13; templated across most rows",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -931,7 +1105,13 @@
     "land"
    ],
    "costUsd": 9000,
-   "source": "curated L7 protection table via forceList var_11_default (657 mm)"
+   "source": "curated L7 protection table via forceList var_11_default (657 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -973,7 +1153,13 @@
     "land"
    ],
    "costUsd": 10000,
-   "source": "curated via forceList var_1_default (848 mm)"
+   "source": "curated via forceList var_1_default (848 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1015,7 +1201,13 @@
     "land"
    ],
    "costUsd": 7000,
-   "source": "curated via forceList var_22_1/var_23_1 (750 mm at 1 km, 638 at 2 km)"
+   "source": "curated via forceList var_22_1/var_23_1 (750 mm at 1 km, 638 at 2 km)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1053,7 +1245,13 @@
     "land"
    ],
    "costUsd": 3000,
-   "source": "curated via forceList var_20_default (390 mm)"
+   "source": "curated via forceList var_20_default (390 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1091,7 +1289,13 @@
     "land"
    ],
    "costUsd": 200,
-   "source": "curated via forceList var_27_default (50 mm)"
+   "source": "curated via forceList var_27_default (50 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1130,7 +1334,13 @@
     "air"
    ],
    "costUsd": 300,
-   "source": "synthetic; TS snapshots.ts cannon30 90 mm"
+   "source": "synthetic; TS snapshots.ts cannon30 90 mm",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0.05,
@@ -1160,7 +1370,13 @@
     "air"
    ],
    "costUsd": 100,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1186,7 +1402,13 @@
     "air"
    ],
    "costUsd": 0.5,
-   "source": "synthetic; TS snapshots.ts apers 600 m on foot"
+   "source": "synthetic; TS snapshots.ts apers 600 m on foot",
+   "dis": {
+    "kind": 2,
+    "domain": 8,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 8 Anti-Personnel; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0,
@@ -1212,7 +1434,13 @@
     "air"
    ],
    "costUsd": 1,
-   "source": "synthetic; sustained-fire 1,800 m (forceList sec_uk_gpmg_sf)"
+   "source": "synthetic; sustained-fire 1,800 m (forceList sec_uk_gpmg_sf)",
+   "dis": {
+    "kind": 2,
+    "domain": 8,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 8 Anti-Personnel; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 1.5,
@@ -1242,7 +1470,13 @@
     "land"
    ],
    "costUsd": 500,
-   "source": "R4.1 (RPG-7 200–300 m effective); curated forceList 500 mm"
+   "source": "R4.1 (RPG-7 200–300 m effective); curated forceList 500 mm",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 1.8,
@@ -1272,7 +1506,13 @@
     "land"
    ],
    "costUsd": 1500,
-   "source": "curated forceList sec_us_mech_sqd (300 m, 420 mm)"
+   "source": "curated forceList sec_us_mech_sqd (300 m, 420 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 1.8,
@@ -1302,7 +1542,13 @@
     "land"
    ],
    "costUsd": 40000,
-   "source": "R4.1 (NLAW ~800 m); curated forceList sec_uk_armd_inf"
+   "source": "R4.1 (NLAW ~800 m); curated forceList sec_uk_armd_inf",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "seeker": {
@@ -1337,7 +1583,13 @@
     "land"
    ],
    "costUsd": 200000,
-   "source": "R4.1 (2.5–4 km); curated forceList sec_uk_javelin (750 mm)"
+   "source": "R4.1 (2.5–4 km); curated forceList sec_uk_javelin (750 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "warheadKg": 7,
@@ -1367,7 +1619,13 @@
     "land"
    ],
    "costUsd": 30000,
-   "source": "R4.1 (5.5–8 km); curated forceList sec_ru_at (1,200 mm)"
+   "source": "R4.1 (5.5–8 km); curated forceList sec_ru_at (1,200 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "warheadKg": 6,
@@ -1397,7 +1655,13 @@
     "land"
    ],
    "costUsd": 90000,
-   "source": "[SIM] L6 profile tankmodels/sw_pvrbv_551 (2,000 m, 800 mm)"
+   "source": "[SIM] L6 profile tankmodels/sw_pvrbv_551 (2,000 m, 800 mm)",
+   "dis": {
+    "kind": 2,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 2 Anti-Armor; Munition Category 1 Guided"
   },
   {
    "warheadKg": 0.7,
@@ -1426,7 +1690,13 @@
     "land"
    ],
    "costUsd": 800,
-   "source": "curated forceList sec_uk_mortar (5,650 m)"
+   "source": "curated forceList sec_uk_mortar (5,650 m)",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0.4,
@@ -1455,7 +1725,13 @@
     "land"
    ],
    "costUsd": 500,
-   "source": "curated forceList sec_ru_mortar (4,000 m)"
+   "source": "curated forceList sec_ru_mortar (4,000 m)",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 0.5,
@@ -1489,7 +1765,13 @@
     "land"
    ],
    "costUsd": 100,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 8,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 8 Anti-Personnel; Munition Category 2 Ballistic"
   },
   {
    "warheadKg": 250,
@@ -1519,7 +1801,13 @@
     "surface"
    ],
    "costUsd": 5000,
-   "source": "synthetic"
+   "source": "synthetic",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
   }
  ]
 }

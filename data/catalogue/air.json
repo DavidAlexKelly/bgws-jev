@@ -100,7 +100,13 @@
    "costUsd": 500000000,
    "rationale": "Radar horizon from 10 km up reaches 400 km.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 8
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 8 Surveillance/C2 (Airborne Early Warning)"
   },
   {
    "id": "generic/attackHelo",
@@ -208,7 +214,13 @@
    "costUsd": 35000000,
    "rationale": "Eight missiles each.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 20
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 20 Attack Helicopter"
   },
   {
    "id": "generic/bomber",
@@ -302,7 +314,13 @@
    "costUsd": 300000000,
    "rationale": "Tu-95/B-52-like: a launch platform for cruise missiles, kept well outside air defence.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 3
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 3 Bomber"
   },
   {
    "id": "generic/fighter4",
@@ -452,7 +470,13 @@
      "kind": "reference",
      "ref": "P30 (default)"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 1 Fighter/Air Defense"
   },
   {
    "id": "generic/fighter5",
@@ -600,7 +624,13 @@
    "costUsd": 100000000,
    "rationale": "A radar cross-section a thousand times smaller than a 4th-generation fighter's.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 1 Fighter/Air Defense"
   },
   {
    "id": "generic/mpa",
@@ -724,7 +754,13 @@
    "costUsd": 150000000,
    "rationale": "Sonobuoys modelled as one passive sonar.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 5
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 5 ASW/Patrol/Observation"
   },
   {
    "id": "generic/strikeFighter",
@@ -838,7 +874,13 @@
    "costUsd": 80000000,
    "rationale": "A two-seat strike jet: glide bombs and ARMs; surge 2–3 sorties a day [P30].",
    "source": "P30",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 2 Attack/Strike"
   },
   {
    "id": "generic/tanker",
@@ -907,7 +949,13 @@
    "costUsd": 200000000,
    "rationale": "Offloads most of its fuel.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 4 Cargo/Tanker"
   },
   {
    "id": "generic/transportHelo",
@@ -992,7 +1040,13 @@
    "costUsd": 20000000,
    "rationale": "A section each.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 2,
+    "category": 21
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Air Category 21 Utility Helicopter"
   }
  ]
 }

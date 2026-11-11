@@ -17,6 +17,7 @@ members = [
   "crates/bgws-decide",
   "crates/bgws-analysis",
   "crates/bgws-run",
+  "crates/bgws-interop",
   "apps/server",
   "apps/desktop",
 ]
@@ -38,6 +39,7 @@ default-members = [
   "crates/bgws-decide",
   "crates/bgws-analysis",
   "crates/bgws-run",
+  "crates/bgws-interop",
   "apps/server",
 ]
 
@@ -61,6 +63,7 @@ bgws-models = { path = "crates/bgws-models" }
 bgws-domains = { path = "crates/bgws-domains" }
 bgws-ops = { path = "crates/bgws-ops" }
 bgws-sim = { path = "crates/bgws-sim" }
+bgws-interop = { path = "crates/bgws-interop" }
 bgws-decide = { path = "crates/bgws-decide" }
 bgws-analysis = { path = "crates/bgws-analysis" }
 bgws-run = { path = "crates/bgws-run" }

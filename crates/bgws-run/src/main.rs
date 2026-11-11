@@ -25,10 +25,10 @@ use anyhow::{anyhow, bail, Result};
 use bgws_analysis::report::VignetteSuite;
 use bgws_analysis::CheckOptions;
 use bgws_core::{Seed, SimTime};
+use bgws_run::default_figures;
 use bgws_run::experiments;
 use bgws_run::{load_scenario, DeciderChoice, Host, HostOptions};
 use bgws_scenario::record::GameRecord;
-use bgws_run::default_figures;
 use bgws_sim::SimOptions;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -68,6 +68,53 @@ enum Cmd {
         local_model: String,
         #[arg(long)]
         claude_model: Option<String>,
+        /// Play in real time: the clock follows the wall clock (at this many
+        /// simulated seconds per second; 1 without a value) and decisions do
+        /// not stop it. Answers apply when they come back.
+        #[arg(long, num_args = 0..=1, default_missing_value = "1")]
+        realtime: Option<f64>,
+        /// Publish the game over DIS (v7 Entity State PDUs) to this address,
+        /// `host:port` (a broadcast address is allowed); implies --realtime.
+        #[arg(long)]
+        dis: Option<String>,
+        /// The DIS exercise ID (else the scenario's `interop.exercise`, else 1).
+        #[arg(long)]
+        dis_exercise: Option<u8>,
+        /// Also take in other simulations' DIS on this address (`host:port`):
+        /// their entities join as remote entities, their detonations on ours
+        /// are judged here. Without it the game only publishes.
+        #[arg(long)]
+        dis_listen: Option<String>,
+        /// Join this IPv4 multicast group to listen.
+        #[arg(long)]
+        dis_group: Option<std::net::Ipv4Addr>,
+        /// Join an HLA 4 federation through this Federate Protocol server
+        /// (`host:port`), with the RPR FOM; real time unless --time-managed.
+        #[arg(long)]
+        hla: Option<String>,
+        #[arg(long, default_value = "BGWS")]
+        federation: String,
+        /// Our federate name (else `BGWS-<site>-<application>`).
+        #[arg(long)]
+        federate: Option<String>,
+        /// A FOM module to create or join with (repeat for each; the
+        /// federation's RPR FOM files for a real RTI).
+        #[arg(long)]
+        fom: Vec<PathBuf>,
+        /// Time-regulating and time-constrained with a 1 s lookahead: the game
+        /// advances in lock step with the federation, waiting for deciders.
+        #[arg(long)]
+        time_managed: bool,
+        /// Federates expected: start only when this many have joined and met
+        /// at the ReadyToRun synchronization point.
+        #[arg(long, default_value_t = 1)]
+        federates: usize,
+    },
+    /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
+    /// federates on one machine.
+    MockRti {
+        #[arg(long, default_value = "127.0.0.1:15164")]
+        listen: String,
     },
     /// Replay a game record exactly, without calling any decider.
     Replay { record: PathBuf },
@@ -122,6 +169,34 @@ enum Cmd {
     /// `bgws terrain` does this as it builds; a pack without one gets it the first
     /// time a game opens on it.
     Analyse { pack: PathBuf },
+    /// Compare a scenario's ground with a partner simulation's elevation (a
+    /// GeoTIFF on a latitude/longitude grid) before a federation runs:
+    /// height errors on a grid, and sight lines judged on both grounds.
+    Correlate {
+        scenario: String,
+        partner: PathBuf,
+        #[arg(long, default_value_t = 250.0)]
+        spacing: f64,
+        /// Height difference worth listing, m.
+        #[arg(long, default_value_t = 2.0)]
+        tolerance: f64,
+        #[arg(long, default_value_t = 2000)]
+        sight_lines: usize,
+        /// The partner's heights are above the WGS84 ellipsoid (not mean sea level).
+        #[arg(long)]
+        ellipsoidal: bool,
+        /// Write the full report (every mismatch and disagreement) here as JSON.
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
+    /// Write a scenario's ground as a GeoTIFF (latitude/longitude, heights
+    /// above mean sea level) for a partner simulation to build its terrain from.
+    ExportGround {
+        scenario: String,
+        out: PathBuf,
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+    },
     /// The decision lab: collect units' decisions from games, play out every
     /// option, grade a decider against the results and your labels.
     Lab {
@@ -341,6 +416,74 @@ enum LabCmd {
         #[arg(long)]
         check: bool,
     },
+    /// The engagement suite: play its scenarios with the decider on one side
+    /// against the rules, paired with a rules-against-rules game on the same
+    /// seed, and report what the decider changes (wins, losses, survival).
+    Suite {
+        #[arg(long, default_value = "jev")]
+        deciders: DeciderChoice,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        prose: bool,
+        /// Seeds: `1-5`, `1,3,9`.
+        #[arg(long, default_value = "1-4")]
+        seeds: String,
+        /// Only these scenarios (comma-separated names); else the suite's.
+        #[arg(long)]
+        scenarios: Option<String>,
+        /// Games played at once (each waits on the decider's answers).
+        #[arg(long, default_value_t = 4)]
+        parallel: usize,
+        /// Also the held-out scenarios (kept back from tuning).
+        #[arg(long)]
+        all: bool,
+        /// Keep the decider's N worst games in the lab, to play out their decisions.
+        #[arg(long, default_value_t = 0)]
+        keep_worst: usize,
+        /// Test the HQ planner instead of a decider: the heuristic planner with
+        /// fire and movement on the side under test, without it everywhere else
+        /// (the rules decide for every unit).
+        #[arg(long)]
+        planner_ab: bool,
+    },
+    /// Print the wording Jev is asked in (data/jev/wording.json, else the engine's own).
+    Wording,
+    /// Write the generated test scenarios (data/scenarios/gen-*.json): attacks,
+    /// defences, a meeting engagement, an ambush, a withdrawal, and on a pack a
+    /// river crossing and a fight into a town.
+    Generate {
+        /// Only this one (its name).
+        #[arg(long)]
+        only: Option<String>,
+        /// Generate these specs instead (a JSON list of scengen specs).
+        #[arg(long)]
+        spec: Option<PathBuf>,
+    },
+    /// Tune Jev's wording: a larger model proposes rewrites from Jev's
+    /// failures; the cases and the suite judge them; the held-out cases and
+    /// scenarios check the result. Nothing changes until `--accept`.
+    Tune {
+        #[arg(long, default_value_t = 3)]
+        rounds: usize,
+        /// Rewrites asked for each round.
+        #[arg(long, default_value_t = 4)]
+        candidates: usize,
+        /// The proposer (an OpenRouter chat model).
+        #[arg(long, default_value = bgws_run::tune::DEFAULT_PROPOSER)]
+        proposer: String,
+        /// Jev's model, else the configured one.
+        #[arg(long)]
+        model: Option<String>,
+        /// Judge on the cases only (no played games).
+        #[arg(long)]
+        no_suite: bool,
+        #[arg(long, default_value = "1-4")]
+        suite_seeds: String,
+        /// Take a run's tuned wording: write it to data/jev/wording.json.
+        #[arg(long)]
+        accept: Option<String>,
+    },
     /// Make a decision case from a lab moment (your label, else its play-outs).
     Case {
         moment: String,
@@ -369,16 +512,7 @@ fn parse_seeds(s: &str) -> Result<Vec<u64>> {
 }
 
 fn scenario_path(s: &str) -> PathBuf {
-    let p = PathBuf::from(s);
-    if p.exists() {
-        return p;
-    }
-    let named = data_dir().join("scenarios").join(if s.ends_with(".json") { s.to_string() } else { format!("{s}.json") });
-    if named.exists() {
-        named
-    } else {
-        p
-    }
+    bgws_run::scenario_file(s)
 }
 
 fn main() -> Result<()> {
@@ -392,7 +526,7 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model } => {
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group, hla, federation, federate, fom, time_managed, federates } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let seed = Seed(seed.unwrap_or(sc.seed.0));
             let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
@@ -403,13 +537,76 @@ fn main() -> Result<()> {
             let until = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
             let started = Instant::now();
             let mut last_print = Instant::now();
-            host.play_until(until, |sim| {
+            let mut progress = |sim: &bgws_sim::Sim| {
                 if last_print.elapsed().as_secs_f64() > 2.0 {
                     let s = sim.strength();
                     eprintln!("  {}  blue {:.0}%  red {:.0}%", sim.now(), s.get(&bgws_core::Side::Blue).unwrap_or(&0.0) * 100.0, s.get(&bgws_core::Side::Red).unwrap_or(&0.0) * 100.0);
                     last_print = Instant::now();
                 }
-            })?;
+            };
+            let pace = realtime.or(dis.as_ref().map(|_| 1.0)).or(hla.as_ref().filter(|_| !time_managed).map(|_| 1.0));
+            if let Some(addr) = &hla {
+                let spec = sc.interop.clone().unwrap_or_default();
+                if let Some(why) = spec.ground_refusal(&sc.theatre, flat) {
+                    bail!("not joining an HLA federation: {why}");
+                }
+                let mut settings = bgws_interop::hla::link::HlaSettings::new(addr, &federation, &federate.clone().unwrap_or_else(|| format!("BGWS-{}-{}", spec.site, spec.application)));
+                settings.foms = fom.iter().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).collect::<Result<_>>()?;
+                settings.lookahead = time_managed.then_some(1.0);
+                settings.federates = federates;
+                eprintln!("HLA: joining {} at {addr} as {}{}", settings.federation, settings.federate, if time_managed { ", time-managed (lookahead 1 s)" } else { ", real time" });
+                let link = bgws_interop::hla::link::HlaLink::join(settings, spec).map_err(|e| anyhow!("{e}"))?;
+                let mut adapter = bgws_run::HlaLinkAdapter::new(link, &mut progress);
+                if time_managed {
+                    host.play_lockstep(until, &mut adapter)?;
+                } else {
+                    host.play_realtime(until, pace, &mut adapter)?;
+                }
+                for n in &adapter.notes {
+                    eprintln!("HLA: {n}");
+                }
+                if let Some(e) = adapter.errors.first() {
+                    eprintln!("HLA: {} calls failed (first: {e})", adapter.errors.len());
+                }
+                eprintln!("HLA: {} updates and interactions sent, {} inputs taken in", adapter.link.sent, adapter.link.received);
+                if let Err(e) = adapter.link.leave() {
+                    eprintln!("HLA: leaving the federation: {e}");
+                }
+            }
+            match pace.filter(|_| hla.is_none()) {
+                None if hla.is_some() => {}
+                None => {
+                    host.play_until(until, progress)?;
+                }
+                Some(speed) => {
+                    eprintln!("playing in real time at {speed}x");
+                    match &dis {
+                        Some(addr) => {
+                            let mut spec = sc.interop.clone().unwrap_or_default();
+                            if let Some(why) = spec.ground_refusal(&sc.theatre, flat) {
+                                bail!("not joining a DIS exercise: {why}");
+                            }
+                            if let Some(x) = dis_exercise {
+                                spec.exercise = x;
+                            }
+                            eprintln!("DIS v7 to {addr} (exercise {}, site {}, application {}){}", spec.exercise, spec.site, spec.application, dis_listen.as_ref().map(|l| format!(", listening on {l}")).unwrap_or_default());
+                            let link = bgws_interop::link::DisLink::new(addr, dis_listen.as_deref(), dis_group, spec, bgws_interop::dr::DrSettings::default())?;
+                            let mut adapter = bgws_run::DisLinkAdapter::new(link, &mut progress);
+                            host.play_realtime(until, Some(speed), &mut adapter)?;
+                            for n in &adapter.notes {
+                                eprintln!("DIS: {n}");
+                            }
+                            if let Some(e) = adapter.errors.first() {
+                                eprintln!("DIS: {} sends failed (first: {e})", adapter.errors.len());
+                            }
+                            eprintln!("DIS: {} PDUs sent, {} inputs taken in", adapter.link.publisher.sent, adapter.link.received);
+                        }
+                        None => {
+                            host.play_realtime(until, Some(speed), &mut bgws_run::OnTick(&mut progress))?;
+                        }
+                    }
+                }
+            }
             let report = host.report();
             println!("{}", serde_json::to_string_pretty(&report)?);
             eprintln!("played {} simulated in {:.1} s wall", report.ended_at, started.elapsed().as_secs_f64());
@@ -421,11 +618,25 @@ fn main() -> Result<()> {
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
             let until = rec.ends_at();
+            let (realtime, lockstep) = (rec.run.realtime, rec.run.lockstep);
             let mut host = Host::replay(rec, default_figures())?;
-            host.play_until(until, |_| {})?;
+            if lockstep {
+                host.play_lockstep(until, &mut bgws_run::OnTick(|_| {}))?;
+            } else if realtime {
+                host.play_realtime(until, None, &mut bgws_run::OnTick(|_| {}))?;
+            } else {
+                host.play_until(until, |_| {})?;
+            }
             host.verify_replay()?;
             println!("{}", serde_json::to_string_pretty(&host.report())?);
             eprintln!("replay matches the record");
+        }
+        Cmd::MockRti { listen } => {
+            let rti = bgws_interop::hla::mock::MockRti::bind(&listen)?;
+            eprintln!("mock RTI (Federate Protocol) on {}; Ctrl-C to stop", rti.address());
+            loop {
+                std::thread::park();
+            }
         }
         Cmd::Branch { record, at, deciders, minutes, record_out } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
@@ -470,6 +681,31 @@ fn main() -> Result<()> {
             eprintln!("terrain analysis: {} key terrain points", a.key.len());
             println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());
             eprintln!("theatre pack `{}` in {} ({} terrain tiles, {:.0} s)", meta.name, out.display(), meta.tiles.len(), started.elapsed().as_secs_f64());
+        }
+        Cmd::Correlate { scenario, partner, spacing, tolerance, sight_lines, ellipsoidal, json } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let sim = bgws_run::correlate::ground_sim(&sc)?;
+            let dem = bgws_run::geotiff::Dem::read(&partner)?;
+            let geoid = bgws_interop::geoid::Geoid::egm96();
+            let ground = &sim.ctx.ground;
+            let ours = |e: f64, n: f64| ground.height(e, n);
+            let theirs = |lat: f64, lon: f64| dem.height(lat, lon).map(|h| if ellipsoidal { geoid.to_msl(lat, lon, h) } else { h });
+            let area = bgws_run::correlate::ground_area(ground);
+            let r = bgws_run::correlate::correlate(&sim.ctx.frame, area, spacing, tolerance, sight_lines, &ours, &theirs, 1);
+            println!("samples {} ({} not covered by the partner)", r.samples, r.uncovered);
+            println!("height, ours − theirs: mean {:+.2} m, rms {:.2} m, 95th percentile |{:.2}| m, worst |{:.2}| m", r.mean_error_m, r.rms_error_m, r.p95_abs_error_m, r.max_abs_error_m);
+            println!("beyond {:.1} m: {} points", r.tolerance_m, r.beyond_tolerance.len());
+            println!("sight lines: {} of {} judged differently ({:.1}%)", r.sight_disagreements.len(), r.sight_lines, 100.0 * r.sight_disagreement_share());
+            if let Some(p) = json {
+                std::fs::write(&p, serde_json::to_string_pretty(&r)?)?;
+                eprintln!("report in {}", p.display());
+            }
+        }
+        Cmd::ExportGround { scenario, out, cell_m } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let sim = bgws_run::correlate::ground_sim(&sc)?;
+            let (w, h) = bgws_run::correlate::export_ground(&sim, &out, cell_m)?;
+            eprintln!("{w} × {h} heights in {}", out.display());
         }
         Cmd::Lab { cmd, lab } => {
             let lab = bgws_run::lab::Lab::open(&lab.unwrap_or_else(bgws_run::lab::lab_dir))?;
@@ -532,6 +768,57 @@ fn main() -> Result<()> {
                         eprintln!("\n{} questions in {:.0} s, ${:.4}; kept in {}. The template fallback scores {} pass, {} wrong.", items.len(), t0.elapsed().as_secs_f64(), run.cost_usd, p.display(), fb.pass, fb.wrong);
                     }
                 }
+                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst, planner_ab } => {
+                    let entries: Vec<bgws_run::suite::Entry> = match scenarios {
+                        Some(list) => list.split(',').map(|s| bgws_run::suite::Entry { scenario: s.trim().to_string(), minutes: None, note: String::new(), held_out: false }).collect(),
+                        None => bgws_run::suite::load_entries()?.into_iter().filter(|e| all || !e.held_out).collect(),
+                    };
+                    let opts = bgws_run::suite::Options { keep_worst: (keep_worst > 0).then(|| (lab.dir.clone(), keep_worst)) };
+                    let r = if planner_ab {
+                        let f = default_figures();
+                        let mut old = f.clone();
+                        old.set("decide.heuristic.fire_and_movement", 0.0).map_err(|e| anyhow!("{e}"))?;
+                        let test: std::sync::Arc<dyn bgws_decide::Planner> = std::sync::Arc::new(bgws_decide::HeuristicPlanner::from_figures(&f));
+                        let base: std::sync::Arc<dyn bgws_decide::Planner> = std::sync::Arc::new(bgws_decide::HeuristicPlanner::from_figures(&old));
+                        bgws_run::suite::run_planners(&entries, &parse_seeds(&seeds)?, test, base, "heuristic planner: fire and movement", &f, parallel, &opts, &|l| eprintln!("{l}"))?
+                    } else {
+                        let (d, name) = bgws_run::lab::decider_for(deciders, &default_figures(), model, prose, ("http://127.0.0.1:8080", "local"))?;
+                        bgws_run::suite::run(&entries, &parse_seeds(&seeds)?, d, &name, &default_figures(), parallel, &opts, &|l| eprintln!("{l}"))?
+                    };
+                    let p = bgws_run::suite::save(&lab.dir, &r)?;
+                    print!("{}", r.table());
+                    eprintln!("kept in {}", p.display());
+                }
+                LabCmd::Tune { rounds, candidates, proposer, model, no_suite, suite_seeds, accept } => match accept {
+                    Some(id) => {
+                        let (p, d) = bgws_run::tune::accept(&lab.dir, &id)?;
+                        println!("{d}");
+                        eprintln!("wrote {}: Jev is asked in the tuned wording from now on (commit the file to keep it)", p.display());
+                    }
+                    None => {
+                        let opts = bgws_run::tune::TuneOptions { rounds, candidates, proposer, jev_model: model, use_suite: !no_suite, suite_seeds: parse_seeds(&suite_seeds)?, ..Default::default() };
+                        let r = bgws_run::tune::tune(&lab.dir, &opts, &default_figures(), &|l| eprintln!("{l}"))?;
+                        println!("{}", r.report());
+                        eprintln!("kept in {}", lab.dir.join("tune").join(&r.id).display());
+                    }
+                },
+                LabCmd::Generate { only, spec } => {
+                    let specs: Vec<bgws_run::scengen::Spec> = match spec {
+                        Some(p) => serde_json::from_slice(&std::fs::read(&p)?)?,
+                        None => bgws_run::scengen::standard(),
+                    };
+                    for spec in specs.into_iter().filter(|s| only.as_ref().is_none_or(|o| &s.name == o)) {
+                        match bgws_run::scengen::write(&spec) {
+                            Ok(p) => {
+                                // Check it loads as the game would.
+                                let ok = load_scenario(&p).map(|_| "ok".to_string()).unwrap_or_else(|e| format!("does not load: {e}"));
+                                eprintln!("{}: {ok}", p.display());
+                            }
+                            Err(e) => eprintln!("{}: skipped ({e})", spec.name),
+                        }
+                    }
+                }
+                LabCmd::Wording => println!("{}", serde_json::to_string_pretty(&bgws_run::jev_wording())?),
                 LabCmd::Case { moment, why } => {
                     let m = lab.moment(&moment)?;
                     let c = bgws_run::cases::case_from_moment(&m, &why)?;

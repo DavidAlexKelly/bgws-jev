@@ -67,6 +67,13 @@ pub fn slow(s: &mut Sim) {
     let any_gnss_jammer = c4.ew.jammers.iter().any(|j| j.jam.on && j.bands.iter().any(|b| b == "gnss"));
     let jammed_before = c4.pnt.recs.values().any(|r| !r.has_fix);
     if !any_gnss_jammer && c4.pnt.side_jam.is_empty() && !jammed_before {
+        // No jamming: every receiver keeps its fix, and the fix keeps
+        // resetting the INS (without this its error grows unchecked).
+        let fix_sigma = c4.p.gnss_fix_sigma_m;
+        for rec in c4.pnt.recs.values_mut() {
+            let st = rec.tracker.update(now, f64::NEG_INFINITY, None);
+            rec.nav.update(&st, fix_sigma);
+        }
         super::put(s, c4);
         return;
     }

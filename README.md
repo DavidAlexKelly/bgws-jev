@@ -153,13 +153,121 @@ choice should not change.
   starting states in `bases.json` with `set` changes (dotted paths). After
   each change, weapon reach and each enemy's `inOurReach` and `canReachUs`
   are worked out again from the ranges. The expectations are a reading of
-  standard small-unit doctrine: review and correct them. The template
-  fallback (the doctrine default) passes 12 of 23 questions (52%) and is
-  wrong on 9: a decider worth its cost should beat that.
+  standard small-unit doctrine: review and correct them. Two more
+  (`from-suite-armour-duel.json`) came from the engagement suite's play-outs
+  (below). Over all 18, the template fallback (the doctrine default) passes
+  14 of 25 questions (56%) and is wrong on 9: a decider worth its cost
+  should beat that. Jev 1.13 passed 18 of the first 23 (78%); its 3 misses
+  were answers below the 0.25 confidence cut-off, where its own pick
+  (search, shift fire, help the friend) was acceptable.
 - **Make it a case** on a lab moment (or `bgws lab case <moment>`) keeps it
   as a case in `<lab>/cases/`: your best and acceptable options (else the
   play-outs' near-best) pass, and options the play-outs found clearly worse
   fail.
+
+**The engagement suite** measures what a decider changes in played games.
+Each scenario in `data/suite/suite.json` is played over several seeds with
+the decider answering one side's units and the rules the other's, paired
+with a rules-against-rules game on the same seed. The two start identically
+and differ only by the decider's choices, so the difference is what it adds
+(with the rules under test, every difference is exactly zero; a test checks
+it). Measured for the side it played: result (+1 a win, −1 a loss),
+exchange (enemy share lost − own share lost), own and enemy losses, and
+survival (the share of the game its vehicles lived), each as a mean
+difference with its standard error, per scenario and overall.
+`bgws lab suite --deciders jev --seeds 1-4` (or the page's **Suite** tab);
+`--keep-worst N` keeps the decider's N worst games in the lab, its side's
+decisions as moments to play out. Two scenarios are held out
+(`heldOut`), kept back for checking a tuned setting.
+
+First results (Jev 1.13, against the doctrine default): on the cases, 78%
+pass against the fallback's 52%, with 32 of 32 consistency checks held, but
+in the suite's 40 paired games Jev did worse: result −0.20 ± 0.12, exchange
+−0.06 ± 0.05, better in 6 pairs and worse in 18. Its worst game, an armour
+duel, shows why: on first contact with an enemy tank at 1.7 km, both in
+reach, it chose to move to a better position. Played out, that loses the
+troop (−1.1), while carrying on, engaging, waiting or watching all win
+(+1.5). In this simulation, moving mid-duel gives the enemy the first
+shots. That moment is now a case. Near-best ignores score gaps under 0.05
+(`lab::MIN_GAP`), however small the noise.
+
+**Tuning Jev's wording.** Everything Jev is told besides the situation
+itself is in `data/jev/wording.json` (`bgws lab wording` prints it; the
+defaults are the text the engine always sent). It holds the instruction
+templates (with `{placeholders}`), the rule of thumb, the notes, how
+doctrine leanings read, Jev's own description of any option
+(`optionWords`, by action, in place of its short label) and the confidence
+cut-offs (overall and per decision point). `bgws lab tune` improves it:
+
+1. A larger model (Claude Opus 5.5 through OpenRouter, `--proposer`) is
+   shown the current wording, the training cases Jev gets wrong (the
+   state, the options as worded, Jev's probabilities, the answers expected
+   and why), the suite's results and earlier rounds, and proposes a few
+   rewrites (`--candidates`, 4).
+2. Each rewrite is checked first: every placeholder kept, no text too
+   long, option descriptions only for real actions, and nothing naming a
+   case (case ids, unit, platform and enemy names from the cases) and no
+   number of three or more digits, so it can only help through general
+   wording. The proposer may not touch the cut-offs.
+3. The ones left are asked the training cases and must keep every
+   consistency check and trend the current wording keeps, and beat it by
+   more than 0.02 (passes less wrongs, as a share).
+4. The best is played on the suite (the scenarios not held out) and taken
+   only if it is not worse in games beyond one standard error.
+5. After the rounds (`--rounds`, 3), the confidence cut-off is chosen from
+   the training answers (Jev's raw picks are kept, so no re-asking).
+6. Last, the original and the tuned wording are compared on what tuning
+   never saw: about 30% of the cases (fixed by a hash of their ids) and the
+   suite's held-out scenarios.
+
+First runs (Jev 1.13, proposer Claude Opus 5.5, $0.70–0.95 each): what
+helped was almost all **option descriptions**. Jev had only seen short
+labels ("Better position"); the rewrite says what each option costs and
+when it fits ("Drive to another firing position before engaging. No fire
+while moving. Best before the fight starts, when it cannot fire from here,
+or when an enemy out-ranges it in the open."). Most other ideas (reading
+checklists, new balance rules) were refused by the consistency checks:
+they changed answers when options were reordered. With 13 training and 5
+held-out cases:
+
+| | training cases | training scenarios | held-out cases | held-out scenarios |
+|---|---|---|---|---|
+| the engine's wording | 17 pass, 3 wrong of 20 | −0.33 ± 0.13 | 2 pass, 1 wrong of 5 | +0.02 ± 0.19 |
+| tuned | 20 pass, 0 wrong | −0.17 ± 0.12 | 3 pass, 0 wrong | +0.29 ± 0.25 |
+
+(Scenario scores are result Δ + exchange Δ against the doctrine default.)
+An earlier run held out only 2 cases, which is too few: the split now
+holds out a fixed 30%. The confidence cut-off stayed at 0.25 because the
+tuned wording left Jev nothing below it to rescue.
+
+**In use now.** Two runs' wordings were compared with the engine's own over
+168 paired games each (all 7 suite scenarios, held-out ones included, both
+sides): seeds 1–6, then fresh seeds 7–12 that no tuning used.
+`BGWS_JEV_WORDING=<file>` points the game and the lab at a wording file
+without installing it, so these comparisons need no edits.
+
+| wording | cases (18) | seeds 1–6: result Δ / exchange Δ | seeds 7–12 (fresh) | all 168 |
+|---|---|---|---|---|
+| the engine's | 19 pass, 4 wrong | −0.14 ± 0.08 / −0.06 ± 0.03 | −0.02 ± 0.08 / −0.06 ± 0.03 | −0.08 / −0.06 |
+| run 1 (`tune-1794253290`) | 25 pass, 0 wrong | +0.14 ± 0.10 / +0.05 ± 0.03 | −0.02 ± 0.09 / −0.02 ± 0.03 | +0.06 / +0.02 |
+| run 2 (`tune-1794254133`) | 22 pass, 1 wrong | −0.05 ± 0.10 / −0.04 ± 0.03 | – | – |
+
+Run 1's wording is the one in `data/jev/wording.json`. Part of its gain on
+seeds 1–4 was fitting those seeds (they are what it was tuned on), but on
+fresh seeds it still trades better than the engine's wording (exchange
+−0.02 against −0.06, and 26 pairs better and 28 worse against 20 and 32),
+with the same results. It is worse in one place: the mechanised hasty
+attack (M2), where it loses more of its own (exchange −0.09 and −0.13).
+That is the place to look next, with `--keep-worst`. On the cases its
+consistency is a little lower (32/36 against 35/36): near-tied options
+sometimes flip when reordered.
+
+A run is kept in `<lab>/tune/<id>/` (`report.md`, `run.json`,
+`wording.json`), and the lab's **Tune** tab shows it. Nothing changes the
+game until it is accepted: `bgws lab tune --accept <id>` (or the tab's
+button) writes `data/jev/wording.json` and prints the diff; commit the file
+to keep it. A run costs well under a dollar: Jev's questions are a
+fraction of a cent each, and the proposer is a few cents a round.
 
 The lab lives in `$BGWS_LAB`, else `./lab` (gitignored): `games/` and
 `moments/`, one JSON file each. A first look at three rules games of the
@@ -191,6 +299,7 @@ to reach openrouter.ai.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
+| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management); HLA 4 through the Federate Protocol with the RPR FOM, time management and a mock RTI; the EGM96 geoid, WGS-84 placement and DIS orientation (`docs/design/INTEROP_PLAN.md`) |
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, speaking the protocol over HTTP and a WebSocket; bundles the default viewer (feature `bundled-viewer`), or serves any frontend folder (`--web`) |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `protocol/` | `PROTOCOL.md` (every message and route), TypeScript types generated from Rust (`ts-rs`) and a typed client |
@@ -613,6 +722,532 @@ vignettes are unchanged. The figures (`sim.appreciation.*`) are judgement
 (confidence low) until checked against a staff's own appreciation of real
 ground.
 
+### How units carry out choices, and how HQs plan an attack
+
+**Execution** (`crates/bgws-sim/src/decide.rs`, `systems.rs`):
+
+- **Firing positions against the threat.** "Better position", "hull down
+  then fire" and "into cover" used to pick the best cover within 400 m,
+  wherever the enemy was. Now they look at the threats the unit knows of
+  (seen in the last five minutes, or firing from a bearing it has not
+  found). Within `sim.exec.reposition_m` (250 m), they pick a spot from
+  which the nearest threat sees the turret but not the hull (hull-down to
+  it), or failing that one hidden from all of them. Short moves come
+  first, and none closes the range for nothing; lines of sight are traced
+  over the ground and the buildings and woods.
+- **Quick hull-down.** In a firing position chosen like that, a unit
+  counts as hull-down after `sim.exec.occupy_s` (30 s), not after the
+  usual settle-plus-hull-down time (4 minutes).
+- **Real bounding.** Orders with mode `bound` used to mean "move
+  stealthily". Now a bounding unit moves a bound (`sim.exec.bound_m`,
+  250 m) at tactical pace, halts to cover (`sim.exec.bound_halt_s`, 30 s,
+  not moving, so it fires as a halted unit), and goes on. Over 1.2 km it
+  halts four times and arrives in 262 s against 142 s moving straight
+  through (a test checks it).
+
+Measured against the previous engine: the calibration vignettes are
+unchanged, and Jev against the doctrine default moved from +0.07 ± 0.10 to
++0.10 ± 0.08 (result, 84 paired games), within the noise. The lab's
+play-outs of "better position" at first contact in the advance to contact
+(27 moments) show what the option costs: units that reposition lose fewer
+vehicles than those that carry on (about 31% of the unit against 40%), but
+they give up the advance (3% of the way to the objective made good
+against 31%). That is a trade-off between survival and momentum, not a
+blunder, and it is the choice a decider should be weighing.
+
+**The HQ planner** (`crates/bgws-decide/src/hq.rs`, `heuristic_plan`)
+used to send every lead unit abreast straight at the objective. With
+`decide.heuristic.fire_and_movement` (on), an attack with at least
+`decide.heuristic.fm_min_units` (3) lead units does this instead:
+
+- The lead unit that reaches farthest **supports by fire**: from an
+  observation point of the terrain analysis in reach of the objective on
+  our side (OP1…), else from a stand-off of `sbf_reach` (70%) of its reach,
+  with weapons free.
+- The others move to a **release line** (`decide.heuristic.release`,
+  1.5 km short of the objective), then **bound** onto it.
+- A lead unit with under half its vehicles (`decide.heuristic.weak`)
+  **supports by fire from where it is**, and the reserve takes its place.
+
+With two lead units it attacks as before: splitting two only lets the
+enemy beat them one at a time (tried first, it cost the small scenarios
+dearly: −0.83 result in the armour duel).
+
+`bgws lab suite --planner-ab` measures a planner against another, per
+side: the new planner plans for the side under test and the old for the
+other side and for both in the baseline game (the rules decide for every
+unit). Over the suite's seven scenarios, both sides:
+
+| seeds | pairs | better / worse | result Δ | exchange Δ |
+|---|---|---|---|---|
+| 1–6 | 84 | 14 / 13 | +0.08 ± 0.06 | +0.02 ± 0.02 |
+| 7–12 (fresh) | 84 | 15 / 8 | +0.05 ± 0.05 | +0.02 ± 0.02 |
+
+It changes only the scenarios with enough units: the combined-arms
+skirmish (+0.58 and +0.33 result), the battalion attack (5 better, 1 worse
+on the fresh seeds) and the mechanised hasty attack. The small ones play as
+before.
+
+### Generated scenarios
+
+`bgws lab generate` writes a varied set of scenarios from short specs
+(`crates/bgws-run/src/scengen.rs`) to `data/scenarios/gen-*.json` and
+checks each loads; `--only <name>` writes one, `--spec <file.json>` writes
+your own from a JSON list of specs, such as
+`[{"name": "gen-my-attack", "kind": "attack", "echelon": "company",
+"ratio": 2.0, "gapKm": 4.0, "hour": 6.0, "weather": "rain", "ground":
+{"type": "generated"}, "minutes": 90.0, "seed": 7}]`. A spec names the kind of fight
+(attack, defence, meeting engagement, ambush, withdrawal, river crossing,
+attack into a town), the echelon (company or battalion), the force ratio
+(attacking platoons per defending element), the gap between the forces,
+the local hour, the weather, the ground (flat, generated, or a theatre
+pack, where a river crossing is put across the pack's widest river and an
+urban attack against its largest town) and the time limit. The standard
+twelve are in the suite (four held out):
+
+| scenario | what | rules vs rules, seeds 1–3 |
+|---|---|---|
+| `gen-company-attack` | 8 platoons on a dug-in 3-element position, 3:1, a river between | blue wins 3 of 3, in about 78 min |
+| `gen-company-attack-even` | the same at 1.5:1, overcast | blue wins 3 of 3 |
+| `gen-company-attack-night` (held out) | at night | blue wins 3 of 3 |
+| `gen-battalion-attack` | 12 platoons on a reinforced company with tanks behind | blue wins 3 of 3, 79–104 min |
+| `gen-company-defence` | blue's dug-in company against 1.5:1 | red wins 2, blue holds 1 |
+| `gen-battalion-defence-fog` (held out) | at dawn in fog | red takes it 2, blue holds 1 |
+| `gen-meeting-engagement` | 4 platoons a side, one objective between them | red wins 3 of 3 (the ground favours it) |
+| `gen-ambush` | blue's column past 4 concealed, dug-in elements | blue wins 3 of 3, in 8–11 min |
+| `gen-withdrawal` (held out) | 3 platoons fall back 4.5 km and must deny the position to 6 | red wins 3 of 3, after about an hour |
+| `gen-kgd-company-attack` | on Kaliningrad's ground | blue takes it 1, fails 2 |
+| `gen-kgd-river-crossing` | across a real river | blue wins 1, fails 2 |
+| `gen-kgd-urban-attack` (held out) | a battalion into a town | blue takes it 2, fails 1 |
+
+The pack scenarios are skipped, with a note, where the pack is not
+installed.
+
+Three things came with them:
+
+- **An objective victory** (`{"kind": "objective", "side", "at",
+  "radiusM", "holdS", "label"}`): the side takes it when it has fit land
+  units (HQs aside) within the radius and the enemy has none, and wins when
+  it has held it that long. At the time limit a side that has not taken
+  its objective loses, unless both sides had one (then strength decides).
+- **A mission for each HQ**, from the objectives as briefed at the start:
+  `attack` (its own objective to take), `defend` (the enemy's, on its
+  ground) or `withdraw` (its own or the enemy's, lying behind it, away from
+  the enemy). The heuristic planner holds when defending whatever the
+  odds, and when withdrawing sends every unit back to the objective to
+  hold it; Jev's HQ prompt is told the mission.
+- **Prepared defences** (`"dugIn": true` on a force): the unit starts dug
+  in and hull down, as if it had spent the night digging.
+
+First baselines on the twelve (seeds 1–4, both sides, 96 paired games
+each) show what the original seven hid:
+
+| under test | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| planner: fire and movement | 12 / 34 | −0.21 ± 0.08 | −0.05 ± 0.02 |
+| Jev 1.13 (tuned wording) against the doctrine default | 29 / 54 | −0.25 ± 0.11 | −0.04 ± 0.02 |
+
+Fire and movement cost most on Kaliningrad's real ground (−0.75 result
+in the company attack and the river crossing). The cause was not the plan
+but the engine: a phase's route was planned when the order arrived, from
+where the unit stood, so starting the next phase (the bound after the
+release line), or resuming orders after any interruption, sent the unit
+back towards its old position first. On flat ground a route is one
+straight leg, which hid it; on real ground the attack wandered for 90
+minutes. A phase's move is now planned afresh when it starts or resumes.
+After the fix the planner A/B over all nineteen scenarios (seeds 1–4) is
+33 better, 29 worse, result +0.03 ± 0.04, exchange +0.02 ± 0.01: the
+Kaliningrad attacks now gain from it (exchange +0.11 and +0.03), the
+fog defence still loses a little (−0.10), and the calibration vignettes
+are unchanged. Jev does worst attacking a dug-in position (−1.00 in
+both company attacks, 0 better in 8 at even odds) and in the ambush
+(survival −0.16); it does no worse in the urban attack, the Kaliningrad
+company attack and the fog defence. Both were tuned on the seven older
+scenarios, which these now check.
+
+**Tuning Jev on them.** Play-outs of Jev's worst games on the generated
+training scenarios gave two patterns, now four cases. A unit halted part
+way through its orders with ground still to cover chose overwatch where
+resuming was 0.5–1.6 better (`d10-step-done.json`). On the even-odds
+attack's first contact, a tank troop moving on step 1 of 3 stopped to
+engage an unidentified, stationary contact at 2.4 km where carrying on was
+0.7–1.4 better (`from-suite-generated.json`). A tune run (3 rounds, 12
+rewrites) took none: the two best passed all 22 training cases (against
+19) but each lost one of 30 consistency checks. The better of them, which
+only rewrites the option descriptions (resume is right while steps remain;
+hold and overwatch stall an unfinished plan; fire only at what is in
+reach), was then played on all nineteen scenarios against the wording it
+replaces (seeds 1–4, 152 paired games each against the doctrine default):
+
+| wording | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| before | 42 / 71 | −0.09 ± 0.05 | −0.02 ± 0.01 |
+| now (`data/jev/wording.json`) | 43 / 71 | −0.01 ± 0.03 | −0.02 ± 0.01 |
+
+Most of the gain is the even-odds attack (−1.00 to −0.25); the held-out
+fog defence (−0.12 to +0.12) and withdrawal (−0.25 to 0.00, exchange
++0.08) improve too. It is still level with the doctrine default rather than
+ahead, and it still engages on the first-contact cases (held out, so no
+rewrite saw them).
+
+A second tune run, with three more first-contact cases from the other
+games (two landing in training), did take a rewrite: option descriptions
+that say carrying on is usually right for a far, unidentified, static or
+silent contact while orders still have ground to cover; that engaging is
+right only when a weapon that can hurt the target reaches it; and that
+light weapons do not hurt armour. Training cases 22 to 24 of 24; held-out
+cases 4 right and 3 wrong to 7 right and 0 wrong of 8; held-out games
+−0.07 to −0.00. Over all nineteen scenarios it is level with the wording
+before it (−0.01 ± 0.03, 30 better and 61 worse): the even-odds attack
+improves (exchange −0.15 to −0.04) and the held-out withdrawal is worse
+(exchange +0.08 to −0.10). On the cases it is clearly better; in games,
+Jev now matches the doctrine default rather than beating it.
+
+**Not changed: the doctrine at D10.** The default template answers "order
+step done" with overwatch whether or not the unit has ground left to
+cover. A branch on a new fact, `orders.moveLeft` (its orders still lead
+somewhere over 150 m off), was tried: resume when they do. Measured with
+`examples/template_ab.rs` (the patch on one side only, paired with the
+doctrine everywhere) it changed nothing under the rules (+0.00 ± 0.01
+over 152 pairs: the rules carry on at first contact, so their units seldom
+stop short) and nothing measurable as Jev's fallback (+0.01 ± 0.04 against
+−0.01 ± 0.03). Shipped templates are kept free of conditions (their walks
+are checked against the TypeScript golden scenes), so it was left out; the
+fact is there for user templates.
+
+**What firing would do.** Play-outs of first contacts showed carrying on
+and engaging best in situations that looked the same in Jev's state, so it
+now gets, for each enemy it has seen, `ifWeFire`: the weapon the engine
+would fire and the chance one volley hits, from the engine's own sums
+(error budget and presented area, bias averaged out). Identified: against
+that platform, with `penetratesFront`; unidentified: both ways,
+`volleyHitPctIfVehicle` and `volleyHitPctIfTeamInCover`. Also
+`onOurObjective`/`fromOurObjectiveM` (within 600 m of where its orders
+end), `friendsFiringOnIt`, and in its orders `headingFor.etaMin` and
+`gameTimeLeftMin`. At 1.7–2.5 km a tank gun or a 30 mm cannon gives 80–95%
+a volley against a vehicle and 3–9% against a team in cover.
+
+Re-played with it, first contacts on the generated attacks favour carrying
+on in 15 of 23 (by up to 1.45; IFVs as much as tanks), and stopping only
+closer in (1.5 km, on the objective). Six of these are cases. With the new
+state and the wording unchanged Jev gets five of them right (it carries on
+past a far unknown it can barely hurt); a tune run found no rewrite that
+held up on unseen cases (training 27 of 29, held out 8 of 9 already).
+
+In games it changes nothing measurable. Over 256 pairs on fresh seeds
+(5–12, the sixteen scenarios not on a theatre pack), the version with the
+new state against the one without: result +0.000 ± 0.025, exchange
++0.001 ± 0.007 (paired). Jev's answers barely move (new contact: carry on
+67% either way), because the decisive first contacts are a few
+decisions in hundreds per game. It stays, being what a crew would know.
+
+**Found on the way: guided missiles are resolved as gun rounds.** Land
+direct fire puts every round, ATGMs included, through the gun error
+budget, with the missile's flight speed as muzzle velocity. At 180 m/s the
+ten-second flight to 1.9 km gives an ATGM team about 1% a volley against
+a tank. A missile's guidance should take that error away; until it does,
+defenders' missiles hardly count, which favours every attacker.
+
+**Fixed.** A guided round fired direct (an ATGM) now reaches its target
+with `direct.guided.ph` (0.8, a stated default: the reference gives no
+figure), less what the gunner's suppression costs: up to 60% when the
+gunner flies it to the end (wire, laser, joystick, fibre), 15% for fire
+and forget (`direct.guided.suppression_operator`, `…_self`). Penetration,
+zone, top attack, ERA and APS work as before, and a miss still suppresses.
+Fights are far shorter: most generated scenarios end in 8–30 minutes
+rather than 30–150, and the meeting engagement turns to blue. The
+calibration vignettes are unchanged, as none has a missile in it; one
+should be added when a reference figure for ATGM hit rates is found.
+
+**Weapon choice and missile flight.** A unit used to fire the first of
+its mounts that had rounds, and held fire when the target was beyond that
+mount's reach: an IFV whose 30 mm cannon is listed first never fired its
+4 km missile. It now fires, at the ordered or nearest target any of its
+weapons reaches, the mount most likely to knock it out (the chance a round
+lands, by the error budget or a missile's guidance, times the chance a hit
+kills, by what the target is and what the round does to it); a missile is
+kept for when it is clearly better (a gun at least `sim.fire.missile_keep`,
+0.7, as likely is used instead). A guided missile volley is now launched
+and lands range ÷ speed later (2–11 s at 0.4–2 km); guided by the gunner
+to the end (wire, laser, joystick, fibre) it needs the gunner able to fire
+and still seeing the target when it lands, and the gunner stays put until
+then; fire and forget needs only the target there.
+
+A new vignette, `atgm-engagement`, plays a dug-in ATGM team against a tank
+platoon advancing over open ground and measures the share of missiles
+launched that hit: 0.81 (200 runs), inside a 50–90% band. The band is
+low-confidence: no combat data was found, only a TOW test figure (73.5% at
+3,500 m for a good gunner) and unsourced Javelin claims (over 90% in
+tests, over 80% in combat). Every other vignette is unchanged. The
+planner A/B is where it was (+0.01 ± 0.05 result, seeds 1–4), and Jev
+(plain) on fresh seeds 5–12 is +0.03 ± 0.04, exchange −0.01 ± 0.01,
+against the doctrine default (before: +0.02 and −0.02). Most generated
+fights end as before; the ambush is quicker (5–7 min).
+
+**The shared picture, and what a unit can tell of a contact.** A unit's
+decision state used to hold only what it saw itself. It now also holds
+what its HQ's picture says, as a battle management system or the company
+net would pass it on. The picture reaches the unit `sim.c2.picture_lag_s`
+(60 s) late, and not at all if its HQ is down or its radios are out.
+- An enemy it sees but has not identified gets `reportedAs`: what the
+  picture says it is, how sure, how old the report is and who made it.
+- Contacts friends reported within 4 km that it has not seen itself are
+  listed in `reportedByFriends` (up to 4).
+- A unit searching where its picture puts an enemy searches as if cued.
+- A contact recognised but not identified is described by kind: a team on
+  foot, an armoured vehicle or a soft-skinned vehicle (before: "something").
+  The judge style uses this kind to answer "is it a vehicle?" without asking.
+- An HQ takes a unit's contact report as an established track, not as one
+  blip waiting for a second look (updates come minutes apart).
+
+Building this found a bug: with no GNSS jamming the navigation step
+returned early and never refreshed any receiver's fix, so every unit's
+inertial navigation drifted unchecked (3–20 km of error by ten minutes)
+and that error was added to every contact report. HQ tracks were born too
+uncertain to keep, and the side picture stayed empty in every game. With
+the fix, company HQs hold their contacts. Moving contacts still drop
+between a unit's five-minute updates, which is fair: an attacker seen once
+five minutes ago could be 2–3 km away.
+
+Measured: in collected games 20 of 95 unit decisions carry friends'
+reports. Every vignette stays in band; detect-to-strike moves from 5.35 to
+4.90 min networked (now inside its 2–5 min band) and from 22.9 to 25.1 min
+by voice (KS p 0.02, inside its 10–30 min band). The FPV calibration test
+now plays 16 seeds by default, as 8 gave as few as 7 attacks. Over 48
+seeds, cueing leaves the number of FPV attacks unchanged (79 with, 83
+without). Jev (plain) on seeds 5–12 is +0.01 ± 0.04, exchange
+−0.01 ± 0.01, against the doctrine default; before it was +0.03 ± 0.04,
+so the extra facts have not yet shown up in results.
+
+**Fire effects: the right round, blast, suppression.** Three gaps in
+direct fire are closed.
+- A mount fired only the first of its rounds. It now loads the one with
+  the best volley kill odds: a tank's HEAT or an IFV's HE for troops and
+  soft targets, sabot for armour. Changing rounds costs one reload.
+- An HE or HEAT miss used to do nothing to troops. A burst now kills the
+  share of a section (`sim.fire.team_front_m` × `team_depth_m`, 50 × 20 m)
+  inside the round's Carleton lethal area, averaged over the fall of shot
+  and reduced by cover; the whole element is lost with that chance, so the
+  expected losses are right. A burst is felt as a blast (suppression). An HE
+  hit kills a soft-skinned vehicle.
+- Suppressive fire. Suppression already slowed, blinded and spoiled the aim
+  of whoever felt it, but only aimed rounds caused it. Now a halted unit
+  with nothing to aim at fires to suppress:
+  - where it lost an enemy within the last minute
+    (`sim.fire.suppress_memory_s`);
+  - or, while a friend within 1.5 km (`sim.fire.support_m`) is moving, on an
+    enemy its picture places within 200 m (`sim.fire.support_error_m`):
+    support by fire.
+
+  It uses cheap rounds only (`sim.fire.suppress_max_cost_usd`: bullets and
+  cannon HE, not main-gun rounds or missiles), keeps a magazine, follows its
+  rules of engagement, and never fires within 150 m of a friend
+  (`sim.fire.danger_close_m`): fire lifts and shifts.
+
+**Dismounts.** The catalogue gave an IFV platoon three infantry sections,
+which never appeared in a game. They now ride with it (a vehicle lost takes
+its share). The carrier is asked `dismountPoint` (here, in cover close by,
+or stay mounted) when:
+- an enemy is seen within 500 m (`sim.dismount.contact_m`);
+- it is within 400 m of the end of the last phase of its move
+  (`sim.dismount.objective_m`);
+- it is in a town.
+
+The doctrine gets out here in cover or with the enemy within 300 m, else in
+the best cover within 150 m. After the drill (`sim.dismount.time_s`, 30 s)
+the sections are a foot unit with the carrier's orders, rules of
+engagement, sightings and HQ, and the carrier supports by fire. Troops
+aboard count in their side's strength from the start, so it never jumps
+when they get out (tested). Remounting is not modelled. The unit state
+shows `infantryAboard`.
+
+**Doctrine drills.** At three decision points the doctrine (the rules
+decider, and the default Jev is measured against) carried on where a drill
+says otherwise:
+- D3, fired on by an unseen shooter: in the open, get into cover from the
+  bearing; in cover, search along it.
+- D2, shooter located: return fire, but a vehicle in the open goes hull-down
+  first, and a shooter beyond all its weapons' reach is left by pulling out
+  of its sight.
+- D6, after a volley: a unit holding ground under fire from a shooter it
+  has seen fires and moves to another position.
+
+Mutual support: a unit advancing by bounds or tactically halts while a
+friend within 600 m (`sim.doctrine.mutual_support_m`) is pinned, and covers
+it.
+
+Measured: every vignette passes as before; networked detect-to-strike is
+5.22 min, still just over its band and on the backlog. Over seeds 1–6 of
+the generated scenarios with the rules on both sides, the winners are
+unchanged except the even company attack, which blue now wins in all six
+(it lost one in 90 minutes before), and fights against dug-in infantry end
+sooner (the battalion attack's longest game 135 → 33 min) while the
+company defence lasts longer (23–55 min, from 23–33).
+
+**Variance: crews, weapons and leaders.** Every crew of one troop quality
+was the same, and nothing ever failed.
+- Crews differ. Each unit draws its skill and its leadership about its troop
+  quality's (1σ `sim.people.skill_spread`, `leadership_spread`, 0.1 on a 0..1
+  scale), from the game's seed, so a replay draws the same crews (tested).
+  Skill sets aim and reaction time; leadership sets how morale holds. A
+  crew that knocks something out gains experience.
+- Weapons fail. A gun or machine-gun volley jams or misfires with chance
+  `sim.fire.gun_stoppage_p` (1%), out for `sim.fire.stoppage_s` (30 s). A
+  guided missile fails in flight with chance `sim.fire.missile_fail_p` (6%,
+  from the roughly 94% reliability claimed for current ATGMs). The odds
+  units choose weapons by allow for it.
+- Leaders are hit. Losses can take a unit's leader (the chance is the share
+  of the unit lost). It then asks no new decisions for
+  `sim.people.leader_replace_s` (2 min) until the second in command takes
+  over, carries on with what it was doing, and feels the shock in its
+  morale. The unit state shows `leaderReplacedInS`.
+
+Two doctrine gaps showed once crews differed:
+- A unit that rallied (D11) held to recover, which dropped its orders for
+  good; tanks shaken while waiting at a minefield never went through the
+  lane. Rallied and no longer under fire, the doctrine now rejoins.
+- "Rejoin" did not resume orders as its description says; it withdrew to
+  the nearest friends. Fixed.
+
+The counter-battery test needed 32 seeds, not 16, to show its contrast. A
+fast enemy crew can now catch a scooting battery in its two minutes out of
+action, and a poorly led battery can break at the first hit. Over 32 seeds
+a battery that stays survives 69% and loses 14 guns; one that scoots
+survives 84% and loses 7. The guard is now "at least twice" rather than
+"more than twice".
+
+**Validation: three new vignettes, and what they found.** Each adds a check
+on something nothing checked before. Each source is secondary, so each band
+is low-confidence.
+
+| Vignette | Claim | Source | Result |
+|---|---|---|---|
+| `tank-engagement-range` | tank platoons meeting in open country open fire at 2–3 km | Desert Storm: VII Corps average 2,200 m, US armour 2,200–2,800 m (an armour history quoted on a forum) | 2,893 m mean |
+| `suppression-recovery` | troops stay suppressed about 2 min after the fire stops | encyclopaedic, no primary citation | 93 s median (band 1–4 min) |
+| `spot-report-latency` | a contact reaches the HQ's picture within 5 min of the sighting | the SALUTE spot report task standard (study-guide summary) | 2.05 min median |
+
+The first one failed at 1,388 m: the heuristic HQ planner ordered every
+unit, attackers included, to hold fire until short range (half its weapon's
+reach). Attack orders now fire at will (armour engages at its greatest
+effective range); defence, reserve and support orders still hold fire to
+short range. Games against a dug-in defence end sooner (the company attack
+in 8–9 min instead of 10–19), and the meeting engagement is less one-sided
+(red wins one of six seeds; it won none before).
+
+That change let blue's tank and IFV in the drone line kill the red infantry
+at 3 km before the drones reached it, which starved both detect-to-strike
+vignettes and the FPV test. All three now measure the drone line without
+blue's armour, the strike chain alone. Networked detect-to-strike is then
+3.4 min, inside its 2–5 min band, and it leaves the calibration backlog.
+
+Other baselines accepted: ATGM hit share 0.81 → 0.75 (missiles now fail
+6% of the time).
+
+Sensitivity: the suppression recovery time is almost all
+`people.suppression.decay_tau_s` (Sobol total index 0.97), an unsourced
+default (60 s), now held by the new vignette.
+
+Jev (plain) on fresh seeds 5–12, against the doctrine default after items
+3–6 (all 19 suite scenarios, 304 paired games, $0.26): result +0.07 ± 0.04,
+exchange +0.02 ± 0.01. Before these items it was +0.01 ± 0.04 and
+−0.01 ± 0.01. The default it is measured against changed too (the drills
+and fire at will in the attack), so the two numbers are not a strict
+before-and-after; but Jev now does better than the doctrine across these
+scenarios, most clearly in the skirmishes (+0.25 to +0.38 result).
+
+Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
+
+| under test | better / worse | result Δ | exchange Δ |
+|---|---|---|---|
+| planner: fire and movement | 34 / 26 | +0.02 ± 0.05 | +0.02 ± 0.02 |
+| Jev against the doctrine default | 31 / 61 | −0.08 ± 0.05 | −0.05 ± 0.01 |
+
+The planner is where it was. Jev is clearly behind now: with missiles
+that hit, its departures from doctrine cost more (the generated battalion
+attack is worse in all 8 pairs). Its cases, wording and tuning all predate
+this engine.
+
+Play-outs of its six worst games here put its cost per decision above the
+doctrine default's at every point measured: new contact 0.17 against 0.07,
+fired on 0.22 against 0.16, after a volley 0.90 against 0.30. After a
+volley it fires and moves in 92–95% of answers, where an IFV pressing an
+advance should keep its fire on (cost 2.1 and 3.1); a hidden ATGM team
+fires at first sight; an ATGM team under tank fire pulls back instead of
+answering. Seven of these are cases (`from-suite-generated.json`, the
+last seven). Two tune runs on this engine (the first cut short when the
+proposer's replies overran its token limit, now 32,000) found no rewrite
+that held up: the best scored 30 of 34 training cases, no better than the
+wording now, and every one broke consistency checks. Sending "after a
+volley" to the doctrine default instead (a point cut-off of 1) gave
+−0.05 ± 0.04 against −0.08 ± 0.05, within the noise.
+
+On this engine the doctrine default plays the unit-level decisions better
+than Jev 1.13 does, and rewording what Jev is told no longer closes the
+gap.
+
+### How Jev is asked: request styles
+
+TypeSafe's guidance for System One models (its skill file and docs) says
+to send each item as its own question, keep every field of the state
+relevant to it, ask plainly (no preamble; options described in the
+criteria), not gate on confidence, and above all not to ask the model
+what an agent should do next: break the decision into the judgments it
+depends on and write the decision in code. The client had done the
+opposite on most counts, so it now has three styles, chosen with
+`BGWS_JEV_STYLE`:
+
+- `legacy`: as before (one request per side with every unit's state, a
+  templated instruction with the balance rule and doctrine, a confidence
+  cut-off).
+- `plain` (the default): each land unit in its own request, sent in
+  parallel; its state cut to what the decision point needs
+  (`jev_ask::trim_state`: the enemy it is about and two others, ground,
+  orders; weapons only for D8, friends only where help is an option);
+  one plain question; each option described by its action's one
+  sentence, the doctrine's lean as a short tag; no cut-off. World and HQ
+  questions are asked as before. The pinned model is now Jev 1.14.
+- `judge`: judgments from Jev, decisions in code (`jev_judge`). At D1, D2,
+  D6, D8 and D10 a truth table reads the exact facts from the unit's state
+  (range, reach, the chance a volley hits, orders, posture, cover) and
+  asks Jev only the yes/no questions a row turns on and the state cannot
+  settle; every other point takes the doctrine default without asking.
+
+The tables were fitted to 179 played-out moments on the engine where
+missiles hit. What they found is mostly the doctrine: carry on at a new
+contact (engage only an identified or judged vehicle within 600 m that can
+reach the unit), answer a shooter you can see (pull back when you cannot
+hurt it and stand in the open), keep firing after a volley, take a better
+position when halted and a volley has under 10%, resume orders that still
+lead somewhere. On those moments they cost, per decision against the best
+option, D1 0.075 (doctrine 0.078), D2 0.088 (0.089), D6 0.097 (0.097),
+D8 0.038 (0.047); Jev choosing the whole action cost 0.17–0.90. The one
+judgment that splits a row is whether a close, unidentified contact is a
+vehicle. Another tried, whether the enemy has spotted the unit, read the
+same (0.27) where engaging won and where it lost, so it is not asked.
+
+Measured on fresh seeds (5–12, all nineteen, 304 pairs each, against the
+doctrine default):
+
+| style | better / worse | result Δ | exchange Δ | cost |
+|---|---|---|---|---|
+| legacy, Jev 1.13 | 64 / 131 | −0.12 ± 0.03 | −0.06 ± 0.01 | $0.41 |
+| plain, Jev 1.14 | 96 / 117 | +0.02 ± 0.04 | −0.02 ± 0.01 | $0.26 |
+| judge, Jev 1.14 | 34 / 51 | −0.00 ± 0.02 | −0.01 ± 0.01 | $0.012 |
+
+On the cases: legacy 80% (invariance 75/76; its wording was tuned on
+them), plain 62% (65/76), judge 71% (76/76). Both new styles take Jev
+from clearly behind the doctrine to level with it; neither is ahead.
+`plain` still lets Jev choose and differs from the doctrine in two games
+of three; `judge` plays nearly as the doctrine does, in a way that can be
+read and tested, at a twentieth of the cost. Jev 1.14 is no better than
+1.13 on the cases.
+
+Making them found a fault in generated ground: it kept the terrain but
+dropped the generator's rivers and roads, so every river was impassable
+water with no bridge. Half the 3:1 attack's start line sat behind a stream
+and never moved. Generated ground now keeps both (the roads with their
+bridges), as theatre packs do.
+
 ### Urban blocks
 
 When a pack has a sight surface, the town is cut into blocks as the game
@@ -695,6 +1330,242 @@ so a replay applies it at the same simulated time and the same point in the
 game. A record saved mid-game says where it stops (`endedAt`).
 `bgws replay` checks the replay against the record's fingerprint.
 
+## Interoperability: DIS and HLA 4
+
+`bgws play <scenario> --dis <host:port>` publishes the game to other
+simulations as DIS version 7 (IEEE 1278.1-2012) Entity State PDUs over UDP,
+and plays in real time, and (with `--dis-listen`) takes in other
+simulations' entities, fires and detonations. These are phases 1 and 2 of
+`docs/design/INTEROP_PLAN.md`. Phase 3 joins HLA 4 federations (below).
+
+```sh
+bgws play gen-kgd-company-attack --dis 127.0.0.1:3000             # real time, published
+bgws play gen-company-attack --realtime 4                      # 4x real time, not published
+bgws play gen-kgd-company-attack --dis 192.168.1.255:3000 --dis-exercise 2 --record game.json
+bgws replay game.json                                          # exact, no network
+bgws play gen-kgd-company-attack --dis 239.1.2.3:3000 --dis-listen 0.0.0.0:3000 --dis-group 239.1.2.3   # two-way, multicast
+bgws export-ground gen-company-attack ground.tif               # our ground, for partners
+bgws correlate gen-kgd-company-attack partner.tif --json diff.json # before an exercise: do the grounds agree?
+```
+
+**DIS codes.** Every catalogue platform and munition has a SISO-REF-010
+(v35) entity type, and each record's `$dis` note names the table and row it
+came from. Generic platforms carry the category (a Tank, an Armored
+Fighting Vehicle, an Air Defense unit), and the scenario sets the country.
+Where the choice was not obvious, the codes follow SISO's own placement of
+real equivalents: Iskander, M270 and coastal missile launchers are
+Self-Propelled Artillery, and S-400, Patriot and Strela-10 are Air Defense.
+People on foot are life forms with their equipment class (assault rifles,
+anti-tank missiles, mortars); installations are cultural features. A test
+checks every code fits its platform's domain and is a SISO value.
+
+A scenario may carry an `interop` block: `exercise`, `site`, `application`,
+the `country` per side (else 0, Other) and the `force` per side (else blue
+1 Friendly, red 2 Opposing, neutral 3 Neutral).
+
+**Where things are.** The sim's ground is a flat local map: east and north
+metres from the theatre origin, height above mean sea level. Positions are
+published as geocentric (ECEF) coordinates on WGS-84:
+- latitude and longitude from the east/north position;
+- height is the sim's height plus the EGM96 geoid undulation, from a 15'
+  grid in `data/geoid/`. NGA's check points agree within 6 cm. The
+  undulation is 29.4 m at the Baltic theatre's origin, so without it every
+  entity would float or sink by that much in other simulations.
+- Taking the 3-D position through the origin's tangent plane instead would
+  lift entities by the Earth's curvature (8 m at 10 km, 70 m at 30 km), so
+  heights are not done that way.
+
+Orientation is DIS's ψ, θ, φ, from heading and the ground's slope under
+each vehicle.
+
+**What each state says.** Damage comes from strength (none, slight,
+moderate, destroyed). Land vehicles show mobility and firepower kills, smoke
+and flames on a wreck, the engine running and a concealed position.
+People's posture (walking, kneeling, prone) is shown too. The marking is
+the unit's label, cut to 11 ASCII characters.
+
+**Dead reckoning.** A state is sent:
+- the first time an entity is seen;
+- every 5 s (the DIS v7 heartbeat);
+- when a receiver's extrapolation (static, or constant velocity) would
+  stray over 1 m or 3°;
+- when the entity's look changes.
+
+A company attack sends about 0.2 states per entity per second instead of 1.
+
+**Real time.** Decisions no longer stop the clock:
+- questions go to the deciders in the background;
+- a unit with a question out carries on with what it was doing;
+- each answer applies when it comes back, and never sooner than the crew's
+  reaction time after the question.
+
+So a slow decider costs time in the world, as it would for a real crew.
+`--realtime <speed>` paces the clock without publishing. The record notes
+the game was played in real time, with the time each answer came back, so
+`bgws replay` is still exact (tested). The analytic mode, paused while
+deciders think, stays the default for experiments.
+
+**Checked.**
+- Unit tests:
+  - the Entity State PDU's 144 octets against the standard's field offsets;
+  - the geoid against NGA;
+  - DIS angles (level and facing north at 0°, 0° gives θ = −90°);
+  - placement round trips to 1 cm;
+  - appearance bits against SISO-REF-010's layouts;
+  - dead-reckoning thresholds.
+- Integration tests:
+  - a real game published over UDP: every PDU parses, every entity is
+    refreshed within the heartbeat, ground vehicles stand on our ground
+    once the geoid is taken off;
+  - a real-time game replays exactly;
+  - pacing at 10× follows the wall clock.
+- By hand: 4 simulated minutes at 4× took 59.8 s of wall time. An
+  independent listener received all 789 PDUs from 15 entities, none
+  malformed, each with the expected type.
+
+### Phase 2: two-way
+
+**Other simulations' entities.** An Entity State PDU from another site or
+application makes a remote entity here:
+- its platform comes from its DIS type: the catalogue record with the same
+  kind, domain, category, subcategory and specific, else the closest by
+  those, else a stand-in for its kind and domain (logged once);
+- its side comes from its force;
+- only its owner moves it: between states it is dead-reckoned, and a land
+  entity stands on our ground;
+- our units see it, report it and fire at it, but it does not see, decide
+  or fire here, and counts in no side's strength;
+- it is taken off when its state says it is deactivated, or after 12 s
+  with nothing from its owner.
+
+**Who judges damage.** Each simulation judges damage to its own entities.
+Our fire on a remote entity goes out as a Fire PDU and a Detonation PDU
+(hit, burst near, or missed onto the ground) for its owner to judge; we set
+its health to whatever its owner then reports. A detonation from another
+simulation at or near one of ours is judged here, with our damage models
+and our protection, and logged as `interop.detonation`, so the AAR and
+`bgws why` explain it like our own fire. A detonation is judged once even
+if the packet comes twice.
+
+**What goes out.**
+- a gun volley: a Fire and its Detonation;
+- a guided missile: a Fire at launch, its Detonation on arrival, under the
+  same event;
+- artillery and mortars: a Fire per salvo, a Detonation at its impact
+  centre for every simulation to judge its own entities near it;
+- fire to suppress: a Fire and a Detonation on the ground at the spot.
+
+**Management.** Stop/Freeze stops our clock and Start/Resume restarts it;
+both are acknowledged. Inputs apply only at tick boundaries and are
+recorded with the tick they applied at, so `bgws replay` of a federated
+game is exact with no network.
+
+**Terrain.** Two simulations only agree on who sees whom if they stand on
+the same ground (the plan's section 2 says why they usually don't):
+- `bgws correlate` compares our ground with a partner's elevation GeoTIFF
+  (add `--ellipsoidal` if its heights are above the ellipsoid): the height
+  error on a grid, and sight lines judged on both grounds with the same
+  method (4/3 Earth refraction, 2 m eyes). Against its own export our
+  ground agrees to 3 cm rms with 1 of 2,000 sight lines judged differently;
+  reading the same heights as ellipsoidal shows the 29.4 m geoid step.
+- During a game, a remote land entity reported more than 2 m off our ground
+  is logged (`interop.terrain_mismatch`, once a minute per entity), so the
+  AAR shows where the worlds differ.
+- A game on generated ground does not join an exercise, because no partner
+  has that ground, unless its `interop` block says `"sharedGround": true`
+  (after `bgws export-ground` has given it to every partner).
+
+**Checked (phase 2).**
+- Unit tests: remote entities join, dead-reckon, time out and are never
+  damaged, moved or decided for by our systems; a detonation is judged
+  once; PDUs in become the right inputs, with stand-ins; terrain mismatch is
+  noted once a minute; correlation finds a uniform 3 m shift and a removed
+  ridge's sight lines (every disagreement near the ridge).
+- Two simulations over UDP on localhost, one owning blue and the other red,
+  each keeping its own objectives: they see and fight each other, blue's
+  side judged 6 detonations on its entities and red's 21, red lost 83%, no
+  entity was owned twice and no detonation applied twice. Each side's
+  record replays exactly with no network.
+
+### Phase 3: HLA 4
+
+`--hla <host:port>` joins an HLA 4 (IEEE 1516-2025) federation through a
+Federate Protocol server, such as Pitch pRTI's, with the RPR FOM. It
+publishes the same truth and fire as DIS and takes in other federates'
+entities and fire the same way.
+
+```sh
+bgws mock-rti                                                   # a small RTI on 127.0.0.1:15164, for trying it
+bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation exercise1 --fom RPR_FOM_v2.0_1516-2010.xml ...
+bgws play gen-kgd-company-attack --hla rti:15164 --time-managed --federates 2 --record game.json
+bgws replay game.json                                           # exact, no RTI
+```
+
+**How it talks to the RTI.**
+- **Wire messages:** the IEEE 1516.1-2025 Federate Protocol protos, as
+  published in Pitch's FedProClient, compiled to Rust (`crates/bgws-interop/proto`;
+  "Reprinted with permission from IEEE 1516.1(TM)-2025").
+- **Session layer:** written from FedProClient's own code. It has:
+  - the 24-octet header and numbered messages;
+  - heartbeats;
+  - call responses matched to their calls;
+  - after a dropped connection, a resume that sends again whatever the
+    other side missed.
+- **Objects:** each entity is a `BaseEntity.PhysicalEntity` subclass chosen
+  by its DIS kind and domain (`GroundVehicle`, `Aircraft`, `SurfaceVessel`,
+  `Lifeform.Human`, …). It carries the DIS identifier, type, spatial (static
+  or DRM F,P,W), force, marking, damage and the appearance flags RPR has.
+  Updates follow the DIS dead-reckoning rules.
+- **Interactions:** fire goes out as `WeaponFire` and `MunitionDetonation`.
+  Entities are named in them by their object instance names, which we
+  reserve as `BGWS-site-application-entity`.
+- **The RPR FOM files are not shipped.** SISO publishes no licence terms for
+  them, so pass the federation's own with `--fom`.
+
+**Time management.** `--time-managed` makes the game time-regulating and
+time-constrained, with a 1 s lookahead, and plays in lock step:
+- the clock waits for deciders, as in analytic play;
+- each second's updates and fire are stamped a second ahead;
+- each second ends with a time-advance request.
+
+Everything stamped up to the grant arrives first, in a fixed order. With
+`--federates N`, the game starts only when all N have joined and met at the
+`ReadyToRun` synchronization point. Without that, the first federate to
+join would run ahead while the others were still joining. So a time-managed
+federation run twice with the same seeds gives the same games (tested).
+Without `--time-managed` the game plays in real time, as on DIS.
+
+**Checked (phase 3).**
+- Byte fixtures:
+  - the session header;
+  - the HLA encoding's alignment (a double after an octet starts at offset 8);
+  - RPR's entity type, identifier, marking and event identifier;
+  - the spatial variant record (60 octets for F,P,W, 48 for static);
+  - round trips of WeaponFire and MunitionDetonation.
+- **Session against the mock RTI:**
+  - a quiet session heartbeats and stays up;
+  - 300 updates through ten dropped connections arrive once each and in
+    order;
+  - 2,000 calls from 8 threads each get their own answer.
+- **Two federates through the mock RTI, time-managed** (the company attack,
+  12 minutes):
+  - they fight: blue judged 6 detonations on its units and red 17, and red
+    lost 83%;
+  - nothing is owned twice and no detonation is judged twice;
+  - a second run gives the same two games;
+  - each record replays exactly with no RTI.
+- **Real time:** two federates see each other's units.
+- **By hand:** the mock RTI as its own process. A federate joined through the
+  CLI, time-managed, played 4 minutes in 1 s, and `bgws replay` matched.
+
+**Not yet checked:** against pRTI or any other real RTI, and against a
+third-party RPR federate. The mock RTI was written from the same reading of
+the protocol as the client, so only a real RTI can show a misreading.
+
+PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
+on markings longer than 11 bytes (in a release build it loops until memory
+runs out), so markings are always cut first.
+
 ## Tests and CI
 
 ```sh
@@ -707,7 +1578,8 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 `.github/workflows/rust-engine.yml` runs all of this on every change to the
 workspace, checks the server builds with no bundled frontend, and type-checks
 and rebuilds the viewer (`frontend/viewer`) to check its committed build.
-Sixteen benchmark vignettes run against stored baselines: fourteen are in band,
-and networked detect-to-strike and the attack halt are on the calibration backlog. Batches and
+Twenty benchmark vignettes run against stored baselines, all in band; the
+attack halt stays on the calibration backlog (its median sits at the band's
+edge, 0.25 in one run of 200 and 0.33 in another). Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.

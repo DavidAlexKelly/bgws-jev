@@ -60,6 +60,11 @@ pub struct HqSituation {
     /// Key terrain round the force and its objective (the terrain appreciation).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub terrain: Vec<TerrainNote>,
+    /// "attack" (take the objective), "withdraw" (fall back to it: it lies
+    /// away from the enemy) or "defend" (hold it against the enemy's attack),
+    /// when the scenario gives the side an objective or the enemy one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<String>,
 }
 
 /// A piece of key terrain from the pack's terrain appreciation, as an HQ

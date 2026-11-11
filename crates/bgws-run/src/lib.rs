@@ -5,21 +5,53 @@
 //! crate (batches, vignettes, sensitivity).
 
 pub mod aar;
-pub mod experiments;
-pub mod geotiff;
-pub mod cases;
-pub mod host;
-pub mod lab;
 pub mod behaviour;
+pub mod cases;
+pub mod correlate;
 pub mod editor;
 pub mod eventlog;
+pub mod experiments;
+pub mod geotiff;
+pub mod host;
+pub mod lab;
+pub mod scengen;
+pub mod suite;
+pub mod tune;
 pub mod workbench;
 
-pub use host::{load_scenario, router_for, DeciderChoice, Host, HostOptions, PlayReport};
+pub use host::{load_scenario, router_for, DeciderChoice, DisLinkAdapter, HlaLinkAdapter, Host, HostOptions, Link, OnTick, PlayReport};
 
 /// The shipped data (scenarios, catalogue, templates, cases): `$BGWS_DATA`, else `data/` at the repository root.
 pub fn data_dir() -> std::path::PathBuf {
     std::env::var_os("BGWS_DATA").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+}
+
+/// A scenario by path, or by the name of a shipped one (`data/scenarios/<name>.json`).
+pub fn scenario_file(s: &str) -> std::path::PathBuf {
+    let p = std::path::PathBuf::from(s);
+    if p.exists() {
+        return p;
+    }
+    let named = data_dir().join("scenarios").join(if s.ends_with(".json") { s.to_string() } else { format!("{s}.json") });
+    if named.exists() {
+        named
+    } else {
+        p
+    }
+}
+
+/// Jev's wording (`$BGWS_JEV_WORDING`, else `data/jev/wording.json`, from `bgws lab tune --accept`),
+/// else the engine's own. A file that does not read is reported and ignored.
+pub fn jev_wording() -> bgws_decide::jev::Wording {
+    // `BGWS_JEV_WORDING`: another wording file, to compare one without installing it.
+    let p = std::env::var_os("BGWS_JEV_WORDING").map(std::path::PathBuf::from).unwrap_or_else(|| data_dir().join("jev").join("wording.json"));
+    match std::fs::read(&p) {
+        Ok(b) => serde_json::from_slice(&b).unwrap_or_else(|e| {
+            eprintln!("{}: {e}; Jev keeps its own wording", p.display());
+            Default::default()
+        }),
+        Err(_) => Default::default(),
+    }
 }
 
 /// Where theatre packs live: `$BGWS_PACKS`, else `packs/` at the repository root.

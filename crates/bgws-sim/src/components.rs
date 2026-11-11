@@ -91,15 +91,26 @@ pub struct Crew {
     /// Who last fired at it, and when.
     pub last_incoming: Option<(SimTime, EntityId)>,
     pub success: bool,
+    /// Its leaders' quality 0..1 (drawn about its troop quality).
+    pub leadership: f64,
+    /// Losses already looked at for a leader hit.
+    pub losses_seen: usize,
+    /// Its leader was hit: no new decisions until the second takes over.
+    pub leaderless_until: Option<SimTime>,
 }
 
 /// One weapon mount's state.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MountState {
     pub index: usize,
+    /// The round loaded (fired next), and how many of it are left.
     pub munition: String,
     pub rounds: u32,
     pub ready_at: SimTime,
+    /// The mount's other rounds and how many of each are left (a tank's
+    /// HEAT beside its sabot, an IFV cannon's HE beside its APFSDS).
+    #[serde(default)]
+    pub stock: BTreeMap<String, u32>,
 }
 
 #[derive(Component, Clone, Debug, Default)]
@@ -111,7 +122,7 @@ pub struct Arms {
 
 impl Arms {
     pub fn rounds(&self) -> u32 {
-        self.mounts.iter().map(|m| m.rounds).sum()
+        self.mounts.iter().map(|m| m.rounds + m.stock.values().sum::<u32>()).sum()
     }
 }
 
@@ -171,6 +182,8 @@ pub enum MoveModeS {
     Tactical,
     Assault,
     Stealth,
+    /// Bounding: a bound at tactical pace, then a halt to cover, and again.
+    Bound,
 }
 
 impl From<MoveModeS> for MoveMode {
@@ -180,6 +193,7 @@ impl From<MoveModeS> for MoveMode {
             MoveModeS::Tactical => MoveMode::Tactical,
             MoveModeS::Assault => MoveMode::Assault,
             MoveModeS::Stealth => MoveMode::Stealth,
+            MoveModeS::Bound => MoveMode::Tactical,
         }
     }
 }
@@ -225,6 +239,20 @@ pub struct Act {
     pub last_shot: Option<SimTime>,
     pub last_event: SimTime,
     pub volleys: u32,
+    /// A firing position it chose against the threat: once it is there and
+    /// still, it counts as hull-down after `sim.exec.occupy_s`.
+    pub fire_position: Option<Enu>,
+    /// Bounding: where this bound began, and the halt it is in (until when).
+    pub bound: Option<(Enu, Option<SimTime>)>,
+    /// Guiding a missile it launched: it stays put until then.
+    pub guiding_until: Option<SimTime>,
+}
+
+impl Act {
+    /// Halted between bounds: not moving, though its move goes on.
+    pub fn bound_halted(&self, now: SimTime) -> bool {
+        matches!(self.bound, Some((_, Some(t))) if t > now)
+    }
 }
 
 /// What it has seen itself.

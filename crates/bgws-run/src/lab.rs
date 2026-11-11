@@ -33,6 +33,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// A difference in mean score smaller than this does not matter, however
+/// tight the noise: an option this close to the best is near-best.
+pub const MIN_GAP: f64 = 0.05;
+
 /// The lab folder: `$BGWS_LAB`, else `lab` in the working directory.
 pub fn lab_dir() -> PathBuf {
     std::env::var_os("BGWS_LAB").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("lab"))
@@ -309,7 +313,8 @@ impl Lab {
             });
         }
         let best = options.iter().max_by(|a, b| a.mean.total_cmp(&b.mean)).ok_or_else(|| anyhow!("no options"))?.clone();
-        let near_best: Vec<String> = options.iter().filter(|o| best.mean - o.mean <= (best.se.powi(2) + o.se.powi(2)).sqrt().max(1e-9)).map(|o| o.option.clone()).collect();
+        // Near-best: within the noise of the best, and in any case within a gap too small to matter.
+        let near_best: Vec<String> = options.iter().filter(|o| best.mean - o.mean <= (best.se.powi(2) + o.se.powi(2)).sqrt().max(MIN_GAP)).map(|o| o.option.clone()).collect();
         let decisive = near_best.len() < options.len();
         m.playouts = Some(Playouts { runs, horizon_s, weights, options, best: best.option, near_best, decisive });
         self.save(&m)?;
@@ -559,7 +564,7 @@ pub fn decider_for(choice: DeciderChoice, figures: &Figures, model: Option<Strin
     use bgws_decide::{ClaudeConfig, ClaudeDecider, JevClient, JevConfig, LocalConfig, LocalDecider, MessagesClient, RulesDecider};
     Ok(match choice {
         DeciderChoice::Jev => {
-            let mut cfg = JevConfig::from_figures(figures);
+            let mut cfg = JevConfig { wording: crate::jev_wording(), ..JevConfig::from_figures(figures) };
             if let Some(m) = model {
                 cfg.model = m;
             }

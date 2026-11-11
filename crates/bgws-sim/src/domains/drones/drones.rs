@@ -1193,6 +1193,10 @@ fn resolve(s: &mut Sim, c4: &mut C4, fid: u64, target: Option<EntityId>, sp: &St
 #[allow(clippy::too_many_arguments)]
 fn effect(s: &mut Sim, c4: &mut C4, team: EntityId, t: EntityId, e: bevy_ecs::prelude::Entity, class: &TargetClass, stage: StrikeStage, rng: &mut impl Rng) -> bool {
     let now = s.ctx.now;
+    // A remote entity's owner judges a strike on it.
+    if crate::remote::is_remote(s, e) {
+        return false;
+    }
     let mut destroyed = false;
     let personnel = matches!(class, TargetClass::InfantryOpen | TargetClass::InfantryCover);
     match stage {
@@ -1474,7 +1478,8 @@ pub fn relocate(s: &mut Sim, id: EntityId) {
     }
 }
 
-fn cover_near(s: &Sim, p: Enu, r: f64) -> Enu {
+/// The point of best cover within `r` of `p` (rings of 12), or `p`.
+pub(crate) fn cover_near(s: &Sim, p: Enu, r: f64) -> Enu {
     let mut best = (s.ctx.ground.micro(p.e, p.n).cover, p);
     for ring in 1..=3 {
         for k in 0..12 {

@@ -31,7 +31,8 @@ pub fn raise(s: &mut Sim) {
             continue;
         }
         let e = s.ctx.entity(t.entity);
-        if !alive(s, e) || s.world.get::<Act>(e).map(|a| a.deciding).unwrap_or(true) {
+        // Another simulation decides for its entities.
+        if !alive(s, e) || crate::remote::is_remote(s, e) || s.world.get::<Act>(e).map(|a| a.deciding).unwrap_or(true) {
             continue;
         }
         if let Some(last) = s.ctx.last_asked.get(&t.entity) {
@@ -39,14 +40,76 @@ pub fn raise(s: &mut Sim) {
                 continue;
             }
         }
+        // Its leader just hit: it carries on until the second takes over.
+        if s.world.get::<Crew>(e).is_some_and(|c| c.leaderless_until.is_some()) && t.point != "D11" {
+            continue;
+        }
         // A broken unit runs itself.
         let morale = s.world.get::<Crew>(e).map(|c| c.morale.state).unwrap_or(MoraleState::Steady);
         if matches!(morale, MoraleState::Broken | MoraleState::Routed) && t.point != "D11" {
             continue;
         }
-        if ask(s, &t) {
+        let rule = doctrine_rule(s, e, &t);
+        if ask_with_rule(s, &t, rule) {
             done.insert(t.entity);
         }
+    }
+}
+
+/// Cover a unit counts as being in, not in the open.
+const IN_COVER: f64 = 0.3;
+/// A shooter fired on it this recently, s: under fire.
+const UNDER_FIRE_S: f64 = 30.0;
+
+/// The doctrine's drills at the points where they differ from the
+/// template's fallback (which is to carry on):
+/// - D3, fired on by an unseen shooter (react to contact): in the open, get
+///   into cover from the bearing; in cover, search along it.
+/// - D2, fired on by a shooter it has located: return fire; but a vehicle in
+///   the open goes hull-down first, and a shooter beyond all its weapons'
+///   reach is left by pulling out of its sight.
+/// - D6, after a volley: a unit holding ground, under fire from a shooter it
+///   has seen, fires and moves to another position (its alternate) before
+///   the enemy's fire is adjusted onto it.
+/// - D11, rallied: back to its orders if no longer under fire, else hold
+///   and recover.
+fn doctrine_rule(s: &Sim, e: bevy_ecs::prelude::Entity, t: &Trigger) -> RulesChoice {
+    let (Some(k), Some(a), Some(c), Some(i)) = (s.world.get::<Kin>(e), s.world.get::<Act>(e), s.world.get::<Crew>(e), s.world.get::<Ident>(e)) else { return RulesChoice::Fallback };
+    let now = s.ctx.now;
+    let cover = s.ctx.ground.micro(k.pos.e, k.pos.n).cover;
+    let in_cover = cover >= IN_COVER || a.posture == Posture::HullDown;
+    let option = |o: &str| RulesChoice::Option(o.into());
+    match t.point {
+        "D3" => option(if in_cover { "search" } else { "cover" }),
+        "D2" => {
+            let Some(shooter) = t.about.and_then(|x| s.world.get::<Aware>(e)?.seen.get(&x).map(|v| v.at)) else { return option("returnFire") };
+            let range = shooter.sub(k.pos).horizontal();
+            let reach = s.world.get::<Arms>(e).map(|ar| ar.mounts.iter().filter(|m| m.rounds > 0 || m.stock.values().any(|n| *n > 0)).filter_map(|m| i.platform.mounts.get(m.index)).flat_map(|m| m.munitions.iter()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)).unwrap_or(0.0);
+            let vehicle = !matches!(i.platform.body.vulnerability, bgws_catalogue::Vulnerability::Personnel);
+            if range > reach {
+                option("pullBack")
+            } else if vehicle && !in_cover {
+                option("hullDown")
+            } else {
+                option("returnFire")
+            }
+        }
+        "D6" => {
+            let holding = !a.activity.moving() && !a.mission.phases.iter().skip(a.mission.phase).any(|p| p.moving());
+            let located_fire = c.last_incoming.is_some_and(|(at, by)| (now - at).secs() <= UNDER_FIRE_S && s.world.get::<Aware>(e).is_some_and(|w| w.seen.contains_key(&by)));
+            if holding && located_fire {
+                option("fireAndMove")
+            } else {
+                RulesChoice::Fallback
+            }
+        }
+        "D11" => {
+            // Rallied: back to its orders once no longer under fire (holding
+            // to recover would drop them for good); under fire, hold.
+            let quiet = c.last_incoming.is_none_or(|(at, _)| (now - at).secs() > 2.0 * UNDER_FIRE_S);
+            option(if quiet { "resume" } else { "hold" })
+        }
+        _ => RulesChoice::Fallback,
     }
 }
 
@@ -79,6 +142,8 @@ fn facts(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> BTre
     m.insert("enemy.known".into(), FactValue::Bool(enemy.is_some()));
     m.insert("enemy.rangeM".into(), enemy.map(|v| FactValue::Num(v.at.sub(k.pos).horizontal().round())).unwrap_or(FactValue::Null));
     m.insert("orders.urgent".into(), FactValue::Bool(a.mission.urgent));
+    // Its orders still lead somewhere: a move it has not finished, now or in a later step.
+    m.insert("orders.moveLeft".into(), FactValue::Bool(heading_for(a).is_some_and(|g| g.sub(k.pos).horizontal() > MOVE_LEFT_M)));
     // World facts default to null for land units; the world layer fills its own.
     for f in bgws_behaviour::facts::world_facts() {
         m.entry(f.name.to_string()).or_insert(FactValue::Null);
@@ -100,6 +165,9 @@ fn gates(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> Gate
         caps.insert(Capability::Mobility);
     }
     caps.insert(Capability::Radio);
+    if s.world.get::<crate::dismount::Troops>(e).is_some_and(|t| t.aboard(h) > 0 && t.leaving.is_none() && t.to_cover.is_none()) {
+        caps.insert(Capability::Dismounts);
+    }
     crate::world::capabilities(s, e, &mut caps);
     let mut g = Gates {
         roe: match a.roe {
@@ -165,6 +233,46 @@ pub(crate) fn situation(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<Ent
 }
 
 /// Where a move leads: the end of the current move, else of the next one in its orders.
+/// A friend's report is of a contact this unit sees when it lies this close (or within twice its error), m.
+const REPORT_MATCH_M: f64 = 300.0;
+/// Reported contacts this far from the unit are listed, m.
+const REPORT_REACH_M: f64 = 4_000.0;
+/// A report's view of what a contact is counts at this belief or more.
+const REPORT_SURE: f64 = 0.6;
+
+/// What a contact is, in words, as its side's picture has it.
+fn hypothesis_words(h: bgws_know::Hypothesis) -> &'static str {
+    use bgws_know::Hypothesis as H;
+    match h {
+        H::Mbt => "a tank",
+        H::Ifv => "an infantry fighting vehicle",
+        H::Apc => "an armoured personnel carrier",
+        H::Truck => "a truck",
+        H::Artillery => "artillery",
+        H::Infantry => "infantry or an anti-tank team",
+        H::LandDecoy => "a decoy",
+        _ => "something not on the ground",
+    }
+}
+
+/// What recognising a contact (short of identifying it) tells: its kind.
+fn recognised_as(s: &Sim, id: EntityId) -> &'static str {
+    match s.world.get::<Ident>(s.ctx.entity(id)).map(|i| i.platform.body.vulnerability) {
+        Some(bgws_catalogue::Vulnerability::Personnel) => "a team on foot",
+        Some(bgws_catalogue::Vulnerability::Armoured) => "an armoured vehicle",
+        Some(_) => "a soft-skinned vehicle",
+        None => "a vehicle or team",
+    }
+}
+
+/// A contact this close to where a unit's orders end is on its objective, m.
+const OBJECTIVE_NEAR_M: f64 = 600.0;
+/// A tactical move's pace as a share of the vehicle's cross-country speed (for the ETA).
+const ETA_PACE: f64 = 0.6;
+
+/// Farther than this from where its orders lead, a unit still has a move to make.
+pub(crate) const MOVE_LEFT_M: f64 = 150.0;
+
 pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
     let end = |x: &Activity| match x {
         Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
@@ -176,6 +284,52 @@ pub(crate) fn heading_for(a: &Act) -> Option<Enu> {
 /// The farthest any of a platform's direct weapons reaches, m (0 none).
 fn reach_m(s: &Sim, p: &bgws_catalogue::Platform) -> f64 {
     p.mounts.iter().flat_map(|m| m.munitions.iter()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)
+}
+
+/// What firing on a target `range` m off would do, by the engine's own sums:
+/// the weapon it would fire (its first direct mount with rounds, as direct
+/// fire picks), the chance one volley hits a target presenting `pres`
+/// (bias averaged out), and that round's penetration at the range, mm, and
+/// whether it is a shaped charge (against chemical-energy armour) or not.
+fn volley_odds(s: &Sim, e: bevy_ecs::prelude::Entity, range: f64, pres: &bgws_models::direct_fire::Presented) -> Option<(String, f64, f64, bool)> {
+    let (i, h, a, c, arms) = (s.world.get::<Ident>(e)?, s.world.get::<Health>(e)?, s.world.get::<Act>(e)?, s.world.get::<Crew>(e)?, s.world.get::<Arms>(e)?);
+    // The mount the engine would choose: of those that reach, the most likely to hit.
+    let mut best: Option<(String, f64, f64, bool)> = None;
+    // Each round a mount holds is a choice (the loaded one and its stock).
+    let choices = arms.mounts.iter().filter(|m| !crate::domains::fires::indirect_mount(&i.platform, m.index)).flat_map(|m| {
+        std::iter::once(m.clone()).chain(m.stock.iter().map(|(mu, n)| MountState { munition: mu.clone(), rounds: *n, stock: Default::default(), ..m.clone() }))
+    });
+    for m in choices.filter(|m| m.rounds > 0) {
+        if let Some(o) = mount_odds(s, i, h, a, c, &m, range, pres) {
+            if best.as_ref().is_none_or(|b| o.1 > b.1) {
+                best = Some(o);
+            }
+        }
+    }
+    best
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mount_odds(s: &Sim, i: &Ident, h: &Health, a: &Act, c: &Crew, m: &MountState, range: f64, pres: &bgws_models::direct_fire::Presented) -> Option<(String, f64, f64, bool)> {
+    use bgws_models::direct_fire as df;
+    let mun = s.ctx.catalogue.munition(&m.munition)?;
+    if range > mun.max_range_m || range < mun.min_range_m {
+        return None;
+    }
+    let mount = i.platform.mounts.get(m.index)?;
+    let p = &s.ctx.p.direct;
+    let fc = df::FireControl::from_quality(mount.fire_control.quality, p);
+    let gun = if mun.kind == bgws_catalogue::MunitionKind::SmallArms { p.rifle } else { df::Gun { muzzle_velocity_mps: mun.speed_ms.max(100.0), ..p.mbt_gun } };
+    let moving = a.posture == Posture::Moving && !mount.fire_control.stabilised;
+    let shot = df::Shot { range_m: range, firer_moving: moving, target_crossing_mps: 0.0, skill_mult: c.skill.error_mult(&s.ctx.p.people), suppression: c.suppression.level };
+    let ph = if crate::systems::is_guided_direct(mun) {
+        df::guided_ph(crate::systems::operator_guided(mun), c.suppression.level, p) * (1.0 - s.ctx.p.missile_fail_p)
+    } else {
+        df::ph_expected(pres, &df::error_budget(&gun, &fc, &shot, p))
+    };
+    let rounds = ((h.fit as f64 * s.ctx.p.rounds_per_volley).round().max(1.0)).min(m.rounds as f64);
+    let chemical = matches!(mun.kind, bgws_catalogue::MunitionKind::Heat | bgws_catalogue::MunitionKind::Atgm);
+    Some((mount.id.clone(), 1.0 - (1.0 - ph).powf(rounds), mun.penetration_at(range), chemical))
 }
 
 /// What a land unit believes, as named fields for a decision model: the
@@ -226,6 +380,31 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
         })
         .unwrap_or_default();
     let my_reach = s.world.get::<Arms>(e).map(|ar| ar.mounts.iter().filter(|m| m.rounds > 0).filter_map(|m| s.ctx.catalogue.munition(&m.munition)).map(|m| m.max_range_m).fold(0.0, f64::max)).unwrap_or(0.0);
+    // Where its orders end: the last point any of its moves leads to.
+    let objective = a.mission.phases.iter().rev().find_map(|x| match x {
+        Activity::Move { route, .. } | Activity::Withdraw { route, .. } => route.last().copied(),
+        _ => None,
+    });
+    // Friends already firing on each enemy.
+    let mut engaged: BTreeMap<EntityId, u32> = BTreeMap::new();
+    for &f in &s.ctx.order {
+        if f == e || !alive(s, f) || s.world.get::<Ident>(f).is_none_or(|fi| fi.side != i.side) {
+            continue;
+        }
+        if let Some(Activity::Engage { target, .. }) = s.world.get::<Act>(f).map(|x| &x.activity) {
+            *engaged.entry(*target).or_default() += 1;
+        }
+    }
+    // What a volley of ours would do, against a vehicle or a team in cover.
+    let dp = &s.ctx.p.direct;
+    let pct0 = |x: f64| (x * 100.0).round();
+    let vehicle = |(length_m, width_m, height_m): (f64, f64, f64), hull_down: bool| {
+        let dims = bgws_models::direct_fire::VehicleDims { length_m: length_m.max(3.0), width_m: width_m.max(2.0), hull_height_m: (height_m * 0.6).max(1.0), turret_height_m: (height_m * 0.4).max(0.3) };
+        bgws_models::direct_fire::presented_vehicle(&dims, 0.0, if hull_down { bgws_models::direct_fire::VehiclePosture::HullDown } else { bgws_models::direct_fire::VehiclePosture::Exposed }, dp)
+    };
+    // An unidentified contact: a typical vehicle (a tank's size), or a team dug in.
+    let typical = (7.0, 3.5, 2.4);
+    let team = bgws_models::direct_fire::presented_person(bgws_models::direct_fire::PersonPosture::Prone, 0.5, dp);
     // Enemies it has seen itself, nearest first.
     let mut seen: Vec<(&EntityId, &Seen)> = aw.seen.iter().collect();
     seen.sort_by(|x, y| x.1.at.sub(k.pos).horizontal().total_cmp(&y.1.at.sub(k.pos).horizontal()).then(x.0.cmp(y.0)));
@@ -237,8 +416,23 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             let range = d.horizontal();
             let known = (v.level >= 2).then(|| s.world.get::<Ident>(s.ctx.entity(**id))).flatten();
             let their_reach = known.map(|x| reach_m(s, &x.platform)).filter(|r| *r > 0.0);
+            // Our volley against it: against what it is, when identified; else both ways.
+            let odds = match known {
+                Some(x) if x.platform.body.vulnerability == bgws_catalogue::Vulnerability::Personnel => volley_odds(s, e, range, &team).map(|(w, p, _, _)| json!({ "weapon": w, "volleyHitPct": pct0(p) })),
+                Some(x) => volley_odds(s, e, range, &vehicle((x.platform.body.length_m, x.platform.body.width_m, x.platform.body.height_m), !v.moving)).map(|(w, p, pen, chemical)| {
+                    let z = crate::systems::armour_zones(&x.platform);
+                    let front = if chemical { z.ce_mm[0] } else { z.ke_mm[0] };
+                    json!({ "weapon": w, "volleyHitPct": pct0(p), "penetratesFront": pen > front })
+                }),
+                None => {
+                    let as_vehicle = volley_odds(s, e, range, &vehicle(typical, !v.moving));
+                    let as_team = volley_odds(s, e, range, &team);
+                    as_vehicle.zip(as_team).map(|((w, pv, _, _), (_, pt, _, _))| json!({ "weapon": w, "volleyHitPctIfVehicle": pct0(pv), "volleyHitPctIfTeamInCover": pct0(pt) }))
+                }
+            };
+            let from_objective = objective.map(|o| v.at.sub(o).horizontal());
             json!({
-                "what": match v.level { 0 => "something".to_string(), 1 => "a vehicle or team".to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
+                "what": match v.level { 0 => "something".to_string(), 1 => recognised_as(s, **id).to_string(), _ => known.map(|x| x.platform.name.clone()).unwrap_or_default() },
                 "identified": v.level >= 2,
                 "rangeM": round(range), "bearing": compass(d.bearing()),
                 "moving": v.moving, "seenAgoS": round((s.ctx.now - v.last).secs()),
@@ -246,15 +440,54 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
                 "itsReachM": their_reach.map(round),
                 "canReachUs": their_reach.map(|r| range <= r),
                 "thisDecisionIsAboutIt": Some(**id) == about,
+                "ifWeFire": odds,
+                "onOurObjective": from_objective.map(|d| d <= OBJECTIVE_NEAR_M),
+                "fromOurObjectiveM": from_objective.map(round),
+                "friendsFiringOnIt": engaged.get(id).copied().filter(|n| *n > 0),
             })
         })
         .collect();
+    // What friends have reported (the unit's share of its side's picture):
+    // what it makes of the contacts this unit sees but has not identified,
+    // and the contacts it cannot see itself.
+    let shared = crate::domains::drones::c2::picture_for(s, i.id);
+    let near_track = |at: Enu| shared.iter().filter(|t| t.pos.sub(at).horizontal() <= (2.0 * t.error_m).max(REPORT_MATCH_M)).min_by(|a, b| a.pos.sub(at).horizontal().total_cmp(&b.pos.sub(at).horizontal()));
+    let reported_as = |at: Enu| {
+        near_track(at).and_then(|t| t.class.filter(|c| c.1 >= REPORT_SURE).map(|c| json!({ "what": hypothesis_words(c.0), "surePct": pct(c.1), "ageS": round(t.age_s), "by": t.by.map(|b| name(s, b)) })))
+    };
+    let enemies: Vec<serde_json::Value> = enemies
+        .into_iter()
+        .zip(seen.iter().take(6))
+        .map(|(mut j, (_, v))| {
+            if j.get("identified").and_then(serde_json::Value::as_bool) != Some(true) {
+                if let Some(r) = reported_as(v.at) {
+                    j["reportedAs"] = r;
+                }
+            }
+            j
+        })
+        .collect();
+    let mut beyond: Vec<(f64, serde_json::Value)> = shared
+        .iter()
+        .filter(|t| !seen.iter().any(|(_, v)| t.pos.sub(v.at).horizontal() <= (2.0 * t.error_m).max(REPORT_MATCH_M)))
+        .filter_map(|t| {
+            let d = t.pos.sub(k.pos);
+            let r = d.horizontal();
+            (r <= REPORT_REACH_M).then(|| {
+                (r, json!({ "what": t.class.filter(|c| c.1 >= REPORT_SURE).map(|c| hypothesis_words(c.0)).unwrap_or("unknown"), "rangeM": round(r), "bearing": compass(d.bearing()), "ageS": round(t.age_s), "errorM": round(t.error_m), "by": t.by.map(|b| name(s, b)) }))
+            })
+        })
+        .collect();
+    beyond.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let reported_by_friends: Vec<serde_json::Value> = beyond.into_iter().take(4).map(|x| x.1).collect();
     let unseen_fire: Vec<serde_json::Value> = aw.suspects.values().map(|v| json!({ "bearing": compass(v.bearing), "agoS": round((s.ctx.now - v.last).secs()) })).collect();
     // Its orders and where they lead.
+    let speed_ms = (i.platform.mover.cross_country_kmh.max(1.0) / 3.6) * ETA_PACE;
     let goal = heading_for(a).map(|g| {
         let d = g.sub(k.pos);
-        json!({ "distanceM": round(d.horizontal()), "bearing": compass(d.bearing()) })
+        json!({ "distanceM": round(d.horizontal()), "bearing": compass(d.bearing()), "etaMin": round(d.horizontal() / speed_ms / 60.0) })
     });
+    let time_left_min = round((s.ctx.duration_limit() - s.ctx.now).secs().max(0.0) / 60.0);
     let orders = json!({
         "purpose": if a.mission.purpose.is_empty() { "none" } else { &a.mission.purpose },
         "doing": a.activity.word(),
@@ -262,6 +495,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
         "urgent": a.mission.urgent,
         "roe": match a.roe { RoeS::Never => "weapons hold", RoeS::IfFiredUpon => "fire only if fired upon", RoeS::WithinShortRange => "fire within short range", RoeS::Always => "fire at any enemy in reach" },
         "headingFor": goal,
+        "gameTimeLeftMin": time_left_min,
     });
     // Its ground.
     let g = &s.ctx.ground;
@@ -311,10 +545,13 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             "vehicles": format!("{} of {}", h.fit, h.start), "strengthPct": pct(h.strength()),
             "posture": posture, "suppressionPct": pct(c.suppression.level), "morale": morale,
             "lastFiredS": a.last_shot.map(|t| round((s.ctx.now - t).secs())),
+            "leaderReplacedInS": c.leaderless_until.map(|t| round((t - s.ctx.now).secs())),
+            "infantryAboard": s.world.get::<crate::dismount::Troops>(e).map(|t| t.aboard(h)).filter(|n| *n > 0).map(|n| format!("{n} sections")),
         },
         "weapons": weapons,
         "weaponReachM": round(my_reach),
         "enemiesSeen": enemies,
+        "reportedByFriends": reported_by_friends,
         "firedOnByUnseen": unseen_fire,
         "orders": orders,
         "ground": ground,
@@ -336,12 +573,7 @@ pub(crate) fn compass(b: f64) -> &'static str {
     N[(((b.to_degrees().rem_euclid(360.0) + 22.5) / 45.0) as usize) % 8]
 }
 
-/// Raise one question for a trigger. Returns whether anything was raised.
-pub(crate) fn ask(s: &mut Sim, t: &Trigger) -> bool {
-    ask_with_rule(s, t, RulesChoice::Fallback)
-}
-
-/// As [`ask`], with the engine's own rule choice for the rules decider (a
+/// Raise one question for a trigger, with the engine's own rule choice for the rules decider (a
 /// world domain's `registerRules`); an option not offered falls back.
 pub(crate) fn ask_with_rule(s: &mut Sim, t: &Trigger, rule: RulesChoice) -> bool {
     let e = s.ctx.entity(t.entity);
@@ -449,6 +681,62 @@ fn point_away(s: &Sim, e: bevy_ecs::prelude::Entity, dist: f64) -> Enu {
 }
 
 /// The best covered spot within the search radius (cover first, then height).
+/// A firing position against the threats it knows of (seen in the last
+/// five minutes, or firing from a bearing it has not found): within
+/// `sim.exec.reposition_m`, the spot from which the nearest threat sees its
+/// turret but not its hull (hull-down to it), or failing that one hidden
+/// from all of them; short moves first, and none that close the range for
+/// nothing. The spot, and whether it is a hull-down firing position. With no
+/// threat known, the best cover nearby (`better_spot`).
+fn fire_position(s: &Sim, e: bevy_ecs::prelude::Entity) -> (Enu, bool) {
+    let k = *s.world.get::<Kin>(e).expect("k");
+    let now = s.ctx.now;
+    let i = s.world.get::<Ident>(e).expect("i");
+    let person = i.platform.body.vulnerability == bgws_catalogue::Vulnerability::Personnel;
+    let (hull, top) = if person { (0.4, 1.1) } else { (1.0, 2.6) };
+    let (class, _) = crate::systems::mover_class(i.platform.mover.kind);
+    let aw = s.world.get::<Aware>(e).expect("aw");
+    let mut threats: Vec<Enu> = aw.seen.values().filter(|v| (now - v.last).secs() < 300.0).map(|v| v.at).collect();
+    threats.extend(aw.suspects.values().map(|sp| k.pos.add(Enu::new(sp.bearing.sin() * 1_500.0, sp.bearing.cos() * 1_500.0, 0.0))));
+    threats.sort_by(|a, b| a.sub(k.pos).horizontal().total_cmp(&b.sub(k.pos).horizontal()));
+    threats.truncate(3);
+    if threats.is_empty() {
+        return (better_spot(s, e), false);
+    }
+    let g = &s.ctx.ground;
+    let r = s.ctx.p.reposition_m;
+    let main = threats[0];
+    let d0 = main.sub(k.pos).horizontal();
+    let score = |p: Enu| -> (f64, bool) {
+        let seen = |t: &Enu, agl: f64| g.los(*t, 2.5, p, agl).p_visible;
+        let hull_main = seen(&main, hull);
+        let top_main = seen(&main, top);
+        let hull_down = hull_main < 0.3 && top_main > 0.5;
+        let masked = threats.iter().all(|t| seen(t, top) < 0.3);
+        let exposed = threats.iter().map(|t| seen(t, hull)).sum::<f64>() / threats.len() as f64;
+        let d = p.sub(k.pos).horizontal();
+        let closing = ((d0 - main.sub(p).horizontal()) / r).max(0.0);
+        let v = if hull_down { 1.0 } else { 0.0 } + if masked { 0.6 } else { 0.0 } - 0.5 * exposed + 0.3 * g.micro(p.e, p.n).cover - 0.25 * d / r - 0.4 * closing;
+        (v, hull_down)
+    };
+    let mut best = (score(k.pos), k.pos);
+    for ring in [0.3, 0.6, 1.0] {
+        for step in 0..16 {
+            let b = step as f64 * std::f64::consts::TAU / 16.0;
+            let p = k.pos.add(Enu::new(b.sin() * r * ring, b.cos() * r * ring, 0.0));
+            if !g.contains(p) || g.going(p.e, p.n, class).speed_kmh <= 0.0 {
+                continue;
+            }
+            let p = Enu::new(p.e, p.n, g.height(p.e, p.n));
+            let sc = score(p);
+            if sc.0 > best.0 .0 + 0.05 {
+                best = (sc, p);
+            }
+        }
+    }
+    (best.1, best.0 .1)
+}
+
 fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
     let k = *s.world.get::<Kin>(e).expect("k");
     let r = s.ctx.p.cover_search_m;
@@ -497,6 +785,29 @@ pub(crate) fn route_for(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: Mo
     let seeks = seeks_contact(s, e, None);
     let urgent = is_urgent(s, e, None);
     plan_route(s, e, to, mode, seeks, urgent)
+}
+
+/// A mission phase as the activity to start now: a move's route planned
+/// afresh from where the unit is (the phase's route was planned from where
+/// it stood when the order came, so taken as it is it leads back there).
+pub(crate) fn phase_activity(s: &Sim, e: bevy_ecs::prelude::Entity, phase: &Activity) -> Activity {
+    match phase {
+        Activity::Move { route, mode, then } => match route.last() {
+            Some(&to) => Activity::Move { route: route_for(s, e, to, *mode), mode: *mode, then: then.clone() },
+            None => phase.clone(),
+        },
+        Activity::Withdraw { route, then } => match route.last() {
+            Some(&to) => Activity::Withdraw { route: plan_route(s, e, to, MoveModeS::Tactical, false, is_urgent(s, e, None)), then: then.clone() },
+            None => phase.clone(),
+        },
+        _ => phase.clone(),
+    }
+}
+
+/// The unit's current mission phase as the activity to start now.
+pub(crate) fn current_phase(s: &Sim, e: bevy_ecs::prelude::Entity) -> Activity {
+    let phase = s.world.get::<Act>(e).and_then(|a| a.mission.phases.get(a.mission.phase).cloned());
+    phase.map(|p| phase_activity(s, e, &p)).unwrap_or(Activity::Overwatch)
 }
 
 /// Is this move time-critical: orders "now", or a weapon getting into range (fire support)?
@@ -559,24 +870,24 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         s.world.get::<Aware>(e)?.seen.iter().min_by(|a, b| a.1.at.sub(pos).horizontal().total_cmp(&b.1.at.sub(pos).horizontal())).map(|x| *x.0)
     });
     let current = s.world.get::<Act>(e).expect("a").activity.clone();
-    let mission_activity = {
-        let a = s.world.get::<Act>(e).expect("a");
-        a.mission.phases.get(a.mission.phase).cloned().unwrap_or(Activity::Overwatch)
-    };
+    let mission_activity = current_phase(s, e);
     let withdraw_m = s.ctx.p.withdraw_m;
     let reach = {
         let i = s.world.get::<Ident>(e).expect("i");
         i.platform.mounts.iter().filter_map(|m| m.munitions.first()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)
     };
+    let mut chosen_position: Option<Enu> = None;
     let new: Option<Activity> = match action.trim_start_matches("land.") {
         "complyWithOrders" | "resumeOrders" | "resumeOrCarryOn" | "complyWithRequest" => Some(mission_activity),
         "carryOn" | "keepAtIt" | "keepFiring" | "keepHolding" | "keepHoldingHere" | "finishFightFirst" => None,
         "skipToNextPhase" => {
-            let mut a = s.world.get_mut::<Act>(e).expect("a");
-            if a.mission.phase + 1 < a.mission.phases.len() {
-                a.mission.phase += 1;
+            {
+                let mut a = s.world.get_mut::<Act>(e).expect("a");
+                if a.mission.phase + 1 < a.mission.phases.len() {
+                    a.mission.phase += 1;
+                }
             }
-            Some(a.mission.phases.get(a.mission.phase).cloned().unwrap_or(Activity::Overwatch))
+            Some(current_phase(s, e))
         }
         "engageNow" | "returnFire" | "fireNow" | "fireFirst" | "shiftFire" | "betterShotOnTarget" | "shiftFireFromLost" | "shiftFireFromTarget" => target.map(|t| Activity::Engage { target: t, volleys: None, then: Some(Box::new(Activity::Overwatch)) }),
         "fireAndMove" => target.map(|t| Activity::Engage { target: t, volleys: Some(2), then: Some(Box::new(Activity::Move { route: vec![better_spot(s, e)], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })) }),
@@ -586,8 +897,15 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
         "holdHere" | "holdAndRecover" | "cannotComply" => Some(Activity::Hold),
         "observe" | "watchLastSeen" => Some(Activity::Observe),
         "overwatchHere" | "partlyOverwatch" => Some(Activity::Overwatch),
-        "betterPosition" | "hullDownThenFire" | "goQuietInCoverMove" => Some(Activity::Move { route: vec![better_spot(s, e)], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) }),
-        "pullBackToFriends" | "joinNearestFriends" | "rejoin" => {
+        "betterPosition" | "hullDownThenFire" | "goQuietInCoverMove" => {
+            let (spot, firing) = fire_position(s, e);
+            chosen_position = firing.then_some(spot);
+            Some(Activity::Move { route: vec![spot], mode: MoveModeS::Tactical, then: Some(Box::new(Activity::Overwatch)) })
+        }
+        // Rejoin (as the vocabulary says): resume its orders; with no
+        // phases of orders, carry on with what it was doing.
+        "rejoin" => s.world.get::<Act>(e).filter(|a| !a.mission.phases.is_empty()).map(|_| mission_activity.clone()),
+        "pullBackToFriends" | "joinNearestFriends" => {
             let to = nearest_friend(s, e).map(|f| f.1).unwrap_or_else(|| point_away(s, e, withdraw_m));
             Some(Activity::Withdraw { route: route_for(s, e, to, MoveModeS::Tactical), then: Some(Box::new(Activity::Overwatch)) })
         }
@@ -613,7 +931,9 @@ pub fn apply_land_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId
     };
     if let Some(n) = new {
         if n != current {
-            s.world.get_mut::<Act>(e).expect("a").activity = n;
+            let mut a = s.world.get_mut::<Act>(e).expect("a");
+            a.activity = n;
+            a.fire_position = chosen_position;
         }
     }
     true
@@ -651,7 +971,7 @@ pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder
             let mode = match ph.mode.as_deref() {
                 Some("march") => MoveModeS::March,
                 Some("assault") => MoveModeS::Assault,
-                Some("bound") => MoveModeS::Stealth,
+                Some("bound") => MoveModeS::Bound,
                 _ => MoveModeS::Tactical,
             };
             match (ph.action.as_str(), to) {

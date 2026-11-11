@@ -106,7 +106,13 @@
    "rationale": "Size grows with echelon; its emissions are what ESM finds (15 km is a typical intercept range).",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "battalion"
+   "echelon": "battalion",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 39
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 39 Field Command Post"
   },
   {
    "id": "generic/cp-brigade",
@@ -213,7 +219,13 @@
    "rationale": "Size grows with echelon; its emissions are what ESM finds (30 km is a typical intercept range).",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "brigade"
+   "echelon": "brigade",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 39
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 39 Field Command Post"
   },
   {
    "id": "generic/cp-company",
@@ -320,7 +332,13 @@
    "rationale": "Size grows with echelon; its emissions are what ESM finds (10 km is a typical intercept range).",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "company"
+   "echelon": "company",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 39
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 39 Field Command Post"
   },
   {
    "id": "generic/cp-division",
@@ -427,7 +445,13 @@
    "rationale": "Size grows with echelon; its emissions are what ESM finds (50 km is a typical intercept range).",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "division"
+   "echelon": "division",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 39
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 39 Field Command Post"
   }
  ]
 }

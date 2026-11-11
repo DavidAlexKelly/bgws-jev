@@ -9,7 +9,6 @@ use std::path::Path;
 use tiff::decoder::{Decoder, DecodingResult};
 use tiff::tags::Tag;
 
-
 /// A decoded DEM on a lat/lon grid.
 #[derive(Clone, Debug)]
 pub struct Dem {
@@ -95,6 +94,24 @@ pub fn apply_dem(t: &mut Terrain, dem: &Dem) -> usize {
     });
     t.elevation = elevation;
     set
+}
+
+/// Write heights (rows from the north edge, west to east) as a one-band
+/// float GeoTIFF on a latitude/longitude grid: `corner` the north-west corner
+/// and `pixel` the pixel size, (longitude, latitude) degrees (EPSG:4326 by
+/// convention); `size` (width, height) in pixels.
+pub fn write_dem(path: &Path, corner: (f64, f64), pixel: (f64, f64), size: (u32, u32), heights: &[f32]) -> Result<()> {
+    let ((lon0, lat0), (dlon, dlat), (width, height)) = (corner, pixel, size);
+    use tiff::encoder::{colortype, TiffEncoder};
+    if heights.len() != (width * height) as usize {
+        bail!("{} heights for {width} × {height} pixels", heights.len());
+    }
+    let mut enc = TiffEncoder::new(std::fs::File::create(path).with_context(|| format!("creating {}", path.display()))?)?;
+    let mut img = enc.new_image::<colortype::Gray32Float>(width, height)?;
+    img.encoder().write_tag(Tag::ModelPixelScaleTag, &[dlon, dlat, 0.0][..])?;
+    img.encoder().write_tag(Tag::ModelTiepointTag, &[0.0f64, 0.0, 0.0, lon0, lat0, 0.0][..])?;
+    img.write_data(heights)?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -790,7 +790,8 @@ fn damage_at(
                 kills += 1;
             }
         }
-        if kills == 0 {
+        // A remote entity's owner judges a strike on it.
+        if kills == 0 || crate::remote::is_remote(s, e) {
             if let Some(mut c) = s.world.get_mut::<Crew>(e) {
                 c.blasts_per_min += 6.0;
             }

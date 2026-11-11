@@ -215,6 +215,7 @@ fn facts_and_gates(st: &Value) -> (BTreeMap<String, FactValue>, Gates) {
     f.insert("enemy.known".into(), FactValue::Bool(nearest.is_some()));
     f.insert("enemy.rangeM".into(), nearest.map(|r| FactValue::Num(r.round())).unwrap_or(FactValue::Null));
     f.insert("orders.urgent".into(), FactValue::Bool(b("/orders/urgent").unwrap_or(false)));
+    f.insert("orders.moveLeft".into(), FactValue::Bool(n("/orders/headingFor/distanceM").is_some_and(|d| d > 150.0)));
     for w in bgws_behaviour::facts::world_facts() {
         f.entry(w.name.to_string()).or_insert(FactValue::Null);
     }
@@ -395,6 +396,12 @@ pub struct ItemResult {
     pub verdict: String,
     pub acceptable: Vec<String>,
     pub wrong: Vec<String>,
+    /// The decider's own pick, before any confidence cut-off (its most likely option).
+    #[serde(default)]
+    pub raw_choice: String,
+    /// What a cut-off falls back to.
+    #[serde(default)]
+    pub fallback: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -504,6 +511,8 @@ pub fn judge(cases: &[Case], items: &[Item], answers: &[bgws_core::Answer], name
             verdict: v.into(),
             acceptable: it.acceptable.clone(),
             wrong: it.wrong.clone(),
+            raw_choice: a.probabilities.as_ref().and_then(|p| p.iter().max_by(|x, y| x.1.total_cmp(y.1)).map(|(k, _)| k.clone())).unwrap_or_else(|| a.choice.clone()),
+            fallback: it.question.fallback.clone(),
         });
     }
     // Trends.
@@ -635,7 +644,10 @@ pub fn case_from_moment(m: &crate::lab::Moment, why: &str) -> Result<Case> {
         acceptable = p.map(|p| p.near_best.clone()).unwrap_or_default();
     }
     if acceptable.is_empty() {
-        return Err(anyhow!("{}: label it (best or acceptable) or play it out first", m.id));
+        return Err(match &m.playouts {
+            Some(p) if !p.decisive => anyhow!("{}: its play-outs are not decisive (every option within the noise of the best), so they say nothing about right and wrong; label it yourself if you have a view", m.id),
+            _ => anyhow!("{}: label it (best or acceptable) or play it out first", m.id),
+        });
     }
     let wrong = p.map(|p| p.options.iter().map(|o| o.option.clone()).filter(|o| !p.near_best.contains(o) && !acceptable.contains(o)).collect()).unwrap_or_default();
     // The template as resolved for the unit (custom ones fall back to the default's options).
@@ -666,4 +678,33 @@ pub fn save_case(lab: &Path, c: &Case) -> Result<PathBuf> {
 /// The decider to test, by choice (as the lab grades).
 pub fn decider(choice: DeciderChoice, figures: &Figures, model: Option<String>, prose: bool) -> Result<(Arc<dyn Decider>, String)> {
     crate::lab::decider_for(choice, figures, model, prose, ("http://127.0.0.1:8080", "local"))
+}
+
+/// The best confidence cut-off for a run's answers: for each candidate
+/// cut-off, a pick below it takes the fallback instead; the score is passes
+/// less wrongs over the judged questions. Ties go to the lower cut-off.
+/// Returns (cut-off, score, the score at `current`).
+pub fn best_threshold(run: &TestRun, current: f64) -> (f64, f64, f64) {
+    let judged: Vec<&ItemResult> = run.items.iter().filter(|r| r.variant != "reordered" && r.variant != "renamed").collect();
+    let score = |t: f64| -> f64 {
+        let mut s = 0.0;
+        for r in &judged {
+            let pick = if r.confidence.unwrap_or(1.0) >= t { &r.raw_choice } else { &r.fallback };
+            match verdict(pick, &r.acceptable, &r.wrong) {
+                "pass" => s += 1.0,
+                "wrong" => s -= 1.0,
+                _ => {}
+            }
+        }
+        s / judged.len().max(1) as f64
+    };
+    let mut best = (current, score(current));
+    for k in 0..=12 {
+        let t = k as f64 * 0.05;
+        let v = score(t);
+        if v > best.1 + 1e-9 {
+            best = (t, v);
+        }
+    }
+    (best.0, best.1, score(current))
 }

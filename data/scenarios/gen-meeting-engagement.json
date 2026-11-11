@@ -1,0 +1,318 @@
+{
+  "format": "bgws.scenario",
+  "version": 4,
+  "name": "gen-meeting-engagement",
+  "description": "Generated (Meeting, Company): A meeting engagement: both advance on the same ground. 4 blue against 4 red manoeuvre elements (dug in where the defence is prepared), 6.0 km apart, at 12:00 local, clear; 90 min. A side with an objective wins by taking it and holding it 10 minutes, and loses if it has not by the time limit.",
+  "savedAt": "2026-10-24T00:00:00.000Z",
+  "seed": 107,
+  "seedText": "gen-meeting-engagement",
+  "theatre": {
+    "origin": {
+      "lat": 54.20000000000001,
+      "lon": 18.6,
+      "h": 0.0
+    },
+    "ground": "generated",
+    "groundSeed": "gen-meeting-engagement-ground"
+  },
+  "scope": {
+    "type": "combinedArms",
+    "durationMin": 90.0,
+    "area": {
+      "widthKm": 20.0,
+      "depthKm": 20.0
+    },
+    "echelons": {
+      "highest": "company",
+      "lowest": "platoon"
+    },
+    "domains": {
+      "land": "simulated",
+      "drones": "abstracted",
+      "fires": "simulated",
+      "ew": "off",
+      "air": "abstracted",
+      "airDefence": "off",
+      "naval": "off",
+      "space": "abstracted",
+      "cyber": "off",
+      "logistics": "abstracted",
+      "medical": "off"
+    },
+    "planners": [
+      "land"
+    ],
+    "detail": {
+      "aggregateAwayFromContact": false,
+      "jev": "all"
+    }
+  },
+  "startUtc": "2026-06-01T10:45:00Z",
+  "weather": {
+    "source": "preset",
+    "weather": "clear"
+  },
+  "environment": {},
+  "comms": "radio",
+  "forces": [
+    {
+      "id": "b-1",
+      "label": "Blue 1 tanks",
+      "side": "blue",
+      "platform": "generic/mbt",
+      "count": 4,
+      "quality": "regular",
+      "position": {
+        "lat": 54.17304752597239,
+        "lon": 18.590812132843276,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-2",
+      "label": "Blue 2 mech",
+      "side": "blue",
+      "platform": "generic/ifv",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.17304783746025,
+        "lon": 18.59693737759109,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-3",
+      "label": "Blue 3 tanks",
+      "side": "blue",
+      "platform": "generic/mbt",
+      "count": 4,
+      "quality": "regular",
+      "position": {
+        "lat": 54.173047837460246,
+        "lon": 18.60306262240891,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-4",
+      "label": "Blue 4 mech",
+      "side": "blue",
+      "platform": "generic/ifv",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.17304752597239,
+        "lon": 18.609187867156727,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-mortar",
+      "label": "Blue mortars",
+      "side": "blue",
+      "platform": "generic/mortar120",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.15957177280881,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "b-hq",
+      "label": "Blue company HQ",
+      "side": "blue",
+      "platform": "generic/cp-company",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.154181324045496,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit",
+      "commandRating": 2.0
+    },
+    {
+      "id": "r-1",
+      "label": "Red 1 tanks",
+      "side": "red",
+      "platform": "generic/mbt",
+      "count": 4,
+      "quality": "regular",
+      "position": {
+        "lat": 54.22695165115274,
+        "lon": 18.59080016744877,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-2",
+      "label": "Red 2 mech",
+      "side": "red",
+      "platform": "generic/ifv",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.22695196325513,
+        "lon": 18.596933389126168,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-3",
+      "label": "Red 3 tanks",
+      "side": "red",
+      "platform": "generic/mbt",
+      "count": 4,
+      "quality": "regular",
+      "position": {
+        "lat": 54.22695196325513,
+        "lon": 18.60306661087384,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-4",
+      "label": "Red 4 mech",
+      "side": "red",
+      "platform": "generic/ifv",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.22695165115274,
+        "lon": 18.60919983255123,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-mortar",
+      "label": "Red mortars",
+      "side": "red",
+      "platform": "generic/mortar120",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.24042795418566,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "r-hq",
+      "label": "Red company HQ",
+      "side": "red",
+      "platform": "generic/cp-company",
+      "count": 2,
+      "quality": "regular",
+      "position": {
+        "lat": 54.245818325294145,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "layer": "unit",
+      "commandRating": 2.0
+    }
+  ],
+  "world": {
+    "obstacles": []
+  },
+  "command": {
+    "sides": {
+      "blue": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      },
+      "red": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      }
+    },
+    "model": "claude-sonnet-5-5",
+    "hqs": [
+      {
+        "id": "blue-coy",
+        "side": "blue",
+        "echelon": "company",
+        "postId": "b-hq",
+        "subordinates": [
+          "b-1",
+          "b-2",
+          "b-3",
+          "b-4",
+          "b-mortar"
+        ],
+        "planner": "land",
+        "decider": "rules"
+      },
+      {
+        "id": "red-coy",
+        "side": "red",
+        "echelon": "company",
+        "postId": "r-hq",
+        "subordinates": [
+          "r-1",
+          "r-2",
+          "r-3",
+          "r-4",
+          "r-mortar"
+        ],
+        "planner": "land",
+        "decider": "rules"
+      }
+    ]
+  },
+  "behaviours": {
+    "assign": {}
+  },
+  "emitters": {
+    "default": {
+      "blue": "free",
+      "red": "free"
+    }
+  },
+  "victory": [
+    {
+      "kind": "objective",
+      "side": "blue",
+      "at": {
+        "lat": 54.20000000000001,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "radiusM": 600.0,
+      "holdS": 600.0,
+      "label": "blue's objective"
+    },
+    {
+      "kind": "objective",
+      "side": "red",
+      "at": {
+        "lat": 54.20000000000001,
+        "lon": 18.6,
+        "h": 0.0
+      },
+      "radiusM": 600.0,
+      "holdS": 600.0,
+      "label": "red's objective"
+    },
+    {
+      "kind": "breakpoint",
+      "pct": 60.0
+    }
+  ]
+}

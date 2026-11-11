@@ -222,6 +222,7 @@ pub fn convert_v3(v3: &ScenarioV3, catalogue: Option<&Catalogue>, opts: &Convert
             layer: Layer::Unit,
             echelon: None,
             concealed: f.concealed.unwrap_or(false),
+            dug_in: false,
             command_rating: f.command_rating,
             dummy: f.is_dummy.unwrap_or(false),
             parent: None,
@@ -255,6 +256,7 @@ pub fn convert_v3(v3: &ScenarioV3, catalogue: Option<&Catalogue>, opts: &Convert
             layer: Layer::Entity,
             echelon: None,
             concealed: false,
+            dug_in: false,
             command_rating: None,
             dummy: false,
             parent: e.parent.clone(),
@@ -368,6 +370,7 @@ pub fn convert_v3(v3: &ScenarioV3, catalogue: Option<&Catalogue>, opts: &Convert
         events,
         notes: v3.caveats.clone(),
         converted_from: None,
+        interop: None,
     };
     // The theatre: the scope's area round the origin, enlarged to hold every position.
     let frame = EnuFrame::new(origin);

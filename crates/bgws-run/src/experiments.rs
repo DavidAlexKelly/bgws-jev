@@ -61,6 +61,104 @@ pub fn mbt_engagement(f: &Figures, seed: Seed) -> Value {
     Some(if e.fire(&pres, &b, &p, &mut r).hit { 1.0 } else { 0.0 })
 }
 
+/// ATGM engagement [no primary source]: a dug-in ATGM team against a tank
+/// platoon advancing on it over open, flat ground from about 4 km, played in
+/// the sim with the rules (the missiles' flight, the gunner keeping sight
+/// of the target, suppression from the tanks' fire). The share of the
+/// missiles launched that hit.
+pub fn atgm_engagement(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-company-attack")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let mut v = crate::scengen::build(&spec).ok()?;
+    let keep = ["b-1", "b-hq", "r-at-2", "r-hq"];
+    v["forces"].as_array_mut()?.retain(|x| x["id"].as_str().is_some_and(|i| keep.contains(&i)));
+    for h in v["command"]["hqs"].as_array_mut()? {
+        let sub = if h["side"] == "blue" { "b-1" } else { "r-at-2" };
+        h["subordinates"] = serde_json::json!([sub]);
+    }
+    v["victory"] = serde_json::json!([]);
+    let sc = ScenarioV4::from_json(&v.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(40.0 * 60.0));
+    let (mut launched, mut hit) = (0.0, 0.0);
+    for e in sim.drain_events() {
+        let d = &e.data;
+        let atgm = d.get("munition").and_then(serde_json::Value::as_str).is_some_and(|m| m.starts_with("atgm"));
+        if !atgm {
+            continue;
+        }
+        match e.kind.as_str() {
+            "fire.launch" => launched += d.get("rounds").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
+            "fire.hit" | "fire.kill" => hit += d.get("hits").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
+            _ => {}
+        }
+    }
+    (launched > 0.0).then(|| hit / launched)
+}
+
+/// Two tank platoons meet on open ground (the meeting engagement's tanks,
+/// flat ground): the range of the first volley either fires, m.
+pub fn tank_engagement_range(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-meeting-engagement")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let mut v = crate::scengen::build(&spec).ok()?;
+    let keep = ["b-1", "b-hq", "r-1", "r-hq"];
+    v["forces"].as_array_mut()?.retain(|x| x["id"].as_str().is_some_and(|i| keep.contains(&i)));
+    for h in v["command"]["hqs"].as_array_mut()? {
+        let sub = if h["side"] == "blue" { "b-1" } else { "r-1" };
+        h["subordinates"] = serde_json::json!([sub]);
+    }
+    v["victory"] = serde_json::json!([]);
+    let sc = ScenarioV4::from_json(&v.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(40.0 * 60.0));
+    sim.drain_events()
+        .into_iter()
+        .find(|e| matches!(e.kind.as_str(), "fire.hit" | "fire.kill" | "fire.miss" | "fire.launch"))
+        .and_then(|e| e.data.get("rangeM").and_then(serde_json::Value::as_f64))
+}
+
+/// Troops in the open (or light cover) under a minute of machine-gun fire,
+/// 10–40 near misses a minute: how long after the fire stops until their
+/// suppression has faded (below 0.1), s. The people model the game uses.
+pub fn suppression_recovery(f: &Figures, seed: Seed) -> Value {
+    use bgws_models::people::{IncomingFire, PeopleParams, Suppression};
+    let p = PeopleParams::from_figures(f);
+    let mut r = rng(seed, "v.suppression");
+    let fire = IncomingFire { near_misses_per_min: r.gen_range(10.0..40.0), blasts_per_min: 0.0 };
+    let cover = r.gen_range(0.0..0.3);
+    let mut s = Suppression::default();
+    for _ in 0..60 {
+        s.step(1.0, &fire, cover, &p);
+    }
+    let quiet = IncomingFire { near_misses_per_min: 0.0, blasts_per_min: 0.0 };
+    for t in 1..=1800 {
+        s.step(1.0, &quiet, cover, &p);
+        if s.level < 0.1 {
+            return Some(t as f64);
+        }
+    }
+    Some(1800.0)
+}
+
+/// The company attack on flat ground with the rules: how long a contact
+/// report takes from the sighting to its HQ's picture, min (the game's
+/// median over the reports that arrive).
+pub fn spot_report_latency(f: &Figures, seed: Seed) -> Value {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-company-attack")?;
+    spec.ground = crate::scengen::GroundSpec::Flat;
+    let sc = ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()?;
+    let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions { flat_ground: true, ..Default::default() }).ok()?;
+    play_with_rules(&mut sim, SimTime::from_secs(30.0 * 60.0));
+    let c4 = sim.world.get_resource::<bgws_sim::domains::drones::C4>()?;
+    let mut l: Vec<f64> = c4.c2.latency.iter().map(|x| x.latency_s / 60.0).collect();
+    if l.is_empty() {
+        return None;
+    }
+    l.sort_by(f64::total_cmp);
+    Some(l[l.len() / 2])
+}
+
 /// FPV strike by a skilled crew: of the hits, did it fail to destroy? [P9]
 pub fn fpv(f: &Figures, seed: Seed) -> Value {
     use bgws_ops::drones::*;
@@ -287,10 +385,25 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
 /// it, in minutes. Only targets handed down by an HQ count (a team striking
 /// what it sees itself needs no network), and only the first strike on each
 /// detection (re-strikes are not a new chain).
+/// The drone line without blue's tank and IFV: the strike chain alone.
+/// Attacking at will, the armour knocks out the red infantry at 3 km before
+/// the drones reach it, and the chain is left with little to strike.
+pub fn drones_only(sc: &ScenarioV4) -> Option<ScenarioV4> {
+    let mut v = serde_json::to_value(sc).ok()?;
+    let armour: Vec<String> = v["forces"].as_array()?.iter().filter(|f| f["side"] == "blue" && (f["platform"] == "generic/mbt" || f["platform"] == "generic/ifv")).filter_map(|f| f["id"].as_str().map(String::from)).collect();
+    v["forces"].as_array_mut()?.retain(|f| !armour.iter().any(|a| f["id"] == a.as_str()));
+    for h in v.get_mut("command").and_then(|c| c.get_mut("hqs")).and_then(|h| h.as_array_mut()).into_iter().flatten() {
+        if let Some(subs) = h.get_mut("subordinates").and_then(|x| x.as_array_mut()) {
+            subs.retain(|x| !armour.iter().any(|a| x == a.as_str()));
+        }
+    }
+    ScenarioV4::from_json(&v.to_string()).ok()
+}
+
 pub fn detect_to_strike(scenario: &ScenarioV4, network: Network, hours: f64) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         use bgws_ops::drones::{DroneType, StrikeStage};
-        let mut sc = scenario.clone();
+        let mut sc = drones_only(scenario)?;
         sc.world.network = [(Side::Blue, network), (Side::Red, network)].into_iter().collect();
         let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
         play_with_rules(&mut sim, SimTime::from_secs(hours * 3600.0));
@@ -416,6 +529,10 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
         };
         let r = match v.id.as_str() {
             "mbt-engagement" => check(&mbt_engagement),
+            "atgm-engagement" => check(&atgm_engagement),
+            "tank-engagement-range" => check(&tank_engagement_range),
+            "suppression-recovery" => check(&suppression_recovery),
+            "spot-report-latency" => check(&spot_report_latency),
             "fpv-effectiveness" => check(&fpv),
             "shahed-raid" => check(&shahed),
             "ballistic-missile-defence" => check(&bmd),
@@ -469,6 +586,10 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
     let exp: Box<ExperimentFn> = match id {
         "mbt-engagement" => Box::new(mbt_engagement),
+        "atgm-engagement" => Box::new(atgm_engagement),
+        "tank-engagement-range" => Box::new(tank_engagement_range),
+        "suppression-recovery" => Box::new(suppression_recovery),
+        "spot-report-latency" => Box::new(spot_report_latency),
         "fpv-effectiveness" => Box::new(fpv),
         "shahed-raid" => Box::new(shahed),
         "ballistic-missile-defence" => Box::new(bmd),

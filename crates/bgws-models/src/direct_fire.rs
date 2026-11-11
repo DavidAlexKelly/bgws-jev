@@ -126,6 +126,14 @@ pub struct DirectFireParams {
     pub small_arms_p_incap: f64,
     pub small_arms_aimed_fraction: f64,
     pub near_miss_radius_m: f64,
+    /// A guided missile's chance of reaching the target it is launched at
+    /// (in place of the gun error budget: guidance takes the dispersion out).
+    pub guided_ph: f64,
+    /// Share of that lost per unit of the gunner's suppression, when the
+    /// gunner guides it to the end (wire, laser, beam), and when it guides
+    /// itself (fire and forget).
+    pub guided_supp_operator: f64,
+    pub guided_supp_self: f64,
 }
 
 fn fc_from(f: &Figures, which: &str) -> FireControl {
@@ -175,6 +183,9 @@ impl DirectFireParams {
             small_arms_p_incap: f.get("direct.small_arms.p_incap_per_hit"),
             small_arms_aimed_fraction: f.get("direct.small_arms.aimed_fraction"),
             near_miss_radius_m: f.get("direct.small_arms.near_miss_radius_m"),
+            guided_ph: f.get("direct.guided.ph"),
+            guided_supp_operator: f.get("direct.guided.suppression_operator"),
+            guided_supp_self: f.get("direct.guided.suppression_self"),
         }
     }
 }
@@ -314,6 +325,14 @@ pub fn presented_person(posture: PersonPosture, cover: f64, p: &DirectFireParams
 pub fn ph_given_bias(pres: &Presented, bias: (f64, f64), b: &ErrorBudget) -> f64 {
     normal_interval(-pres.width_m / 2.0, pres.width_m / 2.0, bias.0, b.random_sigma_x_m)
         * normal_interval(-pres.height_m / 2.0, pres.height_m / 2.0, bias.1, b.random_sigma_y_m)
+}
+
+/// A guided missile's chance of reaching its target: the base figure, less
+/// what the gunner's suppression costs (more when the gunner guides it to
+/// the end than when it guides itself).
+pub fn guided_ph(operator_guided: bool, suppression: f64, p: &DirectFireParams) -> f64 {
+    let k = if operator_guided { p.guided_supp_operator } else { p.guided_supp_self };
+    (p.guided_ph * (1.0 - k * suppression.clamp(0.0, 1.0))).clamp(0.0, 1.0)
 }
 
 /// The marginal first-round Ph (bias integrated out).
@@ -647,6 +666,9 @@ pub fn figures() -> Vec<Figure> {
         figure!("direct.small_arms.p_incap_per_hit", 0.7, "fraction", 0.3, 1.0, "default", Default, "a bullet hit incapacitates"),
         figure!("direct.small_arms.aimed_fraction", 0.1, "fraction", 0.01, 1.0, "default", Default, "fraction of rounds aimed at a visible man (the rest is area fire)"),
         figure!("direct.small_arms.near_miss_radius_m", 3.0, "m", 1.0, 10.0, "default", Default, "a round this close suppresses"),
+        figure!("direct.guided.ph", 0.8, "fraction", 0.3, 0.99, "default", Default, "a guided anti-tank missile's chance of reaching the target it is launched at, within its range"),
+        figure!("direct.guided.suppression_operator", 0.6, "fraction", 0.0, 1.0, "default", Default, "share of that lost at full suppression when the gunner guides it to the end (wire, laser)"),
+        figure!("direct.guided.suppression_self", 0.15, "fraction", 0.0, 1.0, "default", Default, "share lost at full suppression for fire and forget (only the launch is disturbed)"),
     ];
     let fc = [
         ("range_error_frac", 0.10, 0.0, "fraction", 0.0, 0.3, "range estimation σ as a fraction of range"),
@@ -693,6 +715,22 @@ mod tests {
     }
     fn still(range: f64) -> Shot {
         Shot { range_m: range, firer_moving: false, target_crossing_mps: 0.0, skill_mult: 1.0, suppression: 0.0 }
+    }
+
+    /// A guided missile arrives at the guidance's rate, not a gun's over its
+    /// long flight; suppression costs a wire- or laser-guided one more than a
+    /// fire-and-forget one, and never raises it.
+    #[test]
+    fn guided_missiles_hit_by_their_guidance() {
+        let p = DirectFireParams::from_figures(&figs());
+        assert_relative_eq!(guided_ph(true, 0.0, &p), p.guided_ph);
+        assert_relative_eq!(guided_ph(false, 0.0, &p), p.guided_ph);
+        assert!(guided_ph(true, 1.0, &p) < guided_ph(false, 1.0, &p));
+        assert!(guided_ph(true, 0.5, &p) <= guided_ph(true, 0.0, &p));
+        // The same missile's flight as a gun round: far worse at 1.9 km (the old resolution).
+        let gun = Gun { muzzle_velocity_mps: 180.0, ..p.mbt_gun };
+        let as_gun = ph_expected(&presented_vehicle(&mbt(), 0.0, VehiclePosture::Exposed, &p), &error_budget(&gun, &p.fc_modern, &still(1_900.0), &p));
+        assert!(as_gun < 0.2 && guided_ph(true, 0.0, &p) > 0.6, "as a gun {as_gun:.3}");
     }
 
     #[test]

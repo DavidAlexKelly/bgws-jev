@@ -140,3 +140,71 @@ fn the_shipped_decision_cases_build_and_can_be_judged() {
     assert_eq!(b.items(&c).unwrap()[0].acceptable, c.acceptable);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// The engagement suite pairs each game with a rules baseline on the same
+/// seed: with the rules themselves under test, the two games are the same,
+/// so every difference is exactly zero. Its worst games can be kept in the lab.
+#[test]
+fn the_suite_pairs_games_with_the_rules_baseline() {
+    use bgws_run::suite;
+    let entries = vec![suite::Entry { scenario: "skirmish-catalogue-armour-v1".into(), minutes: Some(30.0), note: String::new(), held_out: false }];
+    let (d, name) = bgws_run::lab::decider_for(DeciderChoice::Rules, &default_figures(), None, false, ("", "")).unwrap();
+    let r = suite::run(&entries, &[1, 2], d, &name, &default_figures(), 2, &suite::Options::default(), &|_| {}).unwrap();
+    assert_eq!(r.pairs.len(), 4, "two seeds, each side");
+    for p in &r.pairs {
+        assert_eq!((p.diff.result, p.diff.exchange, p.diff.own_loss, p.diff.survival), (0.0, 0.0, 0.0, 0.0), "{p:?}");
+    }
+    let all = r.summaries.iter().find(|s| s.scope == "all").unwrap();
+    assert_eq!((all.pairs, all.better, all.worse), (4, 0, 0));
+    assert!(all.baseline.survival > 0.0 && all.baseline.survival <= 1.0);
+    assert!(suite::load_entries().unwrap().len() >= 5, "the shipped suite");
+}
+
+/// The tuner's guardrails, without calling anyone: a rewrite that drops a
+/// placeholder, names something from the cases or quotes a range is
+/// refused; a general one passes; the held-out split is fixed; the
+/// confidence cut-off is chosen from the answers; a diff says what changed.
+#[test]
+fn the_tuners_guardrails_hold() {
+    use bgws_decide::jev::Wording;
+    use bgws_run::{cases, tune};
+    let dir = tmp("tune");
+    let (bases, list) = cases::load(&cases::case_dirs(&dir)).unwrap();
+    let (train, held) = tune::split(&list, 0.3);
+    assert_eq!(train.len() + held.len(), list.len());
+    assert!(!held.is_empty() && !train.is_empty());
+    assert_eq!(tune::split(&list, 0.3).1.iter().map(|c| &c.id).collect::<Vec<_>>(), held.iter().map(|c| &c.id).collect::<Vec<_>>(), "the split does not move");
+    let mut b = cases::Builder::new(bases, &default_figures()).unwrap();
+    let items = cases::build_all(&mut b, &list).unwrap();
+    let words: std::collections::BTreeSet<String> = ["blue 1 troop".to_string(), "t-72b3".to_string()].into_iter().collect();
+    let actions: std::collections::BTreeSet<String> = bgws_behaviour::Vocabulary::builtin().actions.keys().cloned().collect();
+    let ok = Wording { balance: "Carry out the intent; stay alive to do it.".into(), ..Default::default() };
+    assert!(tune::check(&ok, &words, &actions).is_ok());
+    let mut lost = ok.clone();
+    lost.land = lost.land.replace("{situation}", "");
+    assert!(tune::check(&lost, &words, &actions).unwrap_err().contains("{situation}"));
+    let leak = Wording { balance: "If a T-72B3 is near, engage.".into(), ..Default::default() };
+    assert!(tune::check(&leak, &words, &actions).unwrap_err().contains("names something"));
+    let range = Wording { balance: "Engage inside 1500 m.".into(), ..Default::default() };
+    assert!(tune::check(&range, &words, &actions).unwrap_err().contains("three or more digits"));
+    let mut unknown = ok.clone();
+    unknown.option_words.insert("land.teleport".into(), "Go elsewhere.".into());
+    assert!(tune::check(&unknown, &words, &actions).is_err());
+    let mut words_ok = ok.clone();
+    words_ok.option_words.insert("land.betterPosition".into(), "Move to a firing position with more cover: it is exposed while it moves.".into());
+    assert!(tune::check(&words_ok, &words, &actions).is_ok());
+    // Option words reach Jev's request; a per-point cut-off is read.
+    let q = items.iter().find(|i| i.question.options.iter().any(|o| o.action == "land.betterPosition")).unwrap().question.clone();
+    let (body, _) = bgws_decide::jev::build_request_worded("m", q.side, std::slice::from_ref(&q), None, 255, false, &words_ok);
+    assert!(body.to_string().contains("exposed while it moves"));
+    let mut t = Wording::default();
+    t.point_confidence.insert("D1".into(), 0.1);
+    assert_eq!((t.threshold("D1", 0.25), t.threshold("D2", 0.25)), (0.1, 0.25));
+    // The cut-off from a run's answers: a confident wrong pick and an unsure right one.
+    let fb = cases::judge(&list, &items, &cases::fallback_answers(&items), "fallback");
+    let th = cases::best_threshold(&fb, 0.25);
+    assert!(th.1 >= th.2, "never worse than the old cut-off");
+    assert!(tune::diff(&Wording::default(), &words_ok).contains("optionWords.land.betterPosition"));
+    assert_eq!(tune::diff(&Wording::default(), &Wording::default()), "(no change)\n");
+    let _ = std::fs::remove_dir_all(dir);
+}

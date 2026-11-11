@@ -1193,7 +1193,15 @@
      "javelin": 4,
      "ball556": 2400
     }
-   }
+   },
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 50,
+    "specific": 60
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 50 Anti-Tank Missiles; specific (Life Form-Human-Specific-Anti Tank Missiles) 60 127mm FGM-148 Javelin"
   },
   {
    "id": "sec_uk_gpmg_sf",
@@ -1218,7 +1226,15 @@
     "ammo": {
      "ball762": 2400
     }
-   }
+   },
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 35,
+    "specific": 58
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 35 Machine Guns; specific (Life Form-Human-Specific-Machine Guns) 58 7.62x51mm M240/FN MAG 58 GPMG (the L7 is an FN MAG)"
   },
   {
    "id": "sec_uk_mortar",
@@ -1288,7 +1304,15 @@
       "front": 1
      }
     }
-   }
+   },
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 75,
+    "specific": 51
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 75 Mortars; specific (Life Form-Human-Specific-Mortars) 51 81mm L16"
   },
   {
    "id": "sec_ru_mr_bmp",
@@ -1466,7 +1490,14 @@
       "front": 1
      }
     }
-   }
+   },
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 75
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 75 Mortars (the 82 mm 2B14 has no specific row)"
   },
   {
    "id": "sec_us_mech_sqd",

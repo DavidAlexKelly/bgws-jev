@@ -854,7 +854,8 @@ fn burst(s: &mut Sim, st: &mut FiresWorld, mid: u64, k: u64, side: Side, shooter
                 crew.last_incoming = Some((now, sh));
             }
         }
-        if kills > 0 {
+        // A remote entity's owner judges a burst on it (it gets our detonation).
+        if kills > 0 && !crate::remote::is_remote(s, e) {
             let destroyed = {
                 let mut h = s.world.get_mut::<Health>(e).expect("h");
                 h.fit -= kills;

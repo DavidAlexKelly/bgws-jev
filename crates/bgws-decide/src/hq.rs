@@ -149,6 +149,11 @@ pub struct HqSituation {
     /// Key terrain round the force and its objective (the terrain appreciation).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub terrain: Vec<TerrainNote>,
+    /// "attack" (take the objective), "withdraw" (fall back to it: it lies
+    /// away from the enemy) or "defend" (hold it against the enemy's attack),
+    /// when the scenario gives the side an objective or the enemy one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<String>,
 }
 
 /// A piece of key terrain from the pack's terrain appreciation, as an HQ
@@ -252,6 +257,12 @@ pub fn land_prompt(s: &HqSituation, side: &str) -> String {
         lines.push(format!("Guidance from {}: {}. Priorities: {}.", g.by, g.aims.join("; "), g.priorities.join(", ")));
     }
     lines.push(format!("Why you are planning now: {}.", s.why));
+    match s.mission.as_deref() {
+        Some("attack") => lines.push("Your mission: take the objective (OBJECTIVE) and hold it; failing to by the time limit loses.".into()),
+        Some("withdraw") => lines.push("Your mission: fall back to the objective (OBJECTIVE), behind you and away from the enemy, and hold it; get there before the enemy does.".into()),
+        Some("defend") => lines.push("Your mission: hold the objective (OBJECTIVE) against the enemy's attack; the enemy must take it, so keeping it until the time limit wins.".into()),
+        _ => {}
+    }
     lines.push(format!("What has reached your HQ:\n{}", picture_words(&s.cop)));
     if !s.terrain.is_empty() {
         lines.push("Key terrain (from the terrain appreciation; orders may use these labels as reference points):".into());
@@ -360,6 +371,11 @@ pub struct HeuristicParams {
     pub enemy_close_m: f64,
     pub culmination_min_distance_m: f64,
     pub min_units_for_reserve: usize,
+    pub fire_and_movement: bool,
+    pub fm_min_units: usize,
+    pub release_m: f64,
+    pub sbf_reach: f64,
+    pub weak: f64,
 }
 
 impl HeuristicParams {
@@ -379,6 +395,11 @@ impl HeuristicParams {
             enemy_close_m: f.get("decide.heuristic.enemy_close"),
             culmination_min_distance_m: f.get("decide.heuristic.culmination_min_distance"),
             min_units_for_reserve: f.get("decide.heuristic.min_units_for_reserve") as usize,
+            fire_and_movement: f.get("decide.heuristic.fire_and_movement") >= 0.5,
+            fm_min_units: f.get("decide.heuristic.fm_min_units").round() as usize,
+            release_m: f.get("decide.heuristic.release"),
+            sbf_reach: f.get("decide.heuristic.sbf_reach"),
+            weak: f.get("decide.heuristic.weak"),
         }
     }
 }
@@ -423,9 +444,32 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
     let fit: u32 = s.units.iter().map(|u| u.vehicles_fit).sum();
     let lost = if total > 0 { 1.0 - fit as f64 / total as f64 } else { 0.0 };
     let culminated = lost >= p.culmination_loss && anchor.surface_distance(objective) > p.culmination_min_distance_m;
-    let attack = !culminated && (enemy == 0.0 || ratio >= p.attack_ratio);
+    // A side told to defend holds, whatever the odds.
+    let defend = s.mission.as_deref() == Some("defend");
+    // Falling back: every unit to the objective, then hold it, whatever the odds.
+    if s.mission.as_deref() == Some("withdraw") {
+        let intent = "fall back to the objective and hold it".to_string();
+        let axis = anchor.bearing_to(objective).to_degrees();
+        let mut orders = Vec::new();
+        let n = units.len();
+        for (i, u) in units.iter().enumerate() {
+            let offset = (i as f64 - (n as f64 - 1.0) / 2.0) * p.frontage_m;
+            let at = objective.destination(deg((axis + 90.0).rem_euclid(360.0)), offset);
+            let (task, hold) = if u.role == UnitRole::Manoeuvre { ("withdraw to the objective and hold it", "overwatch") } else { ("withdraw to the objective", "hold") };
+            orders.push(order(&u.id, vec![phase("fall back to the objective", "withdraw", Some(at), None), phase("hold the objective", hold, None, None)], task, &intent, "engage", "withinShortRange"));
+        }
+        return json!({
+            "by": "heuristic",
+            "plan": format!("{}: {intent}", s.hq),
+            "guidance": {"by": s.hq, "aims": [intent], "priorities": ["the objective", "break contact"], "apportionment": {}, "roe": s.guidance.as_ref().and_then(|g| g.roe.clone()).map(|r| json!(r)).unwrap_or(json!({"weaponsFree": true, "escalationLimit": "conventional"})), "measures": s.guidance.as_ref().map(|g| g.measures.clone()).unwrap_or_default(), "objective": point(objective)},
+            "orders": orders,
+        });
+    }
+    let attack = !defend && !culminated && (enemy == 0.0 || ratio >= p.attack_ratio);
     let r1 = (ratio * 10.0).round() / 10.0;
-    let intent = if culminated {
+    let intent = if defend {
+        format!("hold the objective against the enemy's attack ({r1}:1)")
+    } else if culminated {
         format!("the attack has culminated at {}% losses: hold and consolidate", (lost * 100.0).round())
     } else if attack {
         format!("take the objective and hold it ({} attack, {r1}:1)", s.echelon)
@@ -448,11 +492,79 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
 
     let mut manoeuvre: Vec<&HqUnit> = units.iter().copied().filter(|u| u.role == UnitRole::Manoeuvre).collect();
     manoeuvre.sort_by(|a, b| a.id.cmp(&b.id));
-    let reserve = (attack && manoeuvre.len() >= p.min_units_for_reserve).then(|| manoeuvre[manoeuvre.len() - 1].id.clone());
-    let lead: Vec<&HqUnit> = manoeuvre.iter().copied().filter(|u| Some(&u.id) != reserve.as_ref()).collect();
+    let mut reserve = (attack && manoeuvre.len() >= p.min_units_for_reserve).then(|| manoeuvre[manoeuvre.len() - 1].id.clone());
+    let mut lead: Vec<&HqUnit> = manoeuvre.iter().copied().filter(|u| Some(&u.id) != reserve.as_ref()).collect();
     let axis = anchor.bearing_to(objective).to_degrees();
     let mut orders = Vec::new();
+    let behind = |d: f64| objective.destination(deg((axis + 180.0).rem_euclid(360.0)), d);
+    // Fire and movement: one lead unit supports by fire while the rest move
+    // to a release line and bound in; the badly hurt support by fire from
+    // where they are, and the reserve takes their place.
+    let mut support: Vec<String> = Vec::new();
+    if attack && p.fire_and_movement {
+        let share = |u: &HqUnit| if u.vehicles_total > 0 { u.vehicles_fit as f64 / u.vehicles_total as f64 } else { 1.0 };
+        let (weak, fit): (Vec<&HqUnit>, Vec<&HqUnit>) = lead.iter().copied().partition(|u| share(u) < p.weak);
+        lead = fit;
+        if !weak.is_empty() {
+            if let Some(r) = reserve.take() {
+                if let Some(u) = manoeuvre.iter().find(|u| u.id == r) {
+                    lead.push(u);
+                }
+            }
+        }
+        for u in &weak {
+            orders.push(order(&u.id, vec![phase("support by fire from where it is", "overwatch", None, None)], "support by fire: it is too weak to assault", &intent, "engage", "always"));
+            support.push(u.id.clone());
+        }
+        if lead.len() >= p.fm_min_units.max(2) {
+            // The lead unit that reaches farthest gives the fire.
+            let k = (0..lead.len()).max_by(|&a, &b| lead[a].reach_m.unwrap_or(0.0).total_cmp(&lead[b].reach_m.unwrap_or(0.0)).then(b.cmp(&a))).unwrap_or(0);
+            let sbf = lead.remove(k);
+            let reach = sbf.reach_m.unwrap_or(2_000.0).max(500.0);
+            let want = reach * p.sbf_reach;
+            let near = anchor.surface_distance(objective);
+            // An observation point in reach of the objective, on our side, if the terrain analysis has one.
+            let op = s
+                .terrain
+                .iter()
+                .filter(|t| t.kind == "observation")
+                .filter(|t| {
+                    let d = t.at.surface_distance(objective);
+                    (600.0..=reach * 0.95).contains(&d) && t.at.surface_distance(anchor) < near + 500.0
+                })
+                .min_by(|a, b| (a.at.surface_distance(objective) - want).abs().total_cmp(&(b.at.surface_distance(objective) - want).abs()));
+            let (at, why) = match op {
+                Some(t) => (t.at, format!("from {}", t.label)),
+                None => (if near <= want { sbf.at } else { behind(want) }, "from a stand-off position".to_string()),
+            };
+            orders.push(order(
+                &sbf.id,
+                vec![phase(&format!("move to support by fire {why}"), "move", Some(at), Some("tactical")), phase("support the assault by fire", "overwatch", None, None)],
+                "support by fire onto the objective",
+                &intent,
+                "engage",
+                "always",
+            ));
+            support.push(sbf.id.clone());
+        }
+    }
+    let assault = attack && p.fire_and_movement && !support.is_empty();
     for (i, u) in lead.iter().enumerate() {
+        if assault {
+            let offset = (i as f64 - (lead.len() as f64 - 1.0) / 2.0) * p.frontage_m;
+            let target = objective.destination(deg((axis + 90.0).rem_euclid(360.0)), offset);
+            let release = target.destination(deg((axis + 180.0).rem_euclid(360.0)), p.release_m);
+            let mut phases = Vec::new();
+            if u.at.surface_distance(target) > p.release_m + 300.0 {
+                phases.push(phase("move to the release line", "move", Some(release), Some("tactical")));
+            }
+            phases.push(phase("bound onto the objective under covering fire", "move", Some(target), Some("bound")));
+            phases.push(phase("hold the objective on overwatch", "overwatch", None, None));
+            // Attacking armour engages at its weapons' greatest effective
+            // range; holding fire to short range is for a defence or an ambush.
+            orders.push(order(&u.id, phases, "attack: take the objective", &intent, "engage", "always"));
+            continue;
+        }
         if !attack {
             orders.push(order(&u.id, vec![phase("hold this ground on overwatch", "overwatch", None, None)], "hold", &intent, "engage", "withinShortRange"));
             continue;
@@ -466,10 +578,9 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
             "attack: take the objective",
             &intent,
             "engage",
-            "withinShortRange",
+            "always",
         ));
     }
-    let behind = |d: f64| objective.destination(deg((axis + 180.0).rem_euclid(360.0)), d);
     if let Some(r) = &reserve {
         orders.push(order(
             r,
@@ -523,7 +634,7 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
     }
     let mut plan = json!({
         "by": "heuristic",
-        "plan": format!("{}: {intent}{}", s.hq, reserve.as_ref().map(|r| format!("; reserve {r}")).unwrap_or_default()),
+        "plan": format!("{}: {intent}{}{}", s.hq, if support.is_empty() { String::new() } else { format!("; support by fire {}", support.join(", ")) }, reserve.as_ref().map(|r| format!("; reserve {r}")).unwrap_or_default()),
         "orders": orders,
         "guidance": guidance,
     });

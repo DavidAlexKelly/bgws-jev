@@ -153,7 +153,9 @@ impl EntityTask {
     pub fn references(&self) -> Vec<&str> {
         match self {
             EntityTask::Strike { target_id: Some(t), .. } | EntityTask::Intercept { target_id: t } => vec![t.as_str()],
-            EntityTask::ReturnToBase { base_id } | EntityTask::Landed { base_id, .. } => vec![base_id.as_str()],
+            EntityTask::ReturnToBase { base_id } | EntityTask::Landed { base_id, .. } => {
+                vec![base_id.as_str()]
+            }
             EntityTask::Deliver { to_unit, .. } => vec![to_unit.as_str()],
             EntityTask::Reload { port_id, .. } => vec![port_id.as_str()],
             EntityTask::Route { then: Some(t), .. } => t.references(),
@@ -201,6 +203,9 @@ pub struct Force {
     pub echelon: Option<Echelon>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub concealed: bool,
+    /// Starts in a prepared position: dug in (fights hull-down, entrenched against shellfire).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub dug_in: bool,
     /// A headquarters, and how many subordinates it can activate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command_rating: Option<f64>,
@@ -371,6 +376,18 @@ pub enum VictoryCondition {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         label: Option<String>,
     },
+    /// Take and hold ground: some of `side`'s land units (fit) within
+    /// `radius_m` of `at` and none of the enemy's, held for `hold_s`. A side
+    /// with an objective it has not taken by the time limit has failed: the
+    /// other side wins (unless both have one).
+    Objective {
+        side: Side,
+        at: Geodetic,
+        radius_m: f64,
+        hold_s: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+    },
     /// A side breaks when it has lost this share of its combat strength
     /// (the TS `rules.breakpointPct`); `side` absent applies to both.
     Breakpoint {
@@ -391,7 +408,7 @@ impl VictoryCondition {
     }
     pub fn positions(&self) -> Vec<Geodetic> {
         match self {
-            VictoryCondition::AirSuperiority { at, .. } | VictoryCondition::SeaControl { at, .. } | VictoryCondition::Through { at, .. } => vec![*at],
+            VictoryCondition::AirSuperiority { at, .. } | VictoryCondition::SeaControl { at, .. } | VictoryCondition::Through { at, .. } | VictoryCondition::Objective { at, .. } => vec![*at],
             VictoryCondition::All { of, .. } => of.iter().flat_map(|c| c.positions()).collect(),
             _ => vec![],
         }
@@ -663,6 +680,76 @@ pub struct ScenarioV4 {
     pub notes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub converted_from: Option<Provenance>,
+    /// How the game appears to other simulations (DIS, HLA); none for a game
+    /// that is not connected to any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interop: Option<InteropSpec>,
+}
+
+/// A game's identity on a DIS exercise or HLA federation
+/// (docs/design/INTEROP_PLAN.md).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteropSpec {
+    /// The DIS exercise identifier (1-255).
+    #[serde(default = "one_u8")]
+    pub exercise: u8,
+    /// This simulation's DIS site and application numbers.
+    #[serde(default = "one_u16")]
+    pub site: u16,
+    #[serde(default = "one_u16")]
+    pub application: u16,
+    /// The country (SISO-REF-010) each side's generic platforms are shown
+    /// as; a side not listed is 0, Other.
+    #[serde(default)]
+    pub country: BTreeMap<Side, u16>,
+    /// The DIS force each side is (SISO-REF-010 Force ID); by default blue 1
+    /// Friendly, red 2 Opposing, neutral 3 Neutral.
+    #[serde(default)]
+    pub force: BTreeMap<Side, u8>,
+    /// Every simulation in the exercise plays on this scenario's generated
+    /// ground (exported with `bgws export-ground`). Without it, a game on
+    /// generated ground does not join an exercise: no partner has that ground.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared_ground: bool,
+}
+
+fn one_u8() -> u8 {
+    1
+}
+fn one_u16() -> u16 {
+    1
+}
+
+impl Default for InteropSpec {
+    fn default() -> Self {
+        InteropSpec { exercise: 1, site: 1, application: 1, country: BTreeMap::new(), force: BTreeMap::new(), shared_ground: false }
+    }
+}
+
+impl InteropSpec {
+    /// Why this scenario's ground cannot be federated, if it cannot: generated
+    /// ground (no theatre pack) that the exercise has not agreed to share.
+    pub fn ground_refusal(&self, theatre: &Theatre, flat: bool) -> Option<String> {
+        if self.shared_ground || (theatre.pack.is_some() && !flat) {
+            return None;
+        }
+        let what = if flat { "flat ground".to_string() } else { format!("{} ground", theatre.ground) };
+        Some(format!(
+            "this scenario plays on {what}, which no other simulation has: give it a theatre pack built from real terrain (`bgws terrain`), \
+             or share the ground (`bgws export-ground`, then `\"sharedGround\": true` in its interop block)"
+        ))
+    }
+    pub fn country_of(&self, side: Side) -> u16 {
+        self.country.get(&side).copied().unwrap_or(0)
+    }
+    pub fn force_of(&self, side: Side) -> u8 {
+        self.force.get(&side).copied().unwrap_or(match side {
+            Side::Blue => 1,
+            Side::Red => 2,
+            Side::Neutral => 3,
+        })
+    }
 }
 
 impl ScenarioV4 {
@@ -707,7 +794,9 @@ impl ScenarioV4 {
                 _ => {}
             }
         }
-        let Ok(mut v) = serde_json::to_value(&*self) else { return };
+        let Ok(mut v) = serde_json::to_value(&*self) else {
+            return;
+        };
         walk(&mut v, dlat, dlon);
         if let Ok(moved) = serde_json::from_value::<ScenarioV4>(v) {
             *self = moved;
@@ -742,5 +831,25 @@ impl ScenarioV4 {
             v.extend(c.positions().into_iter().map(|p| (format!("victory[{i}]"), p)));
         }
         v
+    }
+}
+
+#[cfg(test)]
+mod interop_tests {
+    use super::*;
+
+    #[test]
+    fn generated_ground_is_federated_only_when_shared() {
+        let mut theatre: Theatre = serde_json::from_value(serde_json::json!({ "origin": { "lat": 54.2, "lon": 18.6, "h": 0.0 } })).unwrap();
+        let mut spec = InteropSpec::default();
+        assert!(spec.ground_refusal(&theatre, false).is_some(), "generated, not shared");
+        theatre.pack = Some("packs/gdansk".into());
+        assert!(spec.ground_refusal(&theatre, false).is_none(), "real terrain");
+        assert!(spec.ground_refusal(&theatre, true).is_some(), "flat ground over a pack");
+        spec.shared_ground = true;
+        theatre.pack = None;
+        assert!(spec.ground_refusal(&theatre, false).is_none(), "shared");
+        let back: InteropSpec = serde_json::from_value(serde_json::json!({ "sharedGround": true })).unwrap();
+        assert!(back.shared_ground);
     }
 }

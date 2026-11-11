@@ -29,6 +29,7 @@ use crate::hq::{CopTrack, OrderPoint, Phase, Plan, UnitOrder};
 use crate::queue::{Priority, Scheduled};
 use crate::sim::{SeatKind, Sim};
 use bgws_catalogue::Domain;
+use bgws_know::KnowParams;
 use bgws_core::{Enu, EntityId, Geodetic, HqId, QuestionKind, Side, SimDuration, SimTime, TrackId};
 use bgws_know::{Cop, CopOutcome, Detection, TrackView};
 use bgws_ops::c2::{plan_quality, Echelon, StaffCell, StaffItem};
@@ -528,7 +529,11 @@ fn staff(s: &mut Sim, c4: &mut C4) {
                 Work::Contact { observer, dets, new: _ } => {
                     let oldest = dets.iter().map(|d| d.time).min().unwrap_or(now);
                     let store = s.ctx.tracks.get_mut(&side).expect("side");
-                    let scans = store.ingest(dets, &know);
+                    // A unit reports a contact it has been watching: its HQ
+                    // takes it as established, not as one blip to confirm
+                    // with a second look (reports come minutes apart).
+                    let reported = KnowParams { confirm_m: 1, ..know.clone() };
+                    let scans = store.ingest(dets, &reported);
                     let mut ids: BTreeSet<TrackId> = BTreeSet::new();
                     for sc in &scans {
                         ids.extend(sc.tracks_seen_by(observer));
@@ -964,6 +969,89 @@ pub fn hq_cop_tracks(s: &Sim, side: Side) -> Option<Vec<CopTrack>> {
     )
 }
 
+/// An enemy in a unit's share of its side's picture.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharedTrack {
+    pub pos: bgws_core::Enu,
+    /// What the picture makes it, and how sure (when it has a view).
+    pub class: Option<(bgws_know::Hypothesis, f64)>,
+    /// Since it was last seen, s.
+    pub age_s: f64,
+    /// The unit that reported it first, if a friend.
+    pub by: Option<EntityId>,
+    pub error_m: f64,
+}
+
+/// Can this unit get its HQ's picture now: it has an HQ that is up, and
+/// its radios are not out. Returns the HQ and the latest a track may have
+/// been seen to have reached it (`sim.c2.picture_lag_s` ago).
+fn picture_link(s: &Sim, c4: &C4, unit: EntityId) -> Option<(usize, SimTime)> {
+    let &h = c4.c2.unit_hq.get(&unit)?;
+    let hq = &c4.c2.hqs[h];
+    if !hq.up() || c4.comms.dead.contains(&unit) || c4.comms.cut.contains(&unit) {
+        return None;
+    }
+    Some((h, SimTime::from_secs(s.ctx.now.secs() - c4.p.picture_lag_s)))
+}
+
+/// The enemy picture a land unit has from its HQ (a battle management
+/// system, voice reports): the tracks its HQ held `sim.c2.picture_lag_s`
+/// ago. Nothing for a unit with no HQ, an HQ that is down, or radios out.
+pub fn picture_for(s: &Sim, unit: EntityId) -> Vec<SharedTrack> {
+    let Some(c4) = s.world.get_resource::<C4>() else { return Vec::new() };
+    let Some((h, last)) = picture_link(s, c4, unit) else { return Vec::new() };
+    let hq = &c4.c2.hqs[h];
+    let now = s.ctx.now;
+    hq.cop
+        .picture(now, &s.ctx.p.know)
+        .into_iter()
+        .filter(|t| t.domain == bgws_know::Domain::Land && t.seen_at <= last)
+        .map(|t| SharedTrack {
+            pos: t.estimate.position(),
+            class: t.class_top.first().copied(),
+            age_s: (now - t.seen_at).secs(),
+            by: t.sources.first().copied().filter(|&x| x != unit),
+            error_m: t.ellipse.semi_major,
+        })
+        .collect()
+}
+
+/// Where each land unit's share of its side's picture says an enemy is:
+/// (position, how close counts), for cueing its search. Each HQ's picture
+/// is read once; a unit gets it as [`picture_for`] does.
+pub fn cue_spots(s: &Sim) -> BTreeMap<EntityId, Vec<(bgws_core::Enu, f64)>> {
+    let mut out = BTreeMap::new();
+    let Some(c4) = s.world.get_resource::<C4>() else { return out };
+    let now = s.ctx.now;
+    let mut per_hq: BTreeMap<usize, Vec<(bgws_core::Enu, f64, SimTime)>> = BTreeMap::new();
+    for &u in c4.c2.unit_hq.keys() {
+        let Some((h, last)) = picture_link(s, c4, u) else { continue };
+        let hq = &c4.c2.hqs[h];
+        let pic = per_hq.entry(h).or_insert_with(|| {
+            hq.cop
+                .picture(now, &s.ctx.p.know)
+                .into_iter()
+                .filter(|t| t.domain == bgws_know::Domain::Land)
+                .map(|t| (t.estimate.position(), (2.0 * t.ellipse.semi_major).max(CUE_MIN_M), t.seen_at))
+                .collect()
+        });
+        out.insert(u, pic.iter().filter(|x| x.2 <= last).map(|x| (x.0, x.1)).collect());
+    }
+    out
+}
+
+/// A unit made during the game (an IFV's dismounts) joins its parent's HQ:
+/// it reports to it and gets its share of the picture.
+pub fn adopt(s: &mut Sim, parent: EntityId, child: EntityId) {
+    let Some(mut c4) = s.world.get_resource_mut::<C4>() else { return };
+    if let Some(&h) = c4.c2.unit_hq.get(&parent) {
+        c4.c2.unit_hq.insert(child, h);
+    }
+}
+
+/// A cue from the picture covers at least this far around a reported contact, m.
+pub const CUE_MIN_M: f64 = 300.0;
+
 /// A unit as its side's HQs last heard of it (the newest report), with nets.
 pub fn hq_unit_report(s: &Sim, side: Side, unit: EntityId) -> Option<UnitReport> {
     let c4 = s.world.get_resource::<C4>()?;
@@ -1000,13 +1088,18 @@ pub fn apply_action(s: &mut Sim, e: bevy_ecs::prelude::Entity, id: EntityId, act
     let handled = match action {
         "carryOnPhase" | "carryOn" | "acceptRisk" | "holdReserve" | "commitReserve" | "fireFirstRequest" => true,
         "actOnIntent" => {
-            if let Some(mut a) = s.world.get_mut::<Act>(e) {
-                if a.mission.phase + 1 < a.mission.phases.len() {
-                    a.mission.phase += 1;
-                    a.activity = a.mission.phases[a.mission.phase].clone();
-                } else if let Some(p) = a.mission.phases.get(a.mission.phase).cloned() {
-                    a.activity = p;
+            let has = match s.world.get_mut::<Act>(e) {
+                Some(mut a) => {
+                    if a.mission.phase + 1 < a.mission.phases.len() {
+                        a.mission.phase += 1;
+                    }
+                    a.mission.phase < a.mission.phases.len()
                 }
+                None => false,
+            };
+            if has {
+                let next = crate::decide::current_phase(s, e);
+                s.world.get_mut::<Act>(e).expect("a").activity = next;
             }
             true
         }

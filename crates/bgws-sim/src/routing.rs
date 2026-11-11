@@ -269,6 +269,7 @@ fn mode_ix(m: MoveModeS) -> usize {
         MoveModeS::Tactical => 1,
         MoveModeS::Assault => 2,
         MoveModeS::Stealth => 3,
+        MoveModeS::Bound => 1,
     }
 }
 

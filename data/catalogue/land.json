@@ -108,7 +108,14 @@
    "rationale": "Two firing posts; eight missiles between them.",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "team"
+   "echelon": "team",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 50
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 50 Anti-Tank Missiles"
   },
   {
    "id": "generic/bomberDroneTeam",
@@ -159,7 +166,15 @@
    "costUsd": 120000,
    "rationale": "Three airframes and a truckload of batteries.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 171,
+    "specific": 3
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 171 Personal Electronics; specific 3 UAV/UAS Remote Controller"
   },
   {
    "id": "generic/cbRadar",
@@ -241,7 +256,13 @@
      "kind": "reference",
      "ref": "R4.3"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 29
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 29 C3I System"
   },
   {
    "id": "generic/coastalAsm",
@@ -339,7 +360,13 @@
    "costUsd": 200000000,
    "rationale": "The battery that sank Moskva fired two missiles.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 4 Self-Propelled Artillery (coastal missile launchers, as SSC-6 Sennight)"
   },
   {
    "id": "generic/convoyTruck",
@@ -417,7 +444,13 @@
    "costUsd": 600000,
    "rationale": "Ten tonnes a truck.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 7
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 7 Large Wheeled Utility Vehicle"
   },
   {
    "id": "generic/counterDrone",
@@ -548,7 +581,13 @@
    "costUsd": 3000000,
    "rationale": "Layered counter-UAS on one vehicle: find with radar and RF, jam, then guns.",
    "source": "synthetic; R5.1",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 28
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 28 Air Defense / Missile Defense Unit Equipment"
   },
   {
    "id": "generic/droneIsrTeam",
@@ -635,7 +674,15 @@
    "rationale": "Operators in a dugout with four quadcopters and spare batteries.",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "team"
+   "echelon": "team",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 171,
+    "specific": 3
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 171 Personal Electronics; specific 3 UAV/UAS Remote Controller"
   },
   {
    "id": "generic/engineerSection",
@@ -734,7 +781,13 @@
      "kind": "reference",
      "ref": "R4.5, P13"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 3
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 3 Armored Utility Vehicle (as the HMEE engineer vehicle)"
   },
   {
    "id": "generic/esmTeam",
@@ -808,7 +861,13 @@
    "costUsd": 3000000,
    "rationale": "Direction finding to about 40 km on a mast.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 29
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 29 C3I System"
   },
   {
    "id": "generic/ewJammer",
@@ -904,7 +963,13 @@
      "kind": "reference",
      "ref": "R5.3, P16"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 29
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 29 C3I System"
   },
   {
    "id": "generic/fixedWingIsrTeam",
@@ -954,7 +1019,13 @@
    "costUsd": 500000,
    "rationale": "A van, a catapult and three airframes.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 7
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 7 Large Wheeled Utility Vehicle (catapult truck)"
   },
   {
    "id": "generic/fpvTeamFibre",
@@ -1043,7 +1114,15 @@
      "ref": "R4, P8"
     }
    },
-   "echelon": "team"
+   "echelon": "team",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 171,
+    "specific": 3
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 171 Personal Electronics; specific 3 UAV/UAS Remote Controller"
   },
   {
    "id": "generic/fpvTeamRf",
@@ -1138,7 +1217,15 @@
      "ref": "R5.1, P9"
     }
    },
-   "echelon": "team"
+   "echelon": "team",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 171,
+    "specific": 3
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 171 Personal Electronics; specific 3 UAV/UAS Remote Controller"
   },
   {
    "id": "generic/ifv",
@@ -1271,7 +1358,13 @@
    "rationale": "Burn scaled from the tank by mass (about half); one rifle section per vehicle.",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "platoon"
+   "echelon": "platoon",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 2 Armored Fighting Vehicle"
   },
   {
    "id": "generic/infantrySection",
@@ -1389,7 +1482,14 @@
      "ref": "P26 (default)"
     }
    },
-   "echelon": "section"
+   "echelon": "section",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 5
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 5 Assault Rifles"
   },
   {
    "id": "generic/interceptorTeam",
@@ -1499,7 +1599,15 @@
      "ref": "R4.4, P11"
     }
    },
-   "echelon": "team"
+   "echelon": "team",
+   "dis": {
+    "kind": 3,
+    "domain": 1,
+    "category": 10,
+    "subcategory": 171,
+    "specific": 3
+   },
+   "$dis": "SISO-REF-010 v35 Life Form Land Category 10 Conventional Armed Forces; subcategory: Life Form-Human-Subcategory-Equipment Class 171 Personal Electronics; specific 3 UAV/UAS Remote Controller"
   },
   {
    "id": "generic/loiterTeam",
@@ -1587,7 +1695,13 @@
    "costUsd": 400000,
    "rationale": "Lancet-like: 40 km, an hour aloft, a shaped charge.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 4 Self-Propelled Artillery (launcher vehicle)"
   },
   {
    "id": "generic/mbt",
@@ -1724,7 +1838,13 @@
      "ref": "R7, P17"
     }
    },
-   "echelon": "platoon"
+   "echelon": "platoon",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 1
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 1 Tank"
   },
   {
    "id": "generic/medevac",
@@ -1807,7 +1927,13 @@
    "costUsd": 3000000,
    "rationale": "Four stretchers a vehicle.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 3
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 3 Armored Utility Vehicle"
   },
   {
    "id": "generic/mlrs",
@@ -1896,7 +2022,13 @@
    "costUsd": 5000000,
    "rationale": "Six rockets a pod; GNSS-guided, so jamming matters.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 4 Self-Propelled Artillery (as M270 MLRS)"
   },
   {
    "id": "generic/mortar120",
@@ -1990,7 +2122,13 @@
    "rationale": "Range 7 km; a basic load of 60 bombs a tube.",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "section"
+   "echelon": "section",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 10
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 10 Mortar"
   },
   {
    "id": "generic/recce",
@@ -2094,7 +2232,13 @@
    "rationale": "Long-range optics on a mast; light, quiet vehicles.",
    "source": "synthetic",
    "provenance": "synthetic",
-   "echelon": "section"
+   "echelon": "section",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 2 Armored Fighting Vehicle"
   },
   {
    "id": "generic/samLong",
@@ -2199,7 +2343,13 @@
      "kind": "reference",
      "ref": "R4.4, P11"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 28
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 28 Air Defense / Missile Defense Unit Equipment (as S-400, Patriot)"
   },
   {
    "id": "generic/samMedium",
@@ -2296,7 +2446,13 @@
    "costUsd": 80000000,
    "rationale": "Radar 80 km against a fighter; launchers reloaded from stores.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 28
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 28 Air Defense / Missile Defense Unit Equipment"
   },
   {
    "id": "generic/sensorNode",
@@ -2324,7 +2480,13 @@
    "costUsd": 5000,
    "rationale": "A buried seismic and acoustic sensor: weeks on a battery.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 9,
+    "domain": 1,
+    "category": 6
+   },
+   "$dis": "SISO-REF-010 v35 Sensor/Emitter Category 6 Seismic (kind 9 Sensor/Emitter, domain 1 Land)"
   },
   {
    "id": "generic/shorad",
@@ -2443,7 +2605,13 @@
    "costUsd": 15000000,
    "rationale": "Radar 25 km; cheap guns before missiles.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 28
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 28 Air Defense / Missile Defense Unit Equipment (as Strela-10)"
   },
   {
    "id": "generic/sph155",
@@ -2542,7 +2710,13 @@
    "costUsd": 12000000,
    "rationale": "Burst of four rounds a gun; precision rounds a small share of the load.",
    "source": "synthetic",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 4 Self-Propelled Artillery"
   },
   {
    "id": "generic/srbmBattery",
@@ -2602,7 +2776,13 @@
    "costUsd": 50000000,
    "rationale": "Iskander-like: two missiles a launcher; interceptors take about 85% [P20].",
    "source": "P20, P29",
-   "provenance": "synthetic"
+   "provenance": "synthetic",
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 4
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 4 Self-Propelled Artillery (as the Iskander SS-26 TEL)"
   },
   {
    "id": "generic/ugv",
@@ -2683,7 +2863,13 @@
      "kind": "reference",
      "ref": "R7, P19"
     }
-   }
+   },
+   "dis": {
+    "kind": 1,
+    "domain": 1,
+    "category": 50
+   },
+   "$dis": "SISO-REF-010 v35 Platform-Land Category 50 Unmanned"
   }
  ]
 }

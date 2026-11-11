@@ -104,6 +104,13 @@ pub struct RecordedAnswer {
     pub answer: Answer,
 }
 
+/// One input from another simulation, as applied.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RecordedExternal {
+    pub at: SimTime,
+    pub input: Value,
+}
+
 /// A snapshot's bytes or JSON.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "encoding", content = "data", rename_all = "camelCase")]
@@ -158,11 +165,19 @@ pub struct RunSetup {
     pub flat_ground: bool,
     /// The HQs were asked for plans at the start.
     pub plan_at_start: bool,
+    /// Played in real time: decisions did not stop the clock, and each
+    /// answer applied when it came back (its `at`), so a replay gives them
+    /// at those times.
+    pub realtime: bool,
+    /// Played in lock step with a time-managed federation: the clock waited
+    /// for deciders, and other simulations' inputs applied at whole seconds.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub lockstep: bool,
 }
 
 impl Default for RunSetup {
     fn default() -> Self {
-        RunSetup { flat_ground: false, plan_at_start: true }
+        RunSetup { flat_ground: false, plan_at_start: true, realtime: false, lockstep: false }
     }
 }
 
@@ -190,6 +205,11 @@ pub struct GameRecord {
     pub answers: Vec<RecordedAnswer>,
     #[serde(default)]
     pub snapshots: Vec<RecordedSnapshot>,
+    /// Every input from another simulation (DIS, HLA), in the order applied,
+    /// each at the time it was applied (`bgws_sim::remote::ExternalInput`
+    /// as JSON), so a replay gives them back with no network.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external: Vec<RecordedExternal>,
     /// Where the record stops, when the game was saved before it was over.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ended_at: Option<SimTime>,
@@ -215,6 +235,7 @@ impl GameRecord {
             commands: Vec::new(),
             answers: Vec::new(),
             snapshots: Vec::new(),
+            external: Vec::new(),
             ended_at: None,
             fingerprint: None,
             outcome: None,
@@ -234,6 +255,10 @@ impl GameRecord {
 
     pub fn push_answer(&mut self, at: SimTime, answer: Answer) {
         self.answers.push(RecordedAnswer { at, answer });
+    }
+
+    pub fn push_external(&mut self, at: SimTime, input: Value) {
+        self.external.push(RecordedExternal { at, input });
     }
 
     pub fn push_snapshot(&mut self, s: RecordedSnapshot) {

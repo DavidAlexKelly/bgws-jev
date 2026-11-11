@@ -71,7 +71,7 @@ pub fn router_for(scenario: &ScenarioV4, figures: &Figures, opts: &HostOptions) 
     let heuristic = HeuristicPlanner::from_figures(figures);
     r.set_planner(Side::Blue, Route::Rules, Arc::new(heuristic.clone()));
     r.set_planner(Side::Red, Route::Rules, Arc::new(heuristic.clone()));
-    let jev = Arc::new(JevClient::from_env(JevConfig::from_figures(figures)));
+    let jev = Arc::new(JevClient::from_env(JevConfig { wording: crate::jev_wording(), ..JevConfig::from_figures(figures) }));
     let mut ccfg = ClaudeConfig::from_figures(figures);
     if let Some(m) = opts.claude_model.clone().or_else(|| (!scenario.command.model.is_empty()).then(|| scenario.command.model.clone())) {
         ccfg.model = m;
@@ -397,7 +397,86 @@ pub struct PlayReport {
 }
 
 /// A game in progress with its deciders and its record.
+/// What a real-time game is connected to (docs/design/INTEROP_PLAN.md):
+/// `tick` after every second with that second's events (to publish them),
+/// `inbound` before each second for what other simulations sent.
+pub trait Link {
+    fn tick(&mut self, sim: &Sim, events: &[LogEvent]);
+    fn inbound(&mut self, _sim: &Sim) -> Vec<bgws_sim::remote::ExternalInput> {
+        Vec::new()
+    }
+}
+
+/// A link that only watches each second (a progress line, a test).
+pub struct OnTick<F: FnMut(&Sim)>(pub F);
+
+impl<F: FnMut(&Sim)> Link for OnTick<F> {
+    fn tick(&mut self, sim: &Sim, _events: &[LogEvent]) {
+        (self.0)(sim)
+    }
+}
+
+/// A game in an HLA federation: publishes each second and, time-managed,
+/// waits there for the federation's grant.
+pub struct HlaLinkAdapter<F: FnMut(&Sim)> {
+    pub link: bgws_interop::hla::link::HlaLink,
+    pub on_tick: F,
+    pub errors: Vec<String>,
+    pub notes: Vec<String>,
+}
+
+impl<F: FnMut(&Sim)> HlaLinkAdapter<F> {
+    pub fn new(link: bgws_interop::hla::link::HlaLink, on_tick: F) -> Self {
+        HlaLinkAdapter { link, on_tick, errors: Vec::new(), notes: Vec::new() }
+    }
+}
+
+impl<F: FnMut(&Sim)> Link for HlaLinkAdapter<F> {
+    fn tick(&mut self, sim: &Sim, events: &[LogEvent]) {
+        (self.on_tick)(sim);
+        if let Err(e) = self.link.tick(sim, events) {
+            self.errors.push(e.to_string());
+        }
+    }
+    fn inbound(&mut self, sim: &Sim) -> Vec<bgws_sim::remote::ExternalInput> {
+        let inputs = self.link.inbound(sim);
+        self.notes.append(&mut self.link.notes);
+        inputs
+    }
+}
+
+/// A game on DIS: publishes each second, takes in what others send, and
+/// logs the stand-ins chosen for their types.
+pub struct DisLinkAdapter<F: FnMut(&Sim)> {
+    pub link: bgws_interop::link::DisLink,
+    pub on_tick: F,
+    pub errors: Vec<String>,
+    pub notes: Vec<String>,
+}
+
+impl<F: FnMut(&Sim)> DisLinkAdapter<F> {
+    pub fn new(link: bgws_interop::link::DisLink, on_tick: F) -> Self {
+        DisLinkAdapter { link, on_tick, errors: Vec::new(), notes: Vec::new() }
+    }
+}
+
+impl<F: FnMut(&Sim)> Link for DisLinkAdapter<F> {
+    fn tick(&mut self, sim: &Sim, events: &[LogEvent]) {
+        (self.on_tick)(sim);
+        if let Err(e) = self.link.tick(sim, events) {
+            self.errors.push(e.to_string());
+        }
+    }
+    fn inbound(&mut self, sim: &Sim) -> Vec<bgws_sim::remote::ExternalInput> {
+        let inputs = self.link.inbound(sim);
+        self.notes.extend(self.link.notes());
+        inputs
+    }
+}
+
 pub struct Host {
+    /// Events kept for a link while playing in lock step.
+    collected: Option<Vec<LogEvent>>,
     pub sim: Sim,
     pub router: Router,
     pub record: GameRecord,
@@ -416,6 +495,13 @@ pub struct Host {
     /// A play-out: replaying, this question gets this answer instead of the
     /// recorded one; from there the rules decide and the dice are reseeded.
     force: Option<Forced>,
+    /// Real-time play, kept across calls (so a game can be played a second
+    /// at a time): answers being worked on, recorded answers waiting for
+    /// their time, the next recorded input, the last second shown.
+    rt_inflight: Vec<tokio::task::JoinHandle<Vec<Answer>>>,
+    rt_recorded: Vec<(SimTime, Answer)>,
+    rt_next_external: usize,
+    rt_ticked: Option<SimTime>,
 }
 
 #[derive(Clone, Debug)]
@@ -446,9 +532,9 @@ impl Host {
         machine.threads = Some(rayon::current_num_threads() as u32);
         let mut record = GameRecord::new(scenario.clone(), seed, BuildInfo::this(option_env!("BGWS_BUILD_ID").unwrap_or("dev")), machine);
         record.figure_overrides = overrides;
-        record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start };
+        record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start, realtime: false, lockstep: false };
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-        Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0, keep_questions: false, asked: Vec::new(), force: None })
+        Ok(Host { collected: None, sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0, keep_questions: false, asked: Vec::new(), force: None, rt_inflight: Vec::new(), rt_recorded: Vec::new(), rt_next_external: 0, rt_ticked: None })
     }
 
     /// Replay a recorded game without calling any decider.
@@ -573,8 +659,172 @@ impl Host {
         Ok(self.rt.block_on(router.answer(questions)))
     }
 
+    /// Play to `until` in real time (docs/design/INTEROP_PLAN.md §3.4): the
+    /// clock does not stop for decisions. Questions go to the deciders in the
+    /// background; a unit with a question out carries on, and each answer is
+    /// given at the first second boundary after it comes back (it applies no
+    /// sooner than the crew's reaction time after the question). With `pace`
+    /// (sim seconds per wall second), each second waits for the wall clock;
+    /// without it the game runs as fast as it can (a replay, a test).
+    ///
+    /// `link` sees the sim and its events after every second (to publish
+    /// them), and before each second hands over what other simulations sent;
+    /// each input is applied and recorded at that second boundary. While the
+    /// exercise is stopped (a DIS Stop/Freeze), a paced game holds its clock.
+    ///
+    /// Replaying a real-time record, the recorded answers and inputs are
+    /// given at their recorded times, with no network: the replay is exact.
+    pub fn play_realtime(&mut self, until: SimTime, pace: Option<f64>, link: &mut dyn Link) -> Result<Option<bgws_sim::Outcome>> {
+        self.record.run.realtime = true;
+        let (mut wall0, mut sim0) = (std::time::Instant::now(), self.sim.now());
+        let mut inflight = std::mem::take(&mut self.rt_inflight);
+        let mut recorded = std::mem::take(&mut self.rt_recorded);
+        let mut next_external = self.rt_next_external;
+        let mut events: Vec<LogEvent> = Vec::new();
+        // The last whole second shown to `link` (a second ends either
+        // advanced or with questions to hand out; each is shown once).
+        let mut ticked: Option<SimTime> = self.rt_ticked;
+        let tick = |sim: &Sim, ticked: &mut Option<SimTime>, events: &mut Vec<LogEvent>, link: &mut dyn Link| {
+            let now = sim.now();
+            if (now.secs().fract() == 0.0 || now >= until) && *ticked != Some(now) {
+                *ticked = Some(now);
+                link.tick(sim, events);
+                events.clear();
+            }
+        };
+        loop {
+            self.apply_recorded()?;
+            let now = self.sim.now();
+            // Inputs from other simulations, at this boundary.
+            if let Some(rec) = &self.replay {
+                let due: Vec<_> = rec.external.iter().skip(next_external).take_while(|x| x.at <= now).cloned().collect();
+                next_external += due.len();
+                for x in due {
+                    let input: bgws_sim::remote::ExternalInput = serde_json::from_value(x.input.clone()).map_err(|e| anyhow!("a recorded input does not read: {e}"))?;
+                    self.record.push_external(now, x.input);
+                    self.sim.apply_external(input);
+                }
+            } else {
+                for input in link.inbound(&self.sim) {
+                    self.record.push_external(now, serde_json::to_value(&input)?);
+                    self.sim.apply_external(input);
+                }
+            }
+            // Stopped: hold the clock (live and paced only), listening.
+            if self.sim.ctx.frozen && self.replay.is_none() && pace.is_some() {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                (wall0, sim0) = (std::time::Instant::now(), self.sim.now());
+                continue;
+            }
+            // Answers back since the last stop are given now.
+            if self.replay.is_some() {
+                let (ready, later): (Vec<_>, Vec<_>) = std::mem::take(&mut recorded).into_iter().partition(|(at, _)| *at <= now);
+                recorded = later;
+                if !ready.is_empty() {
+                    self.submit(now, ready.into_iter().map(|(_, a)| a).collect())?;
+                }
+            } else {
+                let (done, running): (Vec<_>, Vec<_>) = std::mem::take(&mut inflight).into_iter().partition(|h| h.is_finished());
+                inflight = running;
+                for h in done {
+                    let answers = self.rt.block_on(h).map_err(|e| anyhow!("a decider failed: {e}"))?;
+                    self.submit(now, answers)?;
+                }
+            }
+            let next = SimTime::from_secs(now.secs().floor() + 1.0).min(until);
+            let stop = self.next_command_at().filter(|t| *t < next).unwrap_or(next);
+            let step = self.sim.advance_nonblocking(stop);
+            events.extend(self.flush_events()?);
+            match step {
+                Step::Over(o) => {
+                    self.record.outcome = Some(serde_json::to_value(&o)?);
+                    self.record.fingerprint = Some(self.sim.fingerprint());
+                    tick(&self.sim, &mut ticked, &mut events, link);
+                    (self.rt_inflight, self.rt_recorded, self.rt_next_external, self.rt_ticked) = (inflight, recorded, next_external, ticked);
+                    return Ok(Some(o));
+                }
+                Step::NeedsAnswers { questions, .. } => {
+                    tick(&self.sim, &mut ticked, &mut events, link);
+                    self.questions += questions.len();
+                    if self.keep_questions {
+                        self.asked.extend(questions.iter().cloned());
+                    }
+                    if let Some(rec) = &self.replay {
+                        // Recorded answers wait for their time; one never given stays unanswered.
+                        for q in &questions {
+                            if let Some(a) = rec.answers.iter().find(|a| a.answer.question == q.id) {
+                                recorded.push((a.at, a.answer.clone()));
+                            }
+                        }
+                    } else {
+                        let router = self.router.clone();
+                        inflight.push(self.rt.spawn(async move { router.answer(questions).await }));
+                    }
+                }
+                Step::Advanced => {
+                    let now = self.sim.now();
+                    tick(&self.sim, &mut ticked, &mut events, link);
+                    if now >= until {
+                        (self.rt_inflight, self.rt_recorded, self.rt_next_external, self.rt_ticked) = (inflight, recorded, next_external, ticked);
+                        return Ok(None);
+                    }
+                    if let Some(scale) = pace.filter(|s| *s > 0.0) {
+                        let target = wall0 + std::time::Duration::from_secs_f64((now.secs() - sim0.secs()) / scale);
+                        let wait = target.saturating_duration_since(std::time::Instant::now());
+                        if !wait.is_zero() {
+                            std::thread::sleep(wait);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Advance to `until`, answering every question on the way. `on_step`
     /// sees the sim after each stop (for a UI or progress).
+    /// Play in lock step with a time-managed federation (HLA): the clock
+    /// waits for deciders as in [`Host::play_until`]; at each whole second
+    /// the link is shown the second's events (it sends them and waits for
+    /// the federation to grant the next second) and what it took in applies
+    /// at that boundary. Inputs are recorded, so a replay needs no
+    /// federation; with every federate in lock step, the same seeds give the
+    /// same game.
+    pub fn play_lockstep(&mut self, until: SimTime, link: &mut dyn Link) -> Result<Option<bgws_sim::Outcome>> {
+        self.record.run.lockstep = true;
+        let mut next_external = self.rt_next_external;
+        loop {
+            let now = self.sim.now();
+            if let Some(rec) = &self.replay {
+                let due: Vec<_> = rec.external.iter().skip(next_external).take_while(|x| x.at <= now).cloned().collect();
+                next_external += due.len();
+                for x in due {
+                    let input: bgws_sim::remote::ExternalInput = serde_json::from_value(x.input.clone()).map_err(|e| anyhow!("a recorded input does not read: {e}"))?;
+                    self.record.push_external(now, x.input);
+                    self.sim.apply_external(input);
+                }
+            } else {
+                for input in link.inbound(&self.sim) {
+                    self.record.push_external(now, serde_json::to_value(&input)?);
+                    self.sim.apply_external(input);
+                }
+            }
+            if now >= until {
+                self.rt_next_external = next_external;
+                return Ok(None);
+            }
+            let next = SimTime::from_secs(now.secs().floor() + 1.0).min(until);
+            self.collected = Some(Vec::new());
+            let r = self.play_until(next, |_| {});
+            let events = self.collected.take().unwrap_or_default();
+            let r = r?;
+            link.tick(&self.sim, &events);
+            if r.is_some() {
+                self.rt_next_external = next_external;
+                return Ok(r);
+            }
+        }
+    }
+
     pub fn play_until(&mut self, until: SimTime, mut on_step: impl FnMut(&Sim)) -> Result<Option<bgws_sim::Outcome>> {
         loop {
             self.apply_recorded()?;
@@ -643,12 +893,15 @@ impl Host {
         }
     }
 
-    fn flush_events(&mut self) -> Result<()> {
+    fn flush_events(&mut self) -> Result<Vec<LogEvent>> {
         let events: Vec<LogEvent> = self.sim.drain_events();
         if let Some(w) = &mut self.events_out {
             w.write(&events)?;
         }
-        Ok(())
+        if let Some(c) = &mut self.collected {
+            c.extend(events.iter().cloned());
+        }
+        Ok(events)
     }
 
     pub fn report(&self) -> PlayReport {

@@ -24,7 +24,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 /// The pinned model: `-latest` would make yesterday's experiment unrepeatable.
-pub const JEV_MODEL: &str = "typesafe/jev-1.13";
+pub const JEV_MODEL: &str = "typesafe/jev-1.14";
 /// OpenRouter's Decisions API (alpha).
 pub const OPENROUTER_DECISIONS_URL: &str = "https://openrouter.ai/api/alpha/decisions";
 /// The environment variable the key is read from.
@@ -89,7 +89,7 @@ pub fn parse_choices(body: &Value, offered: &BTreeMap<String, Vec<String>>) -> B
 /// An option's key in the request: its own id when that is a plain word
 /// (`engageNow`, `keep`), which reads better to the model than `o3`;
 /// else `o<index>`. Unique within the question.
-fn option_key(id: &str, index: usize, taken: &[String]) -> String {
+pub(crate) fn option_key(id: &str, index: usize, taken: &[String]) -> String {
     let plain = !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     if plain && !taken.iter().any(|t| t == id) {
         id.to_string()
@@ -118,6 +118,111 @@ pub fn build_request(model: &str, side: Side, questions: &[Question], directive:
 }
 
 pub fn build_request_with(model: &str, side: Side, questions: &[Question], directive: Option<&str>, max_choices: usize, prose: bool) -> (Value, Vec<Keyed>) {
+    build_request_worded(model, side, questions, directive, max_choices, prose, &Wording::default())
+}
+
+/// Fill a wording template: `{name}` → its value.
+fn fill(template: &str, vars: &[(&str, &str)]) -> String {
+    let mut out = template.to_string();
+    for (k, v) in vars {
+        out = out.replace(&format!("{{{k}}}"), v);
+    }
+    out
+}
+
+/// How a question is worded to Jev: every sentence it is given that is not
+/// the situation itself. The defaults are the text the engine has always
+/// sent; a tuned wording (`data/jev/wording.json`, from `bgws lab tune`)
+/// replaces them. Templates take `{name}` placeholders.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Wording {
+    /// A land unit's instructions: {directive} {agent} {balance} {doctrine} {point} {title} {situation} {question} {others}.
+    pub land: String,
+    /// A world entity's: {directive} {agent} {side} {doctrine} {title} {question} {situation}.
+    pub world: String,
+    /// The rule of thumb every land unit is given.
+    pub balance: String,
+    /// {text}: the template's doctrine.
+    pub doctrine: String,
+    /// {names}: the other units deciding at the same moment.
+    pub others: String,
+    /// Where a unit's state is: {agent}.
+    pub state_pointer: String,
+    /// The same, after the situation in words (with `prose`): {situation} {agent}.
+    pub state_pointer_prose: String,
+    pub land_note: String,
+    pub world_note: String,
+    /// What an option's doctrine leaning reads as: strongly preferred, preferred, discouraged, strongly discouraged.
+    pub bias: [String; 4],
+    /// Jev's own description of an option, by action (`land.betterPosition`), in place of the library's.
+    pub option_words: BTreeMap<String, String>,
+    /// The confidence below which Jev's choice is not taken (else the figure's), and per decision point.
+    pub min_confidence: Option<f64>,
+    pub point_confidence: BTreeMap<String, f64>,
+}
+
+impl Default for Wording {
+    fn default() -> Self {
+        Wording {
+            land: "{directive}You lead {agent}. {balance}\n\n{doctrine}Decision point {point}, {title}. {situation} {question} {others}The crew has already done its drill (cover, and return fire if it can see the shooter).".into(),
+            world: "{directive}You decide for {agent}, on the {side} side. {doctrine}{title}. {question}{situation}".into(),
+            balance: BALANCE.into(),
+            doctrine: "Its doctrine: {text}\n\n".into(),
+            others: "Also deciding now, so choose to work together: {names}. ".into(),
+            state_pointer: "What it knows is under units.{agent} in the state: itself, its weapons and how far they reach, the enemy it has seen (and how far they reach), its orders, its ground and its friends.".into(),
+            state_pointer_prose: "{situation} What it knows is under units.{agent} in the state.".into(),
+            land_note: LAND_NOTE.into(),
+            world_note: WORLD_NOTE.into(),
+            bias: [" [strongly preferred by its doctrine]".into(), " [preferred by its doctrine]".into(), " [discouraged by its doctrine]".into(), " [strongly discouraged by its doctrine]".into()],
+            option_words: BTreeMap::new(),
+            min_confidence: None,
+            point_confidence: BTreeMap::new(),
+        }
+    }
+}
+
+impl Wording {
+    fn bias(&self, b: i8) -> &str {
+        match b {
+            b if b >= 2 => &self.bias[0],
+            b if b > 0 => &self.bias[1],
+            b if b <= -2 => &self.bias[3],
+            b if b < 0 => &self.bias[2],
+            _ => "",
+        }
+    }
+
+    /// The confidence a choice at this decision point needs.
+    pub fn threshold(&self, point: &str, figure: f64) -> f64 {
+        self.point_confidence.get(point).copied().or(self.min_confidence).unwrap_or(figure)
+    }
+
+    /// Every piece of text in it, for checks (placeholders, leaks, length).
+    pub fn texts(&self) -> Vec<(String, &str)> {
+        let mut v: Vec<(String, &str)> = vec![
+            ("land".into(), self.land.as_str()),
+            ("world".into(), self.world.as_str()),
+            ("balance".into(), self.balance.as_str()),
+            ("doctrine".into(), self.doctrine.as_str()),
+            ("others".into(), self.others.as_str()),
+            ("statePointer".into(), self.state_pointer.as_str()),
+            ("statePointerProse".into(), self.state_pointer_prose.as_str()),
+            ("landNote".into(), self.land_note.as_str()),
+            ("worldNote".into(), self.world_note.as_str()),
+        ];
+        for (k, b) in self.bias.iter().enumerate() {
+            v.push((format!("bias[{k}]"), b.as_str()));
+        }
+        for (k, w) in &self.option_words {
+            v.push((format!("optionWords.{k}"), w.as_str()));
+        }
+        v
+    }
+}
+
+/// [`build_request_with`] in a given wording.
+pub fn build_request_worded(model: &str, side: Side, questions: &[Question], directive: Option<&str>, max_choices: usize, prose: bool, w: &Wording) -> (Value, Vec<Keyed>) {
     let directive = directive.map(str::trim).filter(|d| !d.is_empty()).map(|d| format!("{d}\n\n")).unwrap_or_default();
     let mut qs = Map::new();
     let mut keyed = Vec::new();
@@ -139,33 +244,31 @@ pub fn build_request_with(model: &str, side: Side, questions: &[Question], direc
         }
         let mut criteria = Map::new();
         for ((k, _), o) in options.iter().zip(&q.options) {
-            criteria.insert(k.clone(), Value::String(format!("{}{}", o.summary, bias_words(o.bias))));
+            let words = w.option_words.get(&o.action).map(String::as_str).unwrap_or(&o.summary);
+            criteria.insert(k.clone(), Value::String(format!("{}{}", words, w.bias(o.bias))));
         }
-        let doctrine = if q.doctrine.is_empty() { String::new() } else { format!("Its doctrine: {}\n\n", q.doctrine.join(" ")) };
+        let doctrine = if q.doctrine.is_empty() { String::new() } else { fill(&w.doctrine, &[("text", &q.doctrine.join(" "))]) };
         let instructions = if is_land {
             let others: Vec<&str> = land.iter().filter(|o| o.agent != q.agent).map(|o| o.agent.as_str()).collect();
             let title = q.title.to_lowercase();
             let situation = match &q.state {
-                Some(_) if prose => format!("{} What it knows is under units.{} in the state.", q.situation, q.agent),
-                Some(_) => format!("What it knows is under units.{} in the state: itself, its weapons and how far they reach, the enemy it has seen (and how far they reach), its orders, its ground and its friends.", q.agent),
+                Some(_) if prose => fill(&w.state_pointer_prose, &[("situation", &q.situation), ("agent", &q.agent)]),
+                Some(_) => fill(&w.state_pointer, &[("agent", &q.agent)]),
                 None => q.situation.clone(),
             };
-            format!(
-                "{directive}You lead {}. {BALANCE}\n\n{doctrine}Decision point {}, {title}. {} {} {}The crew has already done its drill (cover, and return fire if it can see the shooter).",
-                q.agent,
-                q.trigger,
-                situation,
-                q.question,
-                if others.is_empty() { String::new() } else { format!("Also deciding now, so choose to work together: {}. ", others.join(", ")) }
+            let others = if others.is_empty() { String::new() } else { fill(&w.others, &[("names", &others.join(", "))]) };
+            fill(
+                &w.land,
+                &[("directive", &directive), ("agent", &q.agent), ("balance", &w.balance), ("doctrine", &doctrine), ("point", &q.trigger), ("title", &title), ("situation", &situation), ("question", &q.question), ("others", &others)],
             )
         } else {
             let situation = if q.situation.is_empty() { String::new() } else { format!(" {}", q.situation) };
-            format!("{directive}You decide for {}, on the {side} side. {doctrine}{}. {}{situation}", q.agent, q.title, q.question)
+            fill(&w.world, &[("directive", &directive), ("agent", &q.agent), ("side", side.as_str()), ("doctrine", &doctrine), ("title", &q.title), ("question", &q.question), ("situation", &situation)])
         };
         qs.insert(key.clone(), json!({ "type": "choice", "instructions": instructions, "criteria": criteria }));
         keyed.push(Keyed { key, options });
     }
-    let note = if land.is_empty() { WORLD_NOTE } else { LAND_NOTE };
+    let note = if land.is_empty() { &w.world_note } else { &w.land_note };
     let mut state = json!({ "you": side.as_str(), "note": note });
     let units: Map<String, Value> = questions.iter().filter_map(|q| q.state.as_ref().map(|s| (q.agent.clone(), s.clone()))).collect();
     if !units.is_empty() {
@@ -188,6 +291,10 @@ pub struct JevConfig {
     pub directive: Option<String>,
     /// Also give a unit's situation in words when its state goes as named fields.
     pub prose: bool,
+    /// How questions are worded (and the confidence cut-offs a tuned wording sets).
+    pub wording: Wording,
+    /// How Jev is asked (`BGWS_JEV_STYLE`): see [`crate::jev_ask::Style`].
+    pub style: crate::jev_ask::Style,
 }
 
 impl JevConfig {
@@ -201,6 +308,8 @@ impl JevConfig {
             max_choices: f.get("decide.jev.max_choices") as usize,
             directive: None,
             prose: false,
+            wording: Wording::default(),
+            style: crate::jev_ask::Style::from_env(),
         }
     }
 }
@@ -227,6 +336,7 @@ struct JevChoiceById {
 
 /// The Jev client: a [`Decider`] for one or both sides.
 pub struct JevClient {
+    vocab: bgws_behaviour::Vocabulary,
     http: reqwest::Client,
     key: Option<ApiKey>,
     cfg: JevConfig,
@@ -248,7 +358,8 @@ impl JevClient {
     /// With a given HTTP client (tests pass one without a proxy).
     pub fn with_http(http: reqwest::Client, key: Option<ApiKey>, cfg: JevConfig) -> JevClient {
         let name = cfg.model.clone();
-        JevClient { http, key, cfg, cache: Mutex::new(Cache::default()), spent: Mutex::new(BTreeMap::new()), name }
+        let name = if cfg.style == crate::jev_ask::Style::Legacy { name } else { format!("{name}+{}", cfg.style.word()) };
+        JevClient { vocab: bgws_behaviour::Vocabulary::builtin(), http, key, cfg, cache: Mutex::new(Cache::default()), spent: Mutex::new(BTreeMap::new()), name }
     }
 
     /// What this client has spent for a side, as OpenRouter reported it.
@@ -281,9 +392,12 @@ impl JevClient {
         }
     }
 
-    /// Turn an answer by id into an Answer, applying the threshold.
+    /// Turn an answer by id into an Answer, applying the threshold (the
+    /// legacy style only: confidence measures how peaked the answer is, not
+    /// how likely it is to be right).
     fn answer(&self, q: &Question, c: &JevChoiceById, source: AnswerSource, latency_ms: Option<u64>, cost: Option<f64>) -> Answer {
-        if c.confidence >= self.cfg.min_confidence && q.has_option(&c.choice) {
+        let cut = if self.cfg.style == crate::jev_ask::Style::Legacy { self.cfg.wording.threshold(&q.trigger, self.cfg.min_confidence) } else { 0.0 };
+        if c.confidence >= cut && q.has_option(&c.choice) {
             Answer {
                 question: q.id,
                 choice: c.choice.clone(),
@@ -318,10 +432,23 @@ impl Decider for JevClient {
                 None => ask.push(i),
             }
         }
-        if !ask.is_empty() {
-            let batch: Vec<Question> = ask.iter().map(|&i| questions[i].clone()).collect();
+        // Land units one per request (plain, judge); the rest together.
+        let (single, together): (Vec<usize>, Vec<usize>) = if self.cfg.style == crate::jev_ask::Style::Legacy {
+            (Vec::new(), ask)
+        } else {
+            ask.into_iter().partition(|&i| questions[i].kind == QuestionKind::Unit && questions[i].state.is_some())
+        };
+        if !single.is_empty() {
+            let qs: Vec<Question> = single.iter().map(|&i| questions[i].clone()).collect();
+            let answers = if self.cfg.style == crate::jev_ask::Style::Judge { self.judge(&qs).await } else { self.ask_each(side, &qs).await };
+            for (i, a) in single.into_iter().zip(answers) {
+                out[i] = Some(a);
+            }
+        }
+        if !together.is_empty() {
+            let batch: Vec<Question> = together.iter().map(|&i| questions[i].clone()).collect();
             let answers = self.ask(side, &batch).await;
-            for (i, a) in ask.into_iter().zip(answers) {
+            for (i, a) in together.into_iter().zip(answers) {
                 out[i] = Some(a);
             }
         }
@@ -338,10 +465,105 @@ impl JevClient {
         let Some(key) = &self.key else {
             return batch.iter().map(|q| Answer::fallback(q, format!("Jev unavailable (no OpenRouter key: set {KEY_ENV}) — the fallback stands"))).collect();
         };
-        let (body, keyed) = build_request_with(&self.cfg.model, side, batch, self.cfg.directive.as_deref(), self.cfg.max_choices, self.cfg.prose);
+        let (body, keyed) = build_request_worded(&self.cfg.model, side, batch, self.cfg.directive.as_deref(), self.cfg.max_choices, self.cfg.prose, &self.cfg.wording);
         let auth = format!("Bearer {}", key.expose());
         let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
-        let reply = match post_json(&self.http, &self.cfg.url, &headers, &body, self.cfg.timeout).await {
+        let reply = post_json(&self.http, &self.cfg.url, &headers, &body, self.cfg.timeout).await;
+        self.read(side, batch, &keyed, reply)
+    }
+
+    /// Each land unit's question in its own request, all at once.
+    async fn ask_each(&self, side: Side, qs: &[Question]) -> Vec<Answer> {
+        let Some(key) = &self.key else {
+            return qs.iter().map(|q| Answer::fallback(q, format!("Jev unavailable (no OpenRouter key: set {KEY_ENV}) — the fallback stands"))).collect();
+        };
+        let mut set = tokio::task::JoinSet::new();
+        let mut keyed: Vec<Keyed> = Vec::new();
+        for (i, q) in qs.iter().enumerate() {
+            let (body, k) = crate::jev_ask::plain_request(&self.cfg.model, q, self.cfg.max_choices, &self.vocab);
+            keyed.push(k);
+            let (http, url, auth, timeout) = (self.http.clone(), self.cfg.url.clone(), format!("Bearer {}", key.expose()), self.cfg.timeout);
+            set.spawn(async move {
+                let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
+                (i, post_json(&http, &url, &headers, &body, timeout).await)
+            });
+        }
+        let mut replies: Vec<Option<Result<crate::http::Reply, HttpError>>> = (0..qs.len()).map(|_| None).collect();
+        while let Some(done) = set.join_next().await {
+            if let Ok((i, r)) = done {
+                replies[i] = Some(r);
+            }
+        }
+        qs.iter()
+            .zip(keyed)
+            .zip(replies)
+            .map(|((q, k), r)| match r {
+                Some(r) => self.read(side, std::slice::from_ref(q), std::slice::from_ref(&k), r).pop().unwrap_or_else(|| Answer::fallback(q, "Jev gave no answer")),
+                None => Answer::fallback(q, "Jev's request did not finish — the fallback stands"),
+            })
+            .collect()
+    }
+
+    /// The judge style: each unit's decision from its point's table, with
+    /// Jev asked only for the judgments a row turns on (all at once); a
+    /// point without a table takes the doctrine default.
+    async fn judge(&self, qs: &[Question]) -> Vec<Answer> {
+        use crate::jev_judge::{decide, judge_request, judgments, parse_nouls, read, Facts};
+        let facts: Vec<Facts> = qs.iter().map(|q| q.state.as_ref().map(Facts::from_state).unwrap_or_default()).collect();
+        let mut set = tokio::task::JoinSet::new();
+        for (i, (q, f)) in qs.iter().zip(&facts).enumerate() {
+            let js = judgments(&q.trigger, f);
+            let Some(key) = self.key.as_ref().filter(|_| !js.is_empty()) else { continue };
+            let body = judge_request(&self.cfg.model, q, &js);
+            let (http, url, auth, timeout) = (self.http.clone(), self.cfg.url.clone(), format!("Bearer {}", key.expose()), self.cfg.timeout);
+            set.spawn(async move {
+                let headers = [("Authorization", auth.as_str()), ("X-Title", "BGWS")];
+                (i, post_json(&http, &url, &headers, &body, timeout).await)
+            });
+        }
+        let mut replies: Vec<Option<crate::http::Reply>> = (0..qs.len()).map(|_| None).collect();
+        while let Some(done) = set.join_next().await {
+            if let Ok((i, Ok(r))) = done {
+                replies[i] = Some(r);
+            }
+        }
+        qs.iter()
+            .zip(&facts)
+            .zip(replies)
+            .map(|((q, f), reply)| {
+                let nouls = reply.as_ref().map(|r| parse_nouls(&r.body)).unwrap_or_default();
+                let cost = reply.as_ref().and_then(|r| r.body.pointer("/usage/cost").and_then(Value::as_f64));
+                if let (Some(c), Ok(mut m)) = (cost, self.spent.lock()) {
+                    *m.entry(q.side).or_insert(0.0) += c;
+                }
+                let judged = |k: &str| read(nouls.get(k).copied());
+                let said: Vec<String> = nouls.iter().map(|(k, p)| format!("{k} {:.0}%", p * 100.0)).collect();
+                let (choice, why) = match decide(&q.trigger, f, &judged) {
+                    Some((prefer, row)) => match prefer.iter().find(|id| q.has_option(id)) {
+                        Some(id) => (id.to_string(), format!("table {}: {row}", q.trigger)),
+                        None => (q.rules_choice.clone(), format!("table {} ({row}) offers none of its options here: the doctrine's choice", q.trigger)),
+                    },
+                    None => (q.rules_choice.clone(), "no table at this point: the doctrine's choice".to_string()),
+                };
+                let choice = if q.has_option(&choice) { choice } else { q.fallback.clone() };
+                Answer {
+                    question: q.id,
+                    choice,
+                    probabilities: None,
+                    confidence: None,
+                    source: if reply.is_some() { AnswerSource::Jev } else { AnswerSource::Rules },
+                    plan: None,
+                    cost_usd: cost,
+                    latency_ms: reply.as_ref().map(|r| r.latency_ms),
+                    rationale: Some(if said.is_empty() { why } else { format!("{why} (Jev judged: {})", said.join(", ")) }),
+                }
+            })
+            .collect()
+    }
+
+    /// Read one reply's answers for its questions.
+    fn read(&self, side: Side, batch: &[Question], keyed: &[Keyed], reply: Result<crate::http::Reply, HttpError>) -> Vec<Answer> {
+        let reply = match reply {
             Ok(r) => r,
             Err(e) => {
                 let why = match &e {
@@ -364,7 +586,7 @@ impl JevClient {
         let share = cost.map(|c| c / batch.len() as f64);
         batch
             .iter()
-            .zip(&keyed)
+            .zip(keyed)
             .map(|(q, k)| match parsed.get(&k.key) {
                 Some(c) => {
                     let id_of = |key: &str| k.options.iter().find(|(ok, _)| ok == key).map(|(_, id)| id.clone());

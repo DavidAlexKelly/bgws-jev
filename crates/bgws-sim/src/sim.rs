@@ -152,6 +152,16 @@ pub struct Ctx {
     /// The obstacles on the ground and the sides that know of them, for the
     /// route planner (refreshed by the engineers' tick).
     pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
+    /// Guided missile volleys in flight.
+    pub missiles: Vec<crate::systems::InFlight>,
+    /// Entities another simulation owns, by their external key.
+    pub remote: BTreeMap<crate::remote::ExternalKey, EntityId>,
+    /// Detonations already judged: (the firing simulation's event, target,
+    /// burst point to the metre), so a duplicated packet is not judged twice
+    /// (several detonations may share an event: an artillery mission's salvos).
+    pub detonations_seen: std::collections::BTreeSet<crate::remote::DetonationKey>,
+    /// The exercise is stopped (a DIS Stop/Freeze): a real-time host holds the clock.
+    pub frozen: bool,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,
     pub(crate) reports: Vec<(SimTime, Side, bgws_know::Detection)>,
     pub(crate) last_plan: BTreeMap<Side, Plan>,
@@ -271,6 +281,10 @@ impl Sim {
             by_name: BTreeMap::new(),
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
             route_obstacles: Vec::new(),
+            missiles: Vec::new(),
+            remote: BTreeMap::new(),
+            detonations_seen: Default::default(),
+            frozen: false,
             last_asked: BTreeMap::new(),
             reports: Vec::new(),
             last_plan: BTreeMap::new(),
@@ -289,6 +303,7 @@ impl Sim {
         }
         let mut sim = Sim { world, ctx };
         crate::world::setup(&mut sim);
+        crate::dismount::setup(&mut sim);
         if opts.plan_at_start && !scenario.scope.planners.is_empty() {
             for side in Side::PLAYERS {
                 if sim.ctx.scenario.forces_of(side).next().is_some() {
@@ -332,12 +347,28 @@ impl Sim {
         crate::domains::lod::quiet::next_interesting_time(self)
     }
 
+    /// Advance without waiting on decisions (real time, docs/design/INTEROP_PLAN.md
+    /// §3.4): stop only to hand out questions not handed out before; a unit
+    /// whose question is out carries on with what it was doing, and its
+    /// answer, given with [`Sim::answer`] whenever it comes back, applies no
+    /// sooner than the crew's reaction time after the question.
+    pub fn advance_nonblocking(&mut self, until: SimTime) -> Step {
+        let skip = self.ctx.scenario.scope.time.map(|t| t.skip_quiet).unwrap_or(false);
+        self.advance_inner(until, skip, false)
+    }
+
     fn advance_with(&mut self, until: SimTime, skip_quiet: bool) -> Step {
+        self.advance_inner(until, skip_quiet, true)
+    }
+
+    fn advance_inner(&mut self, until: SimTime, skip_quiet: bool, wait: bool) -> Step {
         loop {
             if let Some(o) = &self.ctx.over {
                 return Step::Over(o.clone());
             }
-            let waiting: Vec<Question> = self.ctx.pending.values().filter(|p| !p.answered).map(|p| p.q.clone()).collect();
+            // Waiting: every question not answered. Not waiting: only those
+            // not handed out yet (to hand them out).
+            let waiting: Vec<Question> = self.ctx.pending.values().filter(|p| !p.answered && (wait || !p.handed_out)).map(|p| p.q.clone()).collect();
             if !waiting.is_empty() {
                 for p in self.ctx.pending.values_mut() {
                     p.handed_out = true;
@@ -401,6 +432,14 @@ impl Sim {
                 crate::systems::direct_fire(self);
             }
             {
+                prof_span!("dismount");
+                crate::dismount::base(self);
+            }
+            {
+                prof_span!("remote");
+                crate::remote::base(self, 1.0);
+            }
+            {
                 prof_span!("people");
                 crate::systems::people(self, 1.0);
             }
@@ -439,6 +478,12 @@ impl Sim {
             }
             other => crate::world::scheduled(self, other),
         }
+    }
+
+    /// Apply one input from another simulation (docs/design/INTEROP_PLAN.md
+    /// §3.2), at a tick boundary; the host records it.
+    pub fn apply_external(&mut self, input: crate::remote::ExternalInput) {
+        crate::remote::apply(self, input);
     }
 
     /// Hand back answers to the questions `advance` returned.
@@ -582,13 +627,35 @@ impl Sim {
                 at: Some(self.ctx.frame.enu_to_geodetic(t.position)),
             })
             .collect::<Vec<_>>());
-        // The objective: the enemy's start centroid as briefed (the scenario's intelligence).
-        let enemy: Vec<Geodetic> = self.ctx.scenario.forces_of(side.enemy()).map(|f| f.position).collect();
-        let objective = if enemy.is_empty() {
-            None
-        } else {
-            Some(Geodetic::new(enemy.iter().map(|g| g.lat).sum::<f64>() / enemy.len() as f64, enemy.iter().map(|g| g.lon).sum::<f64>() / enemy.len() as f64, 0.0))
+        // The objective: the scenario's (its own to take, or the enemy's to
+        // deny), else the enemy's start centroid as briefed (the intelligence).
+        let objective_of = |x: Side| {
+            self.ctx.scenario.victory.iter().find_map(|v| match v {
+                bgws_scenario::v4::VictoryCondition::Objective { side, at, .. } if *side == x => Some(*at),
+                _ => None,
+            })
         };
+        let (own_obj, enemy_obj) = (objective_of(side), objective_of(side.enemy()));
+        let enemy: Vec<Geodetic> = self.ctx.scenario.forces_of(side.enemy()).map(|f| f.position).collect();
+        // Farther from the enemy than the side is, as the two start (the
+        // briefing: the mission does not change as the fight moves).
+        let mean = |v: &[Geodetic]| (!v.is_empty()).then(|| Geodetic::new(v.iter().map(|g| g.lat).sum::<f64>() / v.len() as f64, v.iter().map(|g| g.lon).sum::<f64>() / v.len() as f64, 0.0));
+        let own_start: Vec<Geodetic> = self.ctx.scenario.forces_of(side).map(|f| f.position).collect();
+        let behind = |o: Geodetic| match (mean(&enemy), mean(&own_start)) {
+            (Some(ec), Some(oc)) => o.surface_distance(ec) > oc.surface_distance(ec) + 500.0,
+            _ => false,
+        };
+        // Its own objective, or the enemy's, lying behind it: a position to
+        // fall back to (and hold, or deny), not one to take where it stands.
+        let mission = match (own_obj, enemy_obj) {
+            (Some(o), _) | (None, Some(o)) if behind(o) => Some("withdraw".to_string()),
+            (Some(_), _) => Some("attack".to_string()),
+            (None, Some(_)) => Some("defend".to_string()),
+            _ => None,
+        };
+        let objective = own_obj.or(enemy_obj).or_else(|| {
+            (!enemy.is_empty()).then(|| Geodetic::new(enemy.iter().map(|g| g.lat).sum::<f64>() / enemy.len() as f64, enemy.iter().map(|g| g.lon).sum::<f64>() / enemy.len() as f64, 0.0))
+        });
         let mut refs = BTreeMap::new();
         if let Some(o) = objective {
             refs.insert("OBJECTIVE".to_string(), o);
@@ -614,6 +681,7 @@ impl Sim {
             reference_points: refs,
             shareable_means: BTreeMap::new(),
             terrain,
+            mission,
         }
     }
 
@@ -705,12 +773,18 @@ impl Sim {
         let mut fit: BTreeMap<Side, (f64, f64)> = BTreeMap::new();
         for &e in &self.ctx.order {
             let (Some(i), Some(h)) = (self.world.get::<Ident>(e), self.world.get::<Health>(e)) else { continue };
-            if i.dummy || i.side == Side::Neutral || !crate::domains::air::counts_for_strength(&i.platform) {
+            if i.dummy || i.side == Side::Neutral || !crate::domains::air::counts_for_strength(&i.platform) || crate::remote::is_remote(self, e) {
                 continue;
             }
             let s = fit.entry(i.side).or_insert((0.0, 0.0));
             s.0 += if h.destroyed { 0.0 } else { h.fit as f64 };
             s.1 += h.start as f64;
+            // The infantry it carries (or carried, lost before they got out).
+            if let Some(t) = self.world.get::<crate::dismount::Troops>(e) {
+                let (f, st) = t.strength(h);
+                s.0 += f;
+                s.1 += st;
+            }
         }
         fit.into_iter().map(|(s, (a, b))| (s, if b > 0.0 { a / b } else { 0.0 })).collect()
     }
@@ -798,7 +872,22 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
     let template = ctx.scenario.behaviours.assign.get(&f.id).cloned().unwrap_or_else(|| platform.template.clone());
     let quality = f.quality.rating();
     let count = if f.count > 0 { f.count } else { platform.body.count.max(1) };
-    let skill = Skill { base: (quality as f64 - 1.0) / 5.0, experience: 0.0 };
+    // Crews vary about their troop quality: skill and leadership are drawn
+    // for each unit (`sim.people.skill_spread`, `leadership_spread`).
+    let (skill_base, leadership) = {
+        use rand::Rng;
+        let mean = (quality as f64 - 1.0) / 5.0;
+        let mut rng = ctx.rng("crew", id.0 as u64, 0);
+        let mut normal = || {
+            // Box–Muller: one standard normal.
+            let (u1, u2): (f64, f64) = (rng.gen::<f64>().max(1e-12), rng.gen());
+            (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+        };
+        let a = normal();
+        let b = normal();
+        ((mean + ctx.p.skill_spread * a).clamp(0.0, 1.0), (mean + ctx.p.leadership_spread * b).clamp(0.0, 1.0))
+    };
+    let skill = Skill { base: skill_base, experience: 0.0 };
     let arms = Arms {
         mounts: platform
             .mounts
@@ -808,7 +897,8 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 let munition = m.munitions.first()?.clone();
                 let stored = platform.stores.ammo.get(&munition).copied().map(|x| x as u32);
                 let count = if f.count > 0 { f.count } else { platform.body.count.max(1) };
-                Some(MountState { index: i, munition, rounds: stored.unwrap_or(m.magazine).max(m.magazine) * count, ready_at: SimTime::from_secs(m.ready_s) })
+                let stock = m.munitions.iter().skip(1).map(|mu| (mu.clone(), platform.stores.ammo.get(mu).copied().map(|x| x as u32).unwrap_or(m.magazine).max(m.magazine) * count)).collect();
+                Some(MountState { index: i, munition, rounds: stored.unwrap_or(m.magazine).max(m.magazine) * count, ready_at: SimTime::from_secs(m.ready_s), stock })
             })
             .collect(),
         engagements: BTreeMap::new(),
@@ -834,6 +924,9 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 new_casualties: 0.0,
                 last_incoming: None,
                 success: false,
+                leadership,
+                losses_seen: 0,
+                leaderless_until: None,
             },
             arms,
             Act {
@@ -846,6 +939,9 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 last_shot: None,
                 last_event: SimTime::ZERO,
                 volleys: 0,
+                fire_position: None,
+                bound: None,
+                guiding_until: None,
             },
             Aware::default(),
             SigState { engine_on: domain != Domain::Land || platform.mover.kind != bgws_catalogue::MoverKind::Foot, ..Default::default() },

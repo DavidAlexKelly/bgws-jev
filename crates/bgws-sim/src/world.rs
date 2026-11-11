@@ -80,7 +80,8 @@ pub fn capabilities(s: &Sim, e: Entity, c: &mut BTreeSet<Capability>) {
 
 /// Carry out a world action; false if no domain knows it.
 pub fn apply_action(s: &mut Sim, e: Entity, id: EntityId, action: &str, params: &BTreeMap<String, serde_json::Value>, about: Option<EntityId>) -> bool {
-    fires::apply_action(s, e, id, action, params, about)
+    crate::dismount::apply_action(s, e, action)
+        || fires::apply_action(s, e, id, action, params, about)
         || air::apply_action(s, e, id, action, params, about)
         || drones::apply_action(s, e, id, action, params, about)
         || naval::apply_action(s, e, id, action, params, about)

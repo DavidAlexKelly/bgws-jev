@@ -20,6 +20,7 @@ bgws-catalogue.workspace = true
 bgws-scenario.workspace = true
 bgws-sim.workspace = true
 bgws-decide.workspace = true
+bgws-interop.workspace = true
 bgws-analysis.workspace = true
 bgws-models.workspace = true
 bgws-ops.workspace = true
