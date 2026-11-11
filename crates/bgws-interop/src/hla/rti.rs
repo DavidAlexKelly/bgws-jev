@@ -301,6 +301,12 @@ impl Rti {
         Ok(())
     }
 
+    /// Ask for the next timestamped message, or `t` if none comes sooner.
+    pub fn next_message_request(&self, t: f64) -> Result<()> {
+        expect!(self.call(Rq::NextMessageRequestRequest(p::NextMessageRequestRequest { time: Some(p::LogicalTime { data: float_time(t) }) }))?, NextMessageRequestResponse);
+        Ok(())
+    }
+
     fn take_new(&self) {
         let mut held = self.held.lock().unwrap();
         for c in self.session.poll_callbacks() {

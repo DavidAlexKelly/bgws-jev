@@ -16,6 +16,8 @@ bytes = "1"
 serde.workspace = true
 serde_json.workspace = true
 prost = "0.13"
+roxmltree = "0.21"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 prost-build = "0.13"

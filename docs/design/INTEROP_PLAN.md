@@ -45,9 +45,16 @@ Phase 3 as built differs from this plan in these places:
 - **The analytic mode of section 3.4 is `play_lockstep`.** Deciders stop the
   clock, and inputs apply at whole seconds. The record notes it, so replays
   use it too.
-- **Every attribute is sent with each update**, there is no attribute
-  ownership, and the mock has no class hierarchy (a subscription must name
-  the class published).
+- **Every attribute is sent with each update**, and there is no attribute
+  ownership.
+- **The mock grew into the BGWS RTI** (`bgws mock-rti`). It now has:
+  - FOM reading and merging, plain or zipped;
+  - class hierarchy in discovery, reflection and interactions;
+  - next-message requests;
+  - part of the management object model.
+
+  Pitch's Chat sample runs against it with its own FOM. See the README for
+  what it does not serve.
 - **No connection state in the viewer yet** (task 7).
 
 Phase 2 as built differs from this plan in these places:

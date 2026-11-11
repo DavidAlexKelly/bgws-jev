@@ -1495,7 +1495,7 @@ publishes the same truth and fire as DIS and takes in other federates'
 entities and fire the same way.
 
 ```sh
-bgws mock-rti                                                   # a small RTI on 127.0.0.1:15164, for trying it
+bgws mock-rti                                                   # the BGWS RTI on 127.0.0.1:15164 (below)
 bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation exercise1 --fom RPR_FOM_v2.0_1516-2010.xml ...
 bgws play gen-kgd-company-attack --hla rti:15164 --time-managed --federates 2 --record game.json
 bgws replay game.json                                           # exact, no RTI
@@ -1567,8 +1567,44 @@ Without `--time-managed` the game plays in real time, as on DIS.
   - see each other leave.
 
   This is an independent check of our session layer and server side. It
-  found one fault, now fixed: callbacks must name their transport (`0,0,0,1`
-  is HLAreliable), and Pitch's client refuses a callback without one.
+  found two faults, both fixed:
+  - callbacks must name their transport (`0,0,0,1` is HLAreliable), and
+    Pitch's client refuses a callback without one;
+  - Pitch's client sends FOM modules zipped, which the RTI now reads.
+
+**The BGWS RTI** (`bgws mock-rti`, `crates/bgws-interop/src/hla/mock.rs`)
+is a Federate Protocol server with a small RTI behind it, for tests, for
+trying federates on one machine, and for small exercises:
+- **The FOM:** it reads the federation's FOM modules (plain or zipped, given
+  at create or join) and merges them. Names resolve in full, without the
+  root, or by a unique last part, and anything not in the FOM is refused.
+  A federation created with no module accepts any name, as BGWS federates
+  need.
+- **Class hierarchy:**
+  - an object is discovered as the nearest class its subscriber subscribes
+    to, and reflected with only the attributes subscribed there (a
+    `BaseEntity` subscriber sees `GroundVehicle`s as `BaseEntity`);
+  - an interaction reaches subscribers of a superclass as that class, with
+    that class's parameters;
+  - inherited attributes and parameters keep one handle.
+- **Time:** time-advance and next-message requests. A next-message request
+  is granted at the earliest message, if that comes before the time asked
+  for.
+- **Management objects:** `HLAmanager.HLAfederation` (name, federates, time
+  implementation) and `HLAmanager.HLAfederate` (handle, name, type,
+  regulating, constrained, time, lookahead), kept up to date for any
+  federate that subscribes.
+- **Also:**
+  - synchronization points and member lists;
+  - names and handles both ways;
+  - directed interactions and requests for attribute values.
+- **Not served:** ownership transfer, regions, save and restore, retraction,
+  zero lookahead, unsubscribe and unpublish, MOM interactions and most MOM
+  attributes.
+
+Tests cover discovery and reflection at a superclass, interaction delivery
+to a superclass, FOM names refused, next-message grants and the management
+objects, using `tests/data/hierarchy.xml`, a small FOM shaped like RPR.
 
 **Not yet checked:** BGWS's own client against a real RTI (pRTI or any
 other), and against a third-party RPR federate. Pitch's client checks our

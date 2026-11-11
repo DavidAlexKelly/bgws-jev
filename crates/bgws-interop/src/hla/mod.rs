@@ -7,6 +7,7 @@
 //! - [`rti`]: a typed RTI ambassador over a session.
 //! - [`encoding`], [`rpr`]: the HLA data encoding and the RPR FOM structures.
 //! - [`link`]: a game in a federation, publishing and taking in.
+//! - [`fom`]: a federation's object model, read from its FOM modules.
 //! - [`mock`]: a Federate Protocol server with a small RTI, for tests.
 
 /// Generated from IEEE 1516.1-2025's Federate Protocol protos.
@@ -17,6 +18,7 @@ pub mod proto {
 }
 
 pub mod encoding;
+pub mod fom;
 pub mod link;
 pub mod mock;
 pub mod rpr;

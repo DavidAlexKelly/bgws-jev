@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A small FOM for testing class hierarchy in the BGWS RTI. Its class
+     names follow the RPR FOM's shape; it is not the RPR FOM. -->
+<objectModel xmlns="http://standards.ieee.org/IEEE1516-2025">
+  <modelIdentification><name>hierarchy-test</name><type>FOM</type></modelIdentification>
+  <objects>
+    <objectClass><name>HLAobjectRoot</name>
+      <objectClass><name>BaseEntity</name>
+        <attribute><name>EntityType</name></attribute>
+        <objectClass><name>PhysicalEntity</name>
+          <attribute><name>DamageState</name></attribute>
+          <objectClass><name>Platform</name>
+            <objectClass><name>GroundVehicle</name></objectClass>
+            <objectClass><name>Aircraft</name><attribute><name>AfterburnerOn</name></attribute></objectClass>
+          </objectClass>
+        </objectClass>
+      </objectClass>
+    </objectClass>
+  </objects>
+  <interactions>
+    <interactionClass><name>HLAinteractionRoot</name>
+      <interactionClass><name>WeaponFire</name>
+        <parameter><name>EventIdentifier</name></parameter>
+        <interactionClass><name>MissileLaunch</name><parameter><name>SeekerType</name></parameter></interactionClass>
+      </interactionClass>
+    </interactionClass>
+  </interactions>
+</objectModel>
