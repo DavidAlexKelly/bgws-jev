@@ -446,7 +446,7 @@ impl Host {
         machine.threads = Some(rayon::current_num_threads() as u32);
         let mut record = GameRecord::new(scenario.clone(), seed, BuildInfo::this(option_env!("BGWS_BUILD_ID").unwrap_or("dev")), machine);
         record.figure_overrides = overrides;
-        record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start };
+        record.run = RunSetup { flat_ground: opts.sim.flat_ground, plan_at_start: opts.sim.plan_at_start, realtime: false };
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
         Ok(Host { sim, router, record, rt, events_out: None, replay: None, next_command: 0, questions: 0, by_source: Default::default(), cost: 0.0, keep_questions: false, asked: Vec::new(), force: None })
     }
@@ -571,6 +571,97 @@ impl Host {
         }
         let router = self.router.clone();
         Ok(self.rt.block_on(router.answer(questions)))
+    }
+
+    /// Play to `until` in real time (docs/design/INTEROP_PLAN.md §3.4): the
+    /// clock does not stop for decisions. Questions go to the deciders in the
+    /// background; a unit with a question out carries on, and each answer is
+    /// given at the first second boundary after it comes back (it applies no
+    /// sooner than the crew's reaction time after the question). With `pace`
+    /// (sim seconds per wall second), each second waits for the wall clock;
+    /// without it the game runs as fast as it can (a replay, a test).
+    /// `on_tick` sees the sim after every second (to publish it over DIS).
+    ///
+    /// Replaying a real-time record, the recorded answers are given at their
+    /// recorded times, so the replay is exact.
+    pub fn play_realtime(&mut self, until: SimTime, pace: Option<f64>, mut on_tick: impl FnMut(&Sim)) -> Result<Option<bgws_sim::Outcome>> {
+        self.record.run.realtime = true;
+        let (wall0, sim0) = (std::time::Instant::now(), self.sim.now());
+        let mut inflight: Vec<tokio::task::JoinHandle<Vec<Answer>>> = Vec::new();
+        let mut recorded: Vec<(SimTime, Answer)> = Vec::new();
+        // The last whole second shown to `on_tick` (a second ends either
+        // advanced or with questions to hand out; each is shown once).
+        let mut ticked: Option<SimTime> = None;
+        let mut tick = |sim: &Sim, ticked: &mut Option<SimTime>| {
+            let now = sim.now();
+            if (now.secs().fract() == 0.0 || now >= until) && *ticked != Some(now) {
+                *ticked = Some(now);
+                on_tick(sim);
+            }
+        };
+        loop {
+            self.apply_recorded()?;
+            let now = self.sim.now();
+            // Answers back since the last stop are given now.
+            if self.replay.is_some() {
+                let (ready, later): (Vec<_>, Vec<_>) = std::mem::take(&mut recorded).into_iter().partition(|(at, _)| *at <= now);
+                recorded = later;
+                if !ready.is_empty() {
+                    self.submit(now, ready.into_iter().map(|(_, a)| a).collect())?;
+                }
+            } else {
+                let (done, running): (Vec<_>, Vec<_>) = std::mem::take(&mut inflight).into_iter().partition(|h| h.is_finished());
+                inflight = running;
+                for h in done {
+                    let answers = self.rt.block_on(h).map_err(|e| anyhow!("a decider failed: {e}"))?;
+                    self.submit(now, answers)?;
+                }
+            }
+            let next = SimTime::from_secs(now.secs().floor() + 1.0).min(until);
+            let stop = self.next_command_at().filter(|t| *t < next).unwrap_or(next);
+            let step = self.sim.advance_nonblocking(stop);
+            self.flush_events()?;
+            match step {
+                Step::Over(o) => {
+                    self.record.outcome = Some(serde_json::to_value(&o)?);
+                    self.record.fingerprint = Some(self.sim.fingerprint());
+                    tick(&self.sim, &mut ticked);
+                    return Ok(Some(o));
+                }
+                Step::NeedsAnswers { questions, .. } => {
+                    tick(&self.sim, &mut ticked);
+                    self.questions += questions.len();
+                    if self.keep_questions {
+                        self.asked.extend(questions.iter().cloned());
+                    }
+                    if let Some(rec) = &self.replay {
+                        // Recorded answers wait for their time; one never given stays unanswered.
+                        for q in &questions {
+                            if let Some(a) = rec.answers.iter().find(|a| a.answer.question == q.id) {
+                                recorded.push((a.at, a.answer.clone()));
+                            }
+                        }
+                    } else {
+                        let router = self.router.clone();
+                        inflight.push(self.rt.spawn(async move { router.answer(questions).await }));
+                    }
+                }
+                Step::Advanced => {
+                    let now = self.sim.now();
+                    tick(&self.sim, &mut ticked);
+                    if now >= until {
+                        return Ok(None);
+                    }
+                    if let Some(scale) = pace.filter(|s| *s > 0.0) {
+                        let target = wall0 + std::time::Duration::from_secs_f64((now.secs() - sim0.secs()) / scale);
+                        let wait = target.saturating_duration_since(std::time::Instant::now());
+                        if !wait.is_zero() {
+                            std::thread::sleep(wait);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Advance to `until`, answering every question on the way. `on_step`

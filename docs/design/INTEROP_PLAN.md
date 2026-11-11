@@ -1,6 +1,21 @@
 # Interoperability: DIS and HLA 4
 
-Status: **planned**. Nothing here is built yet.
+Status: **phase 1 built** (DIS codes, geoid, Entity State export with dead
+reckoning, real-time play; see the README's *Interoperability: DIS*).
+Phases 2–4 are planned.
+
+Phase 1 as built differs from this plan in four places:
+- **Dead-reckoning thresholds** are publisher settings (`DrSettings`), not
+  sim figures. Every game's event log records the figure count, so new
+  figures would change every replay fingerprint for a network option.
+- **The geoid** lives in `bgws-interop` (`geoid.rs`), not `bgws-core`: the
+  conversion only ever happens at the boundary.
+- **PDUs** are built with `dis-rs` 0.14 (MIT), checked byte by byte against
+  the standard's offsets. Its marking writer underflows on more than 11
+  bytes, so markings are always cut first.
+- **Heights** are placed by latitude and longitude from the east/north
+  position plus the sim's height plus N. Running the 3-D vector through the
+  origin's tangent plane would add the Earth's curvature (8 m at 10 km).
 
 This plan connects BGWS to other simulations over DIS (IEEE 1278.1) and HLA 4
 (IEEE 1516-2025, through its Federate Protocol). It is in four phases. Each

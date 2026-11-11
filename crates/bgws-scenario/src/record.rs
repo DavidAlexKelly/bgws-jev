@@ -158,11 +158,15 @@ pub struct RunSetup {
     pub flat_ground: bool,
     /// The HQs were asked for plans at the start.
     pub plan_at_start: bool,
+    /// Played in real time: decisions did not stop the clock, and each
+    /// answer applied when it came back (its `at`), so a replay gives them
+    /// at those times.
+    pub realtime: bool,
 }
 
 impl Default for RunSetup {
     fn default() -> Self {
-        RunSetup { flat_ground: false, plan_at_start: true }
+        RunSetup { flat_ground: false, plan_at_start: true, realtime: false }
     }
 }
 

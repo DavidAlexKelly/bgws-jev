@@ -68,6 +68,18 @@ enum Cmd {
         local_model: String,
         #[arg(long)]
         claude_model: Option<String>,
+        /// Play in real time: the clock follows the wall clock (at this many
+        /// simulated seconds per second; 1 without a value) and decisions do
+        /// not stop it. Answers apply when they come back.
+        #[arg(long, num_args = 0..=1, default_missing_value = "1")]
+        realtime: Option<f64>,
+        /// Publish the game over DIS (v7 Entity State PDUs) to this address,
+        /// `host:port` (a broadcast address is allowed); implies --realtime.
+        #[arg(long)]
+        dis: Option<String>,
+        /// The DIS exercise ID (else the scenario's `interop.exercise`, else 1).
+        #[arg(long)]
+        dis_exercise: Option<u8>,
     },
     /// Replay a game record exactly, without calling any decider.
     Replay { record: PathBuf },
@@ -451,7 +463,7 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model } => {
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let seed = Seed(seed.unwrap_or(sc.seed.0));
             let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
@@ -462,13 +474,48 @@ fn main() -> Result<()> {
             let until = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
             let started = Instant::now();
             let mut last_print = Instant::now();
-            host.play_until(until, |sim| {
+            let mut progress = |sim: &bgws_sim::Sim| {
                 if last_print.elapsed().as_secs_f64() > 2.0 {
                     let s = sim.strength();
                     eprintln!("  {}  blue {:.0}%  red {:.0}%", sim.now(), s.get(&bgws_core::Side::Blue).unwrap_or(&0.0) * 100.0, s.get(&bgws_core::Side::Red).unwrap_or(&0.0) * 100.0);
                     last_print = Instant::now();
                 }
-            })?;
+            };
+            let pace = realtime.or(dis.as_ref().map(|_| 1.0));
+            match pace {
+                None => {
+                    host.play_until(until, progress)?;
+                }
+                Some(speed) => {
+                    let mut publisher = match &dis {
+                        Some(addr) => {
+                            let mut spec = sc.interop.clone().unwrap_or_default();
+                            if let Some(x) = dis_exercise {
+                                spec.exercise = x;
+                            }
+                            eprintln!("publishing DIS v7 to {addr} (exercise {}, site {}, application {})", spec.exercise, spec.site, spec.application);
+                            Some(bgws_interop::dis::DisPublisher::new(addr, spec, bgws_interop::dr::DrSettings::default())?)
+                        }
+                        None => None,
+                    };
+                    eprintln!("playing in real time at {speed}x");
+                    let mut failed = None;
+                    host.play_realtime(until, Some(speed), |sim| {
+                        progress(sim);
+                        if let Some(p) = publisher.as_mut() {
+                            if let Err(e) = p.publish(sim) {
+                                failed.get_or_insert(e);
+                            }
+                        }
+                    })?;
+                    if let Some(e) = failed {
+                        eprintln!("DIS: a send failed: {e}");
+                    }
+                    if let Some(p) = &publisher {
+                        eprintln!("DIS: {} entity states sent", p.sent);
+                    }
+                }
+            }
             let report = host.report();
             println!("{}", serde_json::to_string_pretty(&report)?);
             eprintln!("played {} simulated in {:.1} s wall", report.ended_at, started.elapsed().as_secs_f64());
@@ -480,8 +527,13 @@ fn main() -> Result<()> {
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
             let until = rec.ends_at();
+            let realtime = rec.run.realtime;
             let mut host = Host::replay(rec, default_figures())?;
-            host.play_until(until, |_| {})?;
+            if realtime {
+                host.play_realtime(until, None, |_| {})?;
+            } else {
+                host.play_until(until, |_| {})?;
+            }
             host.verify_replay()?;
             println!("{}", serde_json::to_string_pretty(&host.report())?);
             eprintln!("replay matches the record");

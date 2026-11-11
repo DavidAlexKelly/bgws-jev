@@ -299,6 +299,7 @@ to reach openrouter.ai.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
+| `bgws-interop` | interoperability with other simulations: DIS v7 Entity State PDUs with dead reckoning, the EGM96 geoid, WGS-84 placement and DIS orientation (HLA 4 to follow; `docs/design/INTEROP_PLAN.md`) |
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, speaking the protocol over HTTP and a WebSocket; bundles the default viewer (feature `bundled-viewer`), or serves any frontend folder (`--web`) |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `protocol/` | `PROTOCOL.md` (every message and route), TypeScript types generated from Rust (`ts-rs`) and a typed client |
@@ -1328,6 +1329,100 @@ seat change a person made. Each command carries its position in the answers,
 so a replay applies it at the same simulated time and the same point in the
 game. A record saved mid-game says where it stops (`endedAt`).
 `bgws replay` checks the replay against the record's fingerprint.
+
+## Interoperability: DIS
+
+`bgws play <scenario> --dis <host:port>` publishes the game to other
+simulations as DIS version 7 (IEEE 1278.1-2012) Entity State PDUs over UDP,
+and plays in real time. This is phase 1 of `docs/design/INTEROP_PLAN.md`:
+export only. Taking in other simulations' entities, Fire and Detonation
+PDUs and HLA 4 come in phases 2–3.
+
+```sh
+bgws play gen-company-attack --dis 127.0.0.1:3000             # real time, published
+bgws play gen-company-attack --realtime 4                      # 4x real time, not published
+bgws play gen-company-attack --dis 192.168.1.255:3000 --dis-exercise 2 --record game.json
+bgws replay game.json                                          # exact, no network
+```
+
+**DIS codes.** Every catalogue platform and munition has a SISO-REF-010
+(v35) entity type, and each record's `$dis` note names the table and row it
+came from. Generic platforms carry the category (a Tank, an Armored
+Fighting Vehicle, an Air Defense unit), and the scenario sets the country.
+Where the choice was not obvious, the codes follow SISO's own placement of
+real equivalents: Iskander, M270 and coastal missile launchers are
+Self-Propelled Artillery, and S-400, Patriot and Strela-10 are Air Defense.
+People on foot are life forms with their equipment class (assault rifles,
+anti-tank missiles, mortars); installations are cultural features. A test
+checks every code fits its platform's domain and is a SISO value.
+
+A scenario may carry an `interop` block: `exercise`, `site`, `application`,
+the `country` per side (else 0, Other) and the `force` per side (else blue
+1 Friendly, red 2 Opposing, neutral 3 Neutral).
+
+**Where things are.** The sim's ground is a flat local map: east and north
+metres from the theatre origin, height above mean sea level. Positions are
+published as geocentric (ECEF) coordinates on WGS-84:
+- latitude and longitude from the east/north position;
+- height is the sim's height plus the EGM96 geoid undulation, from a 15'
+  grid in `data/geoid/`. NGA's check points agree within 6 cm. The
+  undulation is 29.4 m at the Baltic theatre's origin, so without it every
+  entity would float or sink by that much in other simulations.
+- Taking the 3-D position through the origin's tangent plane instead would
+  lift entities by the Earth's curvature (8 m at 10 km, 70 m at 30 km), so
+  heights are not done that way.
+
+Orientation is DIS's ψ, θ, φ, from heading and the ground's slope under
+each vehicle.
+
+**What each state says.** Damage comes from strength (none, slight,
+moderate, destroyed). Land vehicles show mobility and firepower kills, smoke
+and flames on a wreck, the engine running and a concealed position.
+People's posture (walking, kneeling, prone) is shown too. The marking is
+the unit's label, cut to 11 ASCII characters.
+
+**Dead reckoning.** A state is sent:
+- the first time an entity is seen;
+- every 5 s (the DIS v7 heartbeat);
+- when a receiver's extrapolation (static, or constant velocity) would
+  stray over 1 m or 3°;
+- when the entity's look changes.
+
+A company attack sends about 0.2 states per entity per second instead of 1.
+
+**Real time.** Decisions no longer stop the clock:
+- questions go to the deciders in the background;
+- a unit with a question out carries on with what it was doing;
+- each answer applies when it comes back, and never sooner than the crew's
+  reaction time after the question.
+
+So a slow decider costs time in the world, as it would for a real crew.
+`--realtime <speed>` paces the clock without publishing. The record notes
+the game was played in real time, with the time each answer came back, so
+`bgws replay` is still exact (tested). The analytic mode, paused while
+deciders think, stays the default for experiments.
+
+**Checked.**
+- Unit tests:
+  - the Entity State PDU's 144 octets against the standard's field offsets;
+  - the geoid against NGA;
+  - DIS angles (level and facing north at 0°, 0° gives θ = −90°);
+  - placement round trips to 1 cm;
+  - appearance bits against SISO-REF-010's layouts;
+  - dead-reckoning thresholds.
+- Integration tests:
+  - a real game published over UDP: every PDU parses, every entity is
+    refreshed within the heartbeat, ground vehicles stand on our ground
+    once the geoid is taken off;
+  - a real-time game replays exactly;
+  - pacing at 10× follows the wall clock.
+- By hand: 4 simulated minutes at 4× took 59.8 s of wall time. An
+  independent listener received all 789 PDUs from 15 entities, none
+  malformed, each with the expected type.
+
+PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
+on markings longer than 11 bytes (in a release build it loops until memory
+runs out), so markings are always cut first.
 
 ## Tests and CI
 
