@@ -13,3 +13,4 @@ pub mod dis;
 pub mod events;
 pub mod import;
 pub mod link;
+pub mod hla;

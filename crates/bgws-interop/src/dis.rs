@@ -90,9 +90,15 @@ pub fn dis_id_of(sim: &Sim, spec: &InteropSpec, id: Option<EntityId>) -> DisId {
     ExternalId::ours(spec, id).map(|x| DisId::new(x.site, x.application, x.entity)).unwrap_or(DisId::new(0, 0, 0))
 }
 
-/// A munition's descriptor: its DIS type (the firer's side's country for a
-/// generic round), warhead and fuse by kind, the rounds.
+/// A munition's descriptor: its DIS type, warhead and fuse, the rounds.
 fn munition_descriptor(sim: &Sim, spec: &InteropSpec, firer: Option<EntityId>, munition: &str, rounds: u32) -> MunitionDescriptor {
+    let (ty, warhead, fuse) = munition_codes(sim, spec, firer, munition);
+    MunitionDescriptor { entity_type: dis_type(&ty), warhead: MunitionDescriptorWarhead::from(warhead), fuse: MunitionDescriptorFuse::from(fuse), quantity: rounds.min(u16::MAX as u32) as u16, rate: 0 }
+}
+
+/// A munition's DIS type (the firer's side's country for a generic round)
+/// and its SISO-REF-010 warhead and fuse, by kind.
+pub fn munition_codes(sim: &Sim, spec: &InteropSpec, firer: Option<EntityId>, munition: &str) -> ([u16; 7], u16, u16) {
     let m = sim.ctx.catalogue.munition(munition);
     let side = firer.and_then(|f| sim.ctx.order.get(f.index())).and_then(|&e| sim.world.get::<bgws_sim::components::Ident>(e)).map(|i| i.side);
     let country = side.map(|s| spec.country_of(s)).unwrap_or(0);
@@ -104,7 +110,7 @@ fn munition_descriptor(sim: &Sim, spec: &InteropSpec, firer: Option<EntityId>, m
         Some(K::Heat | K::Atgm | K::Fpv | K::Loitering) => 1600,
         _ => 1000,
     };
-    MunitionDescriptor { entity_type: dis_type(&ty), warhead: MunitionDescriptorWarhead::from(warhead), fuse: MunitionDescriptorFuse::from(1100u16), quantity: rounds.min(u16::MAX as u32) as u16, rate: 0 }
+    (ty, warhead, 1100)
 }
 
 fn ecef_of(sim: &Sim, pos: bgws_core::Enu) -> Location {

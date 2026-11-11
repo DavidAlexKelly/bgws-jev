@@ -299,7 +299,7 @@ to reach openrouter.ai.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
-| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management), the EGM96 geoid, WGS-84 placement and DIS orientation (HLA 4 to follow; `docs/design/INTEROP_PLAN.md`) |
+| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management); HLA 4 through the Federate Protocol with the RPR FOM, time management and a mock RTI; the EGM96 geoid, WGS-84 placement and DIS orientation (`docs/design/INTEROP_PLAN.md`) |
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, speaking the protocol over HTTP and a WebSocket; bundles the default viewer (feature `bundled-viewer`), or serves any frontend folder (`--web`) |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `protocol/` | `PROTOCOL.md` (every message and route), TypeScript types generated from Rust (`ts-rs`) and a typed client |
@@ -1330,13 +1330,13 @@ so a replay applies it at the same simulated time and the same point in the
 game. A record saved mid-game says where it stops (`endedAt`).
 `bgws replay` checks the replay against the record's fingerprint.
 
-## Interoperability: DIS
+## Interoperability: DIS and HLA 4
 
 `bgws play <scenario> --dis <host:port>` publishes the game to other
 simulations as DIS version 7 (IEEE 1278.1-2012) Entity State PDUs over UDP,
 and plays in real time, and (with `--dis-listen`) takes in other
 simulations' entities, fires and detonations. These are phases 1 and 2 of
-`docs/design/INTEROP_PLAN.md`; HLA 4 comes in phase 3.
+`docs/design/INTEROP_PLAN.md`. Phase 3 joins HLA 4 federations (below).
 
 ```sh
 bgws play gen-kgd-company-attack --dis 127.0.0.1:3000             # real time, published
@@ -1486,6 +1486,81 @@ the same ground (the plan's section 2 says why they usually don't):
   side judged 6 detonations on its entities and red's 21, red lost 83%, no
   entity was owned twice and no detonation applied twice. Each side's
   record replays exactly with no network.
+
+### Phase 3: HLA 4
+
+`--hla <host:port>` joins an HLA 4 (IEEE 1516-2025) federation through a
+Federate Protocol server, such as Pitch pRTI's, with the RPR FOM. It
+publishes the same truth and fire as DIS and takes in other federates'
+entities and fire the same way.
+
+```sh
+bgws mock-rti                                                   # a small RTI on 127.0.0.1:15164, for trying it
+bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation exercise1 --fom RPR_FOM_v2.0_1516-2010.xml ...
+bgws play gen-kgd-company-attack --hla rti:15164 --time-managed --federates 2 --record game.json
+bgws replay game.json                                           # exact, no RTI
+```
+
+**How it talks to the RTI.**
+- **Wire messages:** the IEEE 1516.1-2025 Federate Protocol protos, as
+  published in Pitch's FedProClient, compiled to Rust (`crates/bgws-interop/proto`;
+  "Reprinted with permission from IEEE 1516.1(TM)-2025").
+- **Session layer:** written from FedProClient's own code. It has:
+  - the 24-octet header and numbered messages;
+  - heartbeats;
+  - call responses matched to their calls;
+  - after a dropped connection, a resume that sends again whatever the
+    other side missed.
+- **Objects:** each entity is a `BaseEntity.PhysicalEntity` subclass chosen
+  by its DIS kind and domain (`GroundVehicle`, `Aircraft`, `SurfaceVessel`,
+  `Lifeform.Human`, …). It carries the DIS identifier, type, spatial (static
+  or DRM F,P,W), force, marking, damage and the appearance flags RPR has.
+  Updates follow the DIS dead-reckoning rules.
+- **Interactions:** fire goes out as `WeaponFire` and `MunitionDetonation`.
+  Entities are named in them by their object instance names, which we
+  reserve as `BGWS-site-application-entity`.
+- **The RPR FOM files are not shipped.** SISO publishes no licence terms for
+  them, so pass the federation's own with `--fom`.
+
+**Time management.** `--time-managed` makes the game time-regulating and
+time-constrained, with a 1 s lookahead, and plays in lock step:
+- the clock waits for deciders, as in analytic play;
+- each second's updates and fire are stamped a second ahead;
+- each second ends with a time-advance request.
+
+Everything stamped up to the grant arrives first, in a fixed order. With
+`--federates N`, the game starts only when all N have joined and met at the
+`ReadyToRun` synchronization point. Without that, the first federate to
+join would run ahead while the others were still joining. So a time-managed
+federation run twice with the same seeds gives the same games (tested).
+Without `--time-managed` the game plays in real time, as on DIS.
+
+**Checked (phase 3).**
+- Byte fixtures:
+  - the session header;
+  - the HLA encoding's alignment (a double after an octet starts at offset 8);
+  - RPR's entity type, identifier, marking and event identifier;
+  - the spatial variant record (60 octets for F,P,W, 48 for static);
+  - round trips of WeaponFire and MunitionDetonation.
+- **Session against the mock RTI:**
+  - a quiet session heartbeats and stays up;
+  - 300 updates through ten dropped connections arrive once each and in
+    order;
+  - 2,000 calls from 8 threads each get their own answer.
+- **Two federates through the mock RTI, time-managed** (the company attack,
+  12 minutes):
+  - they fight: blue judged 6 detonations on its units and red 17, and red
+    lost 83%;
+  - nothing is owned twice and no detonation is judged twice;
+  - a second run gives the same two games;
+  - each record replays exactly with no RTI.
+- **Real time:** two federates see each other's units.
+- **By hand:** the mock RTI as its own process. A federate joined through the
+  CLI, time-managed, played 4 minutes in 1 s, and `bgws replay` matched.
+
+**Not yet checked:** against pRTI or any other real RTI, and against a
+third-party RPR federate. The mock RTI was written from the same reading of
+the protocol as the client, so only a real RTI can show a misreading.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
 on markings longer than 11 bytes (in a release build it loops until memory

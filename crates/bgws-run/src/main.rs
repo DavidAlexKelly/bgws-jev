@@ -88,6 +88,33 @@ enum Cmd {
         /// Join this IPv4 multicast group to listen.
         #[arg(long)]
         dis_group: Option<std::net::Ipv4Addr>,
+        /// Join an HLA 4 federation through this Federate Protocol server
+        /// (`host:port`), with the RPR FOM; real time unless --time-managed.
+        #[arg(long)]
+        hla: Option<String>,
+        #[arg(long, default_value = "BGWS")]
+        federation: String,
+        /// Our federate name (else `BGWS-<site>-<application>`).
+        #[arg(long)]
+        federate: Option<String>,
+        /// A FOM module to create or join with (repeat for each; the
+        /// federation's RPR FOM files for a real RTI).
+        #[arg(long)]
+        fom: Vec<PathBuf>,
+        /// Time-regulating and time-constrained with a 1 s lookahead: the game
+        /// advances in lock step with the federation, waiting for deciders.
+        #[arg(long)]
+        time_managed: bool,
+        /// Federates expected: start only when this many have joined and met
+        /// at the ReadyToRun synchronization point.
+        #[arg(long, default_value_t = 1)]
+        federates: usize,
+    },
+    /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
+    /// federates on one machine.
+    MockRti {
+        #[arg(long, default_value = "127.0.0.1:15164")]
+        listen: String,
     },
     /// Replay a game record exactly, without calling any decider.
     Replay { record: PathBuf },
@@ -499,7 +526,7 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group } => {
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group, hla, federation, federate, fom, time_managed, federates } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let seed = Seed(seed.unwrap_or(sc.seed.0));
             let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
@@ -517,8 +544,37 @@ fn main() -> Result<()> {
                     last_print = Instant::now();
                 }
             };
-            let pace = realtime.or(dis.as_ref().map(|_| 1.0));
-            match pace {
+            let pace = realtime.or(dis.as_ref().map(|_| 1.0)).or(hla.as_ref().filter(|_| !time_managed).map(|_| 1.0));
+            if let Some(addr) = &hla {
+                let spec = sc.interop.clone().unwrap_or_default();
+                if let Some(why) = spec.ground_refusal(&sc.theatre, flat) {
+                    bail!("not joining an HLA federation: {why}");
+                }
+                let mut settings = bgws_interop::hla::link::HlaSettings::new(addr, &federation, &federate.clone().unwrap_or_else(|| format!("BGWS-{}-{}", spec.site, spec.application)));
+                settings.foms = fom.iter().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).collect::<Result<_>>()?;
+                settings.lookahead = time_managed.then_some(1.0);
+                settings.federates = federates;
+                eprintln!("HLA: joining {} at {addr} as {}{}", settings.federation, settings.federate, if time_managed { ", time-managed (lookahead 1 s)" } else { ", real time" });
+                let link = bgws_interop::hla::link::HlaLink::join(settings, spec).map_err(|e| anyhow!("{e}"))?;
+                let mut adapter = bgws_run::HlaLinkAdapter::new(link, &mut progress);
+                if time_managed {
+                    host.play_lockstep(until, &mut adapter)?;
+                } else {
+                    host.play_realtime(until, pace, &mut adapter)?;
+                }
+                for n in &adapter.notes {
+                    eprintln!("HLA: {n}");
+                }
+                if let Some(e) = adapter.errors.first() {
+                    eprintln!("HLA: {} calls failed (first: {e})", adapter.errors.len());
+                }
+                eprintln!("HLA: {} updates and interactions sent, {} inputs taken in", adapter.link.sent, adapter.link.received);
+                if let Err(e) = adapter.link.leave() {
+                    eprintln!("HLA: leaving the federation: {e}");
+                }
+            }
+            match pace.filter(|_| hla.is_none()) {
+                None if hla.is_some() => {}
                 None => {
                     host.play_until(until, progress)?;
                 }
@@ -562,9 +618,11 @@ fn main() -> Result<()> {
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;
             let until = rec.ends_at();
-            let realtime = rec.run.realtime;
+            let (realtime, lockstep) = (rec.run.realtime, rec.run.lockstep);
             let mut host = Host::replay(rec, default_figures())?;
-            if realtime {
+            if lockstep {
+                host.play_lockstep(until, &mut bgws_run::OnTick(|_| {}))?;
+            } else if realtime {
                 host.play_realtime(until, None, &mut bgws_run::OnTick(|_| {}))?;
             } else {
                 host.play_until(until, |_| {})?;
@@ -572,6 +630,13 @@ fn main() -> Result<()> {
             host.verify_replay()?;
             println!("{}", serde_json::to_string_pretty(&host.report())?);
             eprintln!("replay matches the record");
+        }
+        Cmd::MockRti { listen } => {
+            let rti = bgws_interop::hla::mock::MockRti::bind(&listen)?;
+            eprintln!("mock RTI (Federate Protocol) on {}; Ctrl-C to stop", rti.address());
+            loop {
+                std::thread::park();
+            }
         }
         Cmd::Branch { record, at, deciders, minutes, record_out } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;

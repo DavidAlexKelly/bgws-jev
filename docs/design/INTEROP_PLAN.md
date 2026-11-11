@@ -1,10 +1,15 @@
 # Interoperability: DIS and HLA 4
 
-Status: **phases 1 and 2 built** (phase 1: DIS codes, geoid, Entity State
-export with dead reckoning, real-time play; phase 2: two-way DIS, remote
-entities, Fire and Detonation both ways, simulation management, terrain
-correlation; see the README's *Interoperability: DIS*). Phases 3–4 are
-planned.
+Status: **phases 1–3 built**. See the README's *Interoperability: DIS and
+HLA 4*.
+- Phase 1: DIS codes, the geoid, Entity State export with dead reckoning,
+  real-time play.
+- Phase 2: two-way DIS, remote entities, Fire and Detonation both ways,
+  simulation management, terrain correlation.
+- Phase 3: HLA 4 through the Federate Protocol with the RPR FOM, time
+  management, a mock RTI. Tested only against the mock so far.
+
+Phase 4 is planned.
 
 Phase 1 as built differs from this plan in four places:
 - **Dead-reckoning thresholds** are publisher settings (`DrSettings`), not
@@ -18,6 +23,29 @@ Phase 1 as built differs from this plan in four places:
 - **Heights** are placed by latitude and longitude from the east/north
   position plus the sim's height plus N. Running the 3-D vector through the
   origin's tangent plane would add the Earth's curvature (8 m at 10 km).
+
+Phase 3 as built differs from this plan in these places:
+- **No real RTI was available here.** Everything was tested against a mock
+  Federate Protocol server with a small RTI behind it (`hla/mock.rs`,
+  `bgws mock-rti`), written from FedProClient's session code. Checking
+  against pRTI and a third-party RPR federate is still to do.
+- **The RPR FOM files are not vendored.** SISO publishes no licence terms
+  for them, so `--fom` passes the federation's own. The class, attribute and
+  parameter names and the datatypes are coded from RPR 2.0/3.0, and should
+  be checked against the partner's FOM on first use.
+- **Transport is TCP only** (no TLS or WebSocket yet). The session is plain
+  threads, not async.
+- **Time is HLAfloat64Time only**, in seconds.
+- **Start synchronization was added:** `--federates N`, a member count, then
+  the `ReadyToRun` synchronization point. Without it the first federate to
+  join runs ahead, and time-managed runs differ.
+- **The analytic mode of section 3.4 is `play_lockstep`.** Deciders stop the
+  clock, and inputs apply at whole seconds. The record notes it, so replays
+  use it too.
+- **Every attribute is sent with each update**, there is no attribute
+  ownership, and the mock has no class hierarchy (a subscription must name
+  the class published).
+- **No connection state in the viewer yet** (task 7).
 
 Phase 2 as built differs from this plan in these places:
 - **Correlation commands** are `bgws correlate <scenario> <partner.tif>`

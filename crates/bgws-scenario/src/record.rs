@@ -169,11 +169,15 @@ pub struct RunSetup {
     /// answer applied when it came back (its `at`), so a replay gives them
     /// at those times.
     pub realtime: bool,
+    /// Played in lock step with a time-managed federation: the clock waited
+    /// for deciders, and other simulations' inputs applied at whole seconds.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub lockstep: bool,
 }
 
 impl Default for RunSetup {
     fn default() -> Self {
-        RunSetup { flat_ground: false, plan_at_start: true, realtime: false }
+        RunSetup { flat_ground: false, plan_at_start: true, realtime: false, lockstep: false }
     }
 }
 

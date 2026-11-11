@@ -19,7 +19,7 @@ pub mod suite;
 pub mod tune;
 pub mod workbench;
 
-pub use host::{load_scenario, router_for, DeciderChoice, DisLinkAdapter, Host, HostOptions, Link, OnTick, PlayReport};
+pub use host::{load_scenario, router_for, DeciderChoice, DisLinkAdapter, HlaLinkAdapter, Host, HostOptions, Link, OnTick, PlayReport};
 
 /// The shipped data (scenarios, catalogue, templates, cases): `$BGWS_DATA`, else `data/` at the repository root.
 pub fn data_dir() -> std::path::PathBuf {
