@@ -42,6 +42,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)] // Parsed once at start.
 enum Cmd {
     /// List the shipped scenarios.
     Scenarios,
