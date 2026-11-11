@@ -385,10 +385,25 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
 /// it, in minutes. Only targets handed down by an HQ count (a team striking
 /// what it sees itself needs no network), and only the first strike on each
 /// detection (re-strikes are not a new chain).
+/// The drone line without blue's tank and IFV: the strike chain alone.
+/// Attacking at will, the armour knocks out the red infantry at 3 km before
+/// the drones reach it, and the chain is left with little to strike.
+pub fn drones_only(sc: &ScenarioV4) -> Option<ScenarioV4> {
+    let mut v = serde_json::to_value(sc).ok()?;
+    let armour: Vec<String> = v["forces"].as_array()?.iter().filter(|f| f["side"] == "blue" && (f["platform"] == "generic/mbt" || f["platform"] == "generic/ifv")).filter_map(|f| f["id"].as_str().map(String::from)).collect();
+    v["forces"].as_array_mut()?.retain(|f| !armour.iter().any(|a| f["id"] == a.as_str()));
+    for h in v.get_mut("command").and_then(|c| c.get_mut("hqs")).and_then(|h| h.as_array_mut()).into_iter().flatten() {
+        if let Some(subs) = h.get_mut("subordinates").and_then(|x| x.as_array_mut()) {
+            subs.retain(|x| !armour.iter().any(|a| x == a.as_str()));
+        }
+    }
+    ScenarioV4::from_json(&v.to_string()).ok()
+}
+
 pub fn detect_to_strike(scenario: &ScenarioV4, network: Network, hours: f64) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         use bgws_ops::drones::{DroneType, StrikeStage};
-        let mut sc = scenario.clone();
+        let mut sc = drones_only(scenario)?;
         sc.world.network = [(Side::Blue, network), (Side::Red, network)].into_iter().collect();
         let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
         play_with_rules(&mut sim, SimTime::from_secs(hours * 3600.0));
