@@ -500,6 +500,11 @@ pub fn facts(s: &Sim, e: Entity, m: &mut BTreeMap<String, FactValue>) {
     m.insert("agent.onAirS".into(), FactValue::Num(on_air.round()));
     let role = c4.roles.get(&id);
     m.insert("agent.armed".into(), FactValue::Bool(s.world.get::<Arms>(e).map(|a| a.rounds() > 0).unwrap_or(false)));
+    let aboard = match (s.world.get::<crate::dismount::Troops>(e), s.world.get::<Health>(e)) {
+        (Some(t), Some(h)) => t.aboard(h) > 0,
+        _ => false,
+    };
+    m.insert("agent.carriesDismounts".into(), FactValue::Bool(aboard));
     if let Some(t) = c4.drones.teams.get(&id) {
         let full = t.batteries_start.max(1) as f64;
         m.insert("agent.batteryPct".into(), FactValue::Num((t.stores.batteries as f64 / full * 100.0).round()));

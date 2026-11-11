@@ -44,9 +44,59 @@ pub fn raise(s: &mut Sim) {
         if matches!(morale, MoraleState::Broken | MoraleState::Routed) && t.point != "D11" {
             continue;
         }
-        if ask(s, &t) {
+        let rule = doctrine_rule(s, e, &t);
+        if ask_with_rule(s, &t, rule) {
             done.insert(t.entity);
         }
+    }
+}
+
+/// Cover a unit counts as being in, not in the open.
+const IN_COVER: f64 = 0.3;
+/// A shooter fired on it this recently, s: under fire.
+const UNDER_FIRE_S: f64 = 30.0;
+
+/// The doctrine's drills at the points where they differ from the
+/// template's fallback (which is to carry on):
+/// - D3, fired on by an unseen shooter (react to contact): in the open, get
+///   into cover from the bearing; in cover, search along it.
+/// - D2, fired on by a shooter it has located: return fire; but a vehicle in
+///   the open goes hull-down first, and a shooter beyond all its weapons'
+///   reach is left by pulling out of its sight.
+/// - D6, after a volley: a unit holding ground, under fire from a shooter it
+///   has seen, fires and moves to another position (its alternate) before
+///   the enemy's fire is adjusted onto it.
+fn doctrine_rule(s: &Sim, e: bevy_ecs::prelude::Entity, t: &Trigger) -> RulesChoice {
+    let (Some(k), Some(a), Some(c), Some(i)) = (s.world.get::<Kin>(e), s.world.get::<Act>(e), s.world.get::<Crew>(e), s.world.get::<Ident>(e)) else { return RulesChoice::Fallback };
+    let now = s.ctx.now;
+    let cover = s.ctx.ground.micro(k.pos.e, k.pos.n).cover;
+    let in_cover = cover >= IN_COVER || a.posture == Posture::HullDown;
+    let option = |o: &str| RulesChoice::Option(o.into());
+    match t.point {
+        "D3" => option(if in_cover { "search" } else { "cover" }),
+        "D2" => {
+            let Some(shooter) = t.about.and_then(|x| s.world.get::<Aware>(e)?.seen.get(&x).map(|v| v.at)) else { return option("returnFire") };
+            let range = shooter.sub(k.pos).horizontal();
+            let reach = s.world.get::<Arms>(e).map(|ar| ar.mounts.iter().filter(|m| m.rounds > 0 || m.stock.values().any(|n| *n > 0)).filter_map(|m| i.platform.mounts.get(m.index)).flat_map(|m| m.munitions.iter()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max)).unwrap_or(0.0);
+            let vehicle = !matches!(i.platform.body.vulnerability, bgws_catalogue::Vulnerability::Personnel);
+            if range > reach {
+                option("pullBack")
+            } else if vehicle && !in_cover {
+                option("hullDown")
+            } else {
+                option("returnFire")
+            }
+        }
+        "D6" => {
+            let holding = !a.activity.moving() && !a.mission.phases.iter().skip(a.mission.phase).any(|p| p.moving());
+            let located_fire = c.last_incoming.is_some_and(|(at, by)| (now - at).secs() <= UNDER_FIRE_S && s.world.get::<Aware>(e).is_some_and(|w| w.seen.contains_key(&by)));
+            if holding && located_fire {
+                option("fireAndMove")
+            } else {
+                RulesChoice::Fallback
+            }
+        }
+        _ => RulesChoice::Fallback,
     }
 }
 
@@ -102,6 +152,9 @@ fn gates(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<EntityId>) -> Gate
         caps.insert(Capability::Mobility);
     }
     caps.insert(Capability::Radio);
+    if s.world.get::<crate::dismount::Troops>(e).is_some_and(|t| t.aboard(h) > 0 && t.leaving.is_none() && t.to_cover.is_none()) {
+        caps.insert(Capability::Dismounts);
+    }
     crate::world::capabilities(s, e, &mut caps);
     let mut g = Gates {
         roe: match a.roe {
@@ -229,8 +282,12 @@ fn volley_odds(s: &Sim, e: bevy_ecs::prelude::Entity, range: f64, pres: &bgws_mo
     let (i, h, a, c, arms) = (s.world.get::<Ident>(e)?, s.world.get::<Health>(e)?, s.world.get::<Act>(e)?, s.world.get::<Crew>(e)?, s.world.get::<Arms>(e)?);
     // The mount the engine would choose: of those that reach, the most likely to hit.
     let mut best: Option<(String, f64, f64, bool)> = None;
-    for m in arms.mounts.iter().filter(|m| m.rounds > 0 && !crate::domains::fires::indirect_mount(&i.platform, m.index)) {
-        if let Some(o) = mount_odds(s, i, h, a, c, m, range, pres) {
+    // Each round a mount holds is a choice (the loaded one and its stock).
+    let choices = arms.mounts.iter().filter(|m| !crate::domains::fires::indirect_mount(&i.platform, m.index)).flat_map(|m| {
+        std::iter::once(m.clone()).chain(m.stock.iter().map(|(mu, n)| MountState { munition: mu.clone(), rounds: *n, stock: Default::default(), ..m.clone() }))
+    });
+    for m in choices.filter(|m| m.rounds > 0) {
+        if let Some(o) = mount_odds(s, i, h, a, c, &m, range, pres) {
             if best.as_ref().is_none_or(|b| o.1 > b.1) {
                 best = Some(o);
             }
@@ -475,6 +532,7 @@ pub(crate) fn unit_state(s: &Sim, e: bevy_ecs::prelude::Entity, about: Option<En
             "vehicles": format!("{} of {}", h.fit, h.start), "strengthPct": pct(h.strength()),
             "posture": posture, "suppressionPct": pct(c.suppression.level), "morale": morale,
             "lastFiredS": a.last_shot.map(|t| round((s.ctx.now - t).secs())),
+            "infantryAboard": s.world.get::<crate::dismount::Troops>(e).map(|t| t.aboard(h)).filter(|n| *n > 0).map(|n| format!("{n} sections")),
         },
         "weapons": weapons,
         "weaponReachM": round(my_reach),
@@ -501,12 +559,7 @@ pub(crate) fn compass(b: f64) -> &'static str {
     N[(((b.to_degrees().rem_euclid(360.0) + 22.5) / 45.0) as usize) % 8]
 }
 
-/// Raise one question for a trigger. Returns whether anything was raised.
-pub(crate) fn ask(s: &mut Sim, t: &Trigger) -> bool {
-    ask_with_rule(s, t, RulesChoice::Fallback)
-}
-
-/// As [`ask`], with the engine's own rule choice for the rules decider (a
+/// Raise one question for a trigger, with the engine's own rule choice for the rules decider (a
 /// world domain's `registerRules`); an option not offered falls back.
 pub(crate) fn ask_with_rule(s: &mut Sim, t: &Trigger, rule: RulesChoice) -> bool {
     let e = s.ctx.entity(t.entity);

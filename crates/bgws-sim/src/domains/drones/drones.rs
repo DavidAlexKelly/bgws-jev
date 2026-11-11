@@ -1474,7 +1474,8 @@ pub fn relocate(s: &mut Sim, id: EntityId) {
     }
 }
 
-fn cover_near(s: &Sim, p: Enu, r: f64) -> Enu {
+/// The point of best cover within `r` of `p` (rings of 12), or `p`.
+pub(crate) fn cover_near(s: &Sim, p: Enu, r: f64) -> Enu {
     let mut best = (s.ctx.ground.micro(p.e, p.n).cover, p);
     for ring in 1..=3 {
         for k in 0..12 {

@@ -22,6 +22,18 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.light.night_lux", 1.0, "lux", 0.01, 50.0, "default", Default, "illuminance below which eyes and day optics degrade"),
         figure!("sim.fire.lay_min_s", 6.0, "s", 2.0, 30.0, "default", Default, "least time to lay on a new target and fire the first round"),
         figure!("sim.fire.rounds_per_volley", 1.0, "count", 1.0, 4.0, "default", Default, "main-gun rounds per vehicle per volley"),
+        figure!("sim.fire.team_front_m", 50.0, "m", 10.0, 200.0, "default", Default, "frontage of a dismounted section or team on the ground (8 men at 5-10 m spacing): a burst catches the share of them inside its lethal area"),
+        figure!("sim.fire.team_depth_m", 20.0, "m", 5.0, 100.0, "default", Default, "depth of a dismounted section or team on the ground"),
+        figure!("sim.fire.suppress_memory_s", 60.0, "s", 0.0, 600.0, "default", Default, "a unit fires to suppress where it last saw an enemy for this long after losing sight of it (0: never)"),
+        figure!("sim.fire.suppress_aim_m", 15.0, "m", 2.0, 100.0, "default", Default, "least spread (1σ) of fire at a remembered spot: the spot is known only roughly"),
+        figure!("sim.fire.suppress_drift_mps", 3.0, "m/s", 0.0, 15.0, "default", Default, "how fast a spot seen moving grows uncertain"),
+        figure!("sim.fire.suppress_max_cost_usd", 500.0, "USD", 0.0, 100_000.0, "default", Default, "fire to suppress uses only rounds this cheap or cheaper (machine-gun bullets, cannon HE), not main-gun rounds or missiles"),
+        figure!("sim.dismount.contact_m", 500.0, "m", 0.0, 3000.0, "default", Default, "an IFV's infantry get out when an enemy is seen this close"),
+        figure!("sim.dismount.objective_m", 400.0, "m", 0.0, 3000.0, "default", Default, "an IFV's infantry get out this far short of where its move ends (the assault goes in on foot)"),
+        figure!("sim.dismount.time_s", 30.0, "s", 5.0, 300.0, "default", Default, "time from a halt to the infantry out and ready (the dismount drill)"),
+        figure!("sim.fire.support_m", 1500.0, "m", 0.0, 5000.0, "default", Default, "a halted unit fires to suppress a reported enemy position while a friend this close to it is on the move (support by fire)"),
+        figure!("sim.fire.support_error_m", 200.0, "m", 10.0, 1000.0, "default", Default, "a reported enemy position is fired on only if the picture places it this well (1σ)"),
+        figure!("sim.fire.danger_close_m", 150.0, "m", 25.0, 600.0, "default", Default, "no fire to suppress lands this close to a friend (or within twice the fire's spread): fire lifts and shifts"),
         figure!("sim.fire.missile_keep", 0.7, "ratio", 0.0, 1.0, "default", Default, "a gun this nearly as likely to knock the target out as a missile is used instead (missiles are few)"),
         figure!("sim.fire.near_miss_per_round", 1.0, "count", 0.2, 3.0, "default", Default, "near misses felt per round that misses close"),
         figure!("sim.fire.ineffective_volleys", 4.0, "count", 2.0, 10.0, "default", Default, "volleys with no hit before a unit asks whether its fire is working (D8)"),
@@ -73,6 +85,14 @@ pub fn default_figures() -> Figures {
     Figures::from_list(all_figures()).expect("the shipped figures are consistent")
 }
 
+/// When an IFV's infantry get out ([`crate::dismount`]).
+#[derive(Clone, Debug)]
+pub struct DismountParams {
+    pub contact_m: f64,
+    pub objective_m: f64,
+    pub time_s: f64,
+}
+
 /// The parameter bundles, built once per run.
 #[derive(Clone, Debug)]
 pub struct Params {
@@ -80,6 +100,7 @@ pub struct Params {
     pub acquire: AcquireParams,
     pub direct: DirectFireParams,
     pub people: PeopleParams,
+    pub dismount: DismountParams,
     pub know: KnowParams,
     pub observer: bgws_models::sensing::observer::ObserverParams,
     pub atmos: bgws_env::AtmosParams,
@@ -95,6 +116,15 @@ pub struct Params {
     pub lay_min_s: f64,
     pub rounds_per_volley: f64,
     pub missile_keep: f64,
+    pub team_front_m: f64,
+    pub suppress_memory_s: f64,
+    pub support_m: f64,
+    pub support_error_m: f64,
+    pub danger_close_m: f64,
+    pub suppress_max_cost_usd: f64,
+    pub suppress_aim_m: f64,
+    pub suppress_drift_mps: f64,
+    pub team_depth_m: f64,
     pub near_miss_per_round: f64,
     pub ineffective_volleys: u32,
     pub cooldown_s: f64,
@@ -121,6 +151,7 @@ impl Params {
             acquire: AcquireParams::from_figures(f),
             direct: DirectFireParams::from_figures(f),
             people: PeopleParams::from_figures(f),
+            dismount: DismountParams { contact_m: f.get("sim.dismount.contact_m"), objective_m: f.get("sim.dismount.objective_m"), time_s: f.get("sim.dismount.time_s") },
             know: KnowParams::from_figures(f),
             observer: bgws_models::sensing::observer::ObserverParams::from_figures(f),
             atmos: bgws_env::AtmosParams::from_figures(f),
@@ -136,6 +167,15 @@ impl Params {
             lay_min_s: f.get("sim.fire.lay_min_s"),
             rounds_per_volley: f.get("sim.fire.rounds_per_volley"),
             missile_keep: f.get("sim.fire.missile_keep"),
+            team_front_m: f.get("sim.fire.team_front_m"),
+            suppress_memory_s: f.get("sim.fire.suppress_memory_s"),
+            support_m: f.get("sim.fire.support_m"),
+            support_error_m: f.get("sim.fire.support_error_m"),
+            danger_close_m: f.get("sim.fire.danger_close_m"),
+            suppress_max_cost_usd: f.get("sim.fire.suppress_max_cost_usd"),
+            suppress_aim_m: f.get("sim.fire.suppress_aim_m"),
+            suppress_drift_mps: f.get("sim.fire.suppress_drift_mps"),
+            team_depth_m: f.get("sim.fire.team_depth_m"),
             near_miss_per_round: f.get("sim.fire.near_miss_per_round"),
             ineffective_volleys: f.get("sim.fire.ineffective_volleys") as u32,
             cooldown_s: f.get("sim.decide.cooldown_s"),

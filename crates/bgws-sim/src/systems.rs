@@ -887,6 +887,31 @@ fn aim(s: &Sim, e: Entity, cat_mount: &bgws_catalogue::Mount, mun: &bgws_catalog
     (pres, budget, soft, tplat)
 }
 
+/// A round's blast against people in the open: its Carleton damage
+/// function, or a circle of its lethal radius. None for a solid shot or a bullet.
+fn blast_of(mun: &bgws_catalogue::Munition) -> Option<bgws_catalogue::Carleton> {
+    mun.carleton.or_else(|| (mun.lethal_radius_m > 0.0).then_some(bgws_catalogue::Carleton { bx_m: mun.lethal_radius_m, by_m: mun.lethal_radius_m }))
+}
+
+/// The share of a dismounted section or team (spread over `front` × `depth`
+/// m about the aim point) one round's blast kills, the round falling with
+/// the volley's spread (bias and random together): the Carleton function
+/// averaged over the people and the fall of shot. As one round knocks out
+/// the whole element with this chance, the expected losses are the same.
+fn blast_share(b: &bgws_catalogue::Carleton, budget: &df::ErrorBudget, front: f64, depth: f64) -> f64 {
+    let (sx, sy) = budget.total_sigma();
+    // Mean over x uniform on a width w of (b/√c)·exp(−x²/c), c = b² + 2σ².
+    let axis = |b: f64, s: f64, w: f64| {
+        let c = b * b + 2.0 * s * s;
+        if w <= 0.0 {
+            b / c.sqrt()
+        } else {
+            b * std::f64::consts::PI.sqrt() / w * bgws_models::math::erf(w / (2.0 * c.sqrt()))
+        }
+    };
+    (axis(b.bx_m, sx, front) * axis(b.by_m, sy, depth)).clamp(0.0, 1.0)
+}
+
 /// The chance one volley from this mount knocks out at least one of the
 /// target's vehicles or teams: the chance a round lands (the error budget,
 /// or a missile's guidance) times the chance a hit kills, by what it is and
@@ -898,8 +923,19 @@ fn volley_kill_odds(s: &Sim, e: Entity, fit: u32, cat_mount: &bgws_catalogue::Mo
     let supp = s.world.get::<Crew>(e).map(|c| c.suppression.level).unwrap_or(0.0);
     let ph = if is_guided_direct(mun) { df::guided_ph(operator_guided(mun), supp, p) } else { df::ph_expected(&pres, &budget) };
     let pen = mun.penetration_at(range);
-    let pk = if soft {
-        mun.pk.max(0.3)
+    let blast = blast_of(mun);
+    if soft {
+        // Troops: a hit, or a blast close enough (cover shields them).
+        let pk = mun.pk.max(0.3);
+        let tk = s.world.get::<Kin>(te).expect("kin").pos;
+        let shield = 1.0 - s.ctx.ground.micro(tk.e, tk.n).cover;
+        let near = blast.map(|b| blast_share(&b, &budget, s.ctx.p.team_front_m, s.ctx.p.team_depth_m) * shield).unwrap_or(0.0);
+        let p_round = ph * pk + (1.0 - ph) * near;
+        let rounds = ((fit as f64 * s.ctx.p.rounds_per_volley).round().max(1.0)).min(rounds_left as f64);
+        return 1.0 - (1.0 - p_round).powf(rounds);
+    }
+    let pk = if matches!(tplat.body.vulnerability, Vulnerability::Soft) && blast.is_some() {
+        0.8
     } else if matches!(tplat.body.vulnerability, Vulnerability::Soft | Vulnerability::Light) {
         if pen > 50.0 { 0.8 } else { 0.1 }
     } else {
@@ -912,15 +948,18 @@ fn volley_kill_odds(s: &Sim, e: Entity, fit: u32, cat_mount: &bgws_catalogue::Mo
     1.0 - (1.0 - ph * pk).powf(rounds)
 }
 
-/// Of the mounts that can fire at a target, the one to use: the most likely
+/// Of the mounts and rounds that can fire at a target (the place in
+/// `usable`), the one to use: the most likely
 /// to knock it out, except that a missile is kept for when it is clearly
 /// better (a gun at least `sim.fire.missile_keep` as good is used instead).
 #[allow(clippy::too_many_arguments)]
 fn choose_mount(s: &Sim, e: Entity, fit: u32, platform: &bgws_catalogue::Platform, usable: &[(usize, u32, bgws_catalogue::Munition)], te: Entity, range: f64, reaches: &dyn Fn(f64, &bgws_catalogue::Munition) -> bool) -> Option<usize> {
+    // Indexed by place in `usable`: a mount with two rounds is two choices.
     let scored: Vec<(usize, f64, bool)> = usable
         .iter()
-        .filter(|(_, _, mu)| reaches(range, mu))
-        .map(|(i, left, mu)| (*i, volley_kill_odds(s, e, fit, &platform.mounts[*i], mu, *left, te, range), is_guided_direct(mu)))
+        .enumerate()
+        .filter(|(_, (_, _, mu))| reaches(range, mu))
+        .map(|(j, (i, left, mu))| (j, volley_kill_odds(s, e, fit, &platform.mounts[*i], mu, *left, te, range), is_guided_direct(mu)))
         .collect();
     let best = scored.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))?;
     if best.2 {
@@ -1041,6 +1080,8 @@ pub fn direct_fire(s: &mut Sim) {
         // Nothing seen in the last 3 s means no target: the same test as the
         // candidate list below, made before anything is cloned.
         if !s.world.get::<Aware>(e).map(|a| a.seen.values().any(|v| v.last == now || (now - v.last).secs() < 3.0)).unwrap_or(false) {
+            // Nothing to aim at: it may fire to suppress where an enemy was.
+            suppressive_fire(s, e, fit0);
             continue;
         }
         let (id, side, platform, quality) = {
@@ -1060,7 +1101,9 @@ pub fn direct_fire(s: &mut Sim) {
             .mounts
             .iter()
             .filter(|m| m.rounds > 0 && m.ready_at <= now && !crate::domains::fires::indirect_mount(&platform, m.index))
-            .filter_map(|m| s.ctx.catalogue.munition(&m.munition).cloned().map(|mu| (m.index, m.rounds, mu)))
+            .flat_map(|m| std::iter::once((m.munition.clone(), m.rounds)).chain(m.stock.iter().filter(|(_, n)| **n > 0).map(|(k, n)| (k.clone(), *n))).map(move |(mu, n)| (m.index, mu, n)))
+            .filter_map(|(i, mu, n)| s.ctx.catalogue.munition(&mu).cloned().map(|mu| (i, n, mu)))
+            .filter(|(_, n, _)| *n > 0)
             .collect();
         if usable.is_empty() {
             continue;
@@ -1091,10 +1134,241 @@ pub fn direct_fire(s: &mut Sim) {
         let target = wanted.and_then(|w| candidates.iter().find(|c| c.0 == w).copied()).or_else(|| if matches!(act.activity, Activity::Move { mode: MoveModeS::March, .. }) { None } else { candidates.first().copied() });
         let Some((tid, range)) = target else { continue };
         // The weapon most likely to knock it out.
-        let Some(mi) = choose_mount(s, e, fit0, &platform, &usable, s.ctx.entity(tid), range, &reaches) else { continue };
-        let Some(mun) = usable.iter().find(|u| u.0 == mi).map(|u| u.2.clone()) else { continue };
+        let Some(j) = choose_mount(s, e, fit0, &platform, &usable, s.ctx.entity(tid), range, &reaches) else { continue };
+        let (mi, mun) = (usable[j].0, usable[j].2.clone());
+        // Another round wanted: load it (one reload), then fire.
+        if switch_round(s, e, id, side, mi, &mun.id, &platform.mounts[mi]) {
+            continue;
+        }
         fire_volley(s, e, id, side, fit0, quality, mi, &mun, &platform.mounts[mi], tid, range, None);
     }
+}
+
+/// Fire to suppress: no enemy in sight, but one was seen within
+/// `sim.fire.suppress_memory_s`, or one its picture holds within
+/// `sim.fire.support_error_m` while a friend within `sim.fire.support_m` of
+/// it is on the move (support by fire). Never where a friend is within
+/// `sim.fire.danger_close_m` (fire lifts and shifts). A unit not on the move, as its rules of
+/// engagement allow it to fire at that range, puts an area weapon (a machine gun, HE; never a missile) on the
+/// spot, keeping a magazine in reserve. The rounds fall about the spot with
+/// a spread that grows with the sighting's age; any enemy still there feels
+/// the near misses and blasts (suppression), and takes the odd casualty.
+fn suppressive_fire(s: &mut Sim, e: Entity, fit: u32) {
+    let now = s.ctx.now;
+    let memory = s.ctx.p.suppress_memory_s;
+    if memory <= 0.0 {
+        return;
+    }
+    let (id, side, platform) = {
+        let i = s.world.get::<Ident>(e).expect("ident");
+        (i.id, i.side, i.platform.clone())
+    };
+    let roe = {
+        let act = s.world.get::<Act>(e).expect("act");
+        if act.roe == RoeS::Never || !act.activity.may_fire() || act.activity.moving() {
+            return;
+        }
+        act.roe
+    };
+    let fired_upon = s.world.get::<Crew>(e).expect("crew").last_incoming.is_some();
+    let pos = s.world.get::<Kin>(e).expect("kin").pos;
+    let p = &s.ctx.p;
+    // Friends: who is moving (to support) and who is near a spot (to lift).
+    let friends: Vec<(Enu, bool)> = s.ctx.order.iter().copied()
+        .filter(|&f| f != e && alive(s, f) && is_land(s, f) && s.world.get::<Ident>(f).is_some_and(|i| i.side == side))
+        .filter_map(|f| Some((s.world.get::<Kin>(f)?.pos, s.world.get::<Act>(f)?.activity.moving())))
+        .collect();
+    // Spots: enemies it lost from sight within the memory (a knock-out is
+    // seen: none whose enemy is destroyed), each with the spread its age
+    // and motion give; and, to cover friends on the move, enemy positions
+    // its picture holds well enough.
+    let mut spots: Vec<(Option<EntityId>, Enu, f64, f64)> = s.world.get::<Aware>(e).expect("aware").seen.iter()
+        .filter(|(t, v)| (3.0..=memory).contains(&(now - v.last).secs()) && alive(s, s.ctx.entity(**t)))
+        .map(|(t, v)| {
+            let age = (now - v.last).secs();
+            let drift = if v.moving { p.suppress_drift_mps * age } else { 0.0 };
+            (Some(*t), v.at, age, p.suppress_aim_m.hypot(drift))
+        })
+        .collect();
+    for t in crate::domains::drones::c2::picture_for(s, id) {
+        let covering = friends.iter().any(|(f, moving)| *moving && f.sub(t.pos).horizontal() <= p.support_m);
+        if covering && t.error_m <= p.support_error_m {
+            spots.push((None, t.pos, t.age_s, p.suppress_aim_m.max(t.error_m)));
+        }
+    }
+    // Lift and shift: no fire where a friend is within danger close.
+    spots.retain(|(_, spot, _, sig)| !friends.iter().any(|(f, _)| f.sub(*spot).horizontal() <= p.danger_close_m.max(2.0 * sig)));
+    let Some((tid, spot, age, base_sigma)) = spots.into_iter().min_by(|a, b| a.1.sub(pos).horizontal().total_cmp(&b.1.sub(pos).horizontal()).then(a.0.cmp(&b.0))) else {
+        return;
+    };
+    let range = spot.sub(pos).horizontal();
+    // An area weapon, ready, that reaches, with more than a magazine left.
+    let arms = s.world.get::<Arms>(e).expect("arms").clone();
+    let mut pick: Option<(usize, bgws_catalogue::Munition, u32)> = None;
+    let held = arms.mounts.iter().filter(|m| m.ready_at <= now && !crate::domains::fires::indirect_mount(&platform, m.index)).flat_map(|m| {
+        std::iter::once((m.index, m.munition.clone(), m.rounds)).chain(m.stock.iter().map(|(k, n)| (m.index, k.clone(), *n)))
+    });
+    for (index, munition, left) in held {
+        let (Some(mun), Some(cm)) = (s.ctx.catalogue.munition(&munition), platform.mounts.get(index)) else { continue };
+        let area = mun.kind == bgws_catalogue::MunitionKind::SmallArms || (blast_of(mun).is_some() && !is_guided_direct(mun));
+        let allowed = match roe {
+            RoeS::Always => true,
+            RoeS::WithinShortRange => range <= mun.max_range_m * 0.5,
+            RoeS::IfFiredUpon => fired_upon,
+            RoeS::Never => false,
+        };
+        // Cheap rounds only (bullets, cannon HE): not a tank's main-gun round.
+        let cheap = mun.cost_usd <= s.ctx.p.suppress_max_cost_usd;
+        if !area || !allowed || !cheap || is_guided_direct(mun) || range > mun.max_range_m || range < mun.min_range_m || left <= cm.magazine {
+            continue;
+        }
+        // HE before bullets; of those alike, the one that reaches furthest.
+        let better = pick.as_ref().is_none_or(|(_, p, _)| (blast_of(mun).is_some(), mun.max_range_m) > (blast_of(p).is_some(), p.max_range_m));
+        if better {
+            pick = Some((index, mun.clone(), left - cm.magazine));
+        }
+    }
+    let Some((mi, mun, spare)) = pick else { return };
+    let cm = &platform.mounts[mi];
+    if switch_round(s, e, id, side, mi, &mun.id, cm) {
+        return;
+    }
+    let per_volley = ((fit as f64 * s.ctx.p.rounds_per_volley).round() as u32).max(1) * if mun.kind == bgws_catalogue::MunitionKind::SmallArms { cm.salvo.max(1) } else { 1 };
+    let rounds = per_volley.min(spare);
+    if rounds == 0 {
+        return;
+    }
+    // The spread: the spot's own, and the weapon's (about 2 mil).
+    let sigma = base_sigma.hypot(0.002 * range);
+    let (front, depth) = (s.ctx.p.team_front_m, s.ctx.p.team_depth_m);
+    let blast = blast_of(&mun);
+    // Who is there now.
+    let enemies: Vec<(Entity, EntityId, Enu)> = s.ctx.order.iter().copied()
+        .filter(|&t| alive(s, t) && is_land(s, t))
+        .filter_map(|t| {
+            let i = s.world.get::<Ident>(t)?;
+            (i.side != side && i.side != Side::Neutral).then_some((t, i.id, s.world.get::<Kin>(t)?.pos))
+        })
+        .collect();
+    let enemies: Vec<(Entity, EntityId, Enu)> = enemies.into_iter().filter(|(_, _, p)| p.sub(spot).horizontal() <= 3.0 * sigma + front).collect();
+    let mut rng = s.ctx.rng("fire.suppress", id.0 as u64, now.secs() as u64);
+    let mut felt = 0usize;
+    let mut total_kills = 0u32;
+    for (te, eid, tpos) in enemies {
+        let off = tpos.sub(spot);
+        // The share of the rounds that fall among it (its footprint, wider by a burst's reach).
+        let reach = blast.map(|b| b.bx_m.max(b.by_m)).unwrap_or(s.ctx.p.direct.near_miss_radius_m);
+        let inside = |c: f64, w: f64| {
+            let z = |x: f64| 0.5 * (1.0 + bgws_models::math::erf(x / (sigma * std::f64::consts::SQRT_2)));
+            z(c + w / 2.0) - z(c - w / 2.0)
+        };
+        let p_in = inside(off.e, front + 2.0 * reach) * inside(off.n, depth + 2.0 * reach);
+        if p_in < 1e-3 {
+            continue;
+        }
+        let personnel = matches!(s.world.get::<Ident>(te).map(|i| i.platform.body.vulnerability), Some(Vulnerability::Personnel));
+        let shield = 1.0 - s.ctx.ground.micro(tpos.e, tpos.n).cover;
+        // A round falling among troops kills the share of them its burst
+        // covers (a bullet, the share a man presents); vehicles shrug it off.
+        let per_kill = if !personnel {
+            0.0
+        } else if let Some(b) = blast {
+            (b.lethal_area_m2() / (front + 2.0 * reach) / (depth + 2.0 * reach)).min(1.0) * shield
+        } else {
+            (8.0 * 0.5 / (front * depth)) * mun.pk.max(0.3) * shield
+        };
+        let landed = rounds as f64 * p_in;
+        let mut kills = 0u32;
+        for _ in 0..rounds {
+            if rng.gen::<f64>() < p_in * per_kill {
+                kills += 1;
+            }
+        }
+        felt += 1;
+        {
+            let mut c = s.world.get_mut::<Crew>(te).expect("crew");
+            if blast.is_some() {
+                c.blasts_per_min += landed * 60.0 / 10.0;
+            } else {
+                c.near_misses_per_min += landed * s.ctx.p.near_miss_per_round * 60.0 / 10.0;
+            }
+            c.last_incoming = Some((now, id));
+        }
+        let mut destroyed = false;
+        if kills > 0 {
+            let mut h = s.world.get_mut::<Health>(te).expect("h");
+            let k = kills.min(h.fit);
+            h.fit -= k;
+            for _ in 0..k {
+                h.losses.push(now);
+            }
+            destroyed = h.fit == 0;
+            if destroyed {
+                h.destroyed = true;
+            }
+            let frac = k as f64 / h.start.max(1) as f64;
+            s.world.get_mut::<Crew>(te).expect("crew").new_casualties += frac;
+            total_kills += k;
+        }
+        if destroyed {
+            let text = format!("{} is destroyed", name(s, eid));
+            s.ctx.log.push(now, "unit.destroyed").side(side.enemy()).entity(eid).text(text);
+        } else {
+            // Fired upon: located if it has seen the firer, else a bearing.
+            let located = s.world.get::<Aware>(te).map(|a| a.seen.contains_key(&id)).unwrap_or(false);
+            if !located {
+                let mut aw = s.world.get_mut::<Aware>(te).expect("aware");
+                let bearing = pos.sub(tpos).bearing();
+                let entry = aw.suspects.entry(id).or_insert(Suspect { bearing, since: now, last: now });
+                entry.last = now;
+                entry.bearing = bearing;
+            }
+            s.ctx.triggers.push(Trigger { entity: eid, point: if located { "D2" } else { "D3" }, about: Some(id) });
+        }
+    }
+    {
+        let mut arms = s.world.get_mut::<Arms>(e).expect("arms");
+        if let Some(m) = arms.mounts.iter_mut().find(|m| m.index == mi) {
+            m.rounds -= rounds;
+            m.ready_at = now + bgws_core::SimDuration::from_secs(cm.reload_s.max(4.0));
+        }
+    }
+    {
+        let mut a = s.world.get_mut::<Act>(e).expect("act");
+        a.last_shot = Some(now);
+        a.last_event = now;
+    }
+    s.world.get_mut::<SigState>(e).expect("sig").last_fired = Some(now);
+    let whom = tid.map(|t| name(s, t)).unwrap_or_else(|| "an enemy friends reported".into());
+    let text = format!("{} fires {} rounds of {} to suppress where {} was seen {:.0} s ago ({:.0} m, spread {:.0} m): {} enemy under it, {} knocked out", name(s, id), rounds, mun.id, whom, age, range, sigma, felt, total_kills);
+    let mut ev = s.ctx.log.push(now, "fire.suppress").side(side).entity(id);
+    if let Some(t) = tid {
+        ev = ev.target(t);
+    }
+    ev.text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "ageS": age, "sigmaM": sigma, "felt": felt, "kills": total_kills }));
+}
+
+/// Load `munition` in a mount if another round is loaded: the loaded rounds
+/// go back to stock and the mount is ready again after one reload. True if
+/// it had to switch (the volley waits).
+fn switch_round(s: &mut Sim, e: Entity, id: EntityId, side: Side, mount_i: usize, munition: &str, cat_mount: &bgws_catalogue::Mount) -> bool {
+    let now = s.ctx.now;
+    let from = {
+        let mut arms = s.world.get_mut::<Arms>(e).expect("arms");
+        let Some(m) = arms.mounts.iter_mut().find(|m| m.index == mount_i) else { return false };
+        if m.munition == munition {
+            return false;
+        }
+        let n = m.stock.remove(munition).unwrap_or(0);
+        let old = std::mem::replace(&mut m.munition, munition.to_string());
+        let left = std::mem::replace(&mut m.rounds, n);
+        m.stock.insert(old.clone(), left);
+        m.ready_at = now + bgws_core::SimDuration::from_secs(cat_mount.reload_s.max(2.0));
+        old
+    };
+    let text = format!("{} loads {} (was {})", name(s, id), munition, from);
+    s.ctx.log.push(now, "fire.load").side(side).entity(id).text(text).data(serde_json::json!({ "munition": munition, "was": from }));
+    true
 }
 
 /// One volley from a mount at a target. With `arrive`, the rounds of a
@@ -1138,7 +1412,10 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         launch_missiles(s, e, id, side, mount_i, mun, cat_mount, tid, range, rounds);
         return;
     }
-    let (mut hits, mut kills, mut near) = (0u32, 0u32, 0.0f64);
+    let (mut hits, mut kills, mut near, mut blasts) = (0u32, 0u32, 0.0f64, 0.0f64);
+    let blast = blast_of(mun);
+    let shield = 1.0 - s.ctx.ground.micro(tk.pos.e, tk.pos.n).cover;
+    let share = blast.map(|b| blast_share(&b, &budget, s.ctx.p.team_front_m, s.ctx.p.team_depth_m) * shield).unwrap_or(0.0);
     let mut ph_last = 0.0;
     let armour = armour_zones(&tplat);
     let prot = Protection { era: tplat.body.era, aps: tplat.body.aps.is_some() };
@@ -1160,13 +1437,25 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         };
         ph_last = r.ph;
         if !r.hit {
-            if r.x_m.abs() < p.near_miss_radius_m * 3.0 && r.y_m.abs() < p.near_miss_radius_m * 3.0 {
+            if let Some(b) = blast {
+                // A burst close by: it can kill troops, and is felt as a blast.
+                if soft && rng.gen::<f64>() < share {
+                    kills += 1;
+                    near += 2.0;
+                    continue;
+                }
+                if r.x_m.abs() < 3.0 * b.bx_m.max(p.near_miss_radius_m) && r.y_m.abs() < 3.0 * b.by_m.max(p.near_miss_radius_m) {
+                    blasts += 1.0;
+                }
+            } else if r.x_m.abs() < p.near_miss_radius_m * 3.0 && r.y_m.abs() < p.near_miss_radius_m * 3.0 {
                 near += s.ctx.p.near_miss_per_round;
             }
             continue;
         }
         hits += 1;
-        let killed = if soft || matches!(tplat.body.vulnerability, Vulnerability::Soft | Vulnerability::Light) && pen > 50.0 {
+        let killed = if matches!(tplat.body.vulnerability, Vulnerability::Soft) && blast.is_some() {
+            rng.gen::<f64>() < 0.8
+        } else if soft || matches!(tplat.body.vulnerability, Vulnerability::Soft | Vulnerability::Light) && pen > 50.0 {
             let pk = if soft { mun.pk.max(0.3) } else { 0.8 };
             rng.gen::<f64>() < pk
         } else {
@@ -1242,6 +1531,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     {
         let mut c = s.world.get_mut::<Crew>(te).expect("crew");
         c.near_misses_per_min += near * 60.0 / 10.0;
+        c.blasts_per_min += blasts * 60.0 / 10.0;
         c.last_incoming = Some((now, id));
     }
     { let __text = format!(
@@ -1252,7 +1542,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
         range,
         hits,
         kills
-    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills })); }
+    ); s.ctx.log.push(now, if kills > 0 { "fire.kill" } else if hits > 0 { "fire.hit" } else { "fire.miss" }).side(side).entity(id).target(tid).text(__text).data(serde_json::json!({ "munition": mun.id, "ph": ph_last, "biasSigma": [budget.bias_sigma_x_m, budget.bias_sigma_y_m], "penetrationMm": pen, "rounds": rounds, "rangeM": range, "hits": hits, "kills": kills, "blasts": blasts })); }
     if destroyed_now {
         { let __text = format!("{} is destroyed", name(s, tid)); s.ctx.log.push(now, "unit.destroyed").side(side.enemy()).entity(tid).text(__text); }
         s.world.get_mut::<Crew>(e).expect("crew").success = true;

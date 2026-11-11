@@ -43,3 +43,69 @@ fn an_ifv_fires_its_missiles_beyond_its_cannons_reach_and_they_fly() {
     assert!(beyond > 0, "no IFV fired a missile beyond its cannon's reach");
     assert!(checked > 0, "no missile volley landed");
 }
+
+/// A mount with two rounds loads the one most likely to knock out its
+/// target: tanks load HEAT and IFVs HE for troops and soft targets.
+#[test]
+fn units_load_the_round_for_the_target() {
+    let mut loads = std::collections::BTreeSet::new();
+    for seed in 1..=3 {
+        for e in game("gen-company-attack", seed, 30.0).iter().filter(|e| e.kind == "fire.load") {
+            loads.insert(e.data["munition"].as_str().unwrap_or_default().to_string());
+        }
+    }
+    assert!(loads.contains("he30") || loads.contains("heat120"), "no unit changed rounds: {loads:?}");
+}
+
+/// An IFV's infantry get out as a foot unit and fight; a side's strength
+/// never goes up (troops aboard count from the start).
+#[test]
+fn an_ifvs_infantry_get_out_and_strength_never_rises() {
+    use bgws_core::Side;
+    // On its own (generated) ground: on flat open ground the fight is over
+    // at long range before anyone closes.
+    let spec = standard().into_iter().find(|s| s.name == "gen-company-attack").unwrap();
+    assert!(!matches!(spec.ground, GroundSpec::Pack { .. }), "needs no theatre pack");
+    let sc = ScenarioV4::from_json(&build(&spec).unwrap().to_string()).unwrap();
+    let (mut out, mut busy) = (0, 0);
+    for seed in 1..=3 {
+        // Out at first contact (the mechanism, not the drill's distances).
+        let mut f = bgws_run::default_figures();
+        f.set("sim.dismount.contact_m", 3000.0).unwrap();
+        let mut sim = Sim::new(&sc, Seed(seed), f).unwrap();
+        let mut last = sim.strength();
+        // Where each foot unit made in the game was first seen, and how far it got.
+        let mut walked: std::collections::BTreeMap<String, (bgws_core::Enu, f64)> = Default::default();
+        for t in 1..=180 {
+            if bgws_run::experiments::play_with_rules(&mut sim, SimTime::from_secs(t as f64 * 10.0)).is_some() {
+                break;
+            }
+            let now = sim.strength();
+            for side in [Side::Blue, Side::Red] {
+                let (a, b) = (last.get(&side).copied().unwrap_or(0.0), now.get(&side).copied().unwrap_or(0.0));
+                assert!(b <= a + 1e-9, "seed {seed}: {side:?} strength rose from {a:.3} to {b:.3} at {t}0 s");
+            }
+            last = now;
+            for (name, id) in sim.ctx.by_name.iter().filter(|(n, _)| n.ends_with("-dismounts")) {
+                if let Some(k) = sim.world.get::<bgws_sim::components::Kin>(sim.ctx.entity(*id)) {
+                    let w = walked.entry(name.clone()).or_insert((k.pos, 0.0));
+                    w.1 = w.1.max(k.pos.sub(w.0).horizontal());
+                }
+            }
+        }
+        let ev = sim.drain_events();
+        for d in ev.iter().filter(|e| e.kind == "unit.dismounted") {
+            out += 1;
+            let foot = d.target.expect("the foot unit");
+            let name = sim.ctx.by_name.iter().find(|(_, v)| **v == foot).map(|(k, _)| k.clone()).unwrap();
+            let moved = walked.get(&name).map(|w| w.1).unwrap_or(0.0);
+            let acted = ev.iter().any(|e| e.entity == Some(foot) && e.t > d.t);
+            if acted || moved > 50.0 {
+                busy += 1;
+            }
+        }
+    }
+    assert!(out > 0, "no infantry got out");
+    // Some get out just before the end; most go on with the fight.
+    assert!(busy * 2 >= out, "{busy} of {out} foot units fired or moved");
+}

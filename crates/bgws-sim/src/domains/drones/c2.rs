@@ -1040,6 +1040,15 @@ pub fn cue_spots(s: &Sim) -> BTreeMap<EntityId, Vec<(bgws_core::Enu, f64)>> {
     out
 }
 
+/// A unit made during the game (an IFV's dismounts) joins its parent's HQ:
+/// it reports to it and gets its share of the picture.
+pub fn adopt(s: &mut Sim, parent: EntityId, child: EntityId) {
+    let Some(mut c4) = s.world.get_resource_mut::<C4>() else { return };
+    if let Some(&h) = c4.c2.unit_hq.get(&parent) {
+        c4.c2.unit_hq.insert(child, h);
+    }
+}
+
 /// A cue from the picture covers at least this far around a reported contact, m.
 pub const CUE_MIN_M: f64 = 300.0;
 

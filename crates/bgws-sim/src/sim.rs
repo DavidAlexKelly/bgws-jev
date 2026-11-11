@@ -292,6 +292,7 @@ impl Sim {
         }
         let mut sim = Sim { world, ctx };
         crate::world::setup(&mut sim);
+        crate::dismount::setup(&mut sim);
         if opts.plan_at_start && !scenario.scope.planners.is_empty() {
             for side in Side::PLAYERS {
                 if sim.ctx.scenario.forces_of(side).next().is_some() {
@@ -402,6 +403,10 @@ impl Sim {
             {
                 prof_span!("direct_fire");
                 crate::systems::direct_fire(self);
+            }
+            {
+                prof_span!("dismount");
+                crate::dismount::base(self);
             }
             {
                 prof_span!("people");
@@ -737,6 +742,12 @@ impl Sim {
             let s = fit.entry(i.side).or_insert((0.0, 0.0));
             s.0 += if h.destroyed { 0.0 } else { h.fit as f64 };
             s.1 += h.start as f64;
+            // The infantry it carries (or carried, lost before they got out).
+            if let Some(t) = self.world.get::<crate::dismount::Troops>(e) {
+                let (f, st) = t.strength(h);
+                s.0 += f;
+                s.1 += st;
+            }
         }
         fit.into_iter().map(|(s, (a, b))| (s, if b > 0.0 { a / b } else { 0.0 })).collect()
     }
@@ -834,7 +845,8 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 let munition = m.munitions.first()?.clone();
                 let stored = platform.stores.ammo.get(&munition).copied().map(|x| x as u32);
                 let count = if f.count > 0 { f.count } else { platform.body.count.max(1) };
-                Some(MountState { index: i, munition, rounds: stored.unwrap_or(m.magazine).max(m.magazine) * count, ready_at: SimTime::from_secs(m.ready_s) })
+                let stock = m.munitions.iter().skip(1).map(|mu| (mu.clone(), platform.stores.ammo.get(mu).copied().map(|x| x as u32).unwrap_or(m.magazine).max(m.magazine) * count)).collect();
+                Some(MountState { index: i, munition, rounds: stored.unwrap_or(m.magazine).max(m.magazine) * count, ready_at: SimTime::from_secs(m.ready_s), stock })
             })
             .collect(),
         engagements: BTreeMap::new(),

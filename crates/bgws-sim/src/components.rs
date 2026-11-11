@@ -97,9 +97,14 @@ pub struct Crew {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MountState {
     pub index: usize,
+    /// The round loaded (fired next), and how many of it are left.
     pub munition: String,
     pub rounds: u32,
     pub ready_at: SimTime,
+    /// The mount's other rounds and how many of each are left (a tank's
+    /// HEAT beside its sabot, an IFV cannon's HE beside its APFSDS).
+    #[serde(default)]
+    pub stock: BTreeMap<String, u32>,
 }
 
 #[derive(Component, Clone, Debug, Default)]
@@ -111,7 +116,7 @@ pub struct Arms {
 
 impl Arms {
     pub fn rounds(&self) -> u32 {
-        self.mounts.iter().map(|m| m.rounds).sum()
+        self.mounts.iter().map(|m| m.rounds + m.stock.values().sum::<u32>()).sum()
     }
 }
 
