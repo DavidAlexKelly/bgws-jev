@@ -153,7 +153,9 @@ impl EntityTask {
     pub fn references(&self) -> Vec<&str> {
         match self {
             EntityTask::Strike { target_id: Some(t), .. } | EntityTask::Intercept { target_id: t } => vec![t.as_str()],
-            EntityTask::ReturnToBase { base_id } | EntityTask::Landed { base_id, .. } => vec![base_id.as_str()],
+            EntityTask::ReturnToBase { base_id } | EntityTask::Landed { base_id, .. } => {
+                vec![base_id.as_str()]
+            }
             EntityTask::Deliver { to_unit, .. } => vec![to_unit.as_str()],
             EntityTask::Reload { port_id, .. } => vec![port_id.as_str()],
             EntityTask::Route { then: Some(t), .. } => t.references(),
@@ -705,6 +707,11 @@ pub struct InteropSpec {
     /// Friendly, red 2 Opposing, neutral 3 Neutral.
     #[serde(default)]
     pub force: BTreeMap<Side, u8>,
+    /// Every simulation in the exercise plays on this scenario's generated
+    /// ground (exported with `bgws export-ground`). Without it, a game on
+    /// generated ground does not join an exercise: no partner has that ground.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared_ground: bool,
 }
 
 fn one_u8() -> u8 {
@@ -716,11 +723,23 @@ fn one_u16() -> u16 {
 
 impl Default for InteropSpec {
     fn default() -> Self {
-        InteropSpec { exercise: 1, site: 1, application: 1, country: BTreeMap::new(), force: BTreeMap::new() }
+        InteropSpec { exercise: 1, site: 1, application: 1, country: BTreeMap::new(), force: BTreeMap::new(), shared_ground: false }
     }
 }
 
 impl InteropSpec {
+    /// Why this scenario's ground cannot be federated, if it cannot: generated
+    /// ground (no theatre pack) that the exercise has not agreed to share.
+    pub fn ground_refusal(&self, theatre: &Theatre, flat: bool) -> Option<String> {
+        if self.shared_ground || (theatre.pack.is_some() && !flat) {
+            return None;
+        }
+        let what = if flat { "flat ground".to_string() } else { format!("{} ground", theatre.ground) };
+        Some(format!(
+            "this scenario plays on {what}, which no other simulation has: give it a theatre pack built from real terrain (`bgws terrain`), \
+             or share the ground (`bgws export-ground`, then `\"sharedGround\": true` in its interop block)"
+        ))
+    }
     pub fn country_of(&self, side: Side) -> u16 {
         self.country.get(&side).copied().unwrap_or(0)
     }
@@ -775,7 +794,9 @@ impl ScenarioV4 {
                 _ => {}
             }
         }
-        let Ok(mut v) = serde_json::to_value(&*self) else { return };
+        let Ok(mut v) = serde_json::to_value(&*self) else {
+            return;
+        };
         walk(&mut v, dlat, dlon);
         if let Ok(moved) = serde_json::from_value::<ScenarioV4>(v) {
             *self = moved;
@@ -810,5 +831,25 @@ impl ScenarioV4 {
             v.extend(c.positions().into_iter().map(|p| (format!("victory[{i}]"), p)));
         }
         v
+    }
+}
+
+#[cfg(test)]
+mod interop_tests {
+    use super::*;
+
+    #[test]
+    fn generated_ground_is_federated_only_when_shared() {
+        let mut theatre: Theatre = serde_json::from_value(serde_json::json!({ "origin": { "lat": 54.2, "lon": 18.6, "h": 0.0 } })).unwrap();
+        let mut spec = InteropSpec::default();
+        assert!(spec.ground_refusal(&theatre, false).is_some(), "generated, not shared");
+        theatre.pack = Some("packs/gdansk".into());
+        assert!(spec.ground_refusal(&theatre, false).is_none(), "real terrain");
+        assert!(spec.ground_refusal(&theatre, true).is_some(), "flat ground over a pack");
+        spec.shared_ground = true;
+        theatre.pack = None;
+        assert!(spec.ground_refusal(&theatre, false).is_none(), "shared");
+        let back: InteropSpec = serde_json::from_value(serde_json::json!({ "sharedGround": true })).unwrap();
+        assert!(back.shared_ground);
     }
 }

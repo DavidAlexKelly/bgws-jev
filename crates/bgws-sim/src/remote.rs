@@ -17,12 +17,19 @@
 use crate::components::*;
 use crate::sim::Sim;
 use bevy_ecs::prelude::*;
-use bgws_core::{Enu, EntityId, Side, SimTime};
+use bgws_core::{EntityId, Enu, Side, SimTime};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// No update for this long and a remote entity is taken off (2.4 DIS heartbeats), s.
 pub const TIMEOUT_S: f64 = 12.0;
+
+/// A land entity reported this far above or below our ground shows the two
+/// simulations' terrain differ there, m.
+pub const TERRAIN_MISMATCH_M: f64 = 2.0;
+
+/// At most one terrain-mismatch note per entity this often, s.
+const MISMATCH_EVERY_S: f64 = 60.0;
 
 /// An entity's identity in another simulation (DIS site, application, entity).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -106,6 +113,8 @@ pub struct Remote {
     pub damage: u8,
     /// Taken off (removed by its owner, or timed out).
     pub gone: bool,
+    /// When a terrain mismatch was last noted for it.
+    pub mismatch_noted: Option<SimTime>,
 }
 
 /// Is this entity another simulation's?
@@ -126,11 +135,16 @@ pub fn apply(s: &mut Sim, input: ExternalInput) {
             let e = match s.ctx.remote.get(&key).map(|&id| s.ctx.entity(id)) {
                 Some(e) => e,
                 None => {
-                    let Some(e) = spawn(s, key, &platform, side, &label, pos, heading) else { return };
+                    let Some(e) = spawn(s, key, &platform, side, &label, pos, heading) else {
+                        return;
+                    };
                     e
                 }
             };
             let land = s.world.get::<Ident>(e).is_some_and(|i| i.domain == bgws_catalogue::Domain::Land);
+            if land {
+                note_mismatch(s, e, key, pos);
+            }
             let pos = if land { Enu::new(pos.e, pos.n, s.ctx.ground.height(pos.e, pos.n)) } else { pos };
             if let Some(mut k) = s.world.get_mut::<Kin>(e) {
                 k.pos = pos;
@@ -158,8 +172,12 @@ pub fn apply(s: &mut Sim, input: ExternalInput) {
             }
         }
         ExternalInput::Fired { firer, target, munition } => {
-            let Some(fid) = entity_of(s, firer) else { return };
-            let Some(tid) = target.filter(|t| t.index() < s.ctx.order.len()) else { return };
+            let Some(fid) = entity_of(s, firer) else {
+                return;
+            };
+            let Some(tid) = target.filter(|t| t.index() < s.ctx.order.len()) else {
+                return;
+            };
             let te = s.ctx.entity(tid);
             if is_remote(s, te) {
                 return;
@@ -217,7 +235,7 @@ fn spawn(s: &mut Sim, key: ExternalKey, platform: &str, side: Side, label: &str,
     s.ctx.order.push(e);
     s.ctx.by_name.insert(force.id.clone(), id);
     s.ctx.remote.insert(key, id);
-    s.world.entity_mut(e).insert(Remote { key, last_update: now, damage: 0, gone: false });
+    s.world.entity_mut(e).insert(Remote { key, last_update: now, damage: 0, gone: false, mismatch_noted: None });
     if let Some(mut a) = s.world.get_mut::<Act>(e) {
         // Its owner decides what it does; here it only stands for it.
         a.activity = Activity::Hold;
@@ -228,9 +246,32 @@ fn spawn(s: &mut Sim, key: ExternalKey, platform: &str, side: Side, label: &str,
     Some(e)
 }
 
+/// A land entity its owner puts off our ground: the grounds differ there
+/// (it is still placed on ours). Noted at most once a minute per entity.
+fn note_mismatch(s: &mut Sim, e: Entity, key: ExternalKey, reported: Enu) {
+    let now = s.ctx.now;
+    let ground = s.ctx.ground.height(reported.e, reported.n);
+    let diff = reported.u - ground;
+    if diff.abs() <= TERRAIN_MISMATCH_M {
+        return;
+    }
+    let due = s.world.get::<Remote>(e).is_some_and(|r| r.mismatch_noted.is_none_or(|t| (now - t).secs() >= MISMATCH_EVERY_S));
+    if !due {
+        return;
+    }
+    if let Some(mut r) = s.world.get_mut::<Remote>(e) {
+        r.mismatch_noted = Some(now);
+    }
+    let (id, side) = s.world.get::<Ident>(e).map(|i| (i.id, i.side)).unwrap_or((EntityId(0), Side::Neutral));
+    let text = format!("{} ({key}) is reported {diff:+.1} m from our ground: the terrain differs here", crate::systems::name(s, id));
+    s.ctx.log.push(now, "interop.terrain_mismatch").side(side).entity(id).text(text).data(serde_json::json!({ "e": reported.e, "n": reported.n, "differenceM": diff }));
+}
+
 /// Health as its owner last said (the owner judges damage to it).
 fn set_health(s: &mut Sim, e: Entity) {
-    let Some((damage, gone)) = s.world.get::<Remote>(e).map(|r| (r.damage, r.gone)) else { return };
+    let Some((damage, gone)) = s.world.get::<Remote>(e).map(|r| (r.damage, r.gone)) else {
+        return;
+    };
     if let Some(mut h) = s.world.get_mut::<Health>(e) {
         h.destroyed = gone || damage >= 3;
         h.fit = match damage {
@@ -266,7 +307,9 @@ pub fn base(s: &mut Sim, dt: f64) {
     let ids: Vec<EntityId> = s.ctx.remote.values().copied().collect();
     for id in ids {
         let e = s.ctx.entity(id);
-        let Some(r) = s.world.get::<Remote>(e).cloned() else { continue };
+        let Some(r) = s.world.get::<Remote>(e).cloned() else {
+            continue;
+        };
         if r.gone {
             set_health(s, e);
             continue;

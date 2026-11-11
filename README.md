@@ -299,7 +299,7 @@ to reach openrouter.ai.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
-| `bgws-interop` | interoperability with other simulations: DIS v7 Entity State PDUs with dead reckoning, the EGM96 geoid, WGS-84 placement and DIS orientation (HLA 4 to follow; `docs/design/INTEROP_PLAN.md`) |
+| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management), the EGM96 geoid, WGS-84 placement and DIS orientation (HLA 4 to follow; `docs/design/INTEROP_PLAN.md`) |
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, speaking the protocol over HTTP and a WebSocket; bundles the default viewer (feature `bundled-viewer`), or serves any frontend folder (`--web`) |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `protocol/` | `PROTOCOL.md` (every message and route), TypeScript types generated from Rust (`ts-rs`) and a typed client |
@@ -1334,15 +1334,18 @@ game. A record saved mid-game says where it stops (`endedAt`).
 
 `bgws play <scenario> --dis <host:port>` publishes the game to other
 simulations as DIS version 7 (IEEE 1278.1-2012) Entity State PDUs over UDP,
-and plays in real time. This is phase 1 of `docs/design/INTEROP_PLAN.md`:
-export only. Taking in other simulations' entities, Fire and Detonation
-PDUs and HLA 4 come in phases 2–3.
+and plays in real time, and (with `--dis-listen`) takes in other
+simulations' entities, fires and detonations. These are phases 1 and 2 of
+`docs/design/INTEROP_PLAN.md`; HLA 4 comes in phase 3.
 
 ```sh
-bgws play gen-company-attack --dis 127.0.0.1:3000             # real time, published
+bgws play gen-kgd-company-attack --dis 127.0.0.1:3000             # real time, published
 bgws play gen-company-attack --realtime 4                      # 4x real time, not published
-bgws play gen-company-attack --dis 192.168.1.255:3000 --dis-exercise 2 --record game.json
+bgws play gen-kgd-company-attack --dis 192.168.1.255:3000 --dis-exercise 2 --record game.json
 bgws replay game.json                                          # exact, no network
+bgws play gen-kgd-company-attack --dis 239.1.2.3:3000 --dis-listen 0.0.0.0:3000 --dis-group 239.1.2.3   # two-way, multicast
+bgws export-ground gen-company-attack ground.tif               # our ground, for partners
+bgws correlate gen-kgd-company-attack partner.tif --json diff.json # before an exercise: do the grounds agree?
 ```
 
 **DIS codes.** Every catalogue platform and munition has a SISO-REF-010
@@ -1419,6 +1422,70 @@ deciders think, stays the default for experiments.
 - By hand: 4 simulated minutes at 4× took 59.8 s of wall time. An
   independent listener received all 789 PDUs from 15 entities, none
   malformed, each with the expected type.
+
+### Phase 2: two-way
+
+**Other simulations' entities.** An Entity State PDU from another site or
+application makes a remote entity here:
+- its platform comes from its DIS type: the catalogue record with the same
+  kind, domain, category, subcategory and specific, else the closest by
+  those, else a stand-in for its kind and domain (logged once);
+- its side comes from its force;
+- only its owner moves it: between states it is dead-reckoned, and a land
+  entity stands on our ground;
+- our units see it, report it and fire at it, but it does not see, decide
+  or fire here, and counts in no side's strength;
+- it is taken off when its state says it is deactivated, or after 12 s
+  with nothing from its owner.
+
+**Who judges damage.** Each simulation judges damage to its own entities.
+Our fire on a remote entity goes out as a Fire PDU and a Detonation PDU
+(hit, burst near, or missed onto the ground) for its owner to judge; we set
+its health to whatever its owner then reports. A detonation from another
+simulation at or near one of ours is judged here, with our damage models
+and our protection, and logged as `interop.detonation`, so the AAR and
+`bgws why` explain it like our own fire. A detonation is judged once even
+if the packet comes twice.
+
+**What goes out.**
+- a gun volley: a Fire and its Detonation;
+- a guided missile: a Fire at launch, its Detonation on arrival, under the
+  same event;
+- artillery and mortars: a Fire per salvo, a Detonation at its impact
+  centre for every simulation to judge its own entities near it;
+- fire to suppress: a Fire and a Detonation on the ground at the spot.
+
+**Management.** Stop/Freeze stops our clock and Start/Resume restarts it;
+both are acknowledged. Inputs apply only at tick boundaries and are
+recorded with the tick they applied at, so `bgws replay` of a federated
+game is exact with no network.
+
+**Terrain.** Two simulations only agree on who sees whom if they stand on
+the same ground (the plan's section 2 says why they usually don't):
+- `bgws correlate` compares our ground with a partner's elevation GeoTIFF
+  (add `--ellipsoidal` if its heights are above the ellipsoid): the height
+  error on a grid, and sight lines judged on both grounds with the same
+  method (4/3 Earth refraction, 2 m eyes). Against its own export our
+  ground agrees to 3 cm rms with 1 of 2,000 sight lines judged differently;
+  reading the same heights as ellipsoidal shows the 29.4 m geoid step.
+- During a game, a remote land entity reported more than 2 m off our ground
+  is logged (`interop.terrain_mismatch`, once a minute per entity), so the
+  AAR shows where the worlds differ.
+- A game on generated ground does not join an exercise, because no partner
+  has that ground, unless its `interop` block says `"sharedGround": true`
+  (after `bgws export-ground` has given it to every partner).
+
+**Checked (phase 2).**
+- Unit tests: remote entities join, dead-reckon, time out and are never
+  damaged, moved or decided for by our systems; a detonation is judged
+  once; PDUs in become the right inputs, with stand-ins; terrain mismatch is
+  noted once a minute; correlation finds a uniform 3 m shift and a removed
+  ridge's sight lines (every disagreement near the ridge).
+- Two simulations over UDP on localhost, one owning blue and the other red,
+  each keeping its own objectives: they see and fight each other, blue's
+  side judged 6 detonations on its entities and red's 21, red lost 83%, no
+  entity was owned twice and no detonation applied twice. Each side's
+  record replays exactly with no network.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
 on markings longer than 11 bytes (in a release build it loops until memory

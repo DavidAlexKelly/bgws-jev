@@ -25,10 +25,10 @@ use anyhow::{anyhow, bail, Result};
 use bgws_analysis::report::VignetteSuite;
 use bgws_analysis::CheckOptions;
 use bgws_core::{Seed, SimTime};
+use bgws_run::default_figures;
 use bgws_run::experiments;
 use bgws_run::{load_scenario, DeciderChoice, Host, HostOptions};
 use bgws_scenario::record::GameRecord;
-use bgws_run::default_figures;
 use bgws_sim::SimOptions;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -142,6 +142,34 @@ enum Cmd {
     /// `bgws terrain` does this as it builds; a pack without one gets it the first
     /// time a game opens on it.
     Analyse { pack: PathBuf },
+    /// Compare a scenario's ground with a partner simulation's elevation (a
+    /// GeoTIFF on a latitude/longitude grid) before a federation runs:
+    /// height errors on a grid, and sight lines judged on both grounds.
+    Correlate {
+        scenario: String,
+        partner: PathBuf,
+        #[arg(long, default_value_t = 250.0)]
+        spacing: f64,
+        /// Height difference worth listing, m.
+        #[arg(long, default_value_t = 2.0)]
+        tolerance: f64,
+        #[arg(long, default_value_t = 2000)]
+        sight_lines: usize,
+        /// The partner's heights are above the WGS84 ellipsoid (not mean sea level).
+        #[arg(long)]
+        ellipsoidal: bool,
+        /// Write the full report (every mismatch and disagreement) here as JSON.
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
+    /// Write a scenario's ground as a GeoTIFF (latitude/longitude, heights
+    /// above mean sea level) for a partner simulation to build its terrain from.
+    ExportGround {
+        scenario: String,
+        out: PathBuf,
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+    },
     /// The decision lab: collect units' decisions from games, play out every
     /// option, grade a decider against the results and your labels.
     Lab {
@@ -499,6 +527,9 @@ fn main() -> Result<()> {
                     match &dis {
                         Some(addr) => {
                             let mut spec = sc.interop.clone().unwrap_or_default();
+                            if let Some(why) = spec.ground_refusal(&sc.theatre, flat) {
+                                bail!("not joining a DIS exercise: {why}");
+                            }
                             if let Some(x) = dis_exercise {
                                 spec.exercise = x;
                             }
@@ -585,6 +616,31 @@ fn main() -> Result<()> {
             eprintln!("terrain analysis: {} key terrain points", a.key.len());
             println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());
             eprintln!("theatre pack `{}` in {} ({} terrain tiles, {:.0} s)", meta.name, out.display(), meta.tiles.len(), started.elapsed().as_secs_f64());
+        }
+        Cmd::Correlate { scenario, partner, spacing, tolerance, sight_lines, ellipsoidal, json } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let sim = bgws_run::correlate::ground_sim(&sc)?;
+            let dem = bgws_run::geotiff::Dem::read(&partner)?;
+            let geoid = bgws_interop::geoid::Geoid::egm96();
+            let ground = &sim.ctx.ground;
+            let ours = |e: f64, n: f64| ground.height(e, n);
+            let theirs = |lat: f64, lon: f64| dem.height(lat, lon).map(|h| if ellipsoidal { geoid.to_msl(lat, lon, h) } else { h });
+            let area = bgws_run::correlate::ground_area(ground);
+            let r = bgws_run::correlate::correlate(&sim.ctx.frame, area, spacing, tolerance, sight_lines, &ours, &theirs, 1);
+            println!("samples {} ({} not covered by the partner)", r.samples, r.uncovered);
+            println!("height, ours − theirs: mean {:+.2} m, rms {:.2} m, 95th percentile |{:.2}| m, worst |{:.2}| m", r.mean_error_m, r.rms_error_m, r.p95_abs_error_m, r.max_abs_error_m);
+            println!("beyond {:.1} m: {} points", r.tolerance_m, r.beyond_tolerance.len());
+            println!("sight lines: {} of {} judged differently ({:.1}%)", r.sight_disagreements.len(), r.sight_lines, 100.0 * r.sight_disagreement_share());
+            if let Some(p) = json {
+                std::fs::write(&p, serde_json::to_string_pretty(&r)?)?;
+                eprintln!("report in {}", p.display());
+            }
+        }
+        Cmd::ExportGround { scenario, out, cell_m } => {
+            let sc = load_scenario(&scenario_path(&scenario))?;
+            let sim = bgws_run::correlate::ground_sim(&sc)?;
+            let (w, h) = bgws_run::correlate::export_ground(&sim, &out, cell_m)?;
+            eprintln!("{w} × {h} heights in {}", out.display());
         }
         Cmd::Lab { cmd, lab } => {
             let lab = bgws_run::lab::Lab::open(&lab.unwrap_or_else(bgws_run::lab::lab_dir))?;

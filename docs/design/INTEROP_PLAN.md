@@ -1,8 +1,10 @@
 # Interoperability: DIS and HLA 4
 
-Status: **phase 1 built** (DIS codes, geoid, Entity State export with dead
-reckoning, real-time play; see the README's *Interoperability: DIS*).
-Phases 2–4 are planned.
+Status: **phases 1 and 2 built** (phase 1: DIS codes, geoid, Entity State
+export with dead reckoning, real-time play; phase 2: two-way DIS, remote
+entities, Fire and Detonation both ways, simulation management, terrain
+correlation; see the README's *Interoperability: DIS*). Phases 3–4 are
+planned.
 
 Phase 1 as built differs from this plan in four places:
 - **Dead-reckoning thresholds** are publisher settings (`DrSettings`), not
@@ -16,6 +18,27 @@ Phase 1 as built differs from this plan in four places:
 - **Heights** are placed by latitude and longitude from the east/north
   position plus the sim's height plus N. Running the 3-D vector through the
   origin's tangent plane would add the Earth's curvature (8 m at 10 km).
+
+Phase 2 as built differs from this plan in these places:
+- **Correlation commands** are `bgws correlate <scenario> <partner.tif>`
+  and `bgws export-ground <scenario> <out.tif>`, not `bgws terrain
+  correlate <pack>`: `bgws terrain` already takes a pack folder to build,
+  and a scenario covers generated ground as well as packs. Sampling is on a
+  grid only (not along roads), features are not compared, and the "map" is
+  the list of places in the JSON report.
+- **Duplicate detonations** are recognised by (event, target, burst point
+  to the metre), not by event ID alone: a salvo's rounds share one event.
+- **Remove Entity** is not decoded; an entity whose state says it is
+  deactivated (appearance bit 23), or that goes quiet for 12 s, is taken
+  off. DIS v6 Entity State PDUs are read as well as v7 (the parser takes
+  both), so there is no option for it.
+- **The real-terrain rule** is applied when a game joins an exercise
+  (`--dis`), not when any scenario with an `interop` block loads: the block
+  alone federates nothing, and replays of a federated game need no partner.
+  `"sharedGround": true` in the block allows generated ground.
+- **No smoothing on correction:** a remote entity jumps to its owner's new
+  state. With states at least every 5 s and dead reckoning between, the
+  jump is small; smoothing would make our picture lag theirs.
 
 This plan connects BGWS to other simulations over DIS (IEEE 1278.1) and HLA 4
 (IEEE 1516-2025, through its Federate Protocol). It is in four phases. Each

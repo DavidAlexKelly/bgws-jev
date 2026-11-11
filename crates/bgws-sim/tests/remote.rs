@@ -5,7 +5,7 @@
 //! their owner stops sending. Detonations on our entities are ours to judge,
 //! once each.
 
-use bgws_core::{Enu, EntityId, Seed, Side, SimTime};
+use bgws_core::{EntityId, Enu, Seed, Side, SimTime};
 use bgws_scenario::v4::ScenarioV4;
 use bgws_sim::components::{Health, Kin};
 use bgws_sim::remote::{DetonationResult, ExternalInput, ExternalKey};
@@ -99,4 +99,20 @@ fn a_detonation_on_ours_is_judged_once() {
     assert!(end.fit < fit0 || end.destroyed, "39 tandem ATGM impacts did nothing");
     let ev = s.drain_events();
     assert_eq!(ev.iter().filter(|e| e.kind == "interop.detonation").count(), 39);
+}
+
+#[test]
+fn a_land_entity_off_our_ground_is_noted_once_a_minute() {
+    let mut s = sim();
+    let (_, bid) = blue_tank(&s);
+    let at = s.world.get::<Kin>(s.ctx.entity(bid)).unwrap().pos.add(Enu::new(0.0, 1500.0, 0.0));
+    let g = s.ctx.ground.height(at.e, at.n);
+    // On our ground to a metre: nothing to note.
+    s.apply_external(state(Enu::new(at.e, at.n, g + 1.0), Enu::new(0.0, 0.0, 0.0), 0));
+    // Their ground 8 m higher here: noted, then not again within the minute.
+    s.apply_external(state(Enu::new(at.e, at.n, g + 8.0), Enu::new(0.0, 0.0, 0.0), 0));
+    s.apply_external(state(Enu::new(at.e, at.n, g + 8.0), Enu::new(0.0, 0.0, 0.0), 0));
+    let notes: Vec<_> = s.drain_events().into_iter().filter(|e| e.kind == "interop.terrain_mismatch").collect();
+    assert_eq!(notes.len(), 1);
+    assert!((notes[0].data["differenceM"].as_f64().unwrap() - 8.0).abs() < 1e-6);
 }

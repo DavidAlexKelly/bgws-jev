@@ -5,17 +5,18 @@
 //! crate (batches, vignettes, sensitivity).
 
 pub mod aar;
+pub mod behaviour;
+pub mod cases;
+pub mod correlate;
+pub mod editor;
+pub mod eventlog;
 pub mod experiments;
 pub mod geotiff;
-pub mod cases;
 pub mod host;
+pub mod lab;
 pub mod scengen;
 pub mod suite;
 pub mod tune;
-pub mod lab;
-pub mod behaviour;
-pub mod editor;
-pub mod eventlog;
 pub mod workbench;
 
 pub use host::{load_scenario, router_for, DeciderChoice, DisLinkAdapter, Host, HostOptions, Link, OnTick, PlayReport};
