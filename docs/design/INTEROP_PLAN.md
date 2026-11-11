@@ -9,17 +9,20 @@ Status: **phases 1–4 built**, except where noted below. See the README's
 - Phase 3: HLA 4 through the Federate Protocol with the RPR FOM, time
   management, the BGWS RTI. BGWS's client is tested only against our own
   RTI, and our RTI against Pitch's client.
-- Phase 4, over DIS: radio (Transmitter, Signal), electromagnetic emissions,
-  minefields, aggregates; inbound radios, radars and jammers feed our EW;
-  terrain from a partner's elevation, land cover and roads.
+- Phase 4, over DIS and HLA: radio (DIS Transmitter and Signal; RPR
+  `RadioTransmitter` and `RawBinaryRadioSignal`), electromagnetic emissions
+  (Electromagnetic Emission; `EmitterSystem` with radar and jammer beams),
+  minefields, aggregates. Inbound radios, radars and jammers feed our EW.
+  Terrain from a partner's elevation, land cover and roads.
 
 Phase 4 as built differs from this plan in these places:
 - **Smoke and laser designation are not built.** The simulation has no
   smoke screens and no laser designators, so there is nothing for
   Environmental Process or Designator PDUs to carry. Each needs its sim
   feature first.
-- **DIS only.** The RPR `RadioTransmitter`, `EmitterSystem` and aggregate
-  objects are not published over HLA yet.
+- **The RPR objects' names and datatypes** are from the RPR FOM 2.0
+  modules as we read them, and are tested only on the BGWS RTI. Check them
+  against the partner's FOM on first use.
 - **Minefields go out as Minefield State only.** That gives the outline and
   a lane bit, not lane geometry (Minefield Data). Its encoder is written by
   hand, since dis-rs has none.

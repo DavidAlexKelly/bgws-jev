@@ -1641,7 +1641,7 @@ server side, but our client has only met our own server.
 
 ### Phase 4: radio, emissions, minefields, aggregates, partner terrain
 
-Over DIS, alongside entities and fire, each from the sim's own state:
+Over DIS and HLA, alongside entities and fire, each from the sim's own state:
 - **Radios** (Transmitter PDUs): each radio that radiates, off, on, or
   transmitting in the last second, with its frequency, bandwidth and power.
   Sent on a change and every 5 s.
@@ -1665,6 +1665,25 @@ electronic warfare. A remote radio (while transmitting) and radar go on the
 air for our ESM to intercept and fix. A remote jammer joins our jammers and
 jams our receivers in its band. Each goes off when its owner says so.
 
+**Over HLA** the same go out as RPR FOM objects and an interaction, and
+come in the same way:
+
+| ours | RPR |
+|---|---|
+| a radio | `EmbeddedSystem.RadioTransmitter` |
+| a message | `RadioSignal.RawBinaryRadioSignal` (interaction) |
+| a radar or jammer | `EmbeddedSystem.EmitterSystem`, with one `EmitterBeam.RadarBeam` or `.JammerBeam` |
+| an aggregated formation | `BaseEntity.AggregateEntity` |
+| a minefield | `Minefield` |
+
+- Emitters that go quiet, and formations that split up, have their
+  objects deleted (a split formation says so first).
+- Coming in, other federates' radios (while transmitting), radars and
+  jammers reach our EW, as over DIS.
+- The names and datatypes follow the RPR FOM 2.0 modules as we read them.
+  As with the entity classes, check them against the partner's FOM on
+  first use.
+
 **Checked.**
 - A real game publishes every type, and each parses. In 4 minutes of
   `m4-drone-line`: 1,370 Transmitter, 23 Signal (orders and sitreps), 72
@@ -1673,6 +1692,17 @@ jams our receivers in its band. Each goes off when its owner says so.
   their members are.
 - A remote radar and jammer reach our EW and go off again.
 - Our Electromagnetic Emission PDU reads back as the same emitters.
+- **Over HLA, on the BGWS RTI**, with two BGWS federates and an observer
+  federate (150 s of `m4-drone-line`):
+  - the second federate took in the first's jammers, radars and
+    transmitting radios as emitters;
+  - the observer discovered 28 radios, 9 emitter systems with their radar
+    and jammer beams, and the minefield, and received messages (orders and
+    sitreps).
+
+  In `m6-sustained-offensive`, all 8 aggregated formations arrived with
+  their members. The time-managed two-federate test still gives the same
+  games every run.
 
 **Terrain from a partner's data.** When a federation agrees a terrain
 source, `bgws terrain` takes it in place of ours:
@@ -1701,8 +1731,6 @@ partner road reaching the pack's road graph.
 - **Smoke (Environmental Process PDUs) and laser designation (Designator
   PDUs).** The simulation has neither smoke screens nor laser designators
   yet, so there is nothing to publish. Each needs the sim feature first.
-- **HLA forms of these** (RPR `RadioTransmitter`, `EmitterSystem`,
-  aggregates) are not done; phase 4 is DIS for now.
 - **Buildings from a partner** are not taken in.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows

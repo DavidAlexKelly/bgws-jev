@@ -22,5 +22,6 @@ pub mod fom;
 pub mod link;
 pub mod mock;
 pub mod rpr;
+pub mod rpr_extras;
 pub mod rti;
 pub mod session;
