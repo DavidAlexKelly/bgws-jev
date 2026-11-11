@@ -88,7 +88,7 @@ fn a_detonation_on_ours_is_judged_once() {
     let det = |n: u16| ExternalInput::Detonation { firer: Some(KEY), target: Some(bid), munition: "atgmTandem".into(), at, result: DetonationResult::Impact, rounds: 3, event: (9, 9, n) };
     s.apply_external(det(1));
     let after = s.world.get::<Health>(be).unwrap().fit;
-    // The same event again changes nothing.
+    // The same detonation again (a duplicated packet) changes nothing.
     s.apply_external(det(1));
     assert_eq!(s.world.get::<Health>(be).unwrap().fit, after, "a detonation judged twice");
     // Over many events a tandem ATGM's impacts knock tanks out.

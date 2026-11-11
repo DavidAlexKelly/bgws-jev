@@ -156,8 +156,10 @@ pub struct Ctx {
     pub missiles: Vec<crate::systems::InFlight>,
     /// Entities another simulation owns, by their external key.
     pub remote: BTreeMap<crate::remote::ExternalKey, EntityId>,
-    /// Detonations already judged (the firing simulation's event IDs).
-    pub detonations_seen: std::collections::BTreeSet<(u16, u16, u16)>,
+    /// Detonations already judged: (the firing simulation's event, target,
+    /// burst point to the metre), so a duplicated packet is not judged twice
+    /// (several detonations may share an event: an artillery mission's salvos).
+    pub detonations_seen: std::collections::BTreeSet<crate::remote::DetonationKey>,
     /// The exercise is stopped (a DIS Stop/Freeze): a real-time host holds the clock.
     pub frozen: bool,
     pub(crate) last_asked: BTreeMap<EntityId, SimTime>,

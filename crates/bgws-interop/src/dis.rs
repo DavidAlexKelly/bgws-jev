@@ -170,6 +170,13 @@ impl DisPublisher {
         Ok(DisPublisher { socket, dest, spec, dr: DeadReckoner::new(settings), fires: FireBook::default(), sent: 0 })
     }
 
+    /// Send raw bytes (an acknowledgement).
+    pub fn send(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        self.socket.send_to(bytes, self.dest)?;
+        self.sent += 1;
+        Ok(())
+    }
+
     /// Send the states due now, and a Fire and Detonation for each of our
     /// shots in `events` (this tick's); returns how many PDUs were sent.
     pub fn publish(&mut self, sim: &Sim, events: &[LogEvent]) -> std::io::Result<usize> {

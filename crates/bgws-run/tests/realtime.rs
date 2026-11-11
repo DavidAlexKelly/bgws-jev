@@ -22,7 +22,7 @@ fn a_real_time_game_replays_exactly() {
     let mut host = Host::new(&sc, Seed(3), bgws_run::default_figures(), &rules()).unwrap();
     let until = SimTime::from_secs(8.0 * 60.0);
     let mut ticks = 0;
-    host.play_realtime(until, None, |_| ticks += 1).unwrap();
+    host.play_realtime(until, None, &mut bgws_run::OnTick(|_| ticks += 1)).unwrap();
     let rec = host.finished_record();
     assert!(rec.run.realtime, "the record says it was played in real time");
     assert!(!rec.answers.is_empty(), "questions were asked and answered");
@@ -30,7 +30,7 @@ fn a_real_time_game_replays_exactly() {
     assert!((8 * 60..=8 * 60 + 1).contains(&ticks) || rec.outcome.is_some(), "one tick each second ({ticks})");
 
     let mut replay = Host::replay(rec.clone(), bgws_run::default_figures()).unwrap();
-    replay.play_realtime(rec.ends_at(), None, |_| {}).unwrap();
+    replay.play_realtime(rec.ends_at(), None, &mut bgws_run::OnTick(|_| {})).unwrap();
     replay.verify_replay().expect("the replay matches the record");
 }
 
@@ -40,7 +40,7 @@ fn with_a_pace_the_clock_follows_the_wall() {
     let mut host = Host::new(&sc, Seed(1), bgws_run::default_figures(), &rules()).unwrap();
     let started = Instant::now();
     // 30 simulated seconds at 10x: about 3 s of wall clock.
-    host.play_realtime(SimTime::from_secs(30.0), Some(10.0), |_| {}).unwrap();
+    host.play_realtime(SimTime::from_secs(30.0), Some(10.0), &mut bgws_run::OnTick(|_| {})).unwrap();
     let wall = started.elapsed().as_secs_f64();
     assert!((2.7..3.6).contains(&wall), "30 s at 10x took {wall:.2} s");
 }

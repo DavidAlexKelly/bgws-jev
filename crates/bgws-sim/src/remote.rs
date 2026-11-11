@@ -39,6 +39,9 @@ impl std::fmt::Display for ExternalKey {
     }
 }
 
+/// A detonation as judged: (event, target, burst point to the metre).
+pub type DetonationKey = ((u16, u16, u16), Option<EntityId>, (i64, i64));
+
 /// What a detonation did where it went off, as the firing simulation saw it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,8 +89,8 @@ pub enum ExternalInput {
         at: Enu,
         result: DetonationResult,
         rounds: u32,
-        /// The firing simulation's event (site, application, number), so a
-        /// detonation is never judged twice.
+        /// The firing simulation's event (site, application, number); with the
+        /// target and burst point, a duplicated packet is not judged twice.
         event: (u16, u16, u16),
     },
     /// The exercise was stopped (frozen) or started again.
@@ -167,7 +170,7 @@ pub fn apply(s: &mut Sim, input: ExternalInput) {
             s.ctx.log.push(now, "interop.fire").side(side).entity(fid).target(tid).text(text).data(serde_json::json!({ "munition": munition }));
         }
         ExternalInput::Detonation { firer, target, munition, at, result, rounds, event } => {
-            if !s.ctx.detonations_seen.insert(event) {
+            if !s.ctx.detonations_seen.insert((event, target, (at.e.round() as i64, at.n.round() as i64))) {
                 return;
             }
             crate::systems::external_detonation(s, firer.and_then(|k| entity_of(s, k)), target, &munition, at, result, rounds, event);

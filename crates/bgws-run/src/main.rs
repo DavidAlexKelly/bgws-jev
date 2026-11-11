@@ -80,6 +80,14 @@ enum Cmd {
         /// The DIS exercise ID (else the scenario's `interop.exercise`, else 1).
         #[arg(long)]
         dis_exercise: Option<u8>,
+        /// Also take in other simulations' DIS on this address (`host:port`):
+        /// their entities join as remote entities, their detonations on ours
+        /// are judged here. Without it the game only publishes.
+        #[arg(long)]
+        dis_listen: Option<String>,
+        /// Join this IPv4 multicast group to listen.
+        #[arg(long)]
+        dis_group: Option<std::net::Ipv4Addr>,
     },
     /// Replay a game record exactly, without calling any decider.
     Replay { record: PathBuf },
@@ -463,7 +471,7 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise } => {
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let seed = Seed(seed.unwrap_or(sc.seed.0));
             let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
@@ -487,32 +495,28 @@ fn main() -> Result<()> {
                     host.play_until(until, progress)?;
                 }
                 Some(speed) => {
-                    let mut publisher = match &dis {
+                    eprintln!("playing in real time at {speed}x");
+                    match &dis {
                         Some(addr) => {
                             let mut spec = sc.interop.clone().unwrap_or_default();
                             if let Some(x) = dis_exercise {
                                 spec.exercise = x;
                             }
-                            eprintln!("publishing DIS v7 to {addr} (exercise {}, site {}, application {})", spec.exercise, spec.site, spec.application);
-                            Some(bgws_interop::dis::DisPublisher::new(addr, spec, bgws_interop::dr::DrSettings::default())?)
-                        }
-                        None => None,
-                    };
-                    eprintln!("playing in real time at {speed}x");
-                    let mut failed = None;
-                    host.play_realtime(until, Some(speed), |sim| {
-                        progress(sim);
-                        if let Some(p) = publisher.as_mut() {
-                            if let Err(e) = p.publish(sim, &[]) {
-                                failed.get_or_insert(e);
+                            eprintln!("DIS v7 to {addr} (exercise {}, site {}, application {}){}", spec.exercise, spec.site, spec.application, dis_listen.as_ref().map(|l| format!(", listening on {l}")).unwrap_or_default());
+                            let link = bgws_interop::link::DisLink::new(addr, dis_listen.as_deref(), dis_group, spec, bgws_interop::dr::DrSettings::default())?;
+                            let mut adapter = bgws_run::DisLinkAdapter::new(link, &mut progress);
+                            host.play_realtime(until, Some(speed), &mut adapter)?;
+                            for n in &adapter.notes {
+                                eprintln!("DIS: {n}");
                             }
+                            if let Some(e) = adapter.errors.first() {
+                                eprintln!("DIS: {} sends failed (first: {e})", adapter.errors.len());
+                            }
+                            eprintln!("DIS: {} PDUs sent, {} inputs taken in", adapter.link.publisher.sent, adapter.link.received);
                         }
-                    })?;
-                    if let Some(e) = failed {
-                        eprintln!("DIS: a send failed: {e}");
-                    }
-                    if let Some(p) = &publisher {
-                        eprintln!("DIS: {} entity states sent", p.sent);
+                        None => {
+                            host.play_realtime(until, Some(speed), &mut bgws_run::OnTick(&mut progress))?;
+                        }
                     }
                 }
             }
@@ -530,7 +534,7 @@ fn main() -> Result<()> {
             let realtime = rec.run.realtime;
             let mut host = Host::replay(rec, default_figures())?;
             if realtime {
-                host.play_realtime(until, None, |_| {})?;
+                host.play_realtime(until, None, &mut bgws_run::OnTick(|_| {}))?;
             } else {
                 host.play_until(until, |_| {})?;
             }

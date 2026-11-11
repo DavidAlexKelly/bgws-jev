@@ -104,6 +104,13 @@ pub struct RecordedAnswer {
     pub answer: Answer,
 }
 
+/// One input from another simulation, as applied.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RecordedExternal {
+    pub at: SimTime,
+    pub input: Value,
+}
+
 /// A snapshot's bytes or JSON.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "encoding", content = "data", rename_all = "camelCase")]
@@ -194,6 +201,11 @@ pub struct GameRecord {
     pub answers: Vec<RecordedAnswer>,
     #[serde(default)]
     pub snapshots: Vec<RecordedSnapshot>,
+    /// Every input from another simulation (DIS, HLA), in the order applied,
+    /// each at the time it was applied (`bgws_sim::remote::ExternalInput`
+    /// as JSON), so a replay gives them back with no network.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external: Vec<RecordedExternal>,
     /// Where the record stops, when the game was saved before it was over.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ended_at: Option<SimTime>,
@@ -219,6 +231,7 @@ impl GameRecord {
             commands: Vec::new(),
             answers: Vec::new(),
             snapshots: Vec::new(),
+            external: Vec::new(),
             ended_at: None,
             fingerprint: None,
             outcome: None,
@@ -238,6 +251,10 @@ impl GameRecord {
 
     pub fn push_answer(&mut self, at: SimTime, answer: Answer) {
         self.answers.push(RecordedAnswer { at, answer });
+    }
+
+    pub fn push_external(&mut self, at: SimTime, input: Value) {
+        self.external.push(RecordedExternal { at, input });
     }
 
     pub fn push_snapshot(&mut self, s: RecordedSnapshot) {
