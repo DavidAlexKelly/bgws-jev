@@ -61,6 +61,8 @@ struct Federate {
     /// Object class → attributes subscribed.
     subscribed: BTreeMap<u64, BTreeSet<u64>>,
     interactions: BTreeSet<u64>,
+    /// Directed interactions subscribed: object class → interaction classes.
+    directed: BTreeMap<u64, BTreeSet<u64>>,
     /// Lookahead, if time-regulating.
     regulating: Option<f64>,
     constrained: bool,
@@ -215,6 +217,16 @@ impl State {
         self.next_handle += 1;
         self.names.insert(key, h);
         h
+    }
+}
+
+/// A class name in full: `HLAobjectRoot.Participant` for `Participant` (a
+/// FOM's class may be named either way).
+fn qualified(root: &str, name: &str) -> String {
+    if name == root || name.starts_with(&format!("{root}.")) {
+        name.to_string()
+    } else {
+        format!("{root}.{name}")
     }
 }
 
@@ -465,7 +477,7 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
             (Rs::ResignFederationExecutionResponse(p::ResignFederationExecutionResponse {}), none)
         }
         Rq::GetObjectClassHandleRequest(r) => {
-            let h = g.handle(format!("class:{}", r.object_class_name));
+            let h = g.handle(format!("class:{}", qualified("HLAobjectRoot", &r.object_class_name)));
             (Rs::GetObjectClassHandleResponse(p::GetObjectClassHandleResponse { result: och(h) }), none)
         }
         Rq::GetAttributeHandleRequest(r) => {
@@ -473,7 +485,7 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
             (Rs::GetAttributeHandleResponse(p::GetAttributeHandleResponse { result: Some(p::AttributeHandle { data: handle_bytes(h) }) }), none)
         }
         Rq::GetInteractionClassHandleRequest(r) => {
-            let h = g.handle(format!("interaction:{}", r.interaction_class_name));
+            let h = g.handle(format!("interaction:{}", qualified("HLAinteractionRoot", &r.interaction_class_name)));
             (Rs::GetInteractionClassHandleResponse(p::GetInteractionClassHandleResponse { result: Some(p::InteractionClassHandle { data: handle_bytes(h) }) }), none)
         }
         Rq::GetParameterHandleRequest(r) => {
@@ -505,6 +517,78 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
                 }
             }
             (Rs::SubscribeObjectClassAttributesResponse(p::SubscribeObjectClassAttributesResponse {}), out)
+        }
+        Rq::PublishObjectClassDirectedInteractionsRequest(_) => {
+            fed!();
+            (Rs::PublishObjectClassDirectedInteractionsResponse(p::PublishObjectClassDirectedInteractionsResponse {}), none)
+        }
+        Rq::SubscribeObjectClassDirectedInteractionsRequest(r) => {
+            let (fx, me) = fed!();
+            let class = hb(&r.object_class);
+            let set: BTreeSet<u64> = r.interaction_classes.map(|s| s.interaction_class_handle.iter().map(|h| handle_of(&h.data)).collect()).unwrap_or_default();
+            g.federations.get_mut(&fx).unwrap().federates.get_mut(&me).unwrap().directed.entry(class).or_default().extend(set);
+            (Rs::SubscribeObjectClassDirectedInteractionsResponse(p::SubscribeObjectClassDirectedInteractionsResponse {}), none)
+        }
+        Rq::SendDirectedInteractionRequest(r) => {
+            let (fx, me) = fed!();
+            let f = g.federations.get(&fx).unwrap();
+            let Some(class) = f.instances.get(&hb(&r.object_instance)).map(|i| i.class) else { return (exception("ObjectInstanceNotKnown", hb(&r.object_instance).to_string()), none) };
+            let ic = hb(&r.interaction_class);
+            // To every other federate subscribed to it at the object's class.
+            let out = f
+                .federates
+                .iter()
+                .filter(|(&fh, fed)| fh != me && fed.directed.get(&class).is_some_and(|s| s.contains(&ic)))
+                .map(|(_, fed)| {
+                    (
+                        fed.session,
+                        Cb::ReceiveDirectedInteraction(p::ReceiveDirectedInteraction {
+                            interaction_class: r.interaction_class.clone(),
+                            object_instance: r.object_instance.clone(),
+                            parameter_values: r.parameter_values.clone(),
+                            user_supplied_tag: r.user_supplied_tag.clone(),
+                            transportation_type: None,
+                            producing_federate: fed_handle(me),
+                        }),
+                    )
+                })
+                .collect();
+            (Rs::SendDirectedInteractionResponse(p::SendDirectedInteractionResponse {}), out)
+        }
+        Rq::RequestInstanceAttributeValueUpdateRequest(r) => {
+            let (fx, _) = fed!();
+            let f = g.federations.get(&fx).unwrap();
+            let Some(owner) = f.instances.get(&hb(&r.object_instance)).map(|i| i.owner) else { return (exception("ObjectInstanceNotKnown", hb(&r.object_instance).to_string()), none) };
+            let out = f
+                .federates
+                .get(&owner)
+                .map(|o| (o.session, Cb::ProvideAttributeValueUpdate(p::ProvideAttributeValueUpdate { object_instance: r.object_instance.clone(), attributes: r.attributes.clone(), user_supplied_tag: r.user_supplied_tag.clone() })))
+                .into_iter()
+                .collect();
+            (Rs::RequestInstanceAttributeValueUpdateResponse(p::RequestInstanceAttributeValueUpdateResponse {}), out)
+        }
+        Rq::RequestClassAttributeValueUpdateRequest(r) => {
+            let (fx, me) = fed!();
+            let f = g.federations.get(&fx).unwrap();
+            let class = hb(&r.object_class);
+            let out = f
+                .instances
+                .iter()
+                .filter(|(_, i)| i.class == class && i.owner != me)
+                .filter_map(|(&h, i)| {
+                    f.federates.get(&i.owner).map(|o| {
+                        (
+                            o.session,
+                            Cb::ProvideAttributeValueUpdate(p::ProvideAttributeValueUpdate {
+                                object_instance: Some(p::ObjectInstanceHandle { data: handle_bytes(h) }),
+                                attributes: r.attributes.clone(),
+                                user_supplied_tag: r.user_supplied_tag.clone(),
+                            }),
+                        )
+                    })
+                })
+                .collect();
+            (Rs::RequestClassAttributeValueUpdateResponse(p::RequestClassAttributeValueUpdateResponse {}), out)
         }
         Rq::SubscribeInteractionClassRequest(r) => {
             let (fx, me) = fed!();

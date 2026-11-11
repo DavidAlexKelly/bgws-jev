@@ -92,3 +92,52 @@ fn call_responses_match_their_calls_under_load() {
     }
     assert!(rti.calls() >= 2000);
 }
+
+/// What Pitch's Chat sample uses beyond BGWS's own calls: short class names,
+/// directed interactions and requests for attribute values.
+#[test]
+fn the_mock_serves_what_the_chat_sample_uses() {
+    use bgws_interop::hla::proto::{self as p, call_request::CallRequest as Rq, call_response::CallResponse as Rs};
+    use bgws_interop::hla::session::Session;
+    use prost::Message;
+    let rti = MockRti::start().unwrap();
+    let (a, b) = (federate(&rti, "a"), federate(&rti, "b"));
+    // `Participant` and `HLAobjectRoot.Participant` are one class.
+    assert_eq!(a.object_class("Participant").unwrap(), a.object_class("HLAobjectRoot.Participant").unwrap());
+    assert_eq!(a.interaction_class("Communication").unwrap(), b.interaction_class("HLAinteractionRoot.Communication").unwrap());
+    let class = a.object_class("Participant").unwrap();
+    let name = a.attribute(&class, "Name").unwrap();
+    let comm = a.interaction_class("Communication").unwrap();
+    let raw = |s: &Session, rq: Rq| -> Rs { p::CallResponse::decode(s.call(&p::CallRequest { call_request: Some(rq) }.encode_to_vec()).unwrap().as_slice()).unwrap().call_response.unwrap() };
+    let set = Some(p::InteractionClassHandleSet { interaction_class_handle: vec![p::InteractionClassHandle { data: comm.0.clone() }] });
+    for (s, sub) in [(a.session(), false), (b.session(), true)] {
+        let oc = Some(p::ObjectClassHandle { data: class.0.clone() });
+        let rq = if sub {
+            Rq::SubscribeObjectClassDirectedInteractionsRequest(p::SubscribeObjectClassDirectedInteractionsRequest { object_class: oc, interaction_classes: set.clone() })
+        } else {
+            Rq::PublishObjectClassDirectedInteractionsRequest(p::PublishObjectClassDirectedInteractionsRequest { object_class: oc, interaction_classes: set.clone() })
+        };
+        assert!(!matches!(raw(s, rq), Rs::ExceptionData(_)));
+    }
+    b.subscribe_object(&class, std::slice::from_ref(&name)).unwrap();
+    a.publish_object(&class, std::slice::from_ref(&name)).unwrap();
+    assert!(a.reserve_name("alice", Duration::from_secs(5)).unwrap());
+    let alice = a.register_with_name(&class, "alice").unwrap();
+    // B asks for alice's name: A is asked to provide it.
+    let rq = Rq::RequestInstanceAttributeValueUpdateRequest(p::RequestInstanceAttributeValueUpdateRequest {
+        object_instance: Some(p::ObjectInstanceHandle { data: alice.0.clone() }),
+        attributes: Some(p::AttributeHandleSet { attribute_handle: vec![p::AttributeHandle { data: name.0.clone() }] }),
+        user_supplied_tag: vec![],
+    });
+    assert!(!matches!(raw(b.session(), rq), Rs::ExceptionData(_)));
+    assert!(a.wait_for(Duration::from_secs(5), |c| matches!(c, Cb::ProvideAttributeValueUpdate(_))).is_some(), "the owner is asked to update");
+    // A directed interaction to alice reaches B, subscribed at Participant.
+    let rq = Rq::SendDirectedInteractionRequest(p::SendDirectedInteractionRequest {
+        interaction_class: Some(p::InteractionClassHandle { data: comm.0.clone() }),
+        object_instance: Some(p::ObjectInstanceHandle { data: alice.0.clone() }),
+        parameter_values: None,
+        user_supplied_tag: vec![],
+    });
+    assert!(!matches!(raw(a.session(), rq), Rs::ExceptionData(_)));
+    assert!(b.wait_for(Duration::from_secs(5), |c| matches!(c, Cb::ReceiveDirectedInteraction(_))).is_some(), "the directed interaction arrives");
+}
