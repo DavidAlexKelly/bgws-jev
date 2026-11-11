@@ -190,5 +190,12 @@
   ],
   "missing": 42,
   "fingerprint": "ceee6ac74f21bd62",
-  "history": []
+  "history": [
+    {
+      "explanation": "Guided missiles now fail in flight 6% of the time (atgm-engagement 0.81 to 0.75); detect-to-strike measures the drone line without blue's tank and IFV, which attacking at will kill the drones' targets at 3 km first",
+      "fingerprint": "ceee6ac74f21bd62",
+      "replaced": "ceee6ac74f21bd62",
+      "verdict": "pass"
+    }
+  ]
 }

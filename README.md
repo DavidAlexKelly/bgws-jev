@@ -1115,6 +1115,45 @@ a battery that stays survives 69% and loses 14 guns; one that scoots
 survives 84% and loses 7. The guard is now "at least twice" rather than
 "more than twice".
 
+**Validation: three new vignettes, and what they found.** Each adds a check
+on something nothing checked before. Each source is secondary, so each band
+is low-confidence.
+
+| Vignette | Claim | Source | Result |
+|---|---|---|---|
+| `tank-engagement-range` | tank platoons meeting in open country open fire at 2–3 km | Desert Storm: VII Corps average 2,200 m, US armour 2,200–2,800 m (an armour history quoted on a forum) | 2,893 m mean |
+| `suppression-recovery` | troops stay suppressed about 2 min after the fire stops | encyclopaedic, no primary citation | 93 s median (band 1–4 min) |
+| `spot-report-latency` | a contact reaches the HQ's picture within 5 min of the sighting | the SALUTE spot report task standard (study-guide summary) | 2.05 min median |
+
+The first one failed at 1,388 m: the heuristic HQ planner ordered every
+unit, attackers included, to hold fire until short range (half its weapon's
+reach). Attack orders now fire at will (armour engages at its greatest
+effective range); defence, reserve and support orders still hold fire to
+short range. Games against a dug-in defence end sooner (the company attack
+in 8–9 min instead of 10–19), and the meeting engagement is less one-sided
+(red wins one of six seeds; it won none before).
+
+That change let blue's tank and IFV in the drone line kill the red infantry
+at 3 km before the drones reached it, which starved both detect-to-strike
+vignettes and the FPV test. All three now measure the drone line without
+blue's armour, the strike chain alone. Networked detect-to-strike is then
+3.4 min, inside its 2–5 min band, and it leaves the calibration backlog.
+
+Other baselines accepted: ATGM hit share 0.81 → 0.75 (missiles now fail
+6% of the time).
+
+Sensitivity: the suppression recovery time is almost all
+`people.suppression.decay_tau_s` (Sobol total index 0.97), an unsourced
+default (60 s), now held by the new vignette.
+
+Jev (plain) on fresh seeds 5–12, against the doctrine default after items
+3–6 (all 19 suite scenarios, 304 paired games, $0.26): result +0.07 ± 0.04,
+exchange +0.02 ± 0.01. Before these items it was +0.01 ± 0.04 and
+−0.01 ± 0.01. The default it is measured against changed too (the drills
+and fire at will in the attack), so the two numbers are not a strict
+before-and-after; but Jev now does better than the doctrine across these
+scenarios, most clearly in the skirmishes (+0.25 to +0.38 result).
+
 Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
 
 | under test | better / worse | result Δ | exchange Δ |
@@ -1302,7 +1341,8 @@ target/release/bgws vignettes -n 200 --store data/regression   # §15.8: fails o
 `.github/workflows/rust-engine.yml` runs all of this on every change to the
 workspace, checks the server builds with no bundled frontend, and type-checks
 and rebuilds the viewer (`frontend/viewer`) to check its committed build.
-Sixteen benchmark vignettes run against stored baselines: fourteen are in band,
-and networked detect-to-strike and the attack halt are on the calibration backlog. Batches and
+Twenty benchmark vignettes run against stored baselines, all in band; the
+attack halt stays on the calibration backlog (its median sits at the band's
+edge, 0.25 in one run of 200 and 0.33 in another). Batches and
 vignettes answer with the rules and the decider crate's heuristic planner, the
 same planner the host falls back to.
