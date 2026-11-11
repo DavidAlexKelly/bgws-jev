@@ -82,3 +82,33 @@ pub fn all_figures() -> Vec<bgws_core::Figure> {
 pub fn default_figures() -> bgws_core::Figures {
     bgws_core::Figures::from_list(all_figures()).expect("the shipped figures are consistent")
 }
+
+/// One side of a scenario, for a federation where each simulation owns a
+/// side: only that side's forces and HQs (HQs keep only their own
+/// subordinates). Victory keeps only the objectives, which give each side
+/// its mission; a strength breakpoint would end the game at once, since a
+/// simulation counts only its own side's strength.
+pub fn one_side(sc: &bgws_scenario::v4::ScenarioV4, side: bgws_core::Side) -> anyhow::Result<bgws_scenario::v4::ScenarioV4> {
+    let side = serde_json::to_value(side)?;
+    let mut v = serde_json::to_value(sc)?;
+    let forces = v["forces"].as_array().cloned().unwrap_or_default();
+    let gone: Vec<String> = forces.iter().filter(|f| f["side"] != side).filter_map(|f| f["id"].as_str().map(String::from)).collect();
+    if forces.len() == gone.len() {
+        anyhow::bail!("the scenario has no {side} forces");
+    }
+    if let Some(f) = v["forces"].as_array_mut() {
+        f.retain(|f| f["side"] == side);
+    }
+    if let Some(hqs) = v.get_mut("command").and_then(|c| c.get_mut("hqs")).and_then(|h| h.as_array_mut()) {
+        hqs.retain(|h| h["side"] == side);
+        for h in hqs.iter_mut() {
+            if let Some(subs) = h.get_mut("subordinates").and_then(|x| x.as_array_mut()) {
+                subs.retain(|x| !gone.iter().any(|g| x == g.as_str()));
+            }
+        }
+    }
+    if let Some(vc) = v.get_mut("victory").and_then(|x| x.as_array_mut()) {
+        vc.retain(|c| c["kind"] == "objective");
+    }
+    Ok(bgws_scenario::v4::ScenarioV4::from_json(&v.to_string()).map_err(|e| anyhow::anyhow!("{e}"))?)
+}

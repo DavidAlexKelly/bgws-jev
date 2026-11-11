@@ -109,6 +109,15 @@ enum Cmd {
         /// at the ReadyToRun synchronization point.
         #[arg(long, default_value_t = 1)]
         federates: usize,
+        /// Play only this side (blue, red or neutral): its forces and HQs,
+        /// with the objectives as victory. Each simulation in an exercise
+        /// owns one side.
+        #[arg(long)]
+        side: Option<String>,
+        /// Our DIS site number (else the scenario's `interop.site`, else 1):
+        /// each simulation in an exercise needs its own.
+        #[arg(long)]
+        site: Option<u16>,
     },
     /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
     /// federates on one machine.
@@ -526,8 +535,16 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group, hla, federation, federate, fom, time_managed, federates } => {
-            let sc = load_scenario(&scenario_path(&scenario))?;
+        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group, hla, federation, federate, fom, time_managed, federates, side, site } => {
+            let mut sc = load_scenario(&scenario_path(&scenario))?;
+            if let Some(s) = &side {
+                let s: bgws_core::Side = serde_json::from_value(serde_json::Value::String(s.to_lowercase())).map_err(|_| anyhow!("--side is blue, red or neutral, not {s}"))?;
+                sc = bgws_run::one_side(&sc, s)?;
+                eprintln!("playing {} only ({} forces)", side.as_deref().unwrap_or_default(), sc.forces.len());
+            }
+            if let Some(n) = site {
+                sc.interop.get_or_insert_with(Default::default).site = n;
+            }
             let seed = Seed(seed.unwrap_or(sc.seed.0));
             let opts = HostOptions { deciders, local_url, local_model, claude_model, sim: SimOptions { flat_ground: flat, ..Default::default() } };
             let mut host = Host::new(&sc, seed, default_figures(), &opts)?;

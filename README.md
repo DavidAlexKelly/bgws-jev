@@ -1501,6 +1501,26 @@ bgws play gen-kgd-company-attack --hla rti:15164 --time-managed --federates 2 --
 bgws replay game.json                                           # exact, no RTI
 ```
 
+**Blue against red, as two processes.** `--side` plays one side only (its
+forces and HQs, with the objectives as victory), and `--site` gives each
+simulation its own DIS site:
+
+```sh
+bgws mock-rti
+bgws play gen-kgd-company-attack --side blue --site 1 --hla 127.0.0.1:15164 --time-managed --federates 2 --record blue.json
+bgws play gen-kgd-company-attack --side red  --site 2 --hla 127.0.0.1:15164 --time-managed --federates 2 --record red.json
+```
+
+Run this way for 45 minutes, the two fought:
+- every update one sent, the other took in;
+- blue judged 9 detonations on its units, and red judged 57;
+- both games ended at 39:20 with the same verdict, reached separately:
+  blue held its objective (red saw blue's units there as remote entities);
+- blue lost 5% of its strength, red 42%;
+- each record replays exactly with no RTI.
+
+The same flags work on DIS (`--dis`).
+
 **How it talks to the RTI.**
 - **Wire messages:** the IEEE 1516.1-2025 Federate Protocol protos, as
   published in Pitch's FedProClient, compiled to Rust (`crates/bgws-interop/proto`;
