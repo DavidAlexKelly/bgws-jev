@@ -71,11 +71,15 @@ fn layer(name: &str, features: &[Feature]) -> Vec<u8> {
     bytes(&mut l, 1, name.as_bytes());
     for f in features {
         let mut tags = Vec::new();
-        let mut all: Vec<(&str, Vec<u8>)> = f.tags.iter().map(|&(k, v)| {
-            let mut vb = Vec::new();
-            bytes(&mut vb, 1, v.as_bytes());
-            (k, vb)
-        }).collect();
+        let mut all: Vec<(&str, Vec<u8>)> = f
+            .tags
+            .iter()
+            .map(|&(k, v)| {
+                let mut vb = Vec::new();
+                bytes(&mut vb, 1, v.as_bytes());
+                (k, vb)
+            })
+            .collect();
         if let Some(h) = f.height {
             // A double (field 3, fixed 64-bit).
             let mut vb = vec![(3 << 3) | 1];
@@ -274,7 +278,11 @@ fn a_pack_from_local_archives_has_its_ground_roads_and_water() {
     // across the box (kept a little beyond it) and joined across tile seams.
     let g = bgws_geodata::roads::RoadGraph::read(&pack.join("roads")).unwrap();
     let primary: f64 = g.edges.iter().filter(|e| e.class == RoadClass::Primary).map(|e| e.length_m).sum();
-    let width_m = { let (a, _) = at(BOX.west, 54.71); let (b, _) = at(BOX.east, 54.71); b - a };
+    let width_m = {
+        let (a, _) = at(BOX.west, 54.71);
+        let (b, _) = at(BOX.east, 54.71);
+        b - a
+    };
     assert!(primary > width_m && primary < 1.4 * width_m, "main road {primary:.0} m across a box {width_m:.0} m wide");
     assert!(g.edges.iter().filter(|e| e.class == RoadClass::Primary).count() <= 2, "one road either side of the crossing: {:?}", g.edges.iter().map(|e| (e.class, e.length_m)).collect::<Vec<_>>());
     let mut degree = vec![0usize; g.nodes.len()];
@@ -283,5 +291,28 @@ fn a_pack_from_local_archives_has_its_ground_roads_and_water() {
         degree[e.to as usize] += 1;
     }
     assert!(degree.contains(&4), "the crossing is a junction: {degree:?}");
+
+    // A partner's road, added through the build's hook, reaches the pack's
+    // road graph (the hook runs before the roads and the pack are made).
+    assert!(!g.edges.iter().any(|e| e.class == RoadClass::Track));
+    let mut called = false;
+    let pack2 = dir.join("pack2");
+    bgws_geodata::pack::build_pack_with(&pack2, "offline", &spec, 15.0, &|_, _| {}, &mut |gr| {
+        called = true;
+        let ext = gr.extent as f64;
+        let line = [BOX.west + 0.002, BOX.east - 0.002]
+            .iter()
+            .map(|&lon| {
+                let (x, y) = bgws_geodata::mercator::tile_xy(lon, 54.708, gr.zoom);
+                [x * ext, y * ext]
+            })
+            .collect();
+        gr.roads.push(bgws_geodata::build::RawRoad { kind: "minor_road".into(), detail: "track".into(), bridge: false, tunnel: false, link: false, name: Some("partner".into()), line });
+        Ok(())
+    })
+    .unwrap();
+    assert!(called);
+    let g2 = bgws_geodata::roads::RoadGraph::read(&pack2.join("roads")).unwrap();
+    assert!(g2.edges.iter().any(|e| e.class == RoadClass::Track), "the partner's road is in the graph");
     let _ = std::fs::remove_dir_all(&dir);
 }

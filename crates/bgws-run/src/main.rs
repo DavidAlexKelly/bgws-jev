@@ -173,6 +173,24 @@ enum Cmd {
         /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
         #[arg(long)]
         cache: Option<PathBuf>,
+        /// A federation's agreed elevation (GeoTIFF, lat/lon grid) in place of ours where it covers.
+        #[arg(long)]
+        partner_elevation: Option<PathBuf>,
+        /// The partner's heights are above the WGS84 ellipsoid (not mean sea level).
+        #[arg(long)]
+        partner_ellipsoidal: bool,
+        /// A federation's land cover polygons (GeoJSON or shapefile), painted over ours.
+        #[arg(long)]
+        partner_land_cover: Option<PathBuf>,
+        /// A federation's roads (GeoJSON or shapefile lines), added to ours.
+        #[arg(long)]
+        partner_roads: Option<PathBuf>,
+        /// The partner's roads only, in place of ours.
+        #[arg(long)]
+        replace_roads: bool,
+        /// How the partner's classes map to ours (JSON; see crates/bgws-run/src/partner.rs).
+        #[arg(long)]
+        partner_map: Option<PathBuf>,
     },
     /// Work out (again) a theatre pack's terrain appreciation: dead ground, mobility
     /// corridors, chokepoints, crossings and observation points, saved with the pack.
@@ -670,7 +688,8 @@ fn main() -> Result<()> {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
-        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, cache } => {
+        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
+            let partner = bgws_run::partner::PartnerTerrain { elevation: partner_elevation, ellipsoidal: partner_ellipsoidal, land_cover: partner_land_cover, roads: partner_roads, replace_roads, ..Default::default() }.with_mapping_file(partner_map.as_deref())?;
             let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
             let mut spec = bgws_geodata::build::BuildSpec::new(bbox);
             spec.cell_m = cell_m;
@@ -694,7 +713,18 @@ fn main() -> Result<()> {
                     }
                 }
             };
-            let meta = bgws_geodata::pack::build_pack(&out, &name, &spec, snap_m, &progress).map_err(|e| anyhow!("{e}"))?;
+            let mut adjust = |g: &mut bgws_geodata::build::Ground| -> std::result::Result<(), String> {
+                if partner.is_empty() {
+                    return Ok(());
+                }
+                let a = partner.apply(g).map_err(|e| e.to_string())?;
+                eprintln!("partner terrain: {} heights, {} land cover nodes, {} roads", a.heights, a.land_cover, a.roads);
+                if !a.unmapped_classes.is_empty() {
+                    eprintln!("partner terrain: classes the mapping does not name (left as ours): {}", a.unmapped_classes.join(", "));
+                }
+                Ok(())
+            };
+            let meta = bgws_geodata::pack::build_pack_with(&out, &name, &spec, snap_m, &progress, &mut adjust).map_err(|e| anyhow!("{e}"))?;
             let a = bgws_run::host::analyse_pack(&out, &progress)?;
             eprintln!("terrain analysis: {} key terrain points", a.key.len());
             println!("{}", serde_json::to_string_pretty(&meta.sources).unwrap_or_default());

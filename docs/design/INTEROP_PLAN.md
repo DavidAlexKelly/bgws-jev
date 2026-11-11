@@ -1,15 +1,32 @@
 # Interoperability: DIS and HLA 4
 
-Status: **phases 1–3 built**. See the README's *Interoperability: DIS and
-HLA 4*.
+Status: **phases 1–4 built**, except where noted below. See the README's
+*Interoperability: DIS and HLA 4*.
 - Phase 1: DIS codes, the geoid, Entity State export with dead reckoning,
   real-time play.
 - Phase 2: two-way DIS, remote entities, Fire and Detonation both ways,
   simulation management, terrain correlation.
 - Phase 3: HLA 4 through the Federate Protocol with the RPR FOM, time
-  management, a mock RTI. Tested only against the mock so far.
+  management, the BGWS RTI. BGWS's client is tested only against our own
+  RTI, and our RTI against Pitch's client.
+- Phase 4, over DIS: radio (Transmitter, Signal), electromagnetic emissions,
+  minefields, aggregates; inbound radios, radars and jammers feed our EW;
+  terrain from a partner's elevation, land cover and roads.
 
-Phase 4 is planned.
+Phase 4 as built differs from this plan in these places:
+- **Smoke and laser designation are not built.** The simulation has no
+  smoke screens and no laser designators, so there is nothing for
+  Environmental Process or Designator PDUs to carry. Each needs its sim
+  feature first.
+- **DIS only.** The RPR `RadioTransmitter`, `EmitterSystem` and aggregate
+  objects are not published over HLA yet.
+- **Minefields go out as Minefield State only.** That gives the outline and
+  a lane bit, not lane geometry (Minefield Data). Its encoder is written by
+  hand, since dis-rs has none.
+- **Aggregates are published alongside their entities**, not in place of
+  them. Our aggregated formations keep their members as entities.
+- **Partner terrain** takes elevation, land cover and roads; not buildings,
+  OGC CDB or OpenFlight. A GeoPackage must be converted to GeoJSON.
 
 Phase 1 as built differs from this plan in four places:
 - **Dead-reckoning thresholds** are publisher settings (`DrSettings`), not

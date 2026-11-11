@@ -1639,6 +1639,72 @@ objects, using `tests/data/hierarchy.xml`, a small FOM shaped like RPR.
 other), and against a third-party RPR federate. Pitch's client checks our
 server side, but our client has only met our own server.
 
+### Phase 4: radio, emissions, minefields, aggregates, partner terrain
+
+Over DIS, alongside entities and fire, each from the sim's own state:
+- **Radios** (Transmitter PDUs): each radio that radiates, off, on, or
+  transmitting in the last second, with its frequency, bandwidth and power.
+  Sent on a change and every 5 s.
+- **Messages** (Signal PDUs): each message our comms model delivers or
+  loses (orders, sitreps, reports), as data, not voice: a short JSON
+  record of what it was, from and to whom, whether it arrived, and on what.
+- **Radars and jammers** (Electromagnetic Emission PDUs): each entity's
+  emitters on the air, one system and beam each, with frequency, bandwidth
+  and ERP. Sent on a change and every 10 s, and once empty when they go
+  quiet.
+- **Aggregated formations** (Aggregate State PDUs): each formation the level
+  of detail aggregates, with its centre, extent, velocity and members; once
+  more as disaggregated when it splits.
+- **Minefields** (Minefield State PDUs): each land minefield, its four
+  corners as perimeter points, with the lane bit set once breached.
+  `dis-rs` has no builder for this PDU, so it is written by hand from the
+  standard's field list; check it against a partner's tool on first use.
+
+Coming in, Transmitter and Electromagnetic Emission PDUs reach our
+electronic warfare. A remote radio (while transmitting) and radar go on the
+air for our ESM to intercept and fix. A remote jammer joins our jammers and
+jams our receivers in its band. Each goes off when its owner says so.
+
+**Checked.**
+- A real game publishes every type, and each parses. In 4 minutes of
+  `m4-drone-line`: 1,370 Transmitter, 23 Signal (orders and sitreps), 72
+  Electromagnetic Emission (its jammers) and 24 Minefield State PDUs. In
+  `m6-sustained-offensive`, aggregated formations are published where
+  their members are.
+- A remote radar and jammer reach our EW and go off again.
+- Our Electromagnetic Emission PDU reads back as the same emitters.
+
+**Terrain from a partner's data.** When a federation agrees a terrain
+source, `bgws terrain` takes it in place of ours:
+
+```sh
+bgws terrain packs/agreed --bbox 20.3,54.6,20.6,54.8 \
+  --partner-elevation agreed-dem.tif [--partner-ellipsoidal] \
+  --partner-land-cover agreed-cover.geojson --partner-roads agreed-roads.shp [--replace-roads] \
+  --partner-map mapping.json
+```
+
+- Elevation is a GeoTIFF on a latitude/longitude grid.
+- Land cover (polygons) and roads (lines) are GeoJSON or shapefiles in
+  longitude and latitude. A GeoPackage converts with
+  `ogr2ogr -f GeoJSON -t_srs EPSG:4326`.
+- The mapping file names the attribute holding each class and maps the
+  partner's values to our classes; `crates/bgws-run/src/partner.rs` shows
+  the format. Classes it doesn't name are reported and left as ours.
+- The partner's data goes in before the road network and the pack are made.
+
+Tests cover a partner elevation (and the geoid step for ellipsoidal
+heights), land cover with a hole from GeoJSON and from a shapefile, and a
+partner road reaching the pack's road graph.
+
+**Not built:**
+- **Smoke (Environmental Process PDUs) and laser designation (Designator
+  PDUs).** The simulation has neither smoke screens nor laser designators
+  yet, so there is nothing to publish. Each needs the sim feature first.
+- **HLA forms of these** (RPR `RadioTransmitter`, `EmitterSystem`,
+  aggregates) are not done; phase 4 is DIS for now.
+- **Buildings from a partner** are not taken in.
+
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
 on markings longer than 11 bytes (in a release build it loops until memory
 runs out), so markings are always cut first.

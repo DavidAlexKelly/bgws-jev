@@ -62,7 +62,16 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
 
 /// Build a box's ground and roads and write the pack: the whole pre-game step.
 pub fn build_pack(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<PackMeta, GeoError> {
-    let ground = crate::build::build(spec, progress)?;
+    build_pack_with(dir, name, spec, snap_m, progress, &mut |_| Ok(()))
+}
+
+/// As [`build_pack`], with `adjust` changing the ground before the road
+/// network is made and the pack written (a partner's elevation, land cover
+/// or roads in place of ours).
+pub fn build_pack_with(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progress: &(dyn Fn(&str, f64) + Sync), adjust: &mut dyn FnMut(&mut crate::build::Ground) -> Result<(), String>) -> Result<PackMeta, GeoError> {
+    let mut ground = crate::build::build(spec, progress)?;
+    progress("partner terrain", 0.0);
+    adjust(&mut ground).map_err(GeoError::Format)?;
     progress("road network", 0.0);
     let roads = crate::roads::build_graph(&ground, snap_m);
     progress("writing the pack", 0.0);

@@ -21,6 +21,7 @@ bgws-scenario.workspace = true
 bgws-sim.workspace = true
 bgws-decide.workspace = true
 bgws-interop.workspace = true
+shapefile = "0.6"
 bgws-analysis.workspace = true
 bgws-models.workspace = true
 bgws-ops.workspace = true
