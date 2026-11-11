@@ -983,6 +983,41 @@ planner A/B is where it was (+0.01 ± 0.05 result, seeds 1–4), and Jev
 against the doctrine default (before: +0.02 and −0.02). Most generated
 fights end as before; the ambush is quicker (5–7 min).
 
+**The shared picture, and what a unit can tell of a contact.** A unit's
+decision state used to hold only what it saw itself. It now also holds
+what its HQ's picture says, as a battle management system or the company
+net would pass it on. The picture reaches the unit `sim.c2.picture_lag_s`
+(60 s) late, and not at all if its HQ is down or its radios are out.
+- An enemy it sees but has not identified gets `reportedAs`: what the
+  picture says it is, how sure, how old the report is and who made it.
+- Contacts friends reported within 4 km that it has not seen itself are
+  listed in `reportedByFriends` (up to 4).
+- A unit searching where its picture puts an enemy searches as if cued.
+- A contact recognised but not identified is described by kind: a team on
+  foot, an armoured vehicle or a soft-skinned vehicle (before: "something").
+  The judge style uses this kind to answer "is it a vehicle?" without asking.
+- An HQ takes a unit's contact report as an established track, not as one
+  blip waiting for a second look (updates come minutes apart).
+
+Building this found a bug: with no GNSS jamming the navigation step
+returned early and never refreshed any receiver's fix, so every unit's
+inertial navigation drifted unchecked (3–20 km of error by ten minutes)
+and that error was added to every contact report. HQ tracks were born too
+uncertain to keep, and the side picture stayed empty in every game. With
+the fix, company HQs hold their contacts. Moving contacts still drop
+between a unit's five-minute updates, which is fair: an attacker seen once
+five minutes ago could be 2–3 km away.
+
+Measured: in collected games 20 of 95 unit decisions carry friends'
+reports. Every vignette stays in band; detect-to-strike moves from 5.35 to
+4.90 min networked (now inside its 2–5 min band) and from 22.9 to 25.1 min
+by voice (KS p 0.02, inside its 10–30 min band). The FPV calibration test
+now plays 16 seeds by default, as 8 gave as few as 7 attacks. Over 48
+seeds, cueing leaves the number of FPV attacks unchanged (79 with, 83
+without). Jev (plain) on seeds 5–12 is +0.01 ± 0.04, exchange
+−0.01 ± 0.01, against the doctrine default; before it was +0.03 ± 0.04,
+so the extra facts have not yet shown up in results.
+
 Re-measured on this engine (seeds 1–4, all nineteen, 152 pairs each):
 
 | under test | better / worse | result Δ | exchange Δ |
