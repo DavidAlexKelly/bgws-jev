@@ -56,7 +56,7 @@ pub fn attributes_for(class: &str) -> Vec<&'static str> {
     }
 }
 
-pub const SIGNAL_PARAMETERS: [&str; 7] = ["HostRadioIndex", "DataRate", "SignalDataLength", "SignalData", "TacticalDataLinkType", "TDLMessageCount", "UserProtocolID"];
+pub const SIGNAL_PARAMETERS: [&str; 6] = ["HostRadioIndex", "DataRate", "SignalDataLength", "SignalData", "TacticalDataLinkType", "TDLMessageCount"];
 
 /// Instance names: ours, under our entity's.
 pub fn radio_name(host: &str, number: u16) -> String {
@@ -132,7 +132,6 @@ pub fn signal_parameters(m: &MessageTruth, host_radio: &str, from: u16, to: u16)
         ("SignalData", Enc::new().u32(data.len() as u32).bytes(&data).done()),
         ("TacticalDataLinkType", u16v(0)),
         ("TDLMessageCount", u16v(1)),
-        ("UserProtocolID", u32v(0)),
     ]
 }
 

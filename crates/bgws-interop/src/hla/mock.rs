@@ -144,6 +144,8 @@ struct Instance {
 struct Federation {
     fom: Fom,
     time_impl: String,
+    /// The MIM it was created with, if not the standard one.
+    mim: Option<String>,
     /// Its HLAmanager.HLAfederation object.
     mom: u64,
     federates: BTreeMap<u64, Federate>,
@@ -513,12 +515,20 @@ fn read_modules(set: Option<p::FomModuleSet>, one: Option<p::FomModule>) -> Resu
 }
 
 fn create(g: &mut State, name: String, modules: Vec<Module>, time_impl: &str) -> Result<(), Rs> {
+    create_with_mim(g, name, modules, None, time_impl)
+}
+
+/// A federation created with a MIM of its own (the standard one extended,
+/// as NETN's adds `UniqueId` to `HLAobjectRoot`): merged in first, as the
+/// MIM is the base the FOM modules build on.
+fn create_with_mim(g: &mut State, name: String, modules: Vec<Module>, mim: Option<Module>, time_impl: &str) -> Result<(), Rs> {
     if g.federations.contains_key(&name) {
         return Err(exception("FederationExecutionAlreadyExists", name));
     }
-    let fom = Fom::from_modules(modules).map_err(|e| exception("InconsistentFOM", e.0))?;
+    let mim_name = mim.as_ref().map(|m| m.name.clone());
+    let fom = Fom::from_modules(mim.into_iter().chain(modules).collect()).map_err(|e| exception("InconsistentFOM", e.0))?;
     let mom = g.next(K_INSTANCE);
-    let mut f = Federation { fom, time_impl: if time_impl.is_empty() { "HLAfloat64Time".into() } else { time_impl.into() }, ..Default::default() };
+    let mut f = Federation { fom, mim: mim_name, time_impl: if time_impl.is_empty() { "HLAfloat64Time".into() } else { time_impl.into() }, ..Default::default() };
     let class = f.fom.objects.class(fom::FEDERATION).unwrap();
     f.instances.insert(mom, Instance { class, owner: RTI_OWNER, name: format!("HLAfederation-{name}"), values: BTreeMap::new() });
     f.mom = mom;
@@ -776,7 +786,7 @@ fn mom_refresh(g: &mut State, fx: &str) -> Vec<(u64, Cb)> {
             (a(&f.fom, fom::FEDERATION, "HLAfederatesInFederation"), list.done()),
             (a(&f.fom, fom::FEDERATION, "HLAtimeImplementationName"), Enc::new().unicode(&f.time_impl).done()),
             (a(&f.fom, fom::FEDERATION, "HLARTIversion"), unicode(RTI_VERSION)),
-            (a(&f.fom, fom::FEDERATION, "HLAMIMdesignator"), unicode("HLAstandardMIM")),
+            (a(&f.fom, fom::FEDERATION, "HLAMIMdesignator"), unicode(f.mim.as_deref().unwrap_or("HLAstandardMIM"))),
             (a(&f.fom, fom::FEDERATION, "HLAFOMmoduleDesignatorList"), strings(&f.fom.modules)),
             (a(&f.fom, fom::FEDERATION, "HLAcurrentFDD"), unicode(&f.fom.to_xml())),
         ],
@@ -887,6 +897,16 @@ fn call(g: &mut State, session: u64, rq: Rq) -> Out {
             Ok(()) => (Rs::CreateFederationExecutionWithModulesAndTimeResponse(p::CreateFederationExecutionWithModulesAndTimeResponse {}), none),
             Err(e) => (e, none),
         },
+        Rq::CreateFederationExecutionWithMimRequest(r) => match read_modules(r.fom_modules, None).and_then(|m| Ok((m, read_modules(None, r.mim_module)?.pop()))).and_then(|(m, mim)| create_with_mim(g, r.federation_name, m, mim, "")) {
+            Ok(()) => (Rs::CreateFederationExecutionWithMimResponse(p::CreateFederationExecutionWithMimResponse {}), none),
+            Err(e) => (e, none),
+        },
+        Rq::CreateFederationExecutionWithMimAndTimeRequest(r) => {
+            match read_modules(r.fom_modules, None).and_then(|m| Ok((m, read_modules(None, r.mim_module)?.pop()))).and_then(|(m, mim)| create_with_mim(g, r.federation_name, m, mim, &r.logical_time_implementation_name)) {
+                Ok(()) => (Rs::CreateFederationExecutionWithMimAndTimeResponse(p::CreateFederationExecutionWithMimAndTimeResponse {}), none),
+                Err(e) => (e, none),
+            }
+        }
         Rq::DestroyFederationExecutionRequest(r) => match g.federations.get(&r.federation_name) {
             None => (exception("FederationExecutionDoesNotExist", r.federation_name), none),
             Some(f) if !f.federates.is_empty() => (exception("FederatesCurrentlyJoined", r.federation_name), none),

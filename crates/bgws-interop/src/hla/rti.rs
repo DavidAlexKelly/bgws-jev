@@ -121,6 +121,22 @@ impl Rti {
         }
     }
 
+    /// Create with a MIM of the federation's own (NETN's adds `UniqueId` to
+    /// `HLAobjectRoot`); false if it already exists.
+    pub fn create_federation_with_mim(&self, name: &str, foms: &[FomFile], mim: &FomFile) -> Result<bool> {
+        let r = self.call(Rq::CreateFederationExecutionWithMimAndTimeRequest(p::CreateFederationExecutionWithMimAndTimeRequest {
+            federation_name: name.into(),
+            fom_modules: modules(foms),
+            mim_module: Some(p::FomModule { fom_module: Some(p::fom_module::FomModule::File(p::FileFomModule { name: mim.name.clone(), content: mim.content.clone() })) }),
+            logical_time_implementation_name: "HLAfloat64Time".into(),
+        }));
+        match r {
+            Ok(_) => Ok(true),
+            Err(RtiError::Hla { name, .. }) if name == "FederationExecutionAlreadyExists" => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Join as `federate` (a name unique in the federation) of type `kind`.
     pub fn join(&self, federate: &str, kind: &str, federation: &str, foms: &[FomFile]) -> Result<Handle> {
         let r = self.call(Rq::JoinFederationExecutionWithNameAndModulesRequest(p::JoinFederationExecutionWithNameAndModulesRequest {

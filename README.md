@@ -1704,8 +1704,78 @@ to a superclass, FOM names refused, next-message grants and the management
 objects, using `tests/data/hierarchy.xml`, a small FOM shaped like RPR.
 
 **Not yet checked:** BGWS's own client against a real RTI (pRTI or any
-other), and against a third-party RPR federate. Pitch's client checks our
-server side, but our client has only met our own server.
+other). Pitch's client checks our server side, but our client has only met
+our own server. It has met one third-party federate, the HLA–Palantir
+bridge (below), through our RTI.
+
+### Into a NETN federation, and on to Foundry
+
+A federation built on NETN (the NATO Education and Training Network FOM,
+over RPR), such as CSE-Prep, wants two things of an entity beyond RPR.
+- **`UniqueId`:** a UUID on every object, declared in NETN's own MIM. Tools
+  built on NETN key entities by it, because it outlives a federation
+  execution, while an instance handle does not.
+- **`Callsign`:** on NETN's `BaseEntity`.
+
+BGWS publishes both wherever the federation's FOM has them:
+- **`UniqueId`** is a name-based (version 5) UUID of the entity's instance
+  name, so the same unit in the same game has the same UUID every run.
+- **`Callsign`** is the unit's full name, not the 11-character marking.
+
+It also sends its whole event log as **`BGWS_Event`** interactions, from
+our own FOM module `crates/bgws-interop/fom/BGWS-Events.xml`, which joins
+with the federation's FOM. It uses only HLA basic types, so it merges with
+any FOM. Each event carries:
+- kind, time, side and the federate;
+- the entity and its target, each by instance name, UUID and callsign;
+- where the entity was (latitude, longitude, height);
+- a line for people, and the figures behind it as JSON.
+
+The event log covers detections, shots, hits, kills, orders, decisions and
+their reasons, messages, smoke, laser designation and the verdict. That is
+about 340 events in the 31-minute company attack. `--no-hla-events` turns
+it off.
+
+```sh
+bgws mock-rti
+bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation CSE-Prep \
+    --fom foms/NETN-Merged-With-RPR.xml --mim foms/NETN-MIM.xml --realtime 10
+```
+
+`--mim` creates the federation with that MIM, when BGWS is the one to create
+it. The BGWS RTI now takes a MIM at create and merges it under the FOM.
+
+**The HLA–Palantir bridge** (`DavidAlexKelly/cse`,
+`NXG-CSE-Prep-Functions/python-functions/python/HLA-Pal-Bridge`) streams a
+federation into Foundry. It is a Java federate (Pitch's FedPro client, HLA
+Evolved API), plus a Python sidecar that publishes to Foundry streams.
+
+We ran the bridge against the command above, through the BGWS RTI. It:
+- joined;
+- chose NETN v4 tasking from the FOM;
+- discovered every BGWS unit as `GroundVehicle` or `Human`, with its UUID,
+  callsign, position, heading, speed, force and damage.
+
+Its new `GET /events` endpoint served the whole game, 565 events:
+- every `BGWS_Event`;
+- BGWS's RPR `WeaponFire` and `MunitionDetonation`, with firer and target
+  resolved to UUID and callsign.
+
+Its new events thread published all 565 to a stand-in Foundry stream,
+each exactly once. Getting there found:
+- **A BGWS bug:** our `RawBinaryRadioSignal` carried `UserProtocolID`. In
+  RPR 2.0 that parameter belongs to `ApplicationSpecificRadioSignal`, so a
+  real RPR FOM refused the join. It is fixed. Our own test FOM had been too
+  lenient to catch it.
+- **A bridge fault:** it subscribed `PhysicalEntity` before its subclasses.
+  An RTI discovers an object at the nearest class subscribed at that moment,
+  and that class is fixed for the object's life. So every vehicle already in
+  the federation became a bare `PhysicalEntity`, which pRTI does too. It now
+  subscribes the deepest classes first.
+
+`tests/hla_netn.rs` checks the BGWS side: `UniqueId` and `Callsign`, and the
+event log in order, with each event's UUID matching the object's. It uses a
+strict RPR-shaped FOM and a NETN-style MIM.
 
 ### Phase 4: radio, emissions, minefields, aggregates, partner terrain
 

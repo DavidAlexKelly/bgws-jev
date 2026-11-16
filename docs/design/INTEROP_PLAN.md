@@ -14,6 +14,10 @@ Status: **phases 1–4 built**, except where noted below. See the README's
   (Electromagnetic Emission; `EmitterSystem` with radar and jammer beams),
   minefields, aggregates. Inbound radios, radars and jammers feed our EW.
   Terrain from a partner's elevation, land cover and roads.
+- NETN federations (beyond the plan): NETN `UniqueId` and `Callsign` on our
+  entities, a MIM at create, and the event log as `BGWS_Event` (our own FOM
+  module). Checked with the HLA–Palantir bridge through our RTI (README,
+  *Into a NETN federation, and on to Foundry*).
 
 Phase 4 as built differs from this plan in these places:
 - **Smoke and laser designation** were added to the simulation first (see the

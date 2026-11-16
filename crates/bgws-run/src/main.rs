@@ -102,6 +102,14 @@ enum Cmd {
         /// federation's RPR FOM files for a real RTI).
         #[arg(long)]
         fom: Vec<PathBuf>,
+        /// A MIM to create the federation with, when we create it (NETN's
+        /// gives every object a `UniqueId`, which NETN tools key entities by).
+        #[arg(long)]
+        mim: Option<PathBuf>,
+        /// Do not send the event log as `BGWS_Event` interactions (sent by
+        /// default; with --fom, our module BGWS-Events.xml joins with it).
+        #[arg(long)]
+        no_hla_events: bool,
         /// Time-regulating and time-constrained with a 1 s lookahead: the game
         /// advances in lock step with the federation, waiting for deciders.
         #[arg(long)]
@@ -554,7 +562,33 @@ fn main() -> Result<()> {
                 println!("{:40} {:3} forces  {:?}  {} min  — {}", p.file_stem().unwrap().to_string_lossy(), sc.forces.len(), sc.scope.kind, sc.scope.duration_min, sc.name);
             }
         }
-        Cmd::Play { scenario, deciders, seed, minutes, record, events, flat, local_url, local_model, claude_model, realtime, dis, dis_exercise, dis_listen, dis_group, hla, federation, federate, fom, time_managed, federates, side, site } => {
+        Cmd::Play {
+            scenario,
+            deciders,
+            seed,
+            minutes,
+            record,
+            events,
+            flat,
+            local_url,
+            local_model,
+            claude_model,
+            realtime,
+            dis,
+            dis_exercise,
+            dis_listen,
+            dis_group,
+            hla,
+            federation,
+            federate,
+            fom,
+            mim,
+            no_hla_events,
+            time_managed,
+            federates,
+            side,
+            site,
+        } => {
             let mut sc = load_scenario(&scenario_path(&scenario))?;
             if let Some(s) = &side {
                 let s: bgws_core::Side = serde_json::from_value(serde_json::Value::String(s.to_lowercase())).map_err(|_| anyhow!("--side is blue, red or neutral, not {s}"))?;
@@ -588,6 +622,8 @@ fn main() -> Result<()> {
                 }
                 let mut settings = bgws_interop::hla::link::HlaSettings::new(addr, &federation, &federate.clone().unwrap_or_else(|| format!("BGWS-{}-{}", spec.site, spec.application)));
                 settings.foms = fom.iter().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).collect::<Result<_>>()?;
+                settings.mim = mim.as_ref().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).transpose()?;
+                settings.events = !no_hla_events;
                 settings.lookahead = time_managed.then_some(1.0);
                 settings.federates = federates;
                 eprintln!("HLA: joining {} at {addr} as {}{}", settings.federation, settings.federate, if time_managed { ", time-managed (lookahead 1 s)" } else { ", real time" });
@@ -689,7 +725,8 @@ fn main() -> Result<()> {
             }
         }
         Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
-            let partner = bgws_run::partner::PartnerTerrain { elevation: partner_elevation, ellipsoidal: partner_ellipsoidal, land_cover: partner_land_cover, roads: partner_roads, replace_roads, ..Default::default() }.with_mapping_file(partner_map.as_deref())?;
+            let partner = bgws_run::partner::PartnerTerrain { elevation: partner_elevation, ellipsoidal: partner_ellipsoidal, land_cover: partner_land_cover, roads: partner_roads, replace_roads, ..Default::default() }
+                .with_mapping_file(partner_map.as_deref())?;
             let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
             let mut spec = bgws_geodata::build::BuildSpec::new(bbox);
             spec.cell_m = cell_m;
@@ -774,14 +811,7 @@ fn main() -> Result<()> {
                 LabCmd::Playout { moment, runs, horizon_min, limit, point, again } => {
                     let ids: Vec<String> = match moment {
                         Some(m) => vec![m],
-                        None => lab
-                            .moments()?
-                            .into_iter()
-                            .filter(|m| again || m.playouts.is_none())
-                            .filter(|m| point.as_ref().is_none_or(|p| &m.trigger == p))
-                            .map(|m| m.id)
-                            .take(limit.unwrap_or(usize::MAX))
-                            .collect(),
+                        None => lab.moments()?.into_iter().filter(|m| again || m.playouts.is_none()).filter(|m| point.as_ref().is_none_or(|p| &m.trigger == p)).map(|m| m.id).take(limit.unwrap_or(usize::MAX)).collect(),
                     };
                     let f = default_figures();
                     for (k, id) in ids.iter().enumerate() {

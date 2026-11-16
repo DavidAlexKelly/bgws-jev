@@ -22,6 +22,7 @@
 use super::encoding::Dec;
 use super::proto::callback_request::CallbackRequest as Cb;
 use super::rpr::{self, EntityAttrs, Shot};
+use super::netn;
 use super::rpr_extras;
 use super::rti::{FomFile, Handle, Rti, RtiError};
 use super::session::SessionSettings;
@@ -47,6 +48,11 @@ pub struct HlaSettings {
     pub federate: String,
     /// FOM modules to create or join with (the RPR FOM's, for a real RTI).
     pub foms: Vec<FomFile>,
+    /// A MIM to create the federation with (NETN's, for `UniqueId`).
+    pub mim: Option<FomFile>,
+    /// Send the event log as `BGWS_Event` interactions (joining with our
+    /// module when FOM modules are given).
+    pub events: bool,
     /// Time-regulating and time-constrained, with this lookahead (s).
     pub lookahead: Option<f64>,
     /// Federates expected: with more than one, the game starts only when all
@@ -66,6 +72,8 @@ impl HlaSettings {
             federation: federation.into(),
             federate: federate.into(),
             foms: vec![],
+            mim: None,
+            events: true,
             lookahead: None,
             federates: 1,
             grant_wait: Duration::from_secs(600),
@@ -126,6 +134,8 @@ pub struct HlaLink {
     fire: InteractionInfo,
     detonation: InteractionInfo,
     signal: InteractionInfo,
+    /// `BGWS_Event`, when the federation has it.
+    event: Option<InteractionInfo>,
     extras_out: ExtrasOut,
     extras_in: ExtrasIn,
     /// Ours: entity → (class, instance).
@@ -161,13 +171,29 @@ impl HlaLink {
     /// Connect, create the federation if need be, join, and declare.
     pub fn join(settings: HlaSettings, spec: InteropSpec) -> Result<HlaLink, RtiError> {
         let rti = Rti::connect(&settings.address, settings.session)?;
-        rti.create_federation(&settings.federation, &settings.foms)?;
-        rti.join(&settings.federate, "BGWS", &settings.federation, &settings.foms)?;
+        // With a FOM given, ours for the event log goes with it (with none,
+        // the federation takes any name, ours included).
+        let mut foms = settings.foms.clone();
+        if settings.events && !foms.is_empty() && !foms.iter().any(|f| f.name == netn::EVENTS_MODULE_NAME) {
+            foms.push(FomFile { name: netn::EVENTS_MODULE_NAME.into(), content: netn::EVENTS_MODULE.as_bytes().to_vec() });
+        }
+        match &settings.mim {
+            Some(mim) => rti.create_federation_with_mim(&settings.federation, &foms, mim)?,
+            None => rti.create_federation(&settings.federation, &foms)?,
+        };
+        rti.join(&settings.federate, "BGWS", &settings.federation, &foms)?;
         let mut classes = vec![];
         for name in rpr::CLASSES {
             let handle = rti.object_class(name)?;
             let attrs = rpr::attributes_for(name);
-            let (by_name, by_handle) = names_to_handles(&attrs, |a| rti.attribute(&handle, a))?;
+            let (mut by_name, mut by_handle) = names_to_handles(&attrs, |a| rti.attribute(&handle, a))?;
+            // NETN's identity, where the federation's FOM has it.
+            for a in netn::IDENTITY_ATTRIBUTES {
+                if let Ok(h) = rti.attribute(&handle, a) {
+                    by_name.insert(a, h.clone());
+                    by_handle.insert(h, a);
+                }
+            }
             let all: Vec<Handle> = by_name.values().cloned().collect();
             rti.publish_object(&handle, &all)?;
             rti.subscribe_object(&handle, &all)?;
@@ -193,6 +219,24 @@ impl HlaLink {
         let fire = interaction(rpr::WEAPON_FIRE, &rpr::WEAPON_FIRE_PARAMETERS)?;
         let detonation = interaction(rpr::MUNITION_DETONATION, &rpr::MUNITION_DETONATION_PARAMETERS)?;
         let signal = interaction(rpr_extras::RAW_BINARY_SIGNAL, &rpr_extras::SIGNAL_PARAMETERS)?;
+        let mut notes = vec![];
+        let event = if settings.events {
+            // Publish only: what other BGWS federates logged is theirs.
+            let ev = rti.interaction_class(netn::EVENT_CLASS).and_then(|handle| {
+                let (by_name, by_handle) = names_to_handles(&netn::EVENT_PARAMETERS, |p| rti.parameter(&handle, p))?;
+                rti.publish_interaction(&handle)?;
+                Ok(InteractionInfo { handle, by_name, by_handle })
+            });
+            match ev {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    notes.push(format!("the federation has no {} ({e}); the event log is not sent", netn::EVENT_CLASS));
+                    None
+                }
+            }
+        } else {
+            None
+        };
         if let Some(l) = settings.lookahead {
             rti.enable_time_regulation(l, settings.grant_wait)?;
             rti.enable_time_constrained(settings.grant_wait)?;
@@ -218,6 +262,7 @@ impl HlaLink {
             fire,
             detonation,
             signal,
+            event,
             extras_out: ExtrasOut::default(),
             extras_in: ExtrasIn::default(),
             ours: BTreeMap::new(),
@@ -226,7 +271,7 @@ impl HlaLink {
             name_to_key: BTreeMap::new(),
             key_to_name: BTreeMap::new(),
             inbox: vec![],
-            notes: vec![],
+            notes,
             sent: 0,
             received: 0,
             granted: None,
@@ -277,7 +322,13 @@ impl HlaLink {
                 continue;
             }
             let c = &self.classes[class];
-            let values: Vec<(Handle, Vec<u8>)> = rpr::entity_attributes(&t, c.name).into_iter().filter_map(|(k, v)| c.by_name.get(k).map(|h| (h.clone(), v))).collect();
+            let mut attrs = rpr::entity_attributes(&t, c.name);
+            if c.by_name.contains_key("UniqueId") || c.by_name.contains_key("Callsign") {
+                let name = rpr::instance_name(t.external.site, t.external.application, t.external.entity);
+                attrs.push(("UniqueId", netn::unique_id(&name).to_vec()));
+                attrs.push(("Callsign", rpr::unicode(&callsign(sim, t.id))));
+            }
+            let values: Vec<(Handle, Vec<u8>)> = attrs.into_iter().filter_map(|(k, v)| c.by_name.get(k).map(|h| (h.clone(), v))).collect();
             self.rti.update(&instance, &values, stamp)?;
             self.dr.sent(now, &t);
             n += 1;
@@ -325,6 +376,7 @@ impl HlaLink {
             n += 1;
         }
         n += self.publish_extras(sim, stamp)?;
+        n += self.publish_events(sim, events)?;
         self.sent += n as u64;
         if self.settings.lookahead.is_some() {
             let next = now.floor() + 1.0;
@@ -337,6 +389,48 @@ impl HlaLink {
             for cb in before {
                 self.take(sim, cb);
             }
+        }
+        Ok(n)
+    }
+
+    /// An entity named in an event: ours with our UUID, another federate's
+    /// by its instance name only (its UUID is its owner's to give).
+    fn party(&self, sim: &Sim, id: Option<EntityId>) -> netn::Party {
+        let Some(id) = id else { return netn::Party::default() };
+        let name = self.name_of(sim, Some(id));
+        let remote = sim.ctx.order.get(id.index()).is_some_and(|&e| bgws_sim::remote::is_remote(sim, e));
+        if remote {
+            netn::Party { name, unique_id: String::new(), callsign: callsign(sim, id) }
+        } else {
+            netn::Party::of(&name, &callsign(sim, id))
+        }
+    }
+
+    /// The second's events as `BGWS_Event` interactions (receive order: they
+    /// are for people and tools, not for other simulations to judge by).
+    fn publish_events(&mut self, sim: &Sim, events: &[LogEvent]) -> Result<usize, RtiError> {
+        let Some(info) = self.event.as_ref() else { return Ok(0) };
+        let mut n = 0;
+        for e in events {
+            let at = e.entity.and_then(|id| sim.ctx.order.get(id.index()).and_then(|&x| sim.world.get::<bgws_sim::components::Kin>(x))).map(|k| {
+                let g = place(&sim.ctx.frame, Geoid::egm96(), k.pos).geodetic;
+                [g.lat, g.lon, g.h]
+            });
+            let out = netn::EventOut {
+                kind: e.kind.clone(),
+                seq: e.seq,
+                t: e.t.secs(),
+                federate: self.settings.federate.clone(),
+                side: e.side.map(|s| s.to_string()).unwrap_or_default(),
+                entity: self.party(sim, e.entity),
+                target: self.party(sim, e.target),
+                at,
+                text: e.text.clone(),
+                data: netn::data_json(&e.data),
+            };
+            let values: Vec<(Handle, Vec<u8>)> = netn::event_parameters(&out).into_iter().filter_map(|(k, v)| info.by_name.get(k).map(|h| (h.clone(), v))).collect();
+            self.rti.send_interaction(&info.handle, &values, None)?;
+            n += 1;
         }
         Ok(n)
     }
@@ -662,4 +756,9 @@ fn key_of(id: [u16; 3]) -> ExternalKey {
 /// HLAunicodeString decoding, for tools and tests.
 pub fn unicode_of(b: &[u8]) -> String {
     Dec::new(b).unicode().unwrap_or_default()
+}
+
+/// An entity's name for people: its label, or its scenario id.
+fn callsign(sim: &Sim, id: EntityId) -> String {
+    sim.ctx.order.get(id.index()).and_then(|&e| sim.world.get::<bgws_sim::components::Ident>(e)).map(|i| if i.label.is_empty() { i.name.clone() } else { i.label.clone() }).unwrap_or_default()
 }
