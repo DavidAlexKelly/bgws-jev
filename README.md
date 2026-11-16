@@ -1779,6 +1779,9 @@ strict RPR-shaped FOM and a NETN-style MIM.
 
 ### Orders and scenarios from Foundry: `bgws federate`
 
+Setting the whole chain up in Foundry is in `BGWS_FOUNDRY_SETUP.md` in
+`DavidAlexKelly/cse` (branch `claude/confident-cannon-en7fsq`).
+
 `bgws federate` joins a federation and waits for Foundry (or any federate)
 to send it a scenario. It plays the scenario under the federation's
 control, and its units take orders.
