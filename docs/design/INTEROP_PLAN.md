@@ -18,6 +18,10 @@ Status: **phases 1–4 built**, except where noted below. See the README's
   entities, a MIM at create, and the event log as `BGWS_Event` (our own FOM
   module). Checked with the HLA–Palantir bridge through our RTI (README,
   *Into a NETN federation, and on to Foundry*).
+- Orders and scenarios from Foundry (beyond the plan): NETN-SMC tasking for
+  our units, and `bgws federate`, which waits in the federation for a
+  scenario and plays it under control (README, *Orders and scenarios from
+  Foundry*).
 
 Phase 4 as built differs from this plan in these places:
 - **Smoke and laser designation** were added to the simulation first (see the

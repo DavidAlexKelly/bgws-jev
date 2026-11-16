@@ -952,8 +952,18 @@ pub fn apply_plan(s: &mut Sim, side: Side, plan: &Plan) {
     s.ctx.last_plan.insert(side, plan.clone());
 }
 
-/// One unit's orders from a plan: its mission, ROE and first phase.
+/// One unit's orders from a plan: its mission, ROE and first phase. A unit
+/// under outside command ([`crate::tasking`]) is passed by: its orders come
+/// from outside until they are cancelled.
 pub(crate) fn apply_unit_order(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder, refs: &BTreeMap<String, bgws_core::Geodetic>) -> bool {
+    if s.ctx.by_name.get(&o.unit).is_some_and(|&id| crate::tasking::controlled(s, id)) {
+        return false;
+    }
+    apply_unit_order_forced(s, side, o, refs)
+}
+
+/// [`apply_unit_order`] whoever commands the unit (outside orders use it).
+pub(crate) fn apply_unit_order_forced(s: &mut Sim, side: Side, o: &crate::hq::UnitOrder, refs: &BTreeMap<String, bgws_core::Geodetic>) -> bool {
     let Some(&id) = s.ctx.by_name.get(&o.unit) else { return false };
     let e = s.ctx.entity(id);
     let Some(i) = s.world.get::<Ident>(e) else { return false };

@@ -24,6 +24,7 @@ pub mod dismount;
 pub mod remote;
 pub mod smoke;
 pub mod designation;
+pub mod tasking;
 pub mod domains;
 pub mod appreciation;
 pub mod formation;

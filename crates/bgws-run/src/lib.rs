@@ -14,6 +14,8 @@ pub mod experiments;
 pub mod geotiff;
 pub mod host;
 pub mod lab;
+pub mod federate;
+pub mod foundry;
 pub mod partner;
 pub mod scengen;
 pub mod suite;

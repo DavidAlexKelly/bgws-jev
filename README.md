@@ -1777,6 +1777,95 @@ each exactly once. Getting there found:
 event log in order, with each event's UUID matching the object's. It uses a
 strict RPR-shaped FOM and a NETN-style MIM.
 
+### Orders and scenarios from Foundry: `bgws federate`
+
+`bgws federate` joins a federation and waits for Foundry (or any federate)
+to send it a scenario. It plays the scenario under the federation's
+control, and its units take orders.
+
+```sh
+bgws federate --hla rti:15164 --federation CSE-Prep \
+    --fom NETN-Merged-With-RPR.xml --packs packs --records records
+```
+
+**Control** comes as `BGWS_Control`, a second class in our module
+`BGWS-Events.xml`. Its commands:
+- `load` takes a scenario as JSON.
+  - It accepts Foundry's short form (`bgws.foundry` version 1, read by
+    `crates/bgws-run/src/foundry.rs`): the area, the units with platform,
+    side, count and position, objectives, and who commands each side
+    (`rules`, or `foundry` for no HQ). It also accepts a full BGWS scenario.
+  - For a real-terrain area, a theatre pack is built from public map data
+    the first time and reused after. The host needs the internet for that
+    first build; a 5 by 4 km box took well under a minute here.
+  - The units go out to the federation as soon as it is loaded, where they
+    stand, so the initial state can be checked in Foundry before the start.
+- `start`, `pause`, `resume`, `stop` and `speed` control the clock. RPR
+  StartResume and StopFreeze act as start and pause.
+- Every command is answered with a `federate.status` event (state, message,
+  scenario, sim time, speed, units), and the status is repeated every 30 s.
+- On SIGTERM or Ctrl-C it resigns, so a restart can use the same name.
+- Each game's record (every input, Foundry's orders included) is written to
+  `--records` and replays with no federation, on the build that recorded it.
+
+**Orders** are NETN-SMC tasking, as the HLA–Palantir bridge sends for
+Foundry's `hla_*` functions. Each names a unit by its NETN UniqueId.
+
+| Task | BGWS does |
+|---|---|
+| MoveToLocation | moves there (OnlyRoads: a road march) |
+| Patrol | goes through the waypoints; Circle and Reverse repeat until cancelled |
+| MagicMove | puts it there, with the heading |
+| StopAtSideOfRoad | halts and holds |
+| CancelTasks | drops its orders; it is its HQ's again |
+| ChangeRulesOfEngagement | HoldFire → never, FireWhenFiredUpon → if fired upon, FireAtWill → always |
+| DirectFire | engages the target (one of this simulation's entities) |
+| IndirectFire | calls a fire mission on the point for its side |
+| ChangeSpeed / ChangeHeading / ChangeAltitude | refused: not modelled |
+
+An order goes into the sim as an input (`ExternalInput::Order`), so it is
+recorded and replays exactly. `crates/bgws-sim/src/tasking.rs` turns it into
+the mission an HQ's order would be, or a direct change.
+
+A unit given an outside order stays under outside command until its orders
+are cancelled: its HQ's replans pass it by. Its own drills still run, so it
+returns fire and dismounts in a town.
+
+Every action is answered with `SMC_Response`, and every task's progress
+with `ETR_TaskStatus`:
+- Accepted, or Refused with the reason in the federate's notes;
+- Executing;
+- Completed when a move arrives within 75 m, or Cancelled when a newer
+  order replaces it;
+- a unit that stops short for two minutes (it halted to dismount, say) is
+  sent on once more; if it stops short again the task is an Error;
+- also an Error if the unit is lost.
+
+`BaseEntity.SupportedActions` lists the actions BGWS takes.
+
+**Checked.**
+- **Sim** (`tests/tasking.rs`):
+  - a move completes 21 m from its point, and the HQ leaves the unit there;
+  - teleport, halt and supersede act at once;
+  - orders a unit cannot take are refused;
+  - a game with an order replays exactly.
+- **HLA** (`tests/hla_netn.rs`): a tasker federate's MoveToLocation is
+  answered Accepted, Executing, Completed, with the unit on the spot, and
+  a ChangeSpeed is refused. Task decoding passes the bridge's golden byte
+  vectors (`WIRE_CONTRACT.md` B, C and D).
+- **The federate** (`bgws-run/tests/federate.rs`), over HLA: load, the units
+  visible before the start, start at 500x, pause holds the clock, stop
+  takes the units off, and a bad scenario is refused with its reason.
+- **Live, on one machine:** the BGWS RTI, the real Java bridge and `bgws
+  federate`.
+  - A load through the bridge's `POST /bgws/control` built real terrain for
+    a box near Kaliningrad, and the five units appeared in the bridge's
+    `/entities` with UUIDs and names before the start.
+  - After a start at 10x, a move through `/entities/{uuid}/move` went
+    accepted, executing, then completed. The unit halted on its own to
+    dismount 624 m short, was sent on again, and arrived. A speed change
+    was refused.
+
 ### Phase 4: radio, emissions, minefields, aggregates, partner terrain
 
 Over DIS and HLA, alongside entities and fire, each from the sim's own state:

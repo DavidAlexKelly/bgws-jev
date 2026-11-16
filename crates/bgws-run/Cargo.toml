@@ -14,6 +14,7 @@ name = "bgws"
 path = "src/main.rs"
 
 [dependencies]
+libc = "0.2"
 bgws-core.workspace = true
 bgws-behaviour.workspace = true
 bgws-catalogue.workspace = true
