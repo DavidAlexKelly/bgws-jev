@@ -207,6 +207,19 @@ pub fn launch(s: &mut Sim, aw: &mut AirWorld, spec: LaunchSpec) -> Option<Entity
     aw.fast_live |= fast;
     if spec.purpose == Purpose::Strike {
         aw.ledger.entry(spec.side).or_default().strike_cost += m.cost_usd;
+        // A semi-active laser munition: its launcher lases the target until
+        // it lands; a vehicle that sees it coming may smoke itself.
+        if crate::designation::is_sal(&m) {
+            if let Some(l) = spec.launcher {
+                let until = SimTime::from_secs(s.world.get::<InFlight>(e).map(|f| f.flight.arrival()).unwrap_or(now.secs()));
+                crate::designation::start(s, spec.side, l, spec.target, id, to, until);
+            }
+        }
+        if let (Some(t), Some(l)) = (spec.target, spec.launcher) {
+            if crate::smoke::has_dischargers(s, t) {
+                crate::smoke::missile_warning(s, t, l, spec.from);
+            }
+        }
     }
     // Missile warning for an aircraft shot at (`missileWarnings`).
     if let (Some(t), Purpose::Intercept | Purpose::AirToAir) = (spec.target, spec.purpose) {
@@ -638,6 +651,16 @@ fn impact(s: &mut Sim, aw: &mut AirWorld, id: EntityId, f: &InFlight) {
     }
     let mut flight = f.flight.clone();
     flight.profile.cep *= cep_mult;
+    // A semi-active laser munition homes on its spot if it still has it;
+    // without it it flies on unguided.
+    if s.ctx.catalogue.munition(&f.munition).is_some_and(crate::designation::is_sal) {
+        match crate::designation::finish(s, id) {
+            Some(d) if d.lasing => {
+                flight.to = V3::new(d.spot.e, d.spot.n, s.ctx.ground.height(d.spot.e, d.spot.n));
+            }
+            _ => flight.profile.cep = flight.profile.cep.max(crate::designation::lost_cep_m(s)),
+        }
+    }
     // GNSS-guided munitions (cruise missiles, glide bombs, one-way drones)
     // lose accuracy where their GNSS is jammed (§8.7) [P15].
     if s.ctx.catalogue.munition(&f.munition).map(|m| m.guidance == bgws_catalogue::Guidance::Gnss).unwrap_or(false) {

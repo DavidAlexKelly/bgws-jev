@@ -559,6 +559,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
     let seed = s.ctx.seed;
     let world = &s.world;
     let cued = |o: &SenseEnt, t: &SenseEnt| o.cued_on(t, world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
+    let smoke = s.world.get_resource::<crate::smoke::SmokeState>().filter(|sm| sm.any());
     // 1. The best sensor per pair and its first die (no terrain yet).
     let best: Vec<Option<Best>> = {
         prof_span!("sensing.acquire");
@@ -570,14 +571,16 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
                 let cued = cued(o, t);
                 let tau_mult = tau_multiplier(&o.observer, &p.observer);
+                // Smoke between them, by band (heights above the ground).
+                let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
                 let mut best: Option<Best> = None;
                 for &(kind, rmax, res, n50) in &o.sensors {
                     if range > rmax {
                         continue;
                     }
                     let (contrast, mut res, sk) = match kind {
-                        CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) }, res, SensorKind::Thermal),
-                        _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) }, res, SensorKind::Visual),
+                        CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) * through(bgws_models::signature::Band::FarIr) }, res, SensorKind::Thermal),
+                        _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) * through(bgws_models::signature::Band::Visual) }, res, SensorKind::Visual),
                     };
                     if night && matches!(kind, CatSensor::Eye | CatSensor::Optic | CatSensor::Eo) {
                         res *= p.eye_night_factor;
@@ -762,13 +765,16 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let night = lux < p.night_lux;
     let cued = o.cued_on(t, s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
     let tau_mult = tau_multiplier(&o.observer, &p.observer);
+    let smoke = s.world.get_resource::<crate::smoke::SmokeState>().filter(|sm| sm.any());
+    let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
+    let (smoke_visual, smoke_thermal) = (through(bgws_models::signature::Band::Visual), through(bgws_models::signature::Band::FarIr));
     let mut sensors = Vec::new();
     let mut best_rate = 0.0f64;
     for &(kind, rmax, res0, n50) in &o.sensors {
         let in_range = range <= rmax && range <= p.sense_max_m;
         let (contrast, mut res) = match kind {
-            CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) }, res0),
-            _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) }, res0),
+            CatSensor::Thermal => (Contrast::Thermal { delta_t_k: t.delta_t * (1.0 - 0.7 * t.concealment), transmission: transmission(OpticalBand::Lwir, range, &w, &p.atmos) * smoke_thermal }, res0),
+            _ => (Contrast::Visual { inherent: t.contrast * (1.0 - t.concealment), transmission: transmission(OpticalBand::Visible, range, &w, &p.atmos) * smoke_visual }, res0),
         };
         let night_degraded = night && matches!(kind, CatSensor::Eye | CatSensor::Optic | CatSensor::Eo);
         if night_degraded {
@@ -805,6 +811,8 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     Some(json!({
         "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
+        // The share of light smoke between them lets through (1: none).
+        "smoke": { "visual": smoke_visual, "thermal": smoke_thermal },
         "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
         "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
         // pVisible is what sensing uses (any element seen); the rest is the line between the two units' centres.
@@ -1047,6 +1055,8 @@ fn launch_missiles(s: &mut Sim, e: Entity, id: EntityId, side: Side, mount_i: us
     s.ctx.missiles.push(InFlight { firer: id, target: tid, side, mount: mount_i, munition: mun.id.clone(), rounds, fit, arrives, operator });
     let text = format!("{} launches {} {} at {} ({:.0} m, {:.0} s to go)", name(s, id), rounds, mun.name, name(s, tid), range, flight);
     s.ctx.log.push(now, "fire.launch").side(side).entity(id).target(tid).text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "flightS": flight, "guidedByGunner": operator }));
+    let from = s.world.get::<Kin>(e).map(|k| k.pos).unwrap_or_default();
+    crate::smoke::missile_warning(s, tid, id, from);
 }
 
 /// Missile volleys that arrive now: each lands (hits resolved as a volley

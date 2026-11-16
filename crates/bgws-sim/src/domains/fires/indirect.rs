@@ -101,6 +101,8 @@ pub struct Mission {
     pub first_fired: Option<SimTime>,
     pub kills: u32,
     pub reason: String,
+    /// A smoke screen: fired with smoke rounds, which screen and do not kill.
+    pub smoke: bool,
 }
 
 /// A trajectory, cached by round and range bucket.
@@ -223,9 +225,14 @@ struct Shooter {
 }
 
 impl Shooter {
+    /// It reaches `p` with killing rounds.
     fn reaches(&self, p: Enu) -> bool {
+        self.reaches_for(p, false)
+    }
+    /// It reaches `p` with smoke rounds (`smoke`) or killing rounds.
+    fn reaches_for(&self, p: Enu, smoke: bool) -> bool {
         let d = p.sub(self.pos).horizontal();
-        self.mounts.iter().any(|(_, m, r)| *r > 0 && d >= m.min_range_m && d <= m.max_range_m)
+        self.mounts.iter().any(|(_, m, r)| *r > 0 && m.obscurant.is_some() == smoke && d >= m.min_range_m && d <= m.max_range_m)
     }
 }
 
@@ -334,8 +341,18 @@ fn calls_for_fire(s: &mut Sim, st: &mut FiresWorld) {
             let pos = s.world.get::<Kin>(e).expect("kin").pos;
             let own_reach = platform.mounts.iter().enumerate().filter(|(k, _)| !super::indirect_mount(&platform, *k)).filter_map(|(_, m)| m.munitions.first()).filter_map(|m| s.ctx.catalogue.munition(m)).map(|m| m.max_range_m).fold(0.0, f64::max);
             let seen: Vec<(EntityId, Seen)> = s.world.get::<Aware>(e).expect("aware").seen.iter().filter(|(_, v)| (now - v.last).secs() <= 1.0).map(|(k, v)| (*k, v.clone())).collect();
+            let moving = s.world.get::<Act>(e).is_some_and(|a| a.activity.moving());
             for (tid, v) in seen {
-                if open.contains(&tid) || !alive(s, s.ctx.entity(tid)) {
+                if !alive(s, s.ctx.entity(tid)) {
+                    continue;
+                }
+                // Under fire from an enemy we cannot answer (it out-ranges
+                // us), or while moving: smoke on it, to blind it.
+                let under_fire = last_incoming.is_some_and(|(t, by)| by == tid && (now - t).secs() < 60.0);
+                if under_fire && (moving || v.at.sub(pos).horizontal() > own_reach * st.p.own_reach_frac) {
+                    call_screen(s, st, side, oid, tid, v.at, &shooters);
+                }
+                if open.contains(&tid) {
                     continue;
                 }
                 if st.fires.recall.get(&(oid, tid)).map(|t| (now - *t).secs() < st.p.recall_s).unwrap_or(false) {
@@ -398,6 +415,7 @@ pub(crate) fn request(s: &mut Sim, st: &mut FiresWorld, side: Side, observer: Op
             first_fired: None,
             kills: 0,
             reason: reason.into(),
+            smoke: false,
         },
     );
     let who = observer.map(|o| name(s, o)).unwrap_or_else(|| "the fires cell".into());
@@ -447,11 +465,11 @@ fn assign(s: &mut Sim, st: &mut FiresWorld) {
         waiting.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
         let mut free: Vec<Shooter> = shooters_of(s, side).into_iter().filter(|sh| !busy(st, sh.id) && !s.world.get::<Act>(s.ctx.entity(sh.id)).map(|a| a.deciding).unwrap_or(true)).collect();
         for (_, requested_at, mid) in waiting {
-            let (aim, refused) = {
+            let (aim, refused, smoke) = {
                 let m = &st.fires.missions[&mid];
-                (m.aim, m.refused_by.clone())
+                (m.aim, m.refused_by.clone(), m.smoke)
             };
-            let pick = free.iter().enumerate().filter(|(_, sh)| sh.reaches(aim) && !refused.contains(&sh.id)).min_by(|a, b| a.1.pos.sub(aim).horizontal().total_cmp(&b.1.pos.sub(aim).horizontal()).then(a.1.id.cmp(&b.1.id))).map(|(k, _)| k);
+            let pick = free.iter().enumerate().filter(|(_, sh)| sh.reaches_for(aim, smoke) && !refused.contains(&sh.id)).min_by(|a, b| a.1.pos.sub(aim).horizontal().total_cmp(&b.1.pos.sub(aim).horizontal()).then(a.1.id.cmp(&b.1.id))).map(|(k, _)| k);
             let Some(k) = pick else {
                 if (now - requested_at).secs() > st.p.give_up_s {
                     st.fires.missions.get_mut(&mid).expect("m").state = MState::Refused;
@@ -567,7 +585,7 @@ fn fire(s: &mut Sim, st: &mut FiresWorld) {
         let pnt = crate::domains::drones::pnt::policy(s, e);
         let gnss_ok = !matches!(pnt, Some(crate::domains::drones::pnt::PntPolicy::SwitchMunition | crate::domains::drones::pnt::PntPolicy::Wait));
         let want_guided = m.priority >= 4 && gnss_ok;
-        let mut usable: Vec<&(usize, Munition, u32)> = shooter.mounts.iter().filter(|(_, mu, r)| *r > 0 && range >= mu.min_range_m && range <= mu.max_range_m).collect();
+        let mut usable: Vec<&(usize, Munition, u32)> = shooter.mounts.iter().filter(|(_, mu, r)| *r > 0 && mu.obscurant.is_some() == m.smoke && range >= mu.min_range_m && range <= mu.max_range_m).collect();
         usable.sort_by_key(|(k, mu, _)| (guided(mu) != want_guided, *k));
         let Some(&(mount_i, ref mun, mount_rounds)) = usable.first().copied() else {
             let mm = st.fires.missions.get_mut(&mid).expect("m");
@@ -776,8 +794,46 @@ pub fn rounds_land(s: &mut Sim, st: &mut FiresWorld, mid: u64) {
     m.salvos = later;
     let (side, shooter) = (m.side, m.shooter);
     for (k, salvo) in due.into_iter().enumerate() {
+        if s.ctx.catalogue.munition(&salvo.munition).is_some_and(|m| m.obscurant.is_some()) {
+            smoke_lands(s, side, shooter, &salvo);
+            continue;
+        }
         let kills = burst(s, st, mid, k as u64, side, shooter, &salvo);
         st.fires.missions.get_mut(&mid).expect("m").kills += kills;
+    }
+}
+
+/// A smoke salvo lands: each round a puff where it falls, nothing hurt.
+fn smoke_lands(s: &mut Sim, side: Side, shooter: Option<EntityId>, salvo: &Salvo) {
+    let Some(ob) = s.ctx.catalogue.munition(&salvo.munition).and_then(|m| m.obscurant) else { return };
+    let kind = match ob.kind {
+        bgws_catalogue::ObscurantKind::Hc => bgws_models::signature::SmokeKind::Hc,
+        bgws_catalogue::ObscurantKind::Wp => bgws_models::signature::SmokeKind::Wp,
+        bgws_catalogue::ObscurantKind::Multispectral => bgws_models::signature::SmokeKind::Multispectral,
+    };
+    let mass = ob.mass_g * salvo.impacts.len() as f64;
+    crate::smoke::release(s, side, shooter, crate::smoke::Source::Artillery, kind, &salvo.impacts, 1.0, mass);
+}
+
+/// Ask for a smoke screen on an enemy firing on a unit that is moving: its
+/// sight of the unit is cut while the unit gets on (at most once per
+/// `smoke.screen.cooldown_s` per unit and enemy, if a gun with smoke rounds
+/// reaches).
+fn call_screen(s: &mut Sim, st: &mut FiresWorld, side: Side, observer: EntityId, enemy: EntityId, at: Enu, shooters: &[Shooter]) {
+    let now = s.ctx.now;
+    let Some(sm) = s.world.get_resource::<crate::smoke::SmokeState>() else { return };
+    let (cooldown, rounds) = (sm.p.screen_cooldown_s, sm.p.screen_rounds);
+    if sm.asked.get(&(observer, enemy)).is_some_and(|t| (now - *t).secs() < cooldown) || !shooters.iter().any(|sh| sh.reaches_for(at, true)) {
+        return;
+    }
+    if let Some(mut sm) = s.world.get_resource_mut::<crate::smoke::SmokeState>() {
+        sm.asked.insert((observer, enemy), now);
+    }
+    let id = request(s, st, side, Some(observer), Some(enemy), at, 4, false, "screen us from it");
+    if let Some(m) = st.fires.missions.get_mut(&id) {
+        m.smoke = true;
+        m.rounds_total = rounds;
+        m.rounds_left = rounds;
     }
 }
 

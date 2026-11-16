@@ -394,7 +394,8 @@ to reach openrouter.ai.
   DuckDB is a feature because it compiles from C++.
 - **Missile and air-defence models** work at the engagement level: kinematic
   flights, per-shot kill probabilities and kill chains. They do not model
-  guidance laws or seekers.
+  guidance laws or seekers. The exception is semi-active laser homing, which
+  needs its designator's spot (see *Smoke and laser designation*).
 - **Drones:** drones in flight are records in the drones module, not ECS
   entities, so the air-defence kill chains and WTA do not see them. The
   counter-drone loop engages them instead, and units with a short- or
@@ -1320,6 +1321,73 @@ Licences: OpenStreetMap data is ODbL (attribute it; a road graph and land
 cover derived from it are derived databases). Mapterhorn asks for
 attribution. `pack.json` carries both.
 
+### Smoke and laser designation
+
+**Smoke** (`crates/bgws-sim/src/smoke.rs`).
+- **The model:** each screen is a set of obscurant puffs (`bgws-models`
+  `SmokeCloud`). They drift on the surface wind, spread and thin out.
+- **What it blocks:** every optical sighting is multiplied by the share of
+  light that gets through the smoke in its sensor's band: visible for eyes
+  and day sights, far infrared for thermal sights. Phosphorus smoke blinds a
+  day sight almost completely, while a thermal sight sees through it far
+  better.
+- **Cost:** a sight line is checked only where it crosses a screen.
+- **In the breakdown:** `explain_detection` reports the smoke factor for a
+  pair.
+- **Smoke comes from two places:**
+  - **Vehicle dischargers.** An armoured land vehicle (frontal KE armour of
+    at least `smoke.vehicle.armour_mm`) fires a salvo between itself and a
+    missile launched at it, ground ATGM or air-launched. Its crew does so
+    at once if it knows where the launcher is, otherwise with
+    `smoke.vehicle.warning_p`. It carries `smoke.vehicle.salvos` salvos.
+  - **Artillery and mortar smoke rounds** (155 mm, 120, 81 and 82 mm, white
+    or red phosphorus; masses approximate, from public descriptions). Guns
+    and mortars carry them on a separate mount, so they are never fired as
+    HE. A unit fired on by an enemy it cannot answer, or while moving,
+    calls a screen on that enemy. That is a priority call of
+    `smoke.screen.rounds` rounds, at most every `smoke.screen.cooldown_s`
+    per unit and enemy. Each round becomes a puff where it lands and hurts
+    no one.
+- **Effects that follow:** a gunner guiding a wire or beam-riding missile
+  must still see the target when it arrives, so smoke that blinds the
+  gunner makes the missile miss. No extra rule is needed.
+
+**Laser designation** (`crates/bgws-sim/src/designation.rs`).
+- **Which munition:** the Hellfire-class AGM is semi-active laser homing,
+  and its launcher designates for it.
+- **Each second:** the spot follows the target. The designation holds while
+  three things are true:
+  - the designator is alive;
+  - it has the target in sight (on the ground, a sighting in the last 5 s;
+    in the air, a clear line over the ground);
+  - the laser's near infrared gets through any smoke, there and back.
+- **At impact:** a missile with its spot homes on the target where it is.
+  One that lost it flies on unguided and lands `laser.lost_cep_m` about
+  its aim. A target that sees the launch may smoke itself, and so break
+  the spot.
+- Events: `laser.designate`, `laser.lost`.
+
+**Checked** (`crates/bgws-sim/tests/smoke.rs`):
+- **A screen across a sight line:** visible light falls below 5% of clear,
+  and a thermal sight does better.
+- **In the battalion attack:** vehicles fire their dischargers (never more
+  salvos than they carry), units call screens, and smoke rounds land.
+- **An AGM** lands 1.1 m from its target over a clear line. It loses its
+  spot and lands 54 m off when a screen crosses the line, or when the
+  target sees the launch and smokes itself.
+
+**Validation** (200 runs each, against the stored baselines): all 20
+vignettes stay in band. Three moved, none significantly:
+- ATGM engagement hit share: 0.754 to 0.753. Some tanks now smoke
+  themselves when a missile comes, and a gunner who loses sight loses the
+  missile.
+- Detect-to-strike: 3.40 to 3.47 min networked, and 23.15 to 23.45 min by
+  voice (KS p 0.99). Smoke screens and dischargers now delay some
+  sightings.
+
+The other 17 are unchanged, because their vignettes have no armoured
+vehicle under missile fire and no unit calling smoke.
+
 ## Game records
 
 A record (`--record`, or *Save* on the server) holds the scenario, seed,
@@ -1495,11 +1563,31 @@ publishes the same truth and fire as DIS and takes in other federates'
 entities and fire the same way.
 
 ```sh
-bgws mock-rti                                                   # a small RTI on 127.0.0.1:15164, for trying it
+bgws mock-rti                                                   # the BGWS RTI on 127.0.0.1:15164 (below)
 bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation exercise1 --fom RPR_FOM_v2.0_1516-2010.xml ...
 bgws play gen-kgd-company-attack --hla rti:15164 --time-managed --federates 2 --record game.json
 bgws replay game.json                                           # exact, no RTI
 ```
+
+**Blue against red, as two processes.** `--side` plays one side only (its
+forces and HQs, with the objectives as victory), and `--site` gives each
+simulation its own DIS site:
+
+```sh
+bgws mock-rti
+bgws play gen-kgd-company-attack --side blue --site 1 --hla 127.0.0.1:15164 --time-managed --federates 2 --record blue.json
+bgws play gen-kgd-company-attack --side red  --site 2 --hla 127.0.0.1:15164 --time-managed --federates 2 --record red.json
+```
+
+Run this way for 45 minutes, the two fought:
+- every update one sent, the other took in;
+- blue judged 9 detonations on its units, and red judged 57;
+- both games ended at 39:20 with the same verdict, reached separately:
+  blue held its objective (red saw blue's units there as remote entities);
+- blue lost 5% of its strength, red 42%;
+- each record replays exactly with no RTI.
+
+The same flags work on DIS (`--dis`).
 
 **How it talks to the RTI.**
 - **Wire messages:** the IEEE 1516.1-2025 Federate Protocol protos, as
@@ -1558,9 +1646,247 @@ Without `--time-managed` the game plays in real time, as on DIS.
 - **By hand:** the mock RTI as its own process. A federate joined through the
   CLI, time-managed, played 4 minutes in 1 s, and `bgws replay` matched.
 
-**Not yet checked:** against pRTI or any other real RTI, and against a
-third-party RPR federate. The mock RTI was written from the same reading of
-the protocol as the client, so only a real RTI can show a misreading.
+- **Pitch's own client against our mock RTI** (`tools/fedpro-chat-check.sh
+  <FedProClient checkout>`): two copies of FedProClient's Java Chat sample,
+  compiled with `javac` from Pitch's sources. They:
+  - join through `bgws mock-rti`;
+  - see each other join;
+  - swap public messages, and private ones as directed interactions;
+  - see each other leave.
+
+  This is an independent check of our session layer and server side. It
+  found two faults, both fixed:
+  - callbacks must name their transport (`0,0,0,1` is HLAreliable), and
+    Pitch's client refuses a callback without one;
+  - Pitch's client sends FOM modules zipped, which the RTI now reads.
+
+**The BGWS RTI** (`bgws mock-rti`, `crates/bgws-interop/src/hla/mock.rs`)
+is a Federate Protocol server with a small RTI behind it, for tests, for
+trying federates on one machine, and for small exercises:
+- **The FOM:** it reads the federation's FOM modules (plain or zipped, given
+  at create or join) and merges them. Names resolve in full, without the
+  root, or by a unique last part, and anything not in the FOM is refused.
+  A federation created with no module accepts any name, as BGWS federates
+  need.
+- **Class hierarchy:**
+  - an object is discovered as the nearest class its subscriber subscribes
+    to, and reflected with only the attributes subscribed there (a
+    `BaseEntity` subscriber sees `GroundVehicle`s as `BaseEntity`);
+  - an interaction reaches subscribers of a superclass as that class, with
+    that class's parameters;
+  - inherited attributes and parameters keep one handle.
+- **Time:** time-advance and next-message requests. A next-message request
+  is granted at the earliest message, if that comes before the time asked
+  for.
+- **Declarations:** publish, subscribe, unpublish and unsubscribe for object
+  classes (whole or by attribute), interactions and directed interactions.
+  Registering an unpublished class, or sending an unpublished interaction,
+  is refused.
+- **Management objects:**
+  - `HLAmanager.HLAfederation`: name, federates, time implementation, RTI
+    version, MIM designator, FOM modules, and the merged FDD as XML;
+  - `HLAmanager.HLAfederate`: handle, name, type, RTI version, FOM modules,
+    regulating, constrained, time, lookahead, time-manager state, GALT,
+    LITS, queue lengths, and counts of updates, reflections, interactions
+    and objects registered, discovered, deleted and removed.
+
+  They're reported to subscribers when federates join or leave and when
+  time changes, and counts at most once a second.
+- **Also:**
+  - synchronization points and member lists;
+  - names and handles both ways;
+  - directed interactions and requests for attribute values.
+- **Not served:** ownership transfer, regions, save and restore, retraction,
+  zero lookahead, MOM interactions, and the rest of the MOM attributes.
+
+Tests cover discovery and reflection at a superclass, interaction delivery
+to a superclass, FOM names refused, next-message grants and the management
+objects, using `tests/data/hierarchy.xml`, a small FOM shaped like RPR.
+
+**Not yet checked:** BGWS's own client against a real RTI (pRTI or any
+other). Pitch's client checks our server side, but our client has only met
+our own server. It has met one third-party federate, the HLA–Palantir
+bridge (below), through our RTI.
+
+### Into a NETN federation, and on to Foundry
+
+A federation built on NETN (the NATO Education and Training Network FOM,
+over RPR), such as CSE-Prep, wants two things of an entity beyond RPR.
+- **`UniqueId`:** a UUID on every object, declared in NETN's own MIM. Tools
+  built on NETN key entities by it, because it outlives a federation
+  execution, while an instance handle does not.
+- **`Callsign`:** on NETN's `BaseEntity`.
+
+BGWS publishes both wherever the federation's FOM has them:
+- **`UniqueId`** is a name-based (version 5) UUID of the entity's instance
+  name, so the same unit in the same game has the same UUID every run.
+- **`Callsign`** is the unit's full name, not the 11-character marking.
+
+It also sends its whole event log as **`BGWS_Event`** interactions, from
+our own FOM module `crates/bgws-interop/fom/BGWS-Events.xml`, which joins
+with the federation's FOM. It uses only HLA basic types, so it merges with
+any FOM. Each event carries:
+- kind, time, side and the federate;
+- the entity and its target, each by instance name, UUID and callsign;
+- where the entity was (latitude, longitude, height);
+- a line for people, and the figures behind it as JSON.
+
+The event log covers detections, shots, hits, kills, orders, decisions and
+their reasons, messages, smoke, laser designation and the verdict. That is
+about 340 events in the 31-minute company attack. `--no-hla-events` turns
+it off.
+
+```sh
+bgws mock-rti
+bgws play gen-kgd-company-attack --hla 127.0.0.1:15164 --federation CSE-Prep \
+    --fom foms/NETN-Merged-With-RPR.xml --mim foms/NETN-MIM.xml --realtime 10
+```
+
+`--mim` creates the federation with that MIM, when BGWS is the one to create
+it. The BGWS RTI now takes a MIM at create and merges it under the FOM.
+
+**The HLA–Palantir bridge** (`DavidAlexKelly/cse`,
+`NXG-CSE-Prep-Functions/python-functions/python/HLA-Pal-Bridge`) streams a
+federation into Foundry. It is a Java federate (Pitch's FedPro client, HLA
+Evolved API), plus a Python sidecar that publishes to Foundry streams.
+
+We ran the bridge against the command above, through the BGWS RTI. It:
+- joined;
+- chose NETN v4 tasking from the FOM;
+- discovered every BGWS unit as `GroundVehicle` or `Human`, with its UUID,
+  callsign, position, heading, speed, force and damage.
+
+Its new `GET /events` endpoint served the whole game, 565 events:
+- every `BGWS_Event`;
+- BGWS's RPR `WeaponFire` and `MunitionDetonation`, with firer and target
+  resolved to UUID and callsign.
+
+Its new events thread published all 565 to a stand-in Foundry stream,
+each exactly once. Getting there found:
+- **A BGWS bug:** our `RawBinaryRadioSignal` carried `UserProtocolID`. In
+  RPR 2.0 that parameter belongs to `ApplicationSpecificRadioSignal`, so a
+  real RPR FOM refused the join. It is fixed. Our own test FOM had been too
+  lenient to catch it.
+- **A bridge fault:** it subscribed `PhysicalEntity` before its subclasses.
+  An RTI discovers an object at the nearest class subscribed at that moment,
+  and that class is fixed for the object's life. So every vehicle already in
+  the federation became a bare `PhysicalEntity`, which pRTI does too. It now
+  subscribes the deepest classes first.
+
+`tests/hla_netn.rs` checks the BGWS side: `UniqueId` and `Callsign`, and the
+event log in order, with each event's UUID matching the object's. It uses a
+strict RPR-shaped FOM and a NETN-style MIM.
+
+### Phase 4: radio, emissions, minefields, aggregates, partner terrain
+
+Over DIS and HLA, alongside entities and fire, each from the sim's own state:
+- **Radios** (Transmitter PDUs): each radio that radiates, off, on, or
+  transmitting in the last second, with its frequency, bandwidth and power.
+  Sent on a change and every 5 s.
+- **Messages** (Signal PDUs): each message our comms model delivers or
+  loses (orders, sitreps, reports), as data, not voice: a short JSON
+  record of what it was, from and to whom, whether it arrived, and on what.
+- **Radars and jammers** (Electromagnetic Emission PDUs): each entity's
+  emitters on the air, one system and beam each, with frequency, bandwidth
+  and ERP. Sent on a change and every 10 s, and once empty when they go
+  quiet.
+- **Aggregated formations** (Aggregate State PDUs): each formation the level
+  of detail aggregates, with its centre, extent, velocity and members; once
+  more as disaggregated when it splits.
+- **Minefields** (Minefield State PDUs): each land minefield, its four
+  corners as perimeter points, with the lane bit set once breached.
+  `dis-rs` has no builder for this PDU, so it is written by hand from the
+  standard's field list; check it against a partner's tool on first use.
+
+Coming in, Transmitter and Electromagnetic Emission PDUs reach our
+electronic warfare. A remote radio (while transmitting) and radar go on the
+air for our ESM to intercept and fix. A remote jammer joins our jammers and
+jams our receivers in its band. Each goes off when its owner says so.
+
+**Over HLA** the same go out as RPR FOM objects and an interaction, and
+come in the same way:
+
+| ours | RPR |
+|---|---|
+| a radio | `EmbeddedSystem.RadioTransmitter` |
+| a message | `RadioSignal.RawBinaryRadioSignal` (interaction) |
+| a radar or jammer | `EmbeddedSystem.EmitterSystem`, with one `EmitterBeam.RadarBeam` or `.JammerBeam` |
+| an aggregated formation | `BaseEntity.AggregateEntity` |
+| a minefield | `Minefield` |
+
+- Emitters that go quiet, and formations that split up, have their
+  objects deleted (a split formation says so first).
+- Coming in, other federates' radios (while transmitting), radars and
+  jammers reach our EW, as over DIS.
+- The names and datatypes follow the RPR FOM 2.0 modules as we read them.
+  As with the entity classes, check them against the partner's FOM on
+  first use.
+
+**Checked.**
+- A real game publishes every type, and each parses. In 4 minutes of
+  `m4-drone-line`: 1,370 Transmitter, 23 Signal (orders and sitreps), 72
+  Electromagnetic Emission (its jammers) and 24 Minefield State PDUs. In
+  `m6-sustained-offensive`, aggregated formations are published where
+  their members are.
+- A remote radar and jammer reach our EW and go off again.
+- Our Electromagnetic Emission PDU reads back as the same emitters.
+- **Over HLA, on the BGWS RTI**, with two BGWS federates and an observer
+  federate (150 s of `m4-drone-line`):
+  - the second federate took in the first's jammers, radars and
+    transmitting radios as emitters;
+  - the observer discovered 28 radios, 9 emitter systems with their radar
+    and jammer beams, and the minefield, and received messages (orders and
+    sitreps).
+
+  In `m6-sustained-offensive`, all 8 aggregated formations arrived with
+  their members. The time-managed two-federate test still gives the same
+  games every run.
+
+**Terrain from a partner's data.** When a federation agrees a terrain
+source, `bgws terrain` takes it in place of ours:
+
+```sh
+bgws terrain packs/agreed --bbox 20.3,54.6,20.6,54.8 \
+  --partner-elevation agreed-dem.tif [--partner-ellipsoidal] \
+  --partner-land-cover agreed-cover.geojson --partner-roads agreed-roads.shp [--replace-roads] \
+  --partner-map mapping.json
+```
+
+- Elevation is a GeoTIFF on a latitude/longitude grid.
+- Land cover (polygons) and roads (lines) are GeoJSON or shapefiles in
+  longitude and latitude. A GeoPackage converts with
+  `ogr2ogr -f GeoJSON -t_srs EPSG:4326`.
+- The mapping file names the attribute holding each class and maps the
+  partner's values to our classes; `crates/bgws-run/src/partner.rs` shows
+  the format. Classes it doesn't name are reported and left as ours.
+- The partner's data goes in before the road network and the pack are made.
+
+Tests cover a partner elevation (and the geoid step for ellipsoidal
+heights), land cover with a hole from GeoJSON and from a shapefile, and a
+partner road reaching the pack's road graph.
+
+**Smoke and laser designation** (now in the sim, above) go out too:
+- each laser designation as Designator PDUs each second while it lasts (10
+  W at 1.064 µm, the spot on the target), and once more with no power when
+  it ends; over HLA as the RPR `EmbeddedSystem.Designator`;
+- each smoke screen as an Environmental Process PDU (a sphere record at its
+  drifted centre with its reach) on release and every 10 s, and once marked
+  last when it has thinned away. dis-rs has no builder for this PDU, so it
+  is written by hand like the Minefield State PDU, and should be checked
+  the same way;
+- smoke rounds fired are white phosphorus in their munition descriptors.
+
+Tested: a designation goes out lasing and then with no power when the
+missile lands, and a screen goes out as a 72-octet Environmental Process
+PDU with its sphere record.
+
+**Not built:**
+- **Smoke over HLA.** We know of no standard RPR object for an obscurant
+  cloud to publish it as.
+- **Other simulations' designations and smoke** are not taken in: our
+  laser munitions are designated by their own launchers, and partner smoke
+  does not yet cut our sight lines.
+- **Buildings from a partner** are not taken in.
 
 PDUs are built with the `dis-rs` crate (MIT). Its version 0.14 underflows
 on markings longer than 11 bytes (in a release build it loops until memory

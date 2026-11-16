@@ -30,7 +30,7 @@ pub mod validate;
 pub use archetypes::{archetype_for, archetype_of_snapshot, default_template_for_class, SnapshotHint, DEFAULT_TEMPLATE_ID, TS_ARCHETYPES, TS_PLATFORM_KEYS};
 pub use catalogue::{builtin_class_figures, Catalogue, BUILTIN_FILES};
 pub use derive::{radar_power_for_range, radar_range_for, DeriveParams};
-pub use munition::{Carleton, FlightProfile, Guidance, Munition, MunitionKind, PenPoint, Seeker, TargetDomain};
+pub use munition::{Carleton, FlightProfile, Guidance, Munition, MunitionKind, Obscurant, ObscurantKind, PenPoint, Seeker, TargetDomain};
 pub use types::*;
 pub use validate::{CatalogueError, CatalogueErrors};
 

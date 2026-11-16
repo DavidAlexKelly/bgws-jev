@@ -1,15 +1,42 @@
 # Interoperability: DIS and HLA 4
 
-Status: **phases 1–3 built**. See the README's *Interoperability: DIS and
-HLA 4*.
+Status: **phases 1–4 built**, except where noted below. See the README's
+*Interoperability: DIS and HLA 4*.
 - Phase 1: DIS codes, the geoid, Entity State export with dead reckoning,
   real-time play.
 - Phase 2: two-way DIS, remote entities, Fire and Detonation both ways,
   simulation management, terrain correlation.
 - Phase 3: HLA 4 through the Federate Protocol with the RPR FOM, time
-  management, a mock RTI. Tested only against the mock so far.
+  management, the BGWS RTI. BGWS's client is tested only against our own
+  RTI, and our RTI against Pitch's client.
+- Phase 4, over DIS and HLA: radio (DIS Transmitter and Signal; RPR
+  `RadioTransmitter` and `RawBinaryRadioSignal`), electromagnetic emissions
+  (Electromagnetic Emission; `EmitterSystem` with radar and jammer beams),
+  minefields, aggregates. Inbound radios, radars and jammers feed our EW.
+  Terrain from a partner's elevation, land cover and roads.
+- NETN federations (beyond the plan): NETN `UniqueId` and `Callsign` on our
+  entities, a MIM at create, and the event log as `BGWS_Event` (our own FOM
+  module). Checked with the HLA–Palantir bridge through our RTI (README,
+  *Into a NETN federation, and on to Foundry*).
 
-Phase 4 is planned.
+Phase 4 as built differs from this plan in these places:
+- **Smoke and laser designation** were added to the simulation first (see the
+  README's *Smoke and laser designation*), then published:
+  - Designator PDUs and the RPR `Designator` object;
+  - smoke as Environmental Process PDUs, written by hand, DIS only, since
+    we know of no standard RPR object for it.
+
+  Neither is taken in from other simulations yet.
+- **The RPR objects' names and datatypes** are from the RPR FOM 2.0
+  modules as we read them, and are tested only on the BGWS RTI. Check them
+  against the partner's FOM on first use.
+- **Minefields go out as Minefield State only.** That gives the outline and
+  a lane bit, not lane geometry (Minefield Data). Its encoder is written by
+  hand, since dis-rs has none.
+- **Aggregates are published alongside their entities**, not in place of
+  them. Our aggregated formations keep their members as entities.
+- **Partner terrain** takes elevation, land cover and roads; not buildings,
+  OGC CDB or OpenFlight. A GeoPackage must be converted to GeoJSON.
 
 Phase 1 as built differs from this plan in four places:
 - **Dead-reckoning thresholds** are publisher settings (`DrSettings`), not
@@ -27,8 +54,11 @@ Phase 1 as built differs from this plan in four places:
 Phase 3 as built differs from this plan in these places:
 - **No real RTI was available here.** Everything was tested against a mock
   Federate Protocol server with a small RTI behind it (`hla/mock.rs`,
-  `bgws mock-rti`), written from FedProClient's session code. Checking
-  against pRTI and a third-party RPR federate is still to do.
+  `bgws mock-rti`), written from FedProClient's session code.
+  - Pitch's own Java client (FedProClient's Chat sample) runs against the
+    mock end to end: `tools/fedpro-chat-check.sh`.
+  - Our client against pRTI, and against a third-party RPR federate, is
+    still to do.
 - **The RPR FOM files are not vendored.** SISO publishes no licence terms
   for them, so `--fom` passes the federation's own. The class, attribute and
   parameter names and the datatypes are coded from RPR 2.0/3.0, and should
@@ -42,9 +72,16 @@ Phase 3 as built differs from this plan in these places:
 - **The analytic mode of section 3.4 is `play_lockstep`.** Deciders stop the
   clock, and inputs apply at whole seconds. The record notes it, so replays
   use it too.
-- **Every attribute is sent with each update**, there is no attribute
-  ownership, and the mock has no class hierarchy (a subscription must name
-  the class published).
+- **Every attribute is sent with each update**, and there is no attribute
+  ownership.
+- **The mock grew into the BGWS RTI** (`bgws mock-rti`). It now has:
+  - FOM reading and merging, plain or zipped;
+  - class hierarchy in discovery, reflection and interactions;
+  - next-message requests;
+  - part of the management object model.
+
+  Pitch's Chat sample runs against it with its own FOM. See the README for
+  what it does not serve.
 - **No connection state in the viewer yet** (task 7).
 
 Phase 2 as built differs from this plan in these places:

@@ -60,6 +60,8 @@ fn a_company_attack_published_over_dis() {
                         detonations.push(d.event_id.event_id);
                         continue;
                     }
+                    // Phase 4: radios, messages, emitters, aggregates (tests/phase4.rs).
+                    dis_rs::model::PduBody::Transmitter(_) | dis_rs::model::PduBody::Signal(_) | dis_rs::model::PduBody::ElectromagneticEmission(_) | dis_rs::model::PduBody::AggregateState(_) => continue,
                     other => panic!("unexpected PDU {other:?}"),
                 };
                 assert_eq!((es.entity_id.simulation_address.site_id, es.entity_id.simulation_address.application_id), (5, 6));

@@ -1808,6 +1808,162 @@
     "category": 2
    },
    "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic"
+  },
+  {
+   "id": "smoke155",
+   "name": "155 mm smoke shell (white phosphorus)",
+   "kind": "shell",
+   "family": "artillery155",
+   "guidance": "none",
+   "flight": "ballistic",
+   "speedMs": 450,
+   "minRangeM": 3000,
+   "maxRangeM": 24000,
+   "pk": 0,
+   "cepM": 120,
+   "warheadKg": 0.5,
+   "lethalRadiusM": 0,
+   "carleton": {
+    "bxM": 1,
+    "byM": 1
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 3000,
+   "structuralHits": 0,
+   "decoy": false,
+   "source": "approximate: an M825A1-class base-ejection round carries about 5.8 kg of phosphorus-impregnated felt wedges (public descriptions); ranges as he155",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic; Munition Descriptor-Warhead 2005 WP",
+   "obscurant": {
+    "kind": "wp",
+    "massG": 5800
+   }
+  },
+  {
+   "id": "smoke120Mortar",
+   "name": "120 mm mortar bomb, smoke (white phosphorus)",
+   "kind": "mortar",
+   "family": "mortar120",
+   "guidance": "none",
+   "flight": "ballistic",
+   "speedMs": 200,
+   "minRangeM": 500,
+   "maxRangeM": 7000,
+   "pk": 0,
+   "cepM": 60,
+   "warheadKg": 0.5,
+   "lethalRadiusM": 0,
+   "carleton": {
+    "bxM": 1,
+    "byM": 1
+   },
+   "penetration": [],
+   "topAttack": true,
+   "tandem": false,
+   "targets": [
+    "land"
+   ],
+   "costUsd": 1500,
+   "structuralHits": 0,
+   "decoy": false,
+   "source": "approximate: about 3 kg of phosphorus (public descriptions of 120 mm WP bombs); ranges as he120Mortar",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic; Munition Descriptor-Warhead 2005 WP",
+   "obscurant": {
+    "kind": "wp",
+    "massG": 3000
+   }
+  },
+  {
+   "warheadKg": 0.5,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0,
+   "cepM": 50,
+   "minRangeM": 100,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "smoke81Mortar",
+   "name": "81 mm mortar bomb, smoke (red phosphorus)",
+   "kind": "mortar",
+   "family": "mortar81",
+   "speedMs": 180,
+   "maxRangeM": 5650,
+   "pk": 0,
+   "carleton": {
+    "bxM": 1,
+    "byM": 1
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 800,
+   "source": "approximate: about 0.7 kg of red phosphorus (public descriptions of 81 mm RP bombs); ranges as he81Mortar",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic; Munition Descriptor-Warhead 2005 WP",
+   "obscurant": {
+    "kind": "wp",
+    "massG": 700
+   }
+  },
+  {
+   "warheadKg": 0.5,
+   "lethalRadiusM": 0,
+   "penetration": [],
+   "topAttack": false,
+   "tandem": false,
+   "decoy": false,
+   "structuralHits": 0,
+   "cepM": 55,
+   "minRangeM": 100,
+   "flight": "ballistic",
+   "guidance": "none",
+   "id": "smoke82Mortar",
+   "name": "82 mm mortar bomb, smoke",
+   "kind": "mortar",
+   "family": "mortar81",
+   "speedMs": 170,
+   "maxRangeM": 4000,
+   "pk": 0,
+   "carleton": {
+    "bxM": 1,
+    "byM": 1
+   },
+   "targets": [
+    "land"
+   ],
+   "costUsd": 500,
+   "source": "approximate: about 0.4 kg of smoke mixture (public descriptions of 82 mm smoke bombs); ranges as he82Mortar",
+   "dis": {
+    "kind": 2,
+    "domain": 9,
+    "category": 2
+   },
+   "$dis": "SISO-REF-010 v35 Munition Domain 9 Battlefield Support; Munition Category 2 Ballistic; Munition Descriptor-Warhead 2005 WP",
+   "obscurant": {
+    "kind": "wp",
+    "massG": 400
+   }
   }
  ]
 }

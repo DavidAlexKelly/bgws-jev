@@ -44,6 +44,8 @@ pub struct Importer {
     pub acks: Vec<AckDue>,
     /// Notes for the log (stand-ins chosen).
     pub notes: Vec<String>,
+    /// Each remote entity's emission slots last heard (Electromagnetic Emission).
+    ee_slots: std::collections::BTreeMap<ExternalKey, BTreeSet<u16>>,
 }
 
 fn ty(t: &DisType) -> [u16; 7] {
@@ -74,7 +76,7 @@ impl Importer {
         let mut platforms: Vec<(bool, String, [u16; 7])> = sim.ctx.catalogue.platforms().filter_map(|p| Some((p.parent.is_some(), p.id.clone(), p.dis?.with_country(0)))).collect();
         platforms.sort();
         let munitions = sim.ctx.catalogue.munitions().filter_map(|m| Some((m.id.clone(), m.dis?.with_country(0)))).collect();
-        Importer { spec, platforms: platforms.into_iter().map(|(_, id, t)| (id, t)).collect(), munitions, reported: BTreeSet::new(), acks: Vec::new(), notes: Vec::new() }
+        Importer { spec, platforms: platforms.into_iter().map(|(_, id, t)| (id, t)).collect(), munitions, reported: BTreeSet::new(), acks: Vec::new(), notes: Vec::new(), ee_slots: Default::default() }
     }
 
     fn lookup(list: &[(String, [u16; 7])], t: [u16; 7]) -> Option<(String, bool)> {
@@ -229,6 +231,20 @@ impl Importer {
                 let ev = &d.event_id;
                 let target = self.our_entity(sim, &d.target_entity_id);
                 vec![self.detonation(sim, Some(key(&d.source_entity_id)), target, t, rounds, [l.x_coordinate, l.y_coordinate, l.z_coordinate], u8::from(d.detonation_result), (ev.simulation_address.site_id, ev.simulation_address.application_id, ev.event_id))]
+            }
+            PduBody::Transmitter(t) => {
+                if self.ours(&t.radio_reference_id) {
+                    return vec![];
+                }
+                vec![crate::dis_extras::transmitter_input(t, key(&t.radio_reference_id))]
+            }
+            PduBody::ElectromagneticEmission(ee) => {
+                if self.ours(&ee.emitting_entity_id) {
+                    return vec![];
+                }
+                let k = key(&ee.emitting_entity_id);
+                let before = self.ee_slots.entry(k).or_default();
+                crate::dis_extras::emission_inputs(ee, k, before)
             }
             PduBody::StopFreeze(s) => {
                 self.acks.push(AckDue { to: s.originating_id, from: s.receiving_id, flag: 4, request_id: s.request_id });

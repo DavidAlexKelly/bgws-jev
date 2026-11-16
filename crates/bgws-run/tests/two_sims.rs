@@ -15,21 +15,8 @@ use std::collections::BTreeSet;
 /// The company attack with only one side's forces (and its HQ).
 fn half(side: &str) -> ScenarioV4 {
     let path = format!("{}/../../data/scenarios/gen-company-attack.json", env!("CARGO_MANIFEST_DIR"));
-    let mut v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let gone: Vec<String> = v["forces"].as_array().unwrap().iter().filter(|f| f["side"] != side).map(|f| f["id"].as_str().unwrap().to_string()).collect();
-    v["forces"].as_array_mut().unwrap().retain(|f| f["side"] == side);
-    if let Some(hqs) = v.get_mut("command").and_then(|c| c.get_mut("hqs")).and_then(|h| h.as_array_mut()) {
-        hqs.retain(|h| h["side"] == side);
-        for h in hqs.iter_mut() {
-            if let Some(subs) = h.get_mut("subordinates").and_then(|x| x.as_array_mut()) {
-                subs.retain(|x| !gone.iter().any(|g| x == g.as_str()));
-            }
-        }
-    }
-    // The objectives give the missions (blue attacks, red defends); no
-    // breakpoint ends it, since each simulation sees only its own side's strength.
-    v["victory"].as_array_mut().unwrap().retain(|c| c["kind"] == "objective");
-    ScenarioV4::from_json(&v.to_string()).unwrap()
+    let sc = ScenarioV4::from_json(&std::fs::read_to_string(path).unwrap()).unwrap();
+    bgws_run::one_side(&sc, if side == "blue" { Side::Blue } else { Side::Red }).unwrap()
 }
 
 fn rules() -> HostOptions {

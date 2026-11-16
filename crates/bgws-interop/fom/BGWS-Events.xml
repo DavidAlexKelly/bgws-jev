@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BGWS's own FOM module: the simulation's event log as an interaction, so a
+     federate that wants more than entities and fire (an after-action review, a
+     dashboard, a bridge to a data platform) can have every event BGWS logs.
+     Only HLA basic and simple types from the standard MIM are used, so it merges
+     with any FOM. Written for this project; free to use with any federation. -->
+<objectModel xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd">
+    <modelIdentification>
+        <name>BGWS-Events</name>
+        <type>FOM</type>
+        <version>1.0</version>
+        <modificationDate>2026-11-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>The BGWS simulation's event log, one interaction per event</purpose>
+        <applicationDomain>Analysis</applicationDomain>
+        <description>One interaction class, BGWS_Event: what happened, when, to and by whom, where, in a line for people and as JSON for machines.</description>
+        <useLimitation>None</useLimitation>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>BGWS</pocName>
+            <pocOrg>BGWS</pocOrg>
+        </poc>
+    </modelIdentification>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>BGWS_Event</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAreliable</transportation>
+                <order>Receive</order>
+                <semantics>Something a BGWS simulation logged: a detection, a shot, a hit, an order, a decision, a message, a loss.</semantics>
+                <parameter>
+                    <name>Kind</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>Dotted kind, e.g. sense.detect, fire.hit, fire.kill, c2.order_received, decide.answer, smoke.screen, laser.designate.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Sequence</name>
+                    <dataType>HLAinteger64BE</dataType>
+                    <semantics>The event's number in its simulation's log, from 0. With Federate, a unique key.</semantics>
+                </parameter>
+                <parameter>
+                    <name>SimTime</name>
+                    <dataType>HLAfloat64BE</dataType>
+                    <semantics>Simulated seconds since the game started.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Federate</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The federate name of the simulation that logged it.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Side</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>blue, red, ... or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The object instance name of the entity that did it or that it happened to (as RPR interactions name entities), or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EntityUniqueId</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>That entity's NETN UniqueId as text (8-4-4-4-12 hex), or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EntityCallsign</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>That entity's name, or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Target</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The object instance name of the other entity involved, or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>TargetUniqueId</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>Its NETN UniqueId as text, or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>TargetCallsign</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>Its name, or empty.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Latitude</name>
+                    <dataType>HLAfloat64BE</dataType>
+                    <semantics>Where the entity was, degrees (WGS-84); NaN if no entity.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Longitude</name>
+                    <dataType>HLAfloat64BE</dataType>
+                    <semantics>Degrees (WGS-84); NaN if no entity.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Altitude</name>
+                    <dataType>HLAfloat64BE</dataType>
+                    <semantics>Metres above the WGS-84 ellipsoid; NaN if no entity.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Text</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>One line for people.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Data</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The figures and values behind the event, as a JSON object (at most 16 KB; a longer one is replaced by {"truncated": true}).</semantics>
+                </parameter>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+</objectModel>
