@@ -96,6 +96,17 @@ struct InteractionInfo {
     by_handle: BTreeMap<Handle, &'static str>,
 }
 
+/// NETN-SMC tasking: the task classes we hear (with their parameters'
+/// handles), how we answer, and what we have told of each task we took.
+#[derive(Default)]
+struct Tasking {
+    classes: BTreeMap<Handle, (&'static str, BTreeMap<Handle, &'static str>)>,
+    response: Option<InteractionInfo>,
+    status: Option<InteractionInfo>,
+    /// Task id (text) → its UUID and the status last sent.
+    told: BTreeMap<String, ([u8; 16], i32)>,
+}
+
 /// Another federate's object instance, as known so far.
 struct RemoteInstance {
     class: usize,
@@ -136,6 +147,18 @@ pub struct HlaLink {
     signal: InteractionInfo,
     /// `BGWS_Event`, when the federation has it.
     event: Option<InteractionInfo>,
+    tasking: Tasking,
+    /// `BGWS_Control`, StartResume and StopFreeze, where the federation has them.
+    control: Option<InteractionInfo>,
+    sim_management: Vec<(Handle, &'static str)>,
+    /// Control messages for us, not yet taken.
+    controls: Vec<netn::ControlMsg>,
+    /// Callbacks that came while no game was loaded, for the next one.
+    held: Vec<Cb>,
+    /// Instance names we have registered before (still ours to reuse).
+    used_names: BTreeSet<String>,
+    /// Our entities by their NETN UniqueId.
+    by_uuid: BTreeMap<[u8; 16], EntityId>,
     extras_out: ExtrasOut,
     extras_in: ExtrasIn,
     /// Ours: entity → (class, instance).
@@ -237,6 +260,46 @@ impl HlaLink {
         } else {
             None
         };
+        // NETN-SMC tasking, where the federation has it: orders for our units
+        // (Foundry's, through the HLA–Palantir bridge).
+        let mut tasking = Tasking::default();
+        for (short, _, _) in netn::TASK_CLASSES {
+            let Ok(h) = rti.interaction_class(&netn::task_class(short)) else { continue };
+            let mut by_handle = BTreeMap::new();
+            for p in ["Entity", "TaskId", "UniqueId", "TaskParameters", "Tasks"] {
+                if let Ok(ph) = rti.parameter(&h, p) {
+                    by_handle.insert(ph, p);
+                }
+            }
+            if rti.subscribe_interaction(&h).is_ok() {
+                tasking.classes.insert(h, (short, by_handle));
+            }
+        }
+        if !tasking.classes.is_empty() {
+            let answer = |name: &str, params: &[&'static str]| -> Option<InteractionInfo> {
+                let handle = rti.interaction_class(name).ok()?;
+                let (by_name, by_handle) = names_to_handles(params, |p| rti.parameter(&handle, p)).ok()?;
+                rti.publish_interaction(&handle).ok()?;
+                Some(InteractionInfo { handle, by_name, by_handle })
+            };
+            tasking.response = answer(netn::SMC_RESPONSE, &netn::SMC_RESPONSE_PARAMETERS);
+            tasking.status = answer(netn::TASK_STATUS, &netn::TASK_STATUS_PARAMETERS);
+        }
+        // Control of a waiting simulation (bgws federate): our module's
+        // BGWS_Control, and RPR simulation management.
+        let control = rti.interaction_class(netn::CONTROL_CLASS).ok().and_then(|handle| {
+            let (by_name, by_handle) = names_to_handles(&netn::CONTROL_PARAMETERS, |p| rti.parameter(&handle, p)).ok()?;
+            rti.subscribe_interaction(&handle).ok()?;
+            Some(InteractionInfo { handle, by_name, by_handle })
+        });
+        let mut sim_management = vec![];
+        for (name, command) in [(netn::START_RESUME, "start"), (netn::STOP_FREEZE, "pause")] {
+            if let Ok(h) = rti.interaction_class(name) {
+                if rti.subscribe_interaction(&h).is_ok() {
+                    sim_management.push((h, command));
+                }
+            }
+        }
         if let Some(l) = settings.lookahead {
             rti.enable_time_regulation(l, settings.grant_wait)?;
             rti.enable_time_constrained(settings.grant_wait)?;
@@ -263,6 +326,13 @@ impl HlaLink {
             detonation,
             signal,
             event,
+            tasking,
+            control,
+            sim_management,
+            controls: vec![],
+            held: vec![],
+            used_names: BTreeSet::new(),
+            by_uuid: BTreeMap::new(),
             extras_out: ExtrasOut::default(),
             extras_in: ExtrasIn::default(),
             ours: BTreeMap::new(),
@@ -307,13 +377,24 @@ impl HlaLink {
                 Some((_, h)) => h.clone(),
                 None => {
                     let name = rpr::instance_name(t.external.site, t.external.application, t.external.entity);
-                    if !self.rti.reserve_name(&name, self.settings.session.response_timeout)? {
-                        self.notes.push(format!("the RTI would not reserve {name}; {} is not published", t.marking));
-                        self.ours.insert(t.id, (class, Handle::default()));
-                        continue;
-                    }
-                    let h = self.rti.register_with_name(&self.classes[class].handle, &name)?;
+                    // A name we used in an earlier game stays ours (HLA keeps a
+                    // reservation until the federate resigns); an RTI that
+                    // released it wants it reserved again.
+                    let again = if self.used_names.contains(&name) { self.rti.register_with_name(&self.classes[class].handle, &name).ok() } else { None };
+                    let h = match again {
+                        Some(h) => h,
+                        None => {
+                            if !self.rti.reserve_name(&name, self.settings.session.response_timeout)? {
+                                self.notes.push(format!("the RTI would not reserve {name}; {} is not published", t.marking));
+                                self.ours.insert(t.id, (class, Handle::default()));
+                                continue;
+                            }
+                            self.rti.register_with_name(&self.classes[class].handle, &name)?
+                        }
+                    };
+                    self.used_names.insert(name.clone());
                     self.ours.insert(t.id, (class, h.clone()));
+                    self.by_uuid.insert(netn::unique_id(&name), t.id);
                     self.our_names.insert(name, t.id);
                     h
                 }
@@ -327,6 +408,9 @@ impl HlaLink {
                 let name = rpr::instance_name(t.external.site, t.external.application, t.external.entity);
                 attrs.push(("UniqueId", netn::unique_id(&name).to_vec()));
                 attrs.push(("Callsign", rpr::unicode(&callsign(sim, t.id))));
+            }
+            if !self.tasking.classes.is_empty() {
+                attrs.push(("SupportedActions", netn::supported_actions()));
             }
             let values: Vec<(Handle, Vec<u8>)> = attrs.into_iter().filter_map(|(k, v)| c.by_name.get(k).map(|h| (h.clone(), v))).collect();
             self.rti.update(&instance, &values, stamp)?;
@@ -377,6 +461,7 @@ impl HlaLink {
         }
         n += self.publish_extras(sim, stamp)?;
         n += self.publish_events(sim, events)?;
+        n += self.report_tasks(sim);
         self.sent += n as u64;
         if self.settings.lookahead.is_some() {
             let next = now.floor() + 1.0;
@@ -391,6 +476,196 @@ impl HlaLink {
             }
         }
         Ok(n)
+    }
+
+    /// A control message (ours, or RPR simulation management): queued for
+    /// [`HlaLink::control`]. True if it was one.
+    fn control_in(&mut self, class: &Handle, values: &[(Vec<u8>, Vec<u8>)]) -> bool {
+        if let Some(&(_, command)) = self.sim_management.iter().find(|(h, _)| h == class) {
+            self.controls.push(netn::ControlMsg { command: command.into(), options: "{}".into(), ..Default::default() });
+            return true;
+        }
+        let Some(info) = self.control.as_ref().filter(|c| &c.handle == class) else { return false };
+        match netn::read_control(&Self::by_name(values, &info.by_handle)) {
+            Ok(c) if c.for_me(&self.settings.federate) => self.controls.push(c),
+            Ok(_) => {}
+            Err(e) => self.notes.push(format!("a BGWS_Control does not decode: {e}")),
+        }
+        true
+    }
+
+    /// Control messages for this federate since last asked. Works with no
+    /// game loaded: everything else that comes meanwhile is kept for the
+    /// next game's first [`HlaLink::inbound`].
+    pub fn control(&mut self) -> Vec<netn::ControlMsg> {
+        for cb in self.rti.callbacks() {
+            let is_control = match &cb {
+                Cb::ReceiveInteraction(r) => {
+                    let class = Handle(r.interaction_class.clone().map(|x| x.data).unwrap_or_default());
+                    let values: Vec<(Vec<u8>, Vec<u8>)> = r.parameter_values.clone().map(|m| m.parameter_handle_value.into_iter().map(|a| (a.parameter_handle.map(|x| x.data).unwrap_or_default(), a.value)).collect()).unwrap_or_default();
+                    self.control_in(&class, &values)
+                }
+                _ => false,
+            };
+            if !is_control {
+                self.held.push(cb);
+                // Bounded: a long idle wait keeps the latest.
+                if self.held.len() > 100_000 {
+                    self.held.drain(..50_000);
+                }
+            }
+        }
+        std::mem::take(&mut self.controls)
+    }
+
+    /// Send a `BGWS_Event` that no game logged (a waiting simulation's
+    /// status), when the federation has the class.
+    pub fn send_event(&mut self, out: &netn::EventOut) -> Result<(), RtiError> {
+        let Some(info) = self.event.as_ref() else { return Ok(()) };
+        let values: Vec<(Handle, Vec<u8>)> = netn::event_parameters(out).into_iter().filter_map(|(k, v)| info.by_name.get(k).map(|h| (h.clone(), v))).collect();
+        self.rti.send_interaction(&info.handle, &values, None)
+    }
+
+    /// Between games: take our objects off, and forget the last game's
+    /// state. Other federates' objects stay known (they are still there).
+    pub fn reset(&mut self) {
+        for (_, (_, h)) in std::mem::take(&mut self.ours) {
+            if !h.0.is_empty() {
+                let _ = self.rti.delete(&h);
+            }
+        }
+        for (_, h) in std::mem::take(&mut self.extras_out.instances) {
+            let _ = self.rti.delete(&h);
+        }
+        self.extras_out = ExtrasOut::default();
+        self.extras_in = ExtrasIn::default();
+        self.our_names.clear();
+        self.by_uuid.clear();
+        self.dr = DeadReckoner::new(self.settings.dr);
+        self.fires = FireBook::default();
+        self.importer = None;
+        self.inbox.clear();
+        self.tasking.told.clear();
+        // Other federates' attributes are kept: their next update carries only
+        // what changed, and the next game's importer builds them from all of it.
+    }
+
+    /// A task for one of our units: answered at once (accepted or refused),
+    /// and taken in as an outside order at the next tick boundary. A task for
+    /// another federate's entity is not ours to answer.
+    fn task_in(&mut self, sim: &Sim, short: &'static str, names: &BTreeMap<Handle, &'static str>, values: Vec<(Vec<u8>, Vec<u8>)>) {
+        let named = Self::by_name(&values, names);
+        if std::env::var_os("BGWS_DEBUG_TASKING").is_some() {
+            eprintln!("task in: {short}, parameters {:?}, entity {:?}, ours {:?}", named.keys().collect::<Vec<_>>(), named.get("Entity").map(|b| b.len()), self.by_uuid.len());
+        }
+        let u16_of = |k: &str| named.get(k).and_then(|b| <[u8; 16]>::try_from(b.as_slice()).ok());
+        let Some(id) = u16_of("Entity").and_then(|u| self.by_uuid.get(&u).copied()) else { return };
+        let task_id = u16_of("TaskId");
+        let action = u16_of("UniqueId").or(task_id);
+        let params = named.get(if short == "CancelTasks" { "Tasks" } else { "TaskParameters" }).map(|v| v.as_slice());
+        let order = match netn::decode_task(short, params) {
+            Ok(t) => self.order_of(t),
+            Err(e) => Err(e.to_string()),
+        };
+        let order = order.and_then(|o| match bgws_sim::tasking::refusal(sim, id) {
+            Some(why) => Err(why.to_string()),
+            None => Ok(o),
+        });
+        if let (Some(a), Some(info)) = (action, self.tasking.response.as_ref()) {
+            let values: Vec<(Handle, Vec<u8>)> = netn::smc_response(&a, order.is_ok()).into_iter().filter_map(|(k, v)| info.by_name.get(k).map(|h| (h.clone(), v))).collect();
+            if let Err(e) = self.rti.send_interaction(&info.handle, &values, None) {
+                self.notes.push(format!("SMC_Response not sent: {e}"));
+            }
+        }
+        if let Some(t) = task_id {
+            self.send_status(&t, if order.is_ok() { 0 } else { 1 });
+        }
+        match order {
+            Ok(order) => {
+                let task = task_id.or(action).map(|u| netn::uuid_text(&u)).unwrap_or_else(|| format!("{short}-{}", sim.ctx.now.secs()));
+                if let Some(t) = task_id {
+                    self.tasking.told.insert(task.clone(), (t, 0));
+                }
+                self.inbox.push(ExternalInput::Order { entity: id, task, order });
+            }
+            Err(why) => self.notes.push(format!("{short} for {} refused: {why}", callsign(sim, id))),
+        }
+    }
+
+    /// A NETN task as one of our outside orders.
+    fn order_of(&self, t: netn::Task) -> Result<bgws_sim::tasking::ExternalOrder, String> {
+        use bgws_sim::tasking::ExternalOrder as O;
+        let ll = |x: [f64; 3]| {
+            let g = bgws_core::Ecef { x: x[0], y: x[1], z: x[2] }.to_geodetic();
+            (g.lat, g.lon)
+        };
+        Ok(match t {
+            netn::Task::Move { to, path, move_type, .. } if path.is_empty() => {
+                let (lat, lon) = ll(to);
+                O::Move { lat, lon, roads: move_type == 1 }
+            }
+            netn::Task::Move { to, path, .. } => O::Route { points: path.into_iter().chain([to]).map(ll).collect(), repeat: false },
+            netn::Task::Patrol { path, patrol_type, .. } => {
+                if path.is_empty() {
+                    return Err("a patrol with no waypoints".into());
+                }
+                let mut points: Vec<(f64, f64)> = path.into_iter().map(ll).collect();
+                // Reverse: there and back along the same points.
+                if patrol_type == 2 && points.len() > 2 {
+                    let back: Vec<(f64, f64)> = points[1..points.len() - 1].iter().rev().copied().collect();
+                    points.extend(back);
+                }
+                O::Route { points, repeat: patrol_type != 0 }
+            }
+            netn::Task::MagicMove { to, heading_deg } => {
+                let (lat, lon) = ll(to);
+                O::Teleport { lat, lon, heading_deg: heading_deg as f64 }
+            }
+            netn::Task::Stop => O::Halt,
+            netn::Task::Cancel { .. } => O::Cancel,
+            netn::Task::Roe(r) => O::Roe {
+                roe: match r {
+                    0 => "never",
+                    1 => "always",
+                    _ => "ifFiredUpon",
+                }
+                .into(),
+            },
+            netn::Task::DirectFire { target } => O::Engage { target: *self.by_uuid.get(&target).ok_or("the target is not one of this simulation's entities")? },
+            netn::Task::IndirectFire { area } => {
+                let first = *area.first().ok_or("a fire mission with no target area")?;
+                let (lat, lon) = ll(first);
+                O::FireAt { lat, lon }
+            }
+            netn::Task::Unsupported(n) => return Err(format!("{n} is not modelled")),
+        })
+    }
+
+    fn send_status(&mut self, task: &[u8; 16], status: i32) {
+        let Some(info) = self.tasking.status.as_ref() else { return };
+        let values: Vec<(Handle, Vec<u8>)> = netn::task_status(task, status).into_iter().filter_map(|(k, v)| info.by_name.get(k).map(|h| (h.clone(), v))).collect();
+        if let Err(e) = self.rti.send_interaction(&info.handle, &values, None) {
+            self.notes.push(format!("ETR_TaskStatus not sent: {e}"));
+        }
+    }
+
+    /// Each task we took whose state has changed since we last said.
+    fn report_tasks(&mut self, sim: &Sim) -> usize {
+        let Some(book) = sim.world.get_resource::<bgws_sim::tasking::TaskBook>() else { return 0 };
+        let changes: Vec<(String, [u8; 16], i32)> = book
+            .tasks
+            .iter()
+            .filter_map(|t| {
+                let (u, last) = self.tasking.told.get(&t.task)?;
+                let code = t.status as i32;
+                (code != *last).then_some((t.task.clone(), *u, code))
+            })
+            .collect();
+        for (task, u, code) in &changes {
+            self.send_status(u, *code);
+            self.tasking.told.insert(task.clone(), (*u, *code));
+        }
+        changes.len()
     }
 
     /// An entity named in an event: ours with our UUID, another federate's
@@ -437,6 +712,9 @@ impl HlaLink {
 
     /// Before a second: what came in, as inputs to apply (and record).
     pub fn inbound(&mut self, sim: &Sim) -> Vec<ExternalInput> {
+        for cb in std::mem::take(&mut self.held) {
+            self.take(sim, cb);
+        }
         if self.settings.lookahead.is_none() {
             for cb in self.rti.callbacks() {
                 self.take(sim, cb);
@@ -529,6 +807,13 @@ impl HlaLink {
     }
 
     fn interaction(&mut self, sim: &Sim, class: Handle, values: Vec<(Vec<u8>, Vec<u8>)>) {
+        if self.control_in(&class, &values) {
+            return;
+        }
+        if let Some((short, names)) = self.tasking.classes.get(&class).cloned() {
+            self.task_in(sim, short, &names, values);
+            return;
+        }
         let is_fire = class == self.fire.handle;
         let names = if is_fire {
             &self.fire.by_handle

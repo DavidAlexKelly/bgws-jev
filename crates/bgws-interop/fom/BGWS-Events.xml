@@ -8,12 +8,12 @@
     <modelIdentification>
         <name>BGWS-Events</name>
         <type>FOM</type>
-        <version>1.0</version>
+        <version>1.1</version>
         <modificationDate>2026-11-16</modificationDate>
         <securityClassification>Unclassified</securityClassification>
         <purpose>The BGWS simulation's event log, one interaction per event</purpose>
         <applicationDomain>Analysis</applicationDomain>
-        <description>One interaction class, BGWS_Event: what happened, when, to and by whom, where, in a line for people and as JSON for machines.</description>
+        <description>BGWS_Event: what happened, when, to and by whom, where, in a line for people and as JSON for machines. BGWS_Control: load a scenario into a waiting BGWS simulation and run it.</description>
         <useLimitation>None</useLimitation>
         <poc>
             <pocType>Primary author</pocType>
@@ -109,6 +109,38 @@
                     <name>Data</name>
                     <dataType>HLAunicodeString</dataType>
                     <semantics>The figures and values behind the event, as a JSON object (at most 16 KB; a longer one is replaced by {"truncated": true}).</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>BGWS_Control</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAreliable</transportation>
+                <order>Receive</order>
+                <semantics>A command to a BGWS simulation waiting in the federation (bgws federate): load a scenario, start, pause, resume, stop, or change speed. It answers with BGWS_Event kind federate.status.</semantics>
+                <parameter>
+                    <name>Federate</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The federate name addressed; empty for every BGWS simulation.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Command</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>load, start, pause, resume, stop or speed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>RequestId</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>The caller's id for this command, echoed in the status events that answer it.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Scenario</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>For load: the scenario as JSON (format bgws.foundry version 1, or bgws.scenario version 4).</semantics>
+                </parameter>
+                <parameter>
+                    <name>Options</name>
+                    <dataType>HLAunicodeString</dataType>
+                    <semantics>A JSON object, e.g. {"speed": 2.0}: simulated seconds per wall-clock second.</semantics>
                 </parameter>
             </interactionClass>
         </interactionClass>

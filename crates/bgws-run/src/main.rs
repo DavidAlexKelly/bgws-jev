@@ -128,6 +128,46 @@ enum Cmd {
         #[arg(long)]
         site: Option<u16>,
     },
+    /// Wait in an HLA federation for a scenario (from Foundry, through the
+    /// HLA–Palantir bridge, or any federate sending BGWS_Control), then play it
+    /// in real time under the federation's control: load, start, pause,
+    /// resume, stop, speed. Its units take NETN-SMC orders. Runs until killed.
+    Federate {
+        /// The Federate Protocol server, host:port.
+        #[arg(long)]
+        hla: String,
+        #[arg(long, default_value = "BGWS")]
+        federation: String,
+        /// Our federate name (else BGWS-<site>-<application>); Foundry addresses it by this.
+        #[arg(long)]
+        federate: Option<String>,
+        /// The federation's FOM modules (BGWS-Events.xml joins with them).
+        #[arg(long)]
+        fom: Vec<PathBuf>,
+        /// A MIM to create the federation with, if we create it.
+        #[arg(long)]
+        mim: Option<PathBuf>,
+        /// Our DIS site number.
+        #[arg(long, default_value_t = 1)]
+        site: u16,
+        #[arg(long, default_value_t = 1)]
+        application: u16,
+        /// Where theatre packs for Foundry's areas are built and kept.
+        #[arg(long, default_value = "packs")]
+        packs: PathBuf,
+        /// Grid spacing of the packs built, m.
+        #[arg(long, default_value_t = 30.0)]
+        cell_m: f64,
+        /// Allow scenarios on generated ground (no other simulation has it).
+        #[arg(long)]
+        allow_generated_ground: bool,
+        /// Simulated seconds per wall-clock second, until told otherwise.
+        #[arg(long, default_value_t = 1.0)]
+        speed: f64,
+        /// Write each game's record here when it ends (replays with no federation).
+        #[arg(long)]
+        records: Option<PathBuf>,
+    },
     /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
     /// federates on one machine.
     MockRti {
@@ -686,6 +726,16 @@ fn main() -> Result<()> {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
                 eprintln!("record written to {}", p.display());
             }
+        }
+        Cmd::Federate { hla, federation, federate, fom, mim, site, application, packs, cell_m, allow_generated_ground, speed, records } => {
+            let spec = bgws_scenario::v4::InteropSpec { site, application, ..Default::default() };
+            let mut settings = bgws_interop::hla::link::HlaSettings::new(&hla, &federation, &federate.unwrap_or_else(|| format!("BGWS-{site}-{application}")));
+            settings.foms = fom.iter().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).collect::<Result<_>>()?;
+            settings.mim = mim.as_ref().map(|p| bgws_interop::hla::rti::FomFile::read(p).map_err(|e| anyhow!("{}: {e}", p.display()))).transpose()?;
+            eprintln!("HLA: joining {} at {hla} as {}, waiting for a scenario", settings.federation, settings.federate);
+            let link = bgws_interop::hla::link::HlaLink::join(settings, spec.clone()).map_err(|e| anyhow!("{e}"))?;
+            let opts = bgws_run::federate::FederateOptions { packs, allow_generated: allow_generated_ground, speed, records, cell_m };
+            bgws_run::federate::Federate::new(link, spec, opts).serve()?;
         }
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;

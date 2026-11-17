@@ -107,6 +107,10 @@ pub enum ExternalInput {
     /// 1 for an Electromagnetic Emission PDU's system and beam.
     #[serde(rename_all = "camelCase")]
     Emitter { key: ExternalKey, slot: (u8, u16), emitter: Option<RemoteEmitter> },
+    /// An order for one of our units from outside (a federation's tasking):
+    /// `task` is the giver's id for it ([`crate::tasking`]).
+    #[serde(rename_all = "camelCase")]
+    Order { entity: EntityId, task: String, order: crate::tasking::ExternalOrder },
 }
 
 /// What a remote emitter is, for our electronic warfare.
@@ -246,6 +250,7 @@ pub fn apply(s: &mut Sim, input: ExternalInput) {
                 s.ctx.log.push(now, "interop.emitter").side(side).entity(id).text(text).data(serde_json::json!({ "what": what, "freqHz": emitter.map(|x| x.freq_hz) }));
             }
         }
+        ExternalInput::Order { entity, task, order } => crate::tasking::apply(s, entity, task, order),
         ExternalInput::Freeze { frozen } => {
             s.ctx.frozen = frozen;
             let text = if frozen { "the exercise is stopped (frozen)" } else { "the exercise starts again" };
