@@ -137,7 +137,22 @@ export interface UnitDetail {
   knows?: { id?: number; name?: string; level?: string; rangeM?: number | null; agoS: number; moving?: boolean; suspect?: boolean; bearingDeg?: number }[];
   decisions?: { t: number; text: string; data: GameEvent["data"] }[];
   recent?: { t: number; kind: string; text: string }[];
+  /** Under a person's (or the federation's) direct orders: its HQ passes it by until they are cancelled. */
+  directOrders?: boolean;
+  /** Its latest direct orders, newest first. */
+  tasks?: { task: string; order: string; status: "accepted" | "refused" | "cancelled" | "executing" | "completed" | "error"; sinceS: number }[];
 }
+
+/** A direct order to one unit (the server's `order` message). */
+export type ManualOrder =
+  | { order: "move"; lat: number; lon: number; roads?: boolean }
+  | { order: "route"; points: [number, number][]; repeat?: boolean }
+  | { order: "teleport"; lat: number; lon: number; headingDeg?: number }
+  | { order: "halt" }
+  | { order: "cancel" }
+  | { order: "roe"; roe: "never" | "ifFiredUpon" | "withinShortRange" | "always" }
+  | { order: "engage"; target: string }
+  | { order: "fireAt"; lat: number; lon: number };
 
 export interface Viewshed {
   unit: string;
@@ -172,6 +187,7 @@ export type Outbound =
   | { kind: "answer"; question: number; choice: string }
   | { kind: "command"; side: Side; plan: unknown }
   | { kind: "seat"; side: Side; seat: "planner" | "person" | "rules" }
+  | { kind: "order"; unit: string; order: ManualOrder }
   | { kind: "seek"; t: number }
   | { kind: "live" }
   | { kind: "branch"; t: number }

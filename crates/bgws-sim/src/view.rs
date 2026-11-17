@@ -521,6 +521,9 @@ pub fn unit_detail(s: &Sim, id: EntityId, viewer: Viewer) -> Option<serde_json::
         "id": id.0, "name": i.name, "label": i.label, "side": i.side, "own": true,
         "platform": i.platform.name, "platformId": i.platform.id, "role": i.platform.role, "domain": format!("{:?}", i.domain).to_lowercase(),
         "template": i.template, "quality": i.quality, "hq": i.hq, "dummy": i.dummy,
+        // Under a person's (or the federation's) direct orders: its HQ passes it by.
+        "directOrders": crate::tasking::controlled(s, id),
+        "tasks": s.world.get_resource::<crate::tasking::TaskBook>().map(|b| b.tasks.iter().rev().filter(|t| t.entity == id).take(3).map(|t| json!({ "task": t.task, "order": t.order.word(), "status": t.status, "sinceS": t.since.secs() })).collect::<Vec<_>>()).unwrap_or_default(),
         "health": h.map(|h| json!({ "fit": h.fit, "start": h.start, "mobilityKills": h.mobility_kills, "firepowerKills": h.firepower_kills, "destroyed": h.destroyed })),
         "activity": activity, "people": people, "mounts": mounts, "knows": knows,
         "speed": s.world.get::<Kin>(e).map(|k| k.vel.norm()),

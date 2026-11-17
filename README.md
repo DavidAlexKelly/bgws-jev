@@ -434,6 +434,29 @@ to reach openrouter.ai.
   In sight is not spotted: whether a unit picks a target out also depends on
   range, light, weather and the target's cover and movement (*Can it see…?*
   gives every factor).
+- **Giving orders mid-game:** select one of your units (any unit, as the
+  umpire). Under its orders, *Give orders* has:
+  - **Move** and **Road march**: click the map; it goes there tactically, or
+    by road.
+  - **Route**: click points in turn, then *Send route* (or Enter).
+  - **Halt**: it stops and holds.
+  - **Cancel orders**: it holds and is under its HQ's command again.
+  - **Engage**: click an enemy unit.
+  - **Fire mission**: click a point; a call for fire for its side.
+  - **Teleport**: click a point; it is put there at once (umpire).
+  - **Rules of engagement**: hold fire, return fire only, fire at short
+    range, or fire at will.
+
+  Esc cancels a pick. A unit given an order is *under your orders*: its
+  HQ's plans pass it by until you cancel them. Its own drills still run, so
+  it returns fire and dismounts in a town. Each order is a task the panel
+  follows (executing, then completed, cancelled or error), and the feed
+  shows it as `task.*` events.
+
+  Orders go in the game record, so a replay gives them at the same moment.
+  They are the same orders Foundry's tasking gives (`bgws_sim::tasking`),
+  sent as the server's `order` message (`protocol/PROTOCOL.md`). That
+  message is open to any frontend.
 - **3D terrain:** on a theatre pack, the *3D terrain* button (under the
   basemaps) drapes the map over the pack's own elevation. It is the same
   ground the game is played on, stretched ×1.5 upright because most theatres
