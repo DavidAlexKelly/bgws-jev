@@ -88,6 +88,9 @@ pub enum CommandKind {
     Plan,
     /// Who sits in a side's HQ seat (`orders` is the seat).
     Seat,
+    /// A direct order to one unit (`orders` is {unit, task, order}: an
+    /// outside order, `bgws_sim::tasking::ExternalOrder`).
+    Order,
 }
 
 impl CommandKind {
@@ -245,6 +248,12 @@ impl GameRecord {
     pub fn push_command(&mut self, at: SimTime, seat: impl Into<String>, side: Option<Side>, orders: Value) {
         let after_answers = self.answers.len();
         self.commands.push(RecordedCommand { at, seat: seat.into(), side, orders, kind: CommandKind::Plan, after_answers });
+    }
+
+    /// A direct order to one unit.
+    pub fn push_order(&mut self, at: SimTime, side: Side, order: Value) {
+        let after_answers = self.answers.len();
+        self.commands.push(RecordedCommand { at, seat: "person".into(), side: Some(side), orders: order, kind: CommandKind::Order, after_answers });
     }
 
     /// A change of who sits in a side's HQ seat.

@@ -90,6 +90,9 @@ enum Inbound {
     Command { side: Side, plan: serde_json::Value },
     /// Who sits in a side's HQ seat.
     Seat { side: Side, seat: bgws_sim::SeatKind },
+    /// A direct order to one unit, mid-game (move, halt, engage…): a side's
+    /// viewer may order its own units, the umpire any.
+    Order { unit: String, order: bgws_run::host::ManualOrder },
     /// Show the keyframe at or before `t` (simulated seconds); pauses the game.
     Seek { t: f64 },
     /// Back to the live game.
@@ -677,6 +680,18 @@ fn game(mut host: Host, cfg: GameConfig, inbox: mpsc::Receiver<Inbound>, out: br
                     }
                 }
                 Inbound::Seat { side, seat } => host.set_seat(side, seat),
+                Inbound::Order { unit, order } => {
+                    let side = host.sim.ctx.by_name.get(&unit).and_then(|&id| host.sim.ctx.order.get(id.index()).copied()).and_then(|e| host.sim.world.get::<bgws_sim::components::Ident>(e)).map(|i| i.side);
+                    let text = match (viewer.side(), side) {
+                        (_, None) => format!("order refused: no unit {unit}"),
+                        (Some(mine), Some(theirs)) if mine != theirs => format!("order refused: {unit} is not {mine}'s"),
+                        _ => match host.order(&unit, order) {
+                            Ok(task) => format!("order {task} given to {unit}"),
+                            Err(e) => format!("order refused: {e}"),
+                        },
+                    };
+                    send(&out, json!({ "kind": "status", "text": text }));
+                }
                 Inbound::Seek { t } => {
                     playing = false;
                     scrub = Some(SimTime::from_secs(t.max(0.0)));

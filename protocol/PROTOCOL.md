@@ -51,6 +51,7 @@ then streams.
 | `answer` | `question` (id), `choice` (option id) | answer a question put to a person's seat |
 | `command` | `side`, `plan` (the orders schema) | a person's plan for a side, sent over its HQ's nets |
 | `seat` | `side`, `seat`: `planner`, `person`, `rules` | who sits in a side's HQ seat |
+| `order` | `unit` (scenario id), `order`: { `order`: `move` (`lat`, `lon`, `roads`?) · `route` (`points` [[lat, lon]…], `repeat`?) · `teleport` (`lat`, `lon`, `headingDeg`?) · `halt` · `cancel` · `roe` (`roe`: never, ifFiredUpon, withinShortRange, always) · `engage` (`target`: unit id) · `fireAt` (`lat`, `lon`) } | a direct order to one unit, mid-game. The unit leaves its HQ's command until `cancel`; the order is in the game record. A side's viewer may order its own units, the umpire any. Answered with `status`; the feed shows `task.*` events and `unit` its `tasks` |
 | `seek` | `t` | show the keyframe at or before `t` (pauses) |
 | `live` | | back to the live game |
 | `branch` | `t` | restart at `t` and play on ("what if") |

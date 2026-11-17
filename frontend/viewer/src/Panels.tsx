@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { category, CATEGORY_COLOUR, CATEGORY_LABEL, SIDE_COLOUR, type Category } from "./overlays";
-import { clock, span, type FrameEntity, type FrameView, type GameEvent, type GameInfo, type PackInfo, type Question, type ScenarioBrief, type Side, type TerrainProgress, type UnitDetail, type Viewer } from "./protocol";
+import { clock, span, type FrameEntity, type FrameView, type GameEvent, type GameInfo, type ManualOrder, type PackInfo, type Question, type ScenarioBrief, type Side, type TerrainProgress, type UnitDetail, type Viewer } from "./protocol";
 import { LAYERS, type LayerKey } from "./layers";
 import type { Basemap } from "./MapView";
 
@@ -446,6 +446,11 @@ export function Inspector(props: {
   onMessages: (name: string) => void;
   onViewshed: (name: string | null) => void;
   onDetect: (observer: string, target: string) => void;
+  /** Direct orders: one sent now, or a map pick started for one (move, engage…). */
+  onOrder?: (unit: string, order: ManualOrder) => void;
+  onPickOrder?: (unit: string, mode: OrderPick) => void;
+  /** The map pick under way, if any. */
+  picking?: OrderPick | null;
 }) {
   const [target, setTarget] = useState("");
   const u = props.unit;
@@ -531,6 +536,9 @@ export function Inspector(props: {
             </Line>
           )}
           <Line label="behaviour">{u.template}</Line>
+          {props.onOrder && props.onPickOrder && !h?.destroyed && (props.viewer === "umpire" || props.viewer === u.side) && (
+            <OrderButtons unit={u} roe={a.roe} picking={props.picking ?? null} onOrder={(o) => props.onOrder!(u.name, o)} onPick={(m) => props.onPickOrder!(u.name, m)} />
+          )}
         </>
       )}
       {p && (
@@ -976,5 +984,92 @@ export function NewGameCard(props: {
         ))}
       </div>
     </div>
+  );
+}
+
+/** A direct order that needs a place or a target picked on the map. */
+export type OrderPick = "move" | "road" | "route" | "teleport" | "fireAt" | "engage";
+
+const PICK_LABEL: Record<OrderPick, string> = {
+  move: "Move",
+  road: "Road march",
+  route: "Route",
+  teleport: "Teleport",
+  fireAt: "Fire mission",
+  engage: "Engage",
+};
+
+const PICK_HELP: Record<OrderPick, string> = {
+  move: "Click the map: it moves there tactically, across country",
+  road: "Click the map: it marches there by road",
+  route: "Click points on the map in turn, then Send route",
+  teleport: "Click the map: it is put there at once (umpire)",
+  fireAt: "Click the map: a fire mission on that point, for its side",
+  engage: "Click an enemy unit: it fires on it",
+};
+
+/** Help text for the map pick under way. */
+export function orderPickHelp(mode: OrderPick): string {
+  return PICK_HELP[mode];
+}
+
+const STATUS_COLOUR: Record<string, string> = { executing: "#e8c547", completed: "#6fcf7f", refused: "#ef6b6b", error: "#ef6b6b", cancelled: "#8a90a8", accepted: "#e8c547" };
+
+/**
+ * A person's direct orders for the selected unit, mid-game. Each goes to the
+ * server as an `order`; the unit leaves its HQ's command until its orders
+ * are cancelled, and every order is in the game record (a replay repeats it).
+ */
+function OrderButtons(props: { unit: UnitDetail; roe: string; picking: OrderPick | null; onOrder: (o: ManualOrder) => void; onPick: (m: OrderPick) => void }) {
+  const pick = (m: OrderPick, title: string) => (
+    <button key={m} className={`btn${props.picking === m ? " on" : ""}`} onClick={() => props.onPick(m)} title={title}>
+      {PICK_LABEL[m]}
+    </button>
+  );
+  const tasks = props.unit.tasks ?? [];
+  return (
+    <>
+      <div className="group">
+        Give orders{" "}
+        {props.unit.directOrders && (
+          <span className="subtle" style={{ fontWeight: 400 }} title="Its HQ's plans pass it by until its orders are cancelled">
+            · under your orders
+          </span>
+        )}
+      </div>
+      <div className="row" style={{ marginBottom: 4 }}>
+        {pick("move", PICK_HELP.move)}
+        {pick("road", PICK_HELP.road)}
+        {pick("route", PICK_HELP.route)}
+        <button className="btn" onClick={() => props.onOrder({ order: "halt" })} title="Stop and hold where it is">
+          Halt
+        </button>
+        <button className="btn" onClick={() => props.onOrder({ order: "cancel" })} title="Drop its orders: it holds, and is under its HQ's command again">
+          Cancel orders
+        </button>
+      </div>
+      <div className="row" style={{ marginBottom: 4 }}>
+        {pick("engage", PICK_HELP.engage)}
+        {pick("fireAt", PICK_HELP.fireAt)}
+        {pick("teleport", PICK_HELP.teleport)}
+        <select
+          className="select"
+          value={props.roe}
+          onChange={(e) => props.onOrder({ order: "roe", roe: e.target.value as "never" | "ifFiredUpon" | "withinShortRange" | "always" })}
+          aria-label="Rules of engagement"
+          title="Rules of engagement"
+        >
+          <option value="never">Hold fire</option>
+          <option value="ifFiredUpon">Return fire only</option>
+          <option value="withinShortRange">Fire at short range</option>
+          <option value="always">Fire at will</option>
+        </select>
+      </div>
+      {tasks.map((t) => (
+        <Line key={t.task} label={t.task}>
+          {t.order} · <span style={{ color: STATUS_COLOUR[t.status] }}>{t.status}</span> {clock(t.sinceS)}
+        </Line>
+      ))}
+    </>
   );
 }

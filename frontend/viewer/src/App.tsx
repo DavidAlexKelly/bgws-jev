@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildLayers, DEFAULT_LAYERS, tooltip, type KeyPoint, type LayerKey } from "./layers";
 import { MapView, type Basemap } from "./MapView";
 import { SIDE_COLOUR } from "./overlays";
-import { clock, type Side } from "./protocol";
-import { ClockPanel, EndCard, Feed, ForcesPanel, GamePanel, HqConsole, Inspector, MapKey, NewGameCard, Questions, ReportCard, Spectrum, ViewPanel } from "./Panels";
+import { clock, type ManualOrder, type Side } from "./protocol";
+import { ClockPanel, EndCard, Feed, ForcesPanel, GamePanel, HqConsole, Inspector, MapKey, NewGameCard, orderPickHelp, Questions, ReportCard, Spectrum, ViewPanel, type OrderPick } from "./Panels";
 import { useServer } from "./useServer";
 
 function readPref<T extends string>(key: string, fallback: T): T {
@@ -36,6 +36,23 @@ export function App() {
   const [hqOpen, setHqOpen] = useState(false);
   const [objective, setObjective] = useState<{ lat: number; lon: number } | null>(null);
   const [picking, setPicking] = useState(false);
+  // A direct order waiting for its place or target on the map; a route's points so far.
+  const [orderPick, setOrderPick] = useState<{ unit: string; mode: OrderPick; points: [number, number][] } | null>(null);
+  const order = useCallback((unit: string, o: ManualOrder) => send({ kind: "order", unit, order: o }), [send]);
+  const startPick = useCallback((unit: string, mode: OrderPick) => setOrderPick((p) => (p && p.unit === unit && p.mode === mode ? null : { unit, mode, points: [] })), []);
+  const sendRoute = useCallback(() => {
+    if (orderPick && orderPick.points.length) order(orderPick.unit, { order: "route", points: orderPick.points });
+    setOrderPick(null);
+  }, [orderPick, order]);
+  useEffect(() => {
+    if (!orderPick) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOrderPick(null);
+      if (e.key === "Enter" && orderPick.mode === "route") sendRoute();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [orderPick, sendRoute]);
   const [newGame, setNewGame] = useState(false);
   const [endClosed, setEndClosed] = useState(false);
   const [focus, setFocus] = useState<{ lon: number; lat: number; key: number } | null>(null);
@@ -116,6 +133,7 @@ export function App() {
     setSelected(null);
     setObjective(null);
     setEndClosed(false);
+    setOrderPick(null);
   }, [gameName]);
   useEffect(() => {
     if (!s.frame?.over) setEndClosed(false);
@@ -130,13 +148,39 @@ export function App() {
     },
     [s.frame],
   );
-  const pickOnMap = useCallback((name: string) => {
-    pickedAt.current = performance.now();
-    setSelected(name);
-  }, []);
+  const pickOnMap = useCallback(
+    (name: string) => {
+      pickedAt.current = performance.now();
+      // Picking a target for "engage": the click names the target, the selection stays.
+      if (orderPick?.mode === "engage") {
+        if (name !== orderPick.unit) {
+          order(orderPick.unit, { order: "engage", target: name });
+          setOrderPick(null);
+        }
+        return;
+      }
+      setSelected(name);
+    },
+    [orderPick, order],
+  );
 
   const onMapClick = useCallback(
     (lon: number, lat: number) => {
+      if (orderPick && orderPick.mode !== "engage") {
+        // The unit's own click comes first: only an empty-map click is a place.
+        if (performance.now() - pickedAt.current < 120) return;
+        const { unit, mode } = orderPick;
+        if (mode === "route") {
+          setOrderPick({ ...orderPick, points: [...orderPick.points, [lat, lon]] });
+          return;
+        }
+        if (mode === "move" || mode === "road") order(unit, { order: "move", lat, lon, roads: mode === "road" });
+        if (mode === "teleport") order(unit, { order: "teleport", lat, lon });
+        if (mode === "fireAt") order(unit, { order: "fireAt", lat, lon });
+        setOrderPick(null);
+        return;
+      }
+      if (orderPick?.mode === "engage") return;
       if (picking) {
         setObjective({ lon, lat });
         setPicking(false);
@@ -147,7 +191,7 @@ export function App() {
         if (performance.now() - pickedAt.current > 120) setSelected(null);
       }, 30);
     },
-    [picking],
+    [picking, orderPick, order],
   );
 
   const deckLayers = useMemo(
@@ -287,6 +331,9 @@ export function App() {
             onMessages={(unit) => send({ kind: "messages", unit })}
             onViewshed={(unit) => setSightOn(!!unit)}
             onDetect={(observer, target) => send({ kind: "detect", observer, target })}
+            onOrder={order}
+            onPickOrder={startPick}
+            picking={orderPick && orderPick.unit === selected ? orderPick.mode : null}
           />
         </div>
       </div>
@@ -309,6 +356,17 @@ export function App() {
       )}
       {layers.has("spectrum") && s.frame && <Spectrum frame={s.frame} />}
       {picking && <div className="toast">Click the map to set the objective</div>}
+      {orderPick && (
+        <div className="toast">
+          {orderPick.unit}: {orderPickHelp(orderPick.mode)}
+          {orderPick.mode === "route" && ` (${orderPick.points.length} so far)`} · Esc to cancel
+          {orderPick.mode === "route" && orderPick.points.length > 0 && (
+            <button className="btn" style={{ marginLeft: 8 }} onClick={sendRoute}>
+              Send route
+            </button>
+          )}
+        </div>
+      )}
       {s.report && <ReportCard title={s.report.title} text={s.report.text} onClose={server.closeReport} />}
       {newGame && (
         <NewGameCard

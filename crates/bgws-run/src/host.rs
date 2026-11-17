@@ -597,6 +597,32 @@ impl Host {
         Ok(())
     }
 
+    /// A person's direct order to one unit, mid-game: move, halt, engage…
+    /// ([`ManualOrder`]). It goes in as an outside order
+    /// ([`bgws_sim::tasking`]): the unit leaves its HQ's command until its
+    /// orders are cancelled. Recorded, so a replay gives the same order at the
+    /// same moment.
+    pub fn order(&mut self, unit: &str, order: ManualOrder) -> Result<String> {
+        let id = *self.sim.ctx.by_name.get(unit).ok_or_else(|| anyhow!("no unit {unit}"))?;
+        if let Some(why) = bgws_sim::tasking::refusal(&self.sim, id) {
+            bail!("{unit} cannot take orders: {why}");
+        }
+        let order = order.resolve(&self.sim)?;
+        let side = self.sim.ctx.order.get(id.index()).and_then(|&e| self.sim.world.get::<bgws_sim::components::Ident>(e)).map(|i| i.side).unwrap_or(Side::Neutral);
+        let n = self.record.commands.iter().filter(|c| c.kind == CommandKind::Order).count();
+        let task = format!("manual-{}", n + 1);
+        self.apply_order(side, unit, &task, order)?;
+        Ok(task)
+    }
+
+    fn apply_order(&mut self, side: Side, unit: &str, task: &str, order: bgws_sim::tasking::ExternalOrder) -> Result<()> {
+        let id = *self.sim.ctx.by_name.get(unit).ok_or_else(|| anyhow!("no unit {unit}"))?;
+        let recorded = serde_json::json!({ "unit": unit, "task": task, "order": order });
+        self.sim.apply_external(bgws_sim::remote::ExternalInput::Order { entity: id, task: task.into(), order });
+        self.record.push_order(self.sim.now(), side, recorded);
+        Ok(())
+    }
+
     /// Who sits in a side's HQ seat, recorded so a replay makes the same change.
     pub fn set_seat(&mut self, side: Side, seat: SeatKind) {
         self.sim.set_seat(side, seat);
@@ -615,6 +641,12 @@ impl Host {
             match c.kind {
                 CommandKind::Plan => self.command(side, &c.seat, c.orders).map_err(|e| anyhow!("replay diverged: a recorded plan was rejected: {e}"))?,
                 CommandKind::Seat => self.set_seat(side, serde_json::from_value(c.orders)?),
+                CommandKind::Order => {
+                    let unit = c.orders["unit"].as_str().unwrap_or_default().to_string();
+                    let task = c.orders["task"].as_str().unwrap_or_default().to_string();
+                    let order = serde_json::from_value(c.orders["order"].clone()).map_err(|e| anyhow!("a recorded order does not read: {e}"))?;
+                    self.apply_order(side, &unit, &task, order)?;
+                }
             }
         }
         Ok(())
@@ -933,5 +965,93 @@ impl Host {
             Some(f) => bail!("replay diverged: recorded fingerprint {f}, replayed {}", self.sim.fingerprint()),
             None => Ok(()),
         }
+    }
+}
+
+/// A person's order for one unit, as a frontend sends it: units named by
+/// their scenario ids, places by latitude and longitude.
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "order", rename_all = "camelCase")]
+pub enum ManualOrder {
+    /// Go there; `roads`: a road march, else tactically across country.
+    #[serde(rename_all = "camelCase")]
+    Move {
+        lat: f64,
+        lon: f64,
+        #[serde(default)]
+        roads: bool,
+    },
+    /// Through these points ([lat, lon]) in turn, then hold; `repeat` goes round until cancelled.
+    #[serde(rename_all = "camelCase")]
+    Route {
+        points: Vec<[f64; 2]>,
+        #[serde(default)]
+        repeat: bool,
+    },
+    /// Put it there at once (an umpire's move).
+    #[serde(rename_all = "camelCase")]
+    Teleport {
+        lat: f64,
+        lon: f64,
+        #[serde(default)]
+        heading_deg: f64,
+    },
+    /// Stop and hold where it is.
+    Halt,
+    /// Drop its orders: it holds, and is its HQ's to command again.
+    Cancel,
+    /// Rules of engagement: never, ifFiredUpon, withinShortRange, always.
+    #[serde(rename_all = "camelCase")]
+    Roe { roe: String },
+    /// Fire on this unit (its scenario id).
+    #[serde(rename_all = "camelCase")]
+    Engage { target: String },
+    /// Call for indirect fire on this point for the unit's side.
+    #[serde(rename_all = "camelCase")]
+    FireAt { lat: f64, lon: f64 },
+}
+
+impl ManualOrder {
+    /// As an outside order for this game (units by their ids).
+    pub fn resolve(self, sim: &Sim) -> Result<bgws_sim::tasking::ExternalOrder> {
+        use bgws_sim::tasking::ExternalOrder as O;
+        let point = |lat: f64, lon: f64| -> Result<()> {
+            if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+                bail!("{lat}, {lon} is not a place");
+            }
+            Ok(())
+        };
+        Ok(match self {
+            ManualOrder::Move { lat, lon, roads } => {
+                point(lat, lon)?;
+                O::Move { lat, lon, roads }
+            }
+            ManualOrder::Route { points, repeat } => {
+                if points.is_empty() {
+                    bail!("a route with no points");
+                }
+                for p in &points {
+                    point(p[0], p[1])?;
+                }
+                O::Route { points: points.into_iter().map(|p| (p[0], p[1])).collect(), repeat }
+            }
+            ManualOrder::Teleport { lat, lon, heading_deg } => {
+                point(lat, lon)?;
+                O::Teleport { lat, lon, heading_deg }
+            }
+            ManualOrder::Halt => O::Halt,
+            ManualOrder::Cancel => O::Cancel,
+            ManualOrder::Roe { roe } => {
+                if !["never", "ifFiredUpon", "withinShortRange", "always"].contains(&roe.as_str()) {
+                    bail!("rules of engagement {roe} (never, ifFiredUpon, withinShortRange or always)");
+                }
+                O::Roe { roe }
+            }
+            ManualOrder::Engage { target } => O::Engage { target: *sim.ctx.by_name.get(&target).ok_or_else(|| anyhow!("no unit {target}"))? },
+            ManualOrder::FireAt { lat, lon } => {
+                point(lat, lon)?;
+                O::FireAt { lat, lon }
+            }
+        })
     }
 }

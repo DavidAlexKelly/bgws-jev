@@ -9,6 +9,17 @@ import type { Question } from "../types/Question";
 import type { Side } from "../types/Side";
 import type { Viewer } from "../types/Viewer";
 
+/** A direct order to one unit (`order`). Places are latitude/longitude, units their scenario ids. */
+export type ManualOrder =
+  | { order: "move"; lat: number; lon: number; roads?: boolean }
+  | { order: "route"; points: [number, number][]; repeat?: boolean }
+  | { order: "teleport"; lat: number; lon: number; headingDeg?: number }
+  | { order: "halt" }
+  | { order: "cancel" }
+  | { order: "roe"; roe: "never" | "ifFiredUpon" | "withinShortRange" | "always" }
+  | { order: "engage"; target: string }
+  | { order: "fireAt"; lat: number; lon: number };
+
 /** One feed line. */
 export interface FeedEvent {
   clock: string;
@@ -47,6 +58,7 @@ export type Inbound =
   | { kind: "answer"; question: number; choice: string }
   | { kind: "command"; side: Side; plan: unknown }
   | { kind: "seat"; side: Side; seat: "planner" | "person" | "rules" }
+  | { kind: "order"; unit: string; order: ManualOrder }
   | { kind: "seek"; t: number }
   | { kind: "live" }
   | { kind: "branch"; t: number }
@@ -173,6 +185,10 @@ export class BgwsClient {
   /** Give a side's orders as an HQ plan (the orders schema, `plan_schema` on HQ questions). */
   command(side: Side, plan: unknown): void {
     this.send({ kind: "command", side, plan });
+  }
+  /** A direct order to one unit, mid-game: it leaves its HQ's command until `{ order: "cancel" }`. */
+  order(unit: string, order: ManualOrder): void {
+    this.send({ kind: "order", unit, order });
   }
   /** Who sits in a side's HQ seat. */
   seat(side: Side, seat: "planner" | "person" | "rules"): void {
