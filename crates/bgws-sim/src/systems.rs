@@ -218,6 +218,19 @@ pub fn movement(s: &mut Sim, dt: f64) {
             }
         }
         let mut base = off_road.max(on_road);
+        // A step that would carry it over a railway cell with no road in it
+        // (off the road, or leaving one) goes at the crossing's pace, so no
+        // tick jumps the line.
+        {
+            if let Some(cap) = s.ctx.ground.rail_kmh(class) {
+                let d = Enu::new(wp.e - k.pos.e, wp.n - k.pos.n, 0.0);
+                let len = d.horizontal();
+                let reach = (base / 3.6 * dt).min(len);
+                if len > 1e-6 && base > cap && s.ctx.ground.rail_between((k.pos.e, k.pos.n), (k.pos.e + d.e / len * reach, k.pos.n + d.n / len * reach)) {
+                    base = cap.max(crawl);
+                }
+            }
+        }
         // On the road behind a friendly unit moving the same way: its pace.
         if on_road > off_road && !on_roads.is_empty() {
             let side = s.world.get::<Ident>(e).expect("ident").side;

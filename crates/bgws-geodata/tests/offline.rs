@@ -175,6 +175,12 @@ fn vector_tile(z: u8, x: u32, y: u32) -> Vec<u8> {
             roads.push(Feature { kind: 2, pts, tags: vec![("kind", "minor_road"), ("kind_detail", "tertiary")], height: None });
         }
     }
+    // A railway north–south, on the ground, and a tram line beside it (in the street: not one to cross).
+    for (detail, lon) in [("rail", 20.425), ("tram", 20.43)] {
+        if let Some(pts) = clip_line(z, x, y, (lon, 54.695), (lon, 54.725)) {
+            roads.push(Feature { kind: 2, pts, tags: vec![("kind", "rail"), ("kind_detail", detail)], height: None });
+        }
+    }
     let mut landuse = Vec::new();
     if let Some(pts) = rect(z, x, y, 20.400, 54.712, 20.410, 54.718) {
         landuse.push(Feature { kind: 3, pts, tags: vec![("kind", "forest")], height: None });
@@ -245,6 +251,14 @@ fn a_pack_from_local_archives_has_its_ground_roads_and_water() {
     for f in ["pack.json", "preview.png", "roads/graph.json", "roads/nodes.bin", "roads/edges.bin"] {
         assert!(pack.join(f).exists(), "{f}");
     }
+
+    // The railway, read from the basemap's tiles: the one on the ground, not the tram.
+    assert_eq!(meta.railways.as_deref(), Some("railways.json"));
+    let rails: Vec<bgws_env::Railway> = serde_json::from_slice(&std::fs::read(pack.join("railways.json")).unwrap()).unwrap();
+    assert!(!rails.is_empty() && rails.iter().all(|r| r.kind == "rail"), "{} lines", rails.len());
+    let rail_m: f64 = rails.iter().flat_map(|r| r.line.windows(2).map(|w| (w[1].0 - w[0].0).hypot(w[1].1 - w[0].1))).sum();
+    // 0.03° of latitude, about 3.3 km.
+    assert!((rail_m - 3_336.0).abs() < 300.0, "the railway runs the 3.3 km it was drawn: {rail_m:.0} m");
 
     // The ground, as the engine reads it back.
     let ground = bgws_geodata::build::build(&spec, &|_, _| {}).unwrap();

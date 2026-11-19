@@ -224,6 +224,17 @@ pub struct River {
     pub current_m_s: f64,
 }
 
+/// A railway line on the ground (not on a bridge or in a tunnel): rails on
+/// ballast, often on a low bank, which vehicles crossing away from a level
+/// crossing take slowly.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Railway {
+    /// Protomaps' kind detail: rail, light_rail, narrow_gauge, …
+    pub kind: String,
+    /// Centre line, ENU metres.
+    pub line: Vec<(f64, f64)>,
+}
+
 /// Fording limits by class, from figures.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FordLimits {

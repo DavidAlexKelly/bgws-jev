@@ -58,6 +58,8 @@ pub struct RouteParams {
     pub verge_s: f64,
     /// Time to ford a river the vehicle can cross, s.
     pub ford_s: f64,
+    /// The most a vehicle makes over a railway away from a road (bank, rails, ballast): [tracked, wheeled], km/h.
+    pub rail_kmh: [f64; 2],
     /// What crossing a known obstacle costs a move without a lane (about a breach), s.
     pub obstacle_s: f64,
     /// The share of a believed threat's weight that applies where it cannot see (dead ground).
@@ -114,6 +116,8 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.exposure_ref_kmh", 10.0, "km/h", 1.0, 60.0, "default", Default, "fastest pace exposure is counted at; slower movers count the time they take"),
         figure!("sim.route.verge_s", 12.0, "s", 0.0, 120.0, "default", Default, "time to get on or off a road across a verge or ditch"),
         figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
+        figure!("sim.route.rail_kmh_tracked", 8.0, "km/h", 1.0, 40.0, "default", Default, "most a tracked vehicle makes across a railway away from a level crossing (bank, rails, ballast)"),
+        figure!("sim.route.rail_kmh_wheeled", 3.0, "km/h", 0.5, 40.0, "default", Default, "most a wheeled vehicle makes across a railway away from a level crossing (bank, rails, ballast)"),
         figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
@@ -149,6 +153,7 @@ impl RouteParams {
             verge_s: g("verge_s"),
             ford_s: g("ford_s"),
             obstacle_s: g("obstacle_s"),
+            rail_kmh: [g("rail_kmh_tracked"), g("rail_kmh_wheeled")],
             built_block: g("built_block"),
             crawl_kmh: g("crawl_kmh"),
             escape_m: g("escape_m"),
@@ -1091,6 +1096,54 @@ mod tests {
         let river = bgws_env::River { name: "deep".into(), line: vec![(-4_500.0, 0.0), (4_500.0, 0.0)], width_m: 40.0, depth_m: 2.5, current_m_s: 0.5 };
         let stream = bgws_env::River { name: "stream".into(), line: vec![(-4_500.0, -2_500.0), (4_500.0, -2_500.0)], width_m: 3.0, depth_m: 0.6, current_m_s: 0.3 };
         Ground::from_terrain(t, 1, &f).with_roads(&roads).with_rivers(&[river, stream])
+    }
+
+    /// Open fields with a railway east–west along n = 0, a road over it on
+    /// the level at e = +1.5 km, and a second line on the diagonal further north.
+    fn rail_ground(rails: bool) -> Ground {
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
+        let t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        let road = RoadLine::new(RoadClass::Secondary, vec![(1_500.0, -4_400.0), (1_500.0, 4_400.0)]);
+        let g = Ground::from_terrain(t, 1, &f).with_roads(&[road]);
+        if !rails {
+            return g;
+        }
+        let line = |a: (f64, f64), b: (f64, f64)| bgws_env::Railway { kind: "rail".into(), line: vec![a, b] };
+        g.with_railways(&[line((-4_500.0, 0.0), (4_500.0, 0.0)), line((-3_000.0, 1_000.0), (3_000.0, 3_500.0))])
+    }
+
+    #[test]
+    fn a_railway_is_slow_going_for_wheels_away_from_a_crossing() {
+        let (g, bare) = (rail_ground(true), rail_ground(false));
+        // On the line: wheels at a crawl, tracks slowed, troops on foot as before.
+        assert!(g.going(0.0, 0.0, VehicleClass::Wheeled).speed_kmh <= 3.0);
+        assert!(g.going(0.0, 0.0, VehicleClass::Tracked).speed_kmh <= 8.0);
+        assert_eq!(g.going(0.0, 0.0, VehicleClass::Foot).speed_kmh, bare.going(0.0, 0.0, VehicleClass::Foot).speed_kmh);
+        assert_eq!(g.going(0.0, 200.0, VehicleClass::Wheeled).speed_kmh, bare.going(0.0, 200.0, VehicleClass::Wheeled).speed_kmh, "off the line, as before");
+        // The diagonal line has no gap a step between cells slips through (away from the road).
+        for k in 0..200 {
+            let e = -2_900.0 + k as f64 * 29.0;
+            let n = 1_000.0 + (e + 3_000.0) * 2_500.0 / 6_000.0;
+            if (e - 1_500.0).abs() < 90.0 {
+                continue; // where the road crosses it on the level
+            }
+            assert!(g.rail_between((e - 25.0, n + 25.0), (e + 25.0, n - 25.0)), "a step across the line at e = {e:.0} meets it");
+        }
+        // Straight over: it costs a wheeled vehicle about half a minute more, a
+        // tracked one less, troops nothing.
+        let (a, b) = ((-1_000.0, -1_000.0), (-1_000.0, 800.0));
+        let extra = |class| plan_from(&g, a, b, class, MoveModeS::Assault, &[]).time_s - plan_from(&bare, a, b, class, MoveModeS::Assault, &[]).time_s;
+        let (w, t, f) = (extra(VehicleClass::Wheeled), extra(VehicleClass::Tracked), extra(VehicleClass::Foot));
+        eprintln!("crossing the line costs: wheeled {w:.0} s, tracked {t:.0} s, foot {f:.0} s");
+        assert!(w > 20.0 && w < 120.0, "wheeled: {w:.0} s");
+        assert!(t > 0.0 && t < w, "tracked: {t:.0} s");
+        assert!(f.abs() < 1.0, "foot: {f:.0} s");
+        // Beside the level crossing, a wheeled vehicle goes over on the road.
+        let (a, b) = ((1_350.0, -600.0), (1_350.0, 600.0));
+        let p = plan_from(&g, a, b, VehicleClass::Wheeled, MoveModeS::March, &[]);
+        let x = crossing(&p, a).expect("it crosses");
+        assert!((x - 1_500.0).abs() < 40.0, "over at the level crossing: e = {x:.0}");
     }
 
     /// Where a route crosses n = 0, if it does.

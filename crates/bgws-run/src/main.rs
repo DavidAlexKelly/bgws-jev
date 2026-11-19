@@ -171,7 +171,8 @@ enum Cmd {
     /// Fetch a theatre pack's map tiles again (the viewer's basemap) without
     /// rebuilding the rest: to zoom 15, where every building is, with an
     /// estimated height on each building that has none. For packs built
-    /// before the basemap went to zoom 15.
+    /// before the basemap went to zoom 15. Its railway lines (slow going for
+    /// vehicles in the simulation) are read from the new tiles too.
     Basemap {
         /// The pack folder (or the name of one under packs/).
         pack: PathBuf,
@@ -183,6 +184,10 @@ enum Cmd {
         /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
         #[arg(long)]
         cache: Option<PathBuf>,
+        /// Only read the railway lines from the basemap the pack already has
+        /// (no fetching): for a pack built before packs carried railways.
+        #[arg(long)]
+        rails_only: bool,
     },
     /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
     /// federates on one machine.
@@ -753,12 +758,17 @@ fn main() -> Result<()> {
             let opts = bgws_run::federate::FederateOptions { packs, allow_generated: allow_generated_ground, speed, records, cell_m };
             bgws_run::federate::Federate::new(link, spec, opts).serve()?;
         }
-        Cmd::Basemap { pack, max_zoom, planet, cache } => {
+        Cmd::Basemap { pack, max_zoom, planet, cache, rails_only } => {
             let dir = if pack.join("pack.json").exists() { pack.clone() } else { data_dir().join("..").join("packs").join(&pack) };
             if !dir.join("pack.json").exists() {
                 bail!("{}: not a theatre pack (no pack.json)", pack.display());
             }
             let started = Instant::now();
+            if rails_only {
+                let n = bgws_geodata::pack::railways_from_basemap(&dir).map_err(|e| anyhow!("{e}"))?;
+                eprintln!("{}: {n} railway lines read from its basemap, {:.1} s", dir.display(), started.elapsed().as_secs_f64());
+                return Ok(());
+            }
             let last = std::sync::Mutex::new((String::new(), 0u32));
             let progress = |stage: &str, f: f64| {
                 let step = (f * 10.0).floor() as u32;

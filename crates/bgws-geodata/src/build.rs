@@ -224,7 +224,7 @@ fn pool(n: usize) -> Result<rayon::ThreadPool, GeoError> {
 pub type StoredTile = ((u8, u32, u32), Vec<u8>);
 
 /// The viewer's basemap: the archive's tiles over the box, zooms 0 to
-/// `max_zoom`, as stored, except that building tiles (zoom 13 and up) gain an
+/// `max_zoom`, gzipped, as stored, except that building tiles (zoom 13 and up) gain an
 /// estimated height on every building that has none (`mvt::with_estimated_heights`).
 pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, net: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<StoredTile>, GeoError> {
     progress("basemap", 0.0);
@@ -244,17 +244,64 @@ pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, net: &rayon::ThreadPoo
                 let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 progress("basemap", n as f64 / want.len() as f64);
                 Some(r.and_then(|raw| {
-                    if z < 13 {
+                    // Stored gzipped, as the pack's basemap says, whatever the source.
+                    if z < 13 && compression == Compression::Gzip {
                         return Ok(((z, x, y), raw));
                     }
                     let plain = crate::pmtiles::decompress(compression, raw)?;
-                    let patched = mvt::with_estimated_heights(&plain, z, x, y)?;
-                    let stored = if compression == Compression::Gzip { crate::pmtiles::gzip(&patched) } else { patched };
-                    Ok(((z, x, y), stored))
+                    let patched = if z < 13 { plain } else { mvt::with_estimated_heights(&plain, z, x, y)? };
+                    Ok(((z, x, y), crate::pmtiles::gzip(&patched)))
                 }))
             })
             .collect::<Result<Vec<_>, GeoError>>()
     })
+}
+
+/// Railway kinds (Protomaps' `kind_detail` on `kind = rail`) that lie on
+/// their own bank or ballast; trams run in the street, and the rest are not
+/// there to cross.
+const RAIL_KEEP: [&str; 5] = ["", "rail", "light_rail", "narrow_gauge", "preserved"];
+
+/// The railway lines on the ground in a set of basemap tiles (as stored),
+/// in `frame`'s ENU metres: from the roads layer at the deepest zoom up to
+/// 14 that the tiles have, clipped to each tile, leaving out bridges and
+/// tunnels (a road or field under a rail bridge is not crossing the line).
+pub fn railways_from_tiles(tiles: &[StoredTile], compression: Compression, frame: &EnuFrame) -> Result<Vec<bgws_env::Railway>, GeoError> {
+    let Some(z) = tiles.iter().map(|t| t.0 .0).filter(|z| *z <= 14).max() else { return Ok(Vec::new()) };
+    let at: Vec<&StoredTile> = tiles.iter().filter(|t| t.0 .0 == z).collect();
+    let per: Vec<Vec<bgws_env::Railway>> = at
+        .par_iter()
+        .map(|((_, tx, ty), raw)| {
+            let plain = crate::pmtiles::decompress(compression, raw.clone())?;
+            let mut out = Vec::new();
+            for l in mvt::decode(&plain)?.iter().filter(|l| l.name == "roads") {
+                let ext = l.extent as f64;
+                for f in l.features.iter().filter(|f| f.kind == GeomType::Line && f.str("kind") == Some("rail")) {
+                    let detail = f.str("kind_detail").unwrap_or("");
+                    if !RAIL_KEEP.contains(&detail) || f.flag("is_bridge") || f.flag("is_tunnel") {
+                        continue;
+                    }
+                    for part in &f.parts {
+                        for piece in crate::fill::clip_line(part, 0.0, 0.0, ext, ext) {
+                            let line: Vec<(f64, f64)> = piece
+                                .iter()
+                                .map(|p| {
+                                    let (lon, lat) = tile_lonlat(*tx as f64 + p[0] / ext, *ty as f64 + p[1] / ext, z);
+                                    let v = frame.geodetic_to_enu(Geodetic::new(lat, lon, 0.0));
+                                    (v.e, v.n)
+                                })
+                                .collect();
+                            if line.len() >= 2 {
+                                out.push(bgws_env::Railway { kind: if detail.is_empty() { "rail".into() } else { detail.to_string() }, line });
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(out)
+        })
+        .collect::<Result<_, GeoError>>()?;
+    Ok(per.into_iter().flatten().collect())
 }
 
 /// Fetch a pack's basemap again (for packs built before buildings went to

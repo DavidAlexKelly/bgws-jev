@@ -28,6 +28,7 @@ pub fn ground_sim(scenario: &bgws_scenario::v4::ScenarioV4) -> anyhow::Result<bg
         opts.terrain = Some(g.terrain);
         opts.roads = Some(g.roads);
         opts.rivers = Some(g.rivers);
+        opts.rails = Some(g.rails);
     }
     bgws_sim::Sim::with_options(scenario, bgws_core::Seed(1), crate::default_figures(), opts).map_err(|e| anyhow::anyhow!("{e}"))
 }

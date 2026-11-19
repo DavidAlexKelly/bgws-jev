@@ -480,7 +480,7 @@ to reach openrouter.ai.
   basemaps) drapes the map over the pack's own elevation. It is the same
   ground the game is played on, stretched ×1.5 upright because most theatres
   are low. It tilts the view, and buildings stand up as blocks at their mapped
-  height (10 m where none is mapped). Units, tracks, shots and rings sit on
+  height (estimated from the footprint where none is mapped, else 6 m). Units, tracks, shots and rings sit on
   the ground; drones and aircraft keep their height. Right-drag or Ctrl-drag
   to tilt and turn. Generated ground has no real elevation to show, so 3D is
   only offered on a pack, and only one built with an elevation map
@@ -577,6 +577,23 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
   `roads/`: `nodes.bin`, `edges.bin`, `edge_geom.bin` and `adjacency.bin`
   (fixed-width little-endian), with `graph.json` describing the layout and
   the build's statistics.
+- **Railways:** the lines on the ground (rail, light rail, narrow gauge,
+  heritage lines) from the basemap's zoom-14 roads layer, as
+  `railways.json`. Trams run in the street and are left out, and so are
+  rail bridges and tunnels.
+  - In the game, a vehicle crossing a line away from a road (up the bank,
+    over the rails and ballast) goes no faster than 3 km/h wheeled or
+    8 km/h tracked (`sim.route.rail_kmh_*`). Troops on foot are not slowed.
+  - The route planner counts this, so a wheeled column uses a level
+    crossing if one is near and otherwise crosses slowly. On open fields,
+    crossing costs a wheeled vehicle about 30 s, a tracked one about 10 s.
+  - A road in the cell (a level crossing, or a road beside the line) goes
+    at its own speed.
+  - Packs built before railways: `bgws basemap <pack> --rails-only` reads
+    them from the basemap the pack already has, in about a second.
+    `kaliningrad-big` has 1,141 lines, about 535 km including yards and
+    sidings.
+  - The viewer draws them as track, rails over sleepers, in quality mode.
 - **For the viewer:** `basemap.pmtiles` and `dem.pmtiles`, extracts of the
   same archives that `bgws-server` serves under `/packs/`. The "terrain"
   basemap draws them, with hillshade and town names, with no internet.
@@ -586,7 +603,7 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
     8 × 8-tile patch went from 244 buildings to 7,192.
   - **Estimated heights:** each building with no mapped height (most of
     them) gets an `est_height` from its footprint, which the viewer's 3D
-    blocks use. It is a guess for the picture only; the simulation reads
+    blocks use. A building with neither is drawn 6 m high. It is a guess for the picture only; the simulation reads
     its buildings from the planet archive. The estimate goes:
     - a long, thin footprint is a row of garages or sheds (3.5 m);
     - a long block is a five- or nine-storey panel block (15 m or 27 m);
@@ -596,7 +613,8 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
     Only the tile's protobuf framing is touched (`mvt::with_estimated_heights`);
     the geometry is copied as it is.
   - **Older packs:** `bgws basemap <pack>` fetches the map tiles again, to
-    zoom 15 with the heights, and leaves the rest of the pack alone. For
+    zoom 15 with the heights, reads the railways from them, and leaves the
+    rest of the pack alone. For
     `kaliningrad-big` it took about 3 minutes, and the basemap went from
     8.3 to 14.5 MB.
 - **To check a build:** `preview.png` shows land cover over hillshade, with
