@@ -453,6 +453,24 @@ to reach openrouter.ai.
   so nothing is fetched. **3D terrain** now also works over the
   **satellite** basemap: the imagery drapes over the pack's elevation, with
   its buildings standing up in pale stone.
+  - **Roofs:** each building's top shows the imagery of its own roof
+    (`frontend/viewer/src/roofs.ts`).
+    - It is a MapLibre custom layer, so it shares the depth buffer: roofs
+      hide behind nearer blocks and hills like the blocks do.
+    - The roofs are the buildings MapLibre has loaded, triangulated at the
+      top of their block: the same height, above the terrain at the same
+      centroid, 0.25 m higher.
+    - Each roof is drawn from every imagery tile it touches, with the
+      tile's own pixels and the rest cut away, so it joins up across tile
+      edges. The tiles are a zoom deeper than the map, up to 19; 120 at most
+      are drawn (240 in quality mode), nearest the middle first.
+    - Built again when the map settles, from zoom 14.5.
+    - Checked with synthetic imagery seen from straight above: near the
+      middle of the view the roofed blocks vanish into the ground's imagery
+      (81% of their pixels match it, against none for plain blocks).
+    - The imagery is a photograph, not a true orthophoto: a tall building's
+      roof can sit a few metres off its footprint, so the roof's edge may
+      show some ground or wall.
 - **Giving orders mid-game:** select one of your units (any unit, as the
   umpire). Under its orders, *Give orders* has:
   - **Move** and **Road march**: click the map; it goes there tactically, or

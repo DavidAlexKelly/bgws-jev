@@ -13,6 +13,7 @@
     "@deck.gl/extensions": "9.0.38",
     "@deck.gl/layers": "9.0.38",
     "@deck.gl/mapbox": "9.0.38",
+    "earcut": "2.2.4",
     "maplibre-gl": "4.7.1",
     "milsymbol": "2.2.0",
     "pmtiles": "3.2.1",
@@ -20,6 +21,7 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@types/earcut": "2.1.4",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",

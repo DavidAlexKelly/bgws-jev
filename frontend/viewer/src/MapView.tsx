@@ -9,6 +9,7 @@ import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { buildingBlocks, terrainLayers, worldLayers } from "./basemap";
+import { roofLayer } from "./roofs";
 import { addTextures } from "./textures";
 import { setTerrainZ, TERRAIN_EXAGGERATION } from "./layers";
 
@@ -176,6 +177,8 @@ export function MapView(props: {
       // The sky and haze only show with terrain; cleared when it is off.
       setSky(m, false);
       for (const l of m.getStyle().layers ?? []) if (l.id.startsWith("base") || l.id.startsWith("world")) m.removeLayer(l.id);
+      // Custom layers are not in the style's list.
+      if (m.getLayer("base-roofs")) m.removeLayer("base-roofs");
       for (const id of ["base", "base-dem", "base-terrain", "base-vec", "world"]) if (m.getSource(id)) m.removeSource(id);
       const flat = () => {
         if (m.getPitch() > 0) m.easeTo({ pitch: 0, bearing: 0, duration: 600 });
@@ -211,6 +214,8 @@ export function MapView(props: {
       if (packBasemap) {
         m.addSource("base-vec", { type: "vector", url: abs(packBasemap), attribution: "© OpenStreetMap contributors · Protomaps" });
         m.addLayer(buildingBlocks("base-vec", "base-buildings", quality, true));
+        // Each block's top shows the imagery of its own roof.
+        m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
       }
       return terrain(abs);
     };
