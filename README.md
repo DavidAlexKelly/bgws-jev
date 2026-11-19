@@ -434,6 +434,25 @@ to reach openrouter.ai.
   In sight is not spotted: whether a unit picks a target out also depends on
   range, light, weather and the target's cover and movement (*Can it see…?*
   gives every factor).
+- **Graphics: performance or quality** (under the basemaps; remembered).
+  - **Quality** (the default):
+    - The ground is textured by what it is: tree crowns in woods, furrows
+      in fields, grass, scrub, reeds in wetland, a street grid in towns,
+      stipple on sand and rock, ripples and a shoreline on water.
+    - Roads have casings, and the hillshade is stronger.
+    - Buildings are coloured by height and vary a little one to the next.
+      In 2D they cast a shadow and have an edge.
+    - In 3D, woods stand up as a canopy about 15 m tall, buildings are lit
+      by a low sun, and there is sky and haze on the horizon.
+    - It draws at the screen's full resolution, and smooths edges after a
+      reload.
+  - **Performance:** flat colours, one pixel per screen point, and no sky:
+    lighter on the graphics card for long games and big battles.
+
+  The textures are drawn by the viewer itself (`frontend/viewer/src/textures.ts`),
+  so nothing is fetched. **3D terrain** now also works over the
+  **satellite** basemap: the imagery drapes over the pack's elevation, with
+  its buildings standing up in pale stone.
 - **Giving orders mid-game:** select one of your units (any unit, as the
   umpire). Under its orders, *Give orders* has:
   - **Move** and **Road march**: click the map; it goes there tactically, or

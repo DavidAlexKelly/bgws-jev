@@ -6,7 +6,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { category, CATEGORY_COLOUR, CATEGORY_LABEL, SIDE_COLOUR, type Category } from "./overlays";
 import { clock, span, type FrameEntity, type FrameView, type GameEvent, type GameInfo, type ManualOrder, type PackInfo, type Question, type ScenarioBrief, type Side, type TerrainProgress, type UnitDetail, type Viewer } from "./protocol";
 import { LAYERS, type LayerKey } from "./layers";
-import type { Basemap } from "./MapView";
+import type { Basemap, Graphics } from "./MapView";
 
 export const SPEEDS = [1, 5, 10, 30, 60, 300, 600];
 
@@ -173,6 +173,8 @@ export function ViewPanel(props: {
   /** Why 3D is off, when it is. */
   no3D: string;
   onThreeD: (on: boolean) => void;
+  graphics: Graphics;
+  onGraphics: (g: Graphics) => void;
   hqOpen: boolean;
   onHq: () => void;
 }) {
@@ -207,12 +209,28 @@ export function ViewPanel(props: {
           onClick={() => props.onThreeD(!props.threeD)}
           title={
             props.can3D
-              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks. Right-drag or Ctrl-drag to tilt and turn."
+              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks (over the satellite imagery too). Right-drag or Ctrl-drag to tilt and turn."
               : props.no3D
           }
         >
           3D terrain
         </button>
+      </div>
+      <div className="chips fill">
+        {(["performance", "quality"] as Graphics[]).map((g) => (
+          <button
+            key={g}
+            className={`chip${props.graphics === g ? " on" : ""}`}
+            onClick={() => props.onGraphics(g)}
+            title={
+              g === "quality"
+                ? "Textured ground (woods, fields, towns, water), shaded buildings with shadows, road casings, a tree canopy, sky and haze in 3D, and the screen's full resolution. Smoothed edges after a reload."
+                : "Flat colours, one pixel per screen point, no sky: lighter on the graphics card for long games and big battles."
+            }
+          >
+            {g}
+          </button>
+        ))}
       </div>
       <button className={`chip${props.hqOpen ? " on" : ""}`} style={{ width: "100%" }} onClick={props.onHq} title="Take a side's HQ seat and give its units orders">
         {props.hqOpen ? "hide" : "show"} the HQ console

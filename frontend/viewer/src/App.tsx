@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildLayers, DEFAULT_LAYERS, tooltip, type KeyPoint, type LayerKey } from "./layers";
-import { MapView, type Basemap } from "./MapView";
+import { MapView, type Basemap, type Graphics } from "./MapView";
 import { SIDE_COLOUR } from "./overlays";
 import { clock, type ManualOrder, type Side } from "./protocol";
 import { ClockPanel, EndCard, Feed, ForcesPanel, GamePanel, HqConsole, Inspector, MapKey, NewGameCard, orderPickHelp, Questions, ReportCard, Spectrum, ViewPanel, type OrderPick } from "./Panels";
@@ -85,10 +85,13 @@ export function App() {
   }, [keyUrl]);
   const [threeD, setThreeD] = useState(() => readPref<string>("3d", "off") === "on");
   useEffect(() => writePref("3d", threeD ? "on" : "off"), [threeD]);
-  const can3D = basemap === "terrain" && !!s.game?.pack?.dem;
+  // Quality or performance graphics, remembered.
+  const [graphics, setGraphics] = useState<Graphics>(() => (readPref<string>("graphics", "quality") === "performance" ? "performance" : "quality"));
+  useEffect(() => writePref("graphics", graphics), [graphics]);
+  const can3D = (basemap === "terrain" || basemap === "satellite") && !!s.game?.pack?.dem;
   const no3D =
-    basemap !== "terrain"
-      ? "3D uses the terrain basemap: pick terrain first"
+    basemap !== "terrain" && basemap !== "satellite"
+      ? "3D uses the terrain or satellite basemap: pick one of those first"
       : !s.game?.pack
         ? "3D needs a theatre pack (New game… → Ground): generated ground has no real elevation to show"
         : "This pack has no elevation map (built before packs carried one): build it again with bgws terrain";
@@ -230,7 +233,7 @@ export function App() {
 
   return (
     <>
-      <MapView layers={deckLayers} basemap={basemap} pack={s.game?.pack ?? null} threeD={threeD && can3D} onLift={onLift} onView={setView} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
+      <MapView layers={deckLayers} basemap={basemap} pack={s.game?.pack ?? null} threeD={threeD && can3D} graphics={graphics} onLift={onLift} onView={setView} fit={fit} fitKey={`${gameName}`} focus={focus} onMapClick={onMapClick} tooltip={tooltip} />
 
       <div className="header">
         <span className="brand">BGWS</span>
@@ -305,6 +308,8 @@ export function App() {
           threeD={threeD}
           can3D={can3D}
           no3D={no3D}
+          graphics={graphics}
+          onGraphics={setGraphics}
           onThreeD={setThreeD}
           hqOpen={hqOpen}
           onHq={() => setHqOpen((o) => !o)}
