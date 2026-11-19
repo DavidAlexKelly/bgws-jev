@@ -245,6 +245,7 @@ fn a_pack_from_local_archives_has_its_ground_roads_and_water() {
     spec.elevation = elevation.to_string_lossy().into_owned();
     spec.cache = None;
     spec.threads = 2;
+    spec.overture = false;
     let pack = dir.join("pack");
     let meta = bgws_geodata::pack::build_pack(&pack, "offline", &spec, 15.0, &|_, _| {}).unwrap();
     assert_eq!(meta.road_graph.as_deref(), Some("roads"));

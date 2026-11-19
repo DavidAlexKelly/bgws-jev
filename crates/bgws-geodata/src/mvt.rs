@@ -355,13 +355,124 @@ fn put_field(out: &mut Vec<u8>, field: u32, payload: &[u8]) {
     out.extend_from_slice(payload);
 }
 
+/// A building to add to a tile: its rings as fractions of the tile (x east,
+/// y south, 0–1, outer ring first), and its height, m.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NewBuilding {
+    pub rings: Vec<Vec<[f64; 2]>>,
+    pub height: f64,
+}
+
 /// The tile (uncompressed MVT at z/x/y) with `est_height` on every building
 /// in its `buildings` layer that has no `height`. Other layers, and any tile
 /// without such a layer, come back unchanged.
-pub fn with_estimated_heights(b: &[u8], z: u8, _x: u32, y: u32) -> Result<Vec<u8>, GeoError> {
+pub fn with_estimated_heights(b: &[u8], z: u8, x: u32, y: u32) -> Result<Vec<u8>, GeoError> {
+    with_buildings(b, z, x, y, &[])
+}
+
+/// A polygon's MVT geometry commands in tile units: rings wound as the spec
+/// asks (outer positive area with y down, holes negative), each closed;
+/// rings that round to fewer than three points are left out.
+fn polygon_commands(rings: &[Vec<[f64; 2]>], extent: f64) -> Vec<u32> {
+    let mut cmds = Vec::new();
+    let (mut cx, mut cy) = (0i64, 0i64);
+    let zz = |v: i64| ((v << 1) ^ (v >> 63)) as u32;
+    for (k, r) in rings.iter().enumerate() {
+        let mut pts: Vec<[i64; 2]> = Vec::with_capacity(r.len());
+        for p in r {
+            let q = [(p[0] * extent).round() as i64, (p[1] * extent).round() as i64];
+            if pts.last() != Some(&q) {
+                pts.push(q);
+            }
+        }
+        if pts.len() > 1 && pts.first() == pts.last() {
+            pts.pop();
+        }
+        if pts.len() < 3 {
+            if k == 0 {
+                return Vec::new();
+            }
+            continue;
+        }
+        let area: i64 = (0..pts.len())
+            .map(|i| {
+                let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
+                a[0] * b[1] - b[0] * a[1]
+            })
+            .sum();
+        if (k == 0) != (area > 0) {
+            pts.reverse();
+        }
+        cmds.push(1 | (1 << 3));
+        cmds.push(zz(pts[0][0] - cx));
+        cmds.push(zz(pts[0][1] - cy));
+        (cx, cy) = (pts[0][0], pts[0][1]);
+        cmds.push(2 | (((pts.len() - 1) as u32) << 3));
+        for p in &pts[1..] {
+            cmds.push(zz(p[0] - cx));
+            cmds.push(zz(p[1] - cy));
+            (cx, cy) = (p[0], p[1]);
+        }
+        cmds.push(7 | (1 << 3));
+    }
+    cmds
+}
+
+/// A new building's feature: an `est_height` tag (marker key, value index) and its geometry.
+fn new_feature(cmds: &[u32], value: usize) -> Vec<u8> {
+    let mut f = Vec::new();
+    let mut tags = Vec::new();
+    put_varint(&mut tags, 0x3fff_ffff);
+    put_varint(&mut tags, value as u64);
+    put_field(&mut f, 2, &tags);
+    put_varint(&mut f, 3 << 3);
+    put_varint(&mut f, 3); // POLYGON
+    let mut g = Vec::new();
+    for &c in cmds {
+        put_varint(&mut g, c as u64);
+    }
+    put_field(&mut f, 4, &g);
+    f
+}
+
+/// As [`with_estimated_heights`], and with `extra` buildings added to the
+/// `buildings` layer (made, at extent 4096, where the tile has none), tagged
+/// with their `est_height`.
+pub fn with_buildings(b: &[u8], z: u8, _x: u32, y: u32, extra: &[&NewBuilding]) -> Result<Vec<u8>, GeoError> {
     let layers = decode(b)?;
-    let Some(li) = layers.iter().position(|l| l.name == "buildings") else { return Ok(b.to_vec()) };
+    let li = layers.iter().position(|l| l.name == "buildings");
+    if li.is_none() {
+        let built: Vec<(Vec<u32>, f64)> = extra.iter().map(|n| (polygon_commands(&n.rings, 4096.0), n.height)).filter(|(c, _)| !c.is_empty()).collect();
+        if built.is_empty() {
+            return Ok(b.to_vec());
+        }
+        let mut heights: Vec<f64> = built.iter().map(|x| x.1).collect();
+        heights.sort_by(|a, b| a.total_cmp(b));
+        heights.dedup();
+        let mut body = Vec::new();
+        put_varint(&mut body, (15 << 3) as u64);
+        put_varint(&mut body, 2); // version
+        put_field(&mut body, 1, b"buildings");
+        for (cmds, h) in &built {
+            put_field(&mut body, 2, &new_feature(cmds, heights.iter().position(|x| x == h).unwrap_or(0)));
+        }
+        let mut body = fix_markers(&body, 0, 0)?;
+        put_field(&mut body, 3, b"est_height");
+        for h in &heights {
+            let mut v = Vec::with_capacity(9);
+            v.push((3 << 3) | 1);
+            v.extend_from_slice(&h.to_le_bytes());
+            put_field(&mut body, 4, &v);
+        }
+        put_varint(&mut body, (5 << 3) as u64);
+        put_varint(&mut body, 4096);
+        let mut out = b.to_vec();
+        put_field(&mut out, 3, &body);
+        return Ok(out);
+    }
+    let li = li.unwrap_or(0);
     let layer = &layers[li];
+    let added: Vec<(Vec<u32>, f64)> = extra.iter().map(|n| (polygon_commands(&n.rings, layer.extent.max(1) as f64), n.height)).filter(|(c, _)| !c.is_empty()).collect();
     // Metres per tile unit at the tile's middle.
     let n = (1u64 << z) as f64;
     let lat = (std::f64::consts::PI * (1.0 - 2.0 * (y as f64 + 0.5) / n)).sinh().atan();
@@ -377,11 +488,11 @@ pub fn with_estimated_heights(b: &[u8], z: u8, _x: u32, y: u32) -> Result<Vec<u8
             Some(estimate_height(a, p))
         })
         .collect();
-    if est.iter().all(Option::is_none) {
+    if est.iter().all(Option::is_none) && added.is_empty() {
         return Ok(b.to_vec());
     }
     // Distinct heights become the layer's new values, after its own.
-    let mut heights: Vec<f64> = est.iter().flatten().copied().collect();
+    let mut heights: Vec<f64> = est.iter().flatten().copied().chain(added.iter().map(|x| x.1)).collect();
     heights.sort_by(|a, b| a.total_cmp(b));
     heights.dedup();
 
@@ -441,6 +552,9 @@ pub fn with_estimated_heights(b: &[u8], z: u8, _x: u32, y: u32) -> Result<Vec<u8
                     body.extend_from_slice(&payload[fs..lp.p]);
                 }
             }
+        }
+        for (cmds, h) in &added {
+            put_field(&mut body, 2, &new_feature(cmds, heights.iter().position(|x| x == h).unwrap_or(0)));
         }
         // Now the indices: the new key after the layer's keys, the new values after its values.
         let body = fix_markers(&body, keys, values)?;
@@ -678,6 +792,60 @@ mod tests {
         assert_eq!(est(3), Some(7.0), "a house");
         // Running it again changes nothing more than once (idempotent in effect).
         assert!(decode(&with_estimated_heights(&out, z, x, y).unwrap()).unwrap()[1].features.iter().all(|f| f.props.contains_key("est_height") || f.props.contains_key("height")));
+    }
+
+    #[test]
+    fn added_buildings_join_the_layer_or_make_one() {
+        let (z, x, y) = (15u8, 18248u32, 10314u32);
+        // A tile with a mapped 20 m building and a roads layer.
+        let mut roads = Vec::new();
+        field_bytes(&mut roads, 1, b"roads");
+        pb_varint(&mut roads, 5 << 3);
+        pb_varint(&mut roads, 4096);
+        let mut double = Vec::new();
+        pb_varint(&mut double, (3 << 3) | 1);
+        double.extend_from_slice(&20.0f64.to_le_bytes());
+        let mut layer = Vec::new();
+        field_bytes(&mut layer, 1, b"buildings");
+        field_bytes(&mut layer, 2, &building(&[0, 0], &rect(0, 0, 60, 60)));
+        field_bytes(&mut layer, 3, b"height");
+        field_bytes(&mut layer, 4, &double);
+        pb_varint(&mut layer, 5 << 3);
+        pb_varint(&mut layer, 4096);
+        let mut tile = Vec::new();
+        field_bytes(&mut tile, 3, &roads);
+        field_bytes(&mut tile, 3, &layer);
+
+        // Wound the wrong way and closed, with a hole: written as the spec asks.
+        let square = |x0: f64, y0: f64, s: f64| vec![[x0, y0], [x0, y0 + s], [x0 + s, y0 + s], [x0 + s, y0], [x0, y0]];
+        let a = NewBuilding { rings: vec![square(0.5, 0.5, 0.01)], height: 6.0 };
+        let b = NewBuilding { rings: vec![square(0.2, 0.2, 0.1), square(0.24, 0.24, 0.02)], height: 9.0 };
+        let tiny = NewBuilding { rings: vec![square(0.9, 0.9, 0.00002)], height: 6.0 };
+        let out = decode(&with_buildings(&tile, z, x, y, &[&a, &b, &tiny]).unwrap()).unwrap();
+        let l = &out[1];
+        assert_eq!(l.features.len(), 3, "the mapped one and two added (one too small to draw)");
+        assert_eq!(l.features[0].props.get("height").and_then(Value::as_f64), Some(20.0));
+        let f = &l.features[1];
+        assert_eq!((f.kind, f.props.get("est_height").and_then(Value::as_f64)), (GeomType::Polygon, Some(6.0)));
+        let ring = &f.parts[0];
+        assert_eq!(ring.len(), 5, "closed on decode: {ring:?}");
+        assert!(ring.contains(&[2048.0, 2048.0]) && ring.contains(&[2089.0, 2089.0]));
+        let signed = |r: &Vec<[f64; 2]>| (0..r.len() - 1).map(|i| r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]).sum::<f64>();
+        assert!(signed(ring) > 0.0, "outer ring positive in tile coordinates");
+        let g = &l.features[2];
+        assert_eq!(g.props.get("est_height").and_then(Value::as_f64), Some(9.0));
+        assert_eq!(g.parts.len(), 2);
+        assert!(signed(&g.parts[1]) < 0.0, "the hole wound the other way");
+
+        // A tile with no buildings layer gains one.
+        let mut bare = Vec::new();
+        field_bytes(&mut bare, 3, &roads);
+        let out = decode(&with_buildings(&bare, z, x, y, &[&a]).unwrap()).unwrap();
+        assert_eq!(out.len(), 2);
+        assert_eq!((out[1].name.as_str(), out[1].extent, out[1].features.len()), ("buildings", 4096, 1));
+        assert_eq!(out[1].features[0].props.get("est_height").and_then(Value::as_f64), Some(6.0));
+        // And with nothing to add, a tile without buildings is returned as it was.
+        assert_eq!(with_buildings(&bare, z, x, y, &[]).unwrap(), bare);
     }
 
     #[test]

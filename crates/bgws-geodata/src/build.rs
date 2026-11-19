@@ -51,6 +51,13 @@ pub struct BuildSpec {
     pub ground_filter_m: f64,
     /// Parallel downloads.
     pub threads: usize,
+    /// Add Overture Maps' buildings that OpenStreetMap lacks (footprints from
+    /// satellite imagery), at their height where known, else `overture_height_m`.
+    pub overture: bool,
+    /// The Overture release (`2026-11-18.0`); `None` finds the latest.
+    pub overture_release: Option<String>,
+    /// The height given to an added building with none, m.
+    pub overture_height_m: f64,
 }
 
 impl BuildSpec {
@@ -69,6 +76,9 @@ impl BuildSpec {
             cache: default_cache(),
             ground_filter_m: 150.0,
             threads: 16,
+            overture: true,
+            overture_release: None,
+            overture_height_m: 6.0,
         }
     }
 }
@@ -204,6 +214,7 @@ struct Shape {
     rings: Vec<Vec<[f64; 2]>>,
 }
 
+#[derive(Default)]
 struct TileOut {
     shapes: Vec<Shape>,
     /// Building footprint area (m²) at a grid position.
@@ -226,8 +237,32 @@ pub type StoredTile = ((u8, u32, u32), Vec<u8>);
 /// The viewer's basemap: the archive's tiles over the box, zooms 0 to
 /// `max_zoom`, gzipped, as stored, except that building tiles (zoom 13 and up) gain an
 /// estimated height on every building that has none (`mvt::with_estimated_heights`).
-pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, net: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<StoredTile>, GeoError> {
+pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, extra: &[MapBuilding], net: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<StoredTile>, GeoError> {
     progress("basemap", 0.0);
+    // Added buildings go in the tile their middle falls in, at zoom 15 and
+    // deeper (where Protomaps keeps every building), or the deepest zoom
+    // copied if that is 14.
+    let top = max_zoom.min(osm.header.max_zoom);
+    let mut placed: HashMap<(u8, u32, u32), Vec<mvt::NewBuilding>> = HashMap::new();
+    for z in (14..=top).filter(|&z| z >= 15 || z == top) {
+        for m in extra {
+            let (tx, ty) = tile_xy(m.centre[0], m.centre[1], z);
+            let (x, y) = (tx.floor(), ty.floor());
+            let rings = m
+                .rings
+                .iter()
+                .map(|r| {
+                    r.iter()
+                        .map(|p| {
+                            let (px, py) = tile_xy(p[0], p[1], z);
+                            [px - x, py - y]
+                        })
+                        .collect()
+                })
+                .collect();
+            placed.entry((z, x as u32, y as u32)).or_default().push(mvt::NewBuilding { rings, height: m.height });
+        }
+    }
     let compression = osm.header.tile_compression;
     if compression != Compression::Gzip && compression != Compression::None {
         return Ok(Vec::new());
@@ -249,7 +284,8 @@ pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, net: &rayon::ThreadPoo
                         return Ok(((z, x, y), raw));
                     }
                     let plain = crate::pmtiles::decompress(compression, raw)?;
-                    let patched = if z < 13 { plain } else { mvt::with_estimated_heights(&plain, z, x, y)? };
+                    let add: Vec<&mvt::NewBuilding> = placed.get(&(z, x, y)).map(|v| v.iter().collect()).unwrap_or_default();
+                    let patched = if z < 13 { plain } else { mvt::with_buildings(&plain, z, x, y, &add)? };
                     Ok(((z, x, y), crate::pmtiles::gzip(&patched)))
                 }))
             })
@@ -313,7 +349,121 @@ pub fn refetch_basemap(bbox: BBox, max_zoom: u8, planet: Option<&str>, cache: Op
     };
     let osm = Reader::open(open_source(&planet, cache)?)?;
     let net = pool(threads)?;
-    Ok((basemap_tiles(&osm, bbox, max_zoom, &net, progress)?, planet))
+    Ok((basemap_tiles(&osm, bbox, max_zoom, &[], &net, progress)?, planet))
+}
+
+/// A building added to the basemap: (lon, lat) rings, its middle, its height.
+#[derive(Clone, Debug)]
+pub struct MapBuilding {
+    pub rings: Vec<Vec<[f64; 2]>>,
+    pub centre: [f64; 2],
+    pub height: f64,
+}
+
+/// Overture's buildings that the build adds: as tile output for the engine's
+/// ground (footprints and cover), and for the basemap.
+#[derive(Default)]
+struct AddedBuildings {
+    out: TileOut,
+    map: Vec<MapBuilding>,
+}
+
+/// The share of an added building's surface cells that an OpenStreetMap
+/// footprint already covers, above which it is the same building.
+const OVERTURE_OVERLAP: f64 = 0.2;
+
+/// Overture's buildings over the box that OpenStreetMap does not have: not
+/// from OpenStreetMap, and covering no more than [`OVERTURE_OVERLAP`] of
+/// their surface cells with an OpenStreetMap footprint (a building mapped
+/// since Overture's copy, or drawn a little differently). Each keeps its
+/// height where a source gives one (or 3 m a floor), else the default. A
+/// failure to reach Overture leaves the build as it was, and says so in
+/// the stats.
+fn overture_buildings<'a>(
+    spec: &BuildSpec,
+    frame: &EnuFrame,
+    to_grid: &(dyn Fn(f64, f64) -> [f64; 2] + Sync),
+    fspec: GridSpec,
+    fine: f64,
+    osm: impl Iterator<Item = &'a TileOut>,
+    progress: &(dyn Fn(&str, f64) + Sync),
+) -> (AddedBuildings, serde_json::Value) {
+    // Grid units to surface cells.
+    let up = |rings: &Vec<Vec<[f64; 2]>>| -> Vec<Vec<[f64; 2]>> { rings.iter().map(|r| r.iter().map(|p| [p[0] * fine, p[1] * fine]).collect()).collect() };
+    let cache = spec.cache.as_deref();
+    let (all, release) = match crate::overture::buildings(spec.bbox.grown(100.0), spec.overture_release.as_deref(), cache, spec.threads, progress) {
+        Ok(x) => x,
+        Err(e) => {
+            progress(&format!("buildings (Overture): not added ({e})"), 1.0);
+            return (AddedBuildings::default(), serde_json::json!({ "used": false, "error": e.to_string() }));
+        }
+    };
+    progress("buildings (Overture): matching", 0.0);
+    // Where OpenStreetMap already has a building, on the surface grid.
+    let mut taken = vec![false; fspec.len()];
+    for o in osm {
+        for (rings, _) in &o.footprints {
+            fill_polygon(&up(rings), fspec.width, fspec.height, |i, j| taken[fspec.idx(i, j)] = true);
+        }
+    }
+    let mut added = AddedBuildings::default();
+    let (mut from_osm, mut same, mut by_source) = (0usize, 0usize, std::collections::BTreeMap::<String, usize>::new());
+    for bld in all {
+        if bld.dataset == "OpenStreetMap" {
+            from_osm += 1;
+            continue;
+        }
+        let enu: Vec<Vec<[f64; 2]>> = bld
+            .rings
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|p| {
+                        let v = frame.geodetic_to_enu(Geodetic::new(p[1], p[0], 0.0));
+                        [v.e, v.n]
+                    })
+                    .collect()
+            })
+            .collect();
+        let area = ring_area(&enu[0]).abs() - enu[1..].iter().map(|r| ring_area(r).abs()).sum::<f64>();
+        if enu[0].len() < 4 || area < 4.0 {
+            continue;
+        }
+        let grid: Vec<Vec<[f64; 2]>> = enu.iter().map(|r| r.iter().map(|p| to_grid(p[0], p[1])).collect()).collect();
+        let (mut cells, mut over) = (0usize, 0usize);
+        fill_polygon(&up(&grid), fspec.width, fspec.height, |i, j| {
+            cells += 1;
+            over += usize::from(taken[fspec.idx(i, j)]);
+        });
+        let (cx, cy) = enu[0].iter().fold((0.0, 0.0), |(a, b), p| (a + p[0], b + p[1]));
+        let (ce, cn) = (cx / enu[0].len() as f64, cy / enu[0].len() as f64);
+        if cells == 0 {
+            // Smaller than a surface cell: judged by the cell under its middle.
+            let g = to_grid(ce, cn);
+            let (i, j) = ((g[0] * fine).round(), (g[1] * fine).round());
+            if i >= 0.0 && j >= 0.0 && (i as usize) < fspec.width && (j as usize) < fspec.height && taken[fspec.idx(i as usize, j as usize)] {
+                same += 1;
+                continue;
+            }
+        } else if over as f64 > OVERTURE_OVERLAP * cells as f64 {
+            same += 1;
+            continue;
+        }
+        let height = bld.height.or(bld.floors.map(|n| 3.0 * n as f64)).unwrap_or(spec.overture_height_m).clamp(2.0, 300.0);
+        let g = to_grid(ce, cn);
+        added.out.buildings.push((g[0], g[1], area));
+        added.out.footprints.push((grid, height as f32));
+        let c = frame.enu_to_geodetic(Enu::new(ce, cn, 0.0));
+        added.map.push(MapBuilding { rings: bld.rings, centre: [c.lon, c.lat], height });
+        *by_source.entry(bld.dataset).or_default() += 1;
+    }
+    let stats = serde_json::json!({
+        "used": true, "release": release, "added": added.map.len(), "addedBySource": by_source,
+        "alreadyInOsm": from_osm + same, "defaultHeightM": spec.overture_height_m,
+        "attribution": "© Overture Maps Foundation (ODbL); OpenStreetMap contributors, Microsoft, Google, Esri Community Maps",
+    });
+    progress("buildings (Overture): matching", 1.0);
+    (added, stats)
 }
 
 /// Build the ground. `progress(stage, fraction)` reports as it goes.
@@ -427,6 +577,14 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     };
     let extent = outs.iter().map(|o| o.extent).max().unwrap_or(4096);
 
+    // The sight surface's grid: buildings and woods at about 5 m.
+    let fine = (cell / SURFACE_CELL_M).round().max(1.0) as usize;
+    let fspec = GridSpec::new((w - 1) * fine + 1, (h - 1) * fine + 1, cell / fine as f64, lo.0, lo.1);
+    let up = |rings: &Vec<Vec<[f64; 2]>>| -> Vec<Vec<[f64; 2]>> { rings.iter().map(|r| r.iter().map(|p| [p[0] * fine as f64, p[1] * fine as f64]).collect()).collect() };
+
+    // ── Overture: the buildings OpenStreetMap does not have ───────────────
+    let (added, overture_stats) = if spec.overture { overture_buildings(spec, &frame, &to_grid, fspec, fine as f64, outs.iter().chain(&bouts), progress) } else { (AddedBuildings::default(), serde_json::json!({ "used": false })) };
+
     progress("land cover", 0.0);
     let mut cover = Raster::filled(gspec, LandCover::Open);
     let mut prio = vec![0u8; gspec.len()];
@@ -443,7 +601,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     }
     // Building cover: footprint area per cell, then light and dense urban.
     let mut built = vec![0f32; gspec.len()];
-    for o in outs.iter().chain(&bouts) {
+    for o in outs.iter().chain(&bouts).chain(std::iter::once(&added.out)) {
         for &(gi, gj, area) in &o.buildings {
             let (i, j) = (gi.round(), gj.round());
             if i >= 0.0 && j >= 0.0 && (i as usize) < w && (j as usize) < h {
@@ -470,10 +628,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
 
     // ── The sight surface: woods and buildings on a fine grid ─────────────
     progress("sight surface", 0.0);
-    let fine = (cell / SURFACE_CELL_M).round().max(1.0) as usize;
-    let fspec = GridSpec::new((w - 1) * fine + 1, (h - 1) * fine + 1, cell / fine as f64, lo.0, lo.1);
     let mut surface = bgws_env::SightSurface::empty(fspec);
-    let up = |rings: &Vec<Vec<[f64; 2]>>| -> Vec<Vec<[f64; 2]>> { rings.iter().map(|r| r.iter().map(|p| [p[0] * fine as f64, p[1] * fine as f64]).collect()).collect() };
     {
         // Land use in priority order, as for the land cover: a wood, or what overlies it.
         let mut shapes: Vec<&Shape> = outs.iter().flat_map(|o| o.shapes.iter()).collect();
@@ -492,7 +647,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
         }
     }
     let mut footprints = 0usize;
-    for o in outs.iter().chain(&bouts) {
+    for o in outs.iter().chain(&bouts).chain(std::iter::once(&added.out)) {
         for (rings, hgt) in &o.footprints {
             let v = hgt.round().clamp(1.0, 255.0) as u8;
             footprints += 1;
@@ -537,7 +692,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     }
 
     // ── Basemap: the same archive's tiles over the box, for the viewer ──
-    let basemap = basemap_tiles(&osm, b, spec.basemap_max_zoom, &net, progress)?;
+    let basemap = basemap_tiles(&osm, b, spec.basemap_max_zoom, &added.map, &net, progress)?;
 
     let mut rivers: Vec<River> = Vec::new();
     let mut towns: Vec<Town> = Vec::new();
@@ -563,7 +718,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     let stats = serde_json::json!({
         "grid": [w, h], "cellM": cell, "elevationM": [emin, emax], "landCover": counts, "denseUrbanCells": dense,
         "rivers": rivers.len(), "towns": towns.len(), "roadParts": roads.len(), "basemapTiles": basemap.len(),
-        "elevationZoom": ez, "vectorZoom": vz, "surfaceCellM": fspec.cell, "buildingFootprints": footprints,
+        "elevationZoom": ez, "vectorZoom": vz, "surfaceCellM": fspec.cell, "buildingFootprints": footprints, "overture": overture_stats,
     });
     let terrain = Terrain { frame_origin: frame.origin, spec: gspec, elevation, land_cover: cover, soil, wetness, obstacle_gap };
     Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats, surface: Some(surface) })

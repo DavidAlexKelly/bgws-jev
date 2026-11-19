@@ -239,6 +239,16 @@ enum Cmd {
         /// Highest basemap zoom kept for the viewer (15: every building).
         #[arg(long, default_value_t = 15)]
         basemap_max_zoom: u8,
+        /// Leave out the buildings Overture Maps adds to OpenStreetMap's
+        /// (footprints found in satellite imagery); they are added by default.
+        #[arg(long)]
+        no_overture: bool,
+        /// The Overture release to read (e.g. 2026-11-18.0; the latest by default).
+        #[arg(long)]
+        overture_release: Option<String>,
+        /// Height given to an added building that has none, m.
+        #[arg(long, default_value_t = 6.0)]
+        overture_height_m: f64,
         /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
         #[arg(long)]
         cache: Option<PathBuf>,
@@ -822,7 +832,7 @@ fn main() -> Result<()> {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
-        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
+        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, no_overture, overture_release, overture_height_m, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
             let partner = bgws_run::partner::PartnerTerrain { elevation: partner_elevation, ellipsoidal: partner_ellipsoidal, land_cover: partner_land_cover, roads: partner_roads, replace_roads, ..Default::default() }
                 .with_mapping_file(partner_map.as_deref())?;
             let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
@@ -832,6 +842,9 @@ fn main() -> Result<()> {
             spec.elevation = elevation;
             spec.ground_filter_m = ground_filter_m;
             spec.basemap_max_zoom = basemap_max_zoom;
+            spec.overture = !no_overture;
+            spec.overture_release = overture_release;
+            spec.overture_height_m = overture_height_m;
             if cache.is_some() {
                 spec.cache = cache;
             }

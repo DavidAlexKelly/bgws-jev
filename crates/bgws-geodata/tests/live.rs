@@ -36,3 +36,21 @@ fn vector_tile_over_kaliningrad_has_roads_and_land() {
     }
     assert!(layers.iter().any(|l| l.name == "roads" && !l.features.is_empty()));
 }
+
+#[test]
+#[ignore]
+fn overture_buildings_over_kaliningrad() {
+    use bgws_geodata::overture;
+    let b = mercator::BBox::new(20.50, 54.70, 20.53, 54.72);
+    let t = std::time::Instant::now();
+    let (all, release) = overture::buildings(b, None, Some(&cache()), 8, &|_, _| {}).unwrap();
+    let mut by: std::collections::BTreeMap<String, usize> = Default::default();
+    for x in &all {
+        *by.entry(x.dataset.clone()).or_default() += 1;
+    }
+    let heights = all.iter().filter(|x| x.height.is_some()).count();
+    println!("Overture {release}: {} buildings ({heights} with a height) by source {by:?} in {:.1} s", all.len(), t.elapsed().as_secs_f64());
+    assert!(all.len() > 500, "a city district has hundreds of buildings");
+    assert!(all.iter().all(|x| x.rings[0].len() >= 4));
+    assert!(by.contains_key("OpenStreetMap"));
+}
