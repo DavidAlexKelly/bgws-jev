@@ -468,9 +468,29 @@ to reach openrouter.ai.
     - Checked with synthetic imagery seen from straight above: near the
       middle of the view the roofed blocks vanish into the ground's imagery
       (81% of their pixels match it, against none for plain blocks).
-    - The imagery is a photograph, not a true orthophoto: a tall building's
-      roof can sit a few metres off its footprint, so the roof's edge may
-      show some ground or wall.
+    - **Lean:** imagery is taken a little off straight down, so a roof shows
+      in the photograph shifted from its footprint, away from the satellite,
+      by the building's height times a lean. The tile service does not say
+      where the satellite was, so the viewer measures it from the imagery
+      (`frontend/viewer/src/lean.ts`):
+      - It tries leans and keeps the one at which the tall buildings' roof
+        outlines (10 m and up, the 60 tallest) fall on the picture's edges.
+      - Edges are colour steps, capped, so an outline edged all the way
+        round beats a few strong shadow edges.
+      - The search goes coarse to fine; each pass is tolerant of half its
+        step, so it cannot step over the right lean.
+      - It measures per area (zoom-14 tiles, about 1.4 km) where an area
+        has 4 or more tall buildings, else uses the view's lean.
+      - Each building then takes its own share of the lean (0.4–2×) where
+        its outline fits clearly better: its height may be off.
+      - A lean is used only if the outlines fit at least 8% better than with
+        none. What has been measured is kept, so panning back costs nothing.
+    - Checked with synthetic imagery of the pack's real buildings
+      photographed at a known lean (`npm test` for the measurement alone):
+      - Leans of (0.25, −0.35) and (−0.38, 0.12) were found exactly.
+      - The share of roof pixels showing the photographed roof rose from
+        73% to 99% and from 88% to 100%.
+      - Measuring an area took about 0.6 s once; after that, 2 ms.
 - **Giving orders mid-game:** select one of your units (any unit, as the
   umpire). Under its orders, *Give orders* has:
   - **Move** and **Road march**: click the map; it goes there tactically, or
