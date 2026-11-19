@@ -168,6 +168,22 @@ enum Cmd {
         #[arg(long)]
         records: Option<PathBuf>,
     },
+    /// Fetch a theatre pack's map tiles again (the viewer's basemap) without
+    /// rebuilding the rest: to zoom 15, where every building is, with an
+    /// estimated height on each building that has none. For packs built
+    /// before the basemap went to zoom 15.
+    Basemap {
+        /// The pack folder (or the name of one under packs/).
+        pack: PathBuf,
+        #[arg(long, default_value_t = 15)]
+        max_zoom: u8,
+        /// Protomaps archive (URL or path); the latest daily build by default.
+        #[arg(long)]
+        planet: Option<String>,
+        /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
+        #[arg(long)]
+        cache: Option<PathBuf>,
+    },
     /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
     /// federates on one machine.
     MockRti {
@@ -215,8 +231,8 @@ enum Cmd {
         /// Road vertices closer than this join, metres.
         #[arg(long, default_value_t = 3.0)]
         snap_m: f64,
-        /// Highest basemap zoom kept for the viewer.
-        #[arg(long, default_value_t = 14)]
+        /// Highest basemap zoom kept for the viewer (15: every building).
+        #[arg(long, default_value_t = 15)]
         basemap_max_zoom: u8,
         /// Where fetched tiles are kept ($BGWS_CACHE, else the platform cache folder).
         #[arg(long)]
@@ -736,6 +752,28 @@ fn main() -> Result<()> {
             let link = bgws_interop::hla::link::HlaLink::join(settings, spec.clone()).map_err(|e| anyhow!("{e}"))?;
             let opts = bgws_run::federate::FederateOptions { packs, allow_generated: allow_generated_ground, speed, records, cell_m };
             bgws_run::federate::Federate::new(link, spec, opts).serve()?;
+        }
+        Cmd::Basemap { pack, max_zoom, planet, cache } => {
+            let dir = if pack.join("pack.json").exists() { pack.clone() } else { data_dir().join("..").join("packs").join(&pack) };
+            if !dir.join("pack.json").exists() {
+                bail!("{}: not a theatre pack (no pack.json)", pack.display());
+            }
+            let started = Instant::now();
+            let last = std::sync::Mutex::new((String::new(), 0u32));
+            let progress = |stage: &str, f: f64| {
+                let step = (f * 10.0).floor() as u32;
+                if let Ok(mut l) = last.lock() {
+                    if l.0 != stage || step > l.1 {
+                        *l = (stage.to_string(), step);
+                        eprintln!("[{:6.1} s] {stage} {:>3.0}%", started.elapsed().as_secs_f64(), f * 100.0);
+                    }
+                }
+            };
+            let before = std::fs::metadata(dir.join("basemap.pmtiles")).map(|m| m.len()).unwrap_or(0);
+            let cache = cache.or_else(bgws_geodata::build::default_cache);
+            let n = bgws_geodata::pack::refresh_basemap(&dir, max_zoom, planet.as_deref(), cache.as_deref(), &progress).map_err(|e| anyhow!("{e}"))?;
+            let after = std::fs::metadata(dir.join("basemap.pmtiles")).map(|m| m.len()).unwrap_or(0);
+            eprintln!("{}: basemap refreshed to zoom {max_zoom}: {n} tiles, {:.1} MB (was {:.1} MB), {:.0} s", dir.display(), after as f64 / 1e6, before as f64 / 1e6, started.elapsed().as_secs_f64());
         }
         Cmd::Replay { record } => {
             let rec = GameRecord::load(&record).map_err(|e| anyhow!("{e}"))?;

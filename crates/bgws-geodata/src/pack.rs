@@ -68,6 +68,25 @@ pub fn build_pack(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progres
 /// As [`build_pack`], with `adjust` changing the ground before the road
 /// network is made and the pack written (a partner's elevation, land cover
 /// or roads in place of ours).
+/// Fetch a pack's basemap again over its box, up to `max_zoom`, with the
+/// buildings' estimated heights: for a pack built before its map went to
+/// zoom 15. Everything else in the pack is left as it is. Returns the tiles written.
+pub fn refresh_basemap(dir: &Path, max_zoom: u8, planet: Option<&str>, cache: Option<&Path>, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<usize, GeoError> {
+    let io = |e: bgws_env::TileError| GeoError::Io(format!("{e:?}"));
+    let mut meta = TheatrePack::open(dir).map_err(io)?.meta;
+    let [w, s, e, n] = meta.bbox.ok_or_else(|| GeoError::Format(format!("{}: the pack has no bbox (built before packs recorded one)", dir.display())))?;
+    let bbox = crate::mercator::BBox::new(w, s, e, n);
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(16);
+    let (tiles, source) = crate::build::refetch_basemap(bbox, max_zoom, planet, cache, threads, progress)?;
+    let count = tiles.len();
+    let tmp = dir.join("basemap.pmtiles.new");
+    write_archive(&tmp, tiles, TileType::Mvt, Compression::Gzip, [w, s, e, n], &serde_json::json!({ "name": meta.name, "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps", "source": source }))?;
+    std::fs::rename(&tmp, dir.join("basemap.pmtiles")).map_err(|e| GeoError::Io(e.to_string()))?;
+    meta.basemap = Some("basemap.pmtiles".into());
+    TheatrePack::write_meta(dir, &meta).map_err(io)?;
+    Ok(count)
+}
+
 pub fn build_pack_with(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progress: &(dyn Fn(&str, f64) + Sync), adjust: &mut dyn FnMut(&mut crate::build::Ground) -> Result<(), String>) -> Result<PackMeta, GeoError> {
     let mut ground = crate::build::build(spec, progress)?;
     progress("partner terrain", 0.0);

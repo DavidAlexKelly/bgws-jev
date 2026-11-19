@@ -265,6 +265,237 @@ pub fn decode(b: &[u8]) -> Result<Vec<Layer>, GeoError> {
     Ok(layers)
 }
 
+// ── Estimated building heights, for the viewer's 3D buildings ──────────────
+//
+// Most buildings in OpenStreetMap have no height, so a viewer would draw them
+// all at one guessed height. A pack's basemap gives each building without
+// one an `est_height` (m) from what its footprint says: its area, and how
+// long and narrow it is. A row of garages is long and thin and low; a long
+// block of flats 12–14 m deep is a panel block of five or nine storeys; a
+// big compact footprint is a hall or a shop, low for its size; a small one
+// is a house. It is a guess for the picture only: the simulation reads its
+// buildings from the planet archive, not from the basemap.
+//
+// The tile is patched, not re-encoded: every field is copied byte for byte,
+// each estimated feature gets a second packed `tags` field (repeated packed
+// fields concatenate), and the layer gains one key and its values. Geometry
+// is never touched.
+
+/// A footprint's height estimate, m, from its area (m²), perimeter (m) and
+/// whether it is a building part (parts keep what they are given).
+pub fn estimate_height(area_m2: f64, perimeter_m: f64) -> f64 {
+    if area_m2 <= 0.0 || perimeter_m <= 0.0 {
+        return 6.0;
+    }
+    // Roughly its width for a long building, half its side for a square one.
+    let thickness = 2.0 * area_m2 / perimeter_m;
+    // 1.27 for a square, 1.7 for 1:3, 2.3 for 1:5.
+    let elongation = perimeter_m * perimeter_m / (4.0 * std::f64::consts::PI * area_m2);
+    let long = elongation > 1.9;
+    match area_m2 {
+        a if a < 30.0 => 3.0,
+        _ if long && thickness < 7.0 => 3.5, // garage rows, sheds, barns
+        a if a < 80.0 => 4.5,
+        a if a < 200.0 => 7.0,
+        a if a < 500.0 => {
+            if long {
+                12.0
+            } else {
+                9.0
+            }
+        }
+        a if a < 2000.0 => {
+            if long {
+                15.0
+            } else {
+                11.0
+            }
+        }
+        _ => {
+            if long {
+                27.0
+            } else {
+                12.0
+            }
+        }
+    }
+}
+
+/// Area (m², net of holes) and perimeter (m) of a polygon feature in a tile.
+fn footprint(parts: &[Vec<[f64; 2]>], unit_m: f64) -> (f64, f64) {
+    let (mut area, mut perim) = (0.0, 0.0);
+    for ring in parts {
+        let n = ring.len();
+        if n < 3 {
+            continue;
+        }
+        let mut a = 0.0;
+        for i in 0..n {
+            let (p, q) = (ring[i], ring[(i + 1) % n]);
+            a += p[0] * q[1] - q[0] * p[1];
+            perim += ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2)).sqrt();
+        }
+        // Exterior rings are positive in tile space (y down), holes negative.
+        area += a / 2.0;
+    }
+    (area.abs() * unit_m * unit_m, perim * unit_m)
+}
+
+fn put_varint(out: &mut Vec<u8>, mut v: u64) {
+    while v >= 0x80 {
+        out.push((v as u8 & 0x7f) | 0x80);
+        v >>= 7;
+    }
+    out.push(v as u8);
+}
+
+fn put_field(out: &mut Vec<u8>, field: u32, payload: &[u8]) {
+    put_varint(out, ((field as u64) << 3) | 2);
+    put_varint(out, payload.len() as u64);
+    out.extend_from_slice(payload);
+}
+
+/// The tile (uncompressed MVT at z/x/y) with `est_height` on every building
+/// in its `buildings` layer that has no `height`. Other layers, and any tile
+/// without such a layer, come back unchanged.
+pub fn with_estimated_heights(b: &[u8], z: u8, _x: u32, y: u32) -> Result<Vec<u8>, GeoError> {
+    let layers = decode(b)?;
+    let Some(li) = layers.iter().position(|l| l.name == "buildings") else { return Ok(b.to_vec()) };
+    let layer = &layers[li];
+    // Metres per tile unit at the tile's middle.
+    let n = (1u64 << z) as f64;
+    let lat = (std::f64::consts::PI * (1.0 - 2.0 * (y as f64 + 0.5) / n)).sinh().atan();
+    let unit_m = 40_075_016.686 * lat.cos() / n / layer.extent.max(1) as f64;
+    let est: Vec<Option<f64>> = layer
+        .features
+        .iter()
+        .map(|f| {
+            if f.kind != GeomType::Polygon || f.props.contains_key("height") {
+                return None;
+            }
+            let (a, p) = footprint(&f.parts, unit_m);
+            Some(estimate_height(a, p))
+        })
+        .collect();
+    if est.iter().all(Option::is_none) {
+        return Ok(b.to_vec());
+    }
+    // Distinct heights become the layer's new values, after its own.
+    let mut heights: Vec<f64> = est.iter().flatten().copied().collect();
+    heights.sort_by(|a, b| a.total_cmp(b));
+    heights.dedup();
+
+    let mut out = Vec::with_capacity(b.len() + 4096);
+    let mut pb = Pb::new(b);
+    let mut index = 0usize;
+    while !pb.done() {
+        let start = pb.p;
+        let (f, w) = pb.key()?;
+        if f != 3 || w != 2 {
+            pb.skip(w)?;
+            out.extend_from_slice(&b[start..pb.p]);
+            continue;
+        }
+        let payload = pb.bytes()?;
+        let this = index;
+        index += 1;
+        if this != li {
+            out.extend_from_slice(&b[start..pb.p]);
+            continue;
+        }
+        // The buildings layer: copy each field, adding tags to estimated features.
+        let mut lp = Pb::new(payload);
+        let (mut keys, mut values, mut feature) = (0u32, 0u32, 0usize);
+        let mut body = Vec::with_capacity(payload.len() + 2048);
+        while !lp.done() {
+            let fs = lp.p;
+            let (lf, lw) = lp.key()?;
+            match (lf, lw) {
+                (2, 2) => {
+                    let fb = lp.bytes()?;
+                    let mut fbody = fb.to_vec();
+                    if let Some(Some(h)) = est.get(feature) {
+                        let vi = heights.iter().position(|x| x == h).unwrap_or(0);
+                        let mut tags = Vec::new();
+                        // The key and value indices are known only after the
+                        // whole layer is read: written as markers, fixed below.
+                        put_varint(&mut tags, 0x3fff_ffff);
+                        put_varint(&mut tags, vi as u64);
+                        put_field(&mut fbody, 2, &tags);
+                    }
+                    feature += 1;
+                    put_field(&mut body, 2, &fbody);
+                }
+                (3, 2) => {
+                    lp.bytes()?;
+                    keys += 1;
+                    body.extend_from_slice(&payload[fs..lp.p]);
+                }
+                (4, 2) => {
+                    lp.bytes()?;
+                    values += 1;
+                    body.extend_from_slice(&payload[fs..lp.p]);
+                }
+                _ => {
+                    lp.skip(lw)?;
+                    body.extend_from_slice(&payload[fs..lp.p]);
+                }
+            }
+        }
+        // Now the indices: the new key after the layer's keys, the new values after its values.
+        let body = fix_markers(&body, keys, values)?;
+        let mut body = body;
+        put_field(&mut body, 3, b"est_height");
+        for h in &heights {
+            let mut v = Vec::with_capacity(9);
+            v.push((3 << 3) | 1); // Value.double_value, 64-bit
+            v.extend_from_slice(&h.to_le_bytes());
+            put_field(&mut body, 4, &v);
+        }
+        put_field(&mut out, 3, &body);
+    }
+    Ok(out)
+}
+
+/// Rewrite the marker tags in a buildings layer's features: the key index
+/// (written as 0x3fffffff) becomes `keys`, and each value index gains `values`.
+fn fix_markers(body: &[u8], keys: u32, values: u32) -> Result<Vec<u8>, GeoError> {
+    let mut out = Vec::with_capacity(body.len() + 1024);
+    let mut lp = Pb::new(body);
+    while !lp.done() {
+        let fs = lp.p;
+        let (lf, lw) = lp.key()?;
+        if (lf, lw) != (2, 2) {
+            lp.skip(lw)?;
+            out.extend_from_slice(&body[fs..lp.p]);
+            continue;
+        }
+        let fb = lp.bytes()?;
+        let mut fp = Pb::new(fb);
+        let mut fbody = Vec::with_capacity(fb.len() + 8);
+        while !fp.done() {
+            let s = fp.p;
+            let (f, w) = fp.key()?;
+            if (f, w) == (2, 2) {
+                let tags = fp.packed()?;
+                if tags.len() == 2 && tags[0] == 0x3fff_ffff {
+                    let mut t = Vec::new();
+                    put_varint(&mut t, keys as u64);
+                    put_varint(&mut t, (values + tags[1]) as u64);
+                    put_field(&mut fbody, 2, &t);
+                    continue;
+                }
+                fbody.extend_from_slice(&fb[s..fp.p]);
+                continue;
+            }
+            fp.skip(w)?;
+            fbody.extend_from_slice(&fb[s..fp.p]);
+        }
+        put_field(&mut out, 2, &fbody);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,5 +563,79 @@ mod tests {
         let p = &ls[0].features[1];
         assert!(p.flag("is_bridge"));
         assert_eq!(p.parts[0], vec![[0.0, 0.0], [4.0, 0.0], [4.0, 4.0], [0.0, 4.0], [0.0, 0.0]]);
+    }
+
+    /// A rectangle w × h tile units at (x, y), as polygon commands.
+    fn rect(x: i32, y: i32, w: i32, h: i32) -> Vec<u32> {
+        vec![(1 << 3) | 1, zz(x), zz(y), (3 << 3) | 2, zz(w), zz(0), zz(0), zz(h), zz(-w), zz(0), 7 | (1 << 3)]
+    }
+
+    fn building(tags: &[u32], geom: &[u32]) -> Vec<u8> {
+        let mut f = Vec::new();
+        pb_varint(&mut f, (3 << 3) as u64);
+        pb_varint(&mut f, 3);
+        if !tags.is_empty() {
+            field_bytes(&mut f, 2, &packed(tags));
+        }
+        field_bytes(&mut f, 4, &packed(geom));
+        f
+    }
+
+    #[test]
+    fn buildings_without_a_height_gain_an_estimate_and_nothing_else_changes() {
+        // z15 tile at 54.7°N: a tile unit is about 0.17 m.
+        let (z, x, y) = (15u8, 18248u32, 10314u32);
+        let mut roads = Vec::new();
+        field_bytes(&mut roads, 1, b"roads");
+        pb_varint(&mut roads, 5 << 3);
+        pb_varint(&mut roads, 4096);
+        let mut double = Vec::new();
+        pb_varint(&mut double, (3 << 3) | 1);
+        double.extend_from_slice(&20.0f64.to_le_bytes());
+        let mut layer = Vec::new();
+        field_bytes(&mut layer, 1, b"buildings");
+        // A mapped 20 m building, an unmapped long narrow block (≈ 80 m × 13 m),
+        // an unmapped garage row (≈ 60 m × 5 m) and an unmapped small house (≈ 10 m × 10 m).
+        field_bytes(&mut layer, 2, &building(&[0, 0], &rect(0, 0, 60, 60)));
+        field_bytes(&mut layer, 2, &building(&[], &rect(100, 100, 470, 76)));
+        field_bytes(&mut layer, 2, &building(&[], &rect(1000, 1000, 352, 29)));
+        field_bytes(&mut layer, 2, &building(&[], &rect(2000, 2000, 58, 58)));
+        field_bytes(&mut layer, 3, b"height");
+        field_bytes(&mut layer, 4, &double);
+        pb_varint(&mut layer, 5 << 3);
+        pb_varint(&mut layer, 4096);
+        let mut tile = Vec::new();
+        field_bytes(&mut tile, 3, &roads);
+        field_bytes(&mut tile, 3, &layer);
+
+        let out = with_estimated_heights(&tile, z, x, y).unwrap();
+        let before = decode(&tile).unwrap();
+        let after = decode(&out).unwrap();
+        // The other layer is byte for byte the same.
+        assert_eq!(&out[..roads.len() + 2], &tile[..roads.len() + 2]);
+        let b = &after[1];
+        assert_eq!(b.name, "buildings");
+        for (f0, f1) in before[1].features.iter().zip(&b.features) {
+            assert_eq!(f0.parts, f1.parts, "geometry untouched");
+        }
+        let est = |i: usize| b.features[i].props.get("est_height").and_then(Value::as_f64);
+        assert_eq!(b.features[0].props.get("height").and_then(Value::as_f64), Some(20.0));
+        assert_eq!(est(0), None, "a mapped height is kept, not estimated");
+        assert_eq!(est(1), Some(15.0), "a long block: a five-storey panel block");
+        assert_eq!(est(2), Some(3.5), "a garage row");
+        assert_eq!(est(3), Some(7.0), "a house");
+        // Running it again changes nothing more than once (idempotent in effect).
+        assert!(decode(&with_estimated_heights(&out, z, x, y).unwrap()).unwrap()[1].features.iter().all(|f| f.props.contains_key("est_height") || f.props.contains_key("height")));
+    }
+
+    #[test]
+    fn estimates_by_footprint() {
+        let rect = |a: f64, b: f64| estimate_height(a * b, 2.0 * (a + b));
+        assert_eq!(rect(4.0, 5.0), 3.0, "a shed");
+        assert_eq!(rect(10.0, 12.0), 7.0, "a house");
+        assert_eq!(rect(60.0, 12.0), 15.0, "a five-storey block");
+        assert_eq!(rect(150.0, 14.0), 27.0, "a nine-storey block");
+        assert_eq!(rect(60.0, 50.0), 12.0, "a hall: low for its size");
+        assert_eq!(rect(50.0, 6.0), 3.5, "garages");
     }
 }

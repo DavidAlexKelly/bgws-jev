@@ -60,7 +60,9 @@ impl BuildSpec {
             cell_m: 30.0,
             vector_zoom: 14,
             elevation_zoom: 12,
-            basemap_max_zoom: 14,
+            // 15: Protomaps keeps every building footprint only there (at 14
+            // a town keeps only its largest), so a viewer zoomed in needs it.
+            basemap_max_zoom: 15,
             building_zoom: 15,
             planet: None,
             elevation: ELEVATION_URL.into(),
@@ -218,6 +220,55 @@ fn pool(n: usize) -> Result<rayon::ThreadPool, GeoError> {
     rayon::ThreadPoolBuilder::new().num_threads(n.max(1)).build().map_err(|e| GeoError::Io(e.to_string()))
 }
 
+/// A tile at (z, x, y), as stored in an archive (compressed as the archive is).
+pub type StoredTile = ((u8, u32, u32), Vec<u8>);
+
+/// The viewer's basemap: the archive's tiles over the box, zooms 0 to
+/// `max_zoom`, as stored, except that building tiles (zoom 13 and up) gain an
+/// estimated height on every building that has none (`mvt::with_estimated_heights`).
+pub fn basemap_tiles(osm: &Reader, b: BBox, max_zoom: u8, net: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<StoredTile>, GeoError> {
+    progress("basemap", 0.0);
+    let compression = osm.header.tile_compression;
+    if compression != Compression::Gzip && compression != Compression::None {
+        return Ok(Vec::new());
+    }
+    let mut want: Vec<(u8, u32, u32)> = Vec::new();
+    for z in 0..=max_zoom.min(osm.header.max_zoom) {
+        want.extend(tiles_covering(&b.grown(500.0), z).into_iter().map(|(x, y)| (z, x, y)));
+    }
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    net.install(|| {
+        want.par_iter()
+            .filter_map(|&(z, x, y)| {
+                let r = osm.tile_raw(z, x, y).transpose()?;
+                let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                progress("basemap", n as f64 / want.len() as f64);
+                Some(r.and_then(|raw| {
+                    if z < 13 {
+                        return Ok(((z, x, y), raw));
+                    }
+                    let plain = crate::pmtiles::decompress(compression, raw)?;
+                    let patched = mvt::with_estimated_heights(&plain, z, x, y)?;
+                    let stored = if compression == Compression::Gzip { crate::pmtiles::gzip(&patched) } else { patched };
+                    Ok(((z, x, y), stored))
+                }))
+            })
+            .collect::<Result<Vec<_>, GeoError>>()
+    })
+}
+
+/// Fetch a pack's basemap again (for packs built before buildings went to
+/// zoom 15 and gained heights): the planet archive's tiles over `bbox`.
+pub fn refetch_basemap(bbox: BBox, max_zoom: u8, planet: Option<&str>, cache: Option<&std::path::Path>, threads: usize, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<(Vec<StoredTile>, String), GeoError> {
+    let planet = match planet {
+        Some(p) => p.to_string(),
+        None => latest_planet()?,
+    };
+    let osm = Reader::open(open_source(&planet, cache)?)?;
+    let net = pool(threads)?;
+    Ok((basemap_tiles(&osm, bbox, max_zoom, &net, progress)?, planet))
+}
+
 /// Build the ground. `progress(stage, fraction)` reports as it goes.
 pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Ground, GeoError> {
     let b = spec.bbox;
@@ -276,12 +327,7 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     for z in ez.saturating_sub(4)..=ez {
         dem_want.extend(tiles_covering(&b.grown(500.0), z).into_iter().map(|(x, y)| (z, x, y)));
     }
-    let dem: Vec<((u8, u32, u32), Vec<u8>)> = net.install(|| {
-        dem_want
-            .par_iter()
-            .filter_map(|&(z, x, y)| elev.tile_raw(z, x, y).transpose().map(|r| r.map(|b| ((z, x, y), b))))
-            .collect::<Result<_, GeoError>>()
-    })?;
+    let dem: Vec<((u8, u32, u32), Vec<u8>)> = net.install(|| dem_want.par_iter().filter_map(|&(z, x, y)| elev.tile_raw(z, x, y).transpose().map(|r| r.map(|b| ((z, x, y), b)))).collect::<Result<_, GeoError>>())?;
 
     // ── Vector tiles: land cover, water, buildings, towns, roads ──────────
     progress("map data: opening archive", 0.0);
@@ -443,26 +489,8 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
         bare_ground(&mut elevation, &cover, (spec.ground_filter_m / cell / 2.0).round().max(1.0) as usize);
     }
 
-    // ── Basemap: the same archive, lower zooms and the box, as stored ─────
-    progress("basemap", 0.0);
-    let mut basemap = Vec::new();
-    if osm.header.tile_compression == Compression::Gzip || osm.header.tile_compression == Compression::None {
-        let mut want: Vec<(u8, u32, u32)> = Vec::new();
-        for z in 0..=spec.basemap_max_zoom.min(osm.header.max_zoom) {
-            want.extend(tiles_covering(&b.grown(500.0), z).into_iter().map(|(x, y)| (z, x, y)));
-        }
-        let done = std::sync::atomic::AtomicUsize::new(0);
-        basemap = net.install(|| {
-            want.par_iter()
-                .filter_map(|&(z, x, y)| {
-                    let r = osm.tile_raw(z, x, y).transpose()?;
-                    let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-                    progress("basemap", n as f64 / want.len() as f64);
-                    Some(r.map(|b| ((z, x, y), b)))
-                })
-                .collect::<Result<Vec<_>, GeoError>>()
-        })?;
-    }
+    // ── Basemap: the same archive's tiles over the box, for the viewer ──
+    let basemap = basemap_tiles(&osm, b, spec.basemap_max_zoom, &net, progress)?;
 
     let mut rivers: Vec<River> = Vec::new();
     let mut towns: Vec<Town> = Vec::new();
@@ -602,10 +630,18 @@ fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, t
                 ("landuse", GeomType::Polygon) | ("water", GeomType::Polygon) => {
                     let class = if l.name == "water" { Some((LandCover::Water, WATER_PRIORITY)) } else { landuse_class(kind) };
                     if let Some((class, priority)) = class {
-                        let rings = f.parts.iter().map(|r| r.iter().map(|&p| {
-                            let (e, n) = enu(l, p);
-                            to_grid(e, n)
-                        }).collect()).collect();
+                        let rings = f
+                            .parts
+                            .iter()
+                            .map(|r| {
+                                r.iter()
+                                    .map(|&p| {
+                                        let (e, n) = enu(l, p);
+                                        to_grid(e, n)
+                                    })
+                                    .collect()
+                            })
+                            .collect();
                         out.shapes.push(Shape { class, priority, rings });
                     }
                 }
@@ -614,10 +650,18 @@ fn read_tile(layers: &[mvt::Layer], tx: u32, ty: u32, z: u8, frame: &EnuFrame, t
                     // Mapped, else by footprint: houses low, blocks and halls higher.
                     let area: f64 = f.parts.iter().map(|r| ring_area(r)).sum::<f64>().abs() * m_per_unit * m_per_unit;
                     let height = f.props.get("height").and_then(mvt::Value::as_f64).filter(|h| *h > 0.0).unwrap_or_else(|| default_height(area));
-                    let rings: Vec<Vec<[f64; 2]>> = f.parts.iter().map(|r| r.iter().map(|&p| {
-                        let (e, n) = enu(l, p);
-                        to_grid(e, n)
-                    }).collect()).collect();
+                    let rings: Vec<Vec<[f64; 2]>> = f
+                        .parts
+                        .iter()
+                        .map(|r| {
+                            r.iter()
+                                .map(|&p| {
+                                    let (e, n) = enu(l, p);
+                                    to_grid(e, n)
+                                })
+                                .collect()
+                        })
+                        .collect();
                     out.footprints.push((rings, height as f32));
                     for r in &f.parts {
                         let area = ring_area(r).abs() * m_per_unit * m_per_unit;
