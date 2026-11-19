@@ -115,6 +115,7 @@ pub struct PackGround {
     pub terrain: bgws_env::Terrain,
     pub roads: Vec<bgws_env::RoadLine>,
     pub rivers: Vec<bgws_env::River>,
+    pub rails: Vec<bgws_env::Railway>,
     pub sight: Option<bgws_env::SightView>,
     pub appreciation: Option<bgws_env::AppreciationView>,
 }
@@ -248,6 +249,13 @@ fn pack_ground(path: &std::path::Path, dir: &str, pack: &mut bgws_env::TheatrePa
             rivers.push(bgws_env::River { line: r.line.iter().map(|p| to_scenario(p.0, p.1)).collect(), ..r });
         }
     }
+    let mut rails = Vec::new();
+    if let Some(rf) = &pack.meta.railways {
+        let all: Vec<bgws_env::Railway> = std::fs::read(path.join(rf)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        for r in all.into_iter().filter(|r| r.line.iter().any(|p| inside(&[p.0, p.1]))) {
+            rails.push(bgws_env::Railway { line: r.line.iter().map(|p| to_scenario(p.0, p.1)).collect(), ..r });
+        }
+    }
     // Buildings and woods for sight lines: read in the pack's frame, reached
     // from the scenario's by an affine map (a shift and a slight turn).
     let affine = if same { [1.0, 0.0, 0.0, 0.0, 1.0, 0.0] } else { to_pack_affine(&pack_frame, frame) };
@@ -266,7 +274,7 @@ fn pack_ground(path: &std::path::Path, dir: &str, pack: &mut bgws_env::TheatrePa
         .and_then(|f| bgws_env::Appreciation::read(&path.join(f)).ok())
         .filter(|a| a.version == bgws_env::appreciation::VERSION)
         .map(|a| appreciation_view(std::sync::Arc::new(a), &pack_frame, frame));
-    Ok(PackGround { terrain, roads, rivers, sight, appreciation })
+    Ok(PackGround { terrain, roads, rivers, rails, sight, appreciation })
 }
 
 /// Work out a pack's terrain appreciation over the whole of it and save it
@@ -282,7 +290,7 @@ pub fn analyse_pack(path: &std::path::Path, progress: &(dyn Fn(&str, f64) + Sync
     progress("terrain analysis: loading the pack", 0.0);
     let g = pack_ground(path, &dir, &mut pack, &frame, &aoi)?;
     let figures = crate::default_figures();
-    let mut ground = bgws_sim::ground::Ground::from_terrain(g.terrain, 0, &figures).with_roads(&g.roads).with_rivers(&g.rivers);
+    let mut ground = bgws_sim::ground::Ground::from_terrain(g.terrain, 0, &figures).with_roads(&g.roads).with_rivers(&g.rivers).with_railways(&g.rails);
     if let Some(v) = g.sight {
         ground = ground.with_sight(v);
     }
@@ -523,6 +531,7 @@ impl Host {
                 sim_opts.terrain = Some(g.terrain);
                 sim_opts.roads = Some(g.roads);
                 sim_opts.rivers = Some(g.rivers);
+                sim_opts.rails = Some(g.rails);
                 sim_opts.sight = g.sight;
                 sim_opts.appreciation = g.appreciation;
             }

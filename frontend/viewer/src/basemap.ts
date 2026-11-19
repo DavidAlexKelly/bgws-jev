@@ -21,7 +21,7 @@ const WOODS = ["wood", "forest", "nature_reserve"];
 
 /** A building's colour by its height (and a little per building, so a town is not one block). */
 function buildingColour(light: boolean): maplibregl.ExpressionSpecification {
-  const height = ["coalesce", ["get", "height"], ["get", "est_height"], 10] as maplibregl.ExpressionSpecification;
+  const height = ["coalesce", ["get", "height"], ["get", "est_height"], 6] as maplibregl.ExpressionSpecification;
   const [low, mid, high] = light ? ["#8a8478", "#9d978a", "#b7b2a6"] : ["#363f56", "#434d68", "#56617f"];
   const shade = ["%", ["coalesce", ["to-number", ["id"]], 0], 3] as maplibregl.ExpressionSpecification;
   return [
@@ -37,7 +37,7 @@ function buildingColour(light: boolean): maplibregl.ExpressionSpecification {
 
 /**
  * Buildings as blocks at their mapped height (else the pack's estimate from
- * the footprint, `est_height`, else 10 m), on
+ * the footprint, `est_height`, else 6 m), on
  * the 3D terrain. `light`: pale stone, for draping over satellite imagery.
  */
 export function buildingBlocks(source: string, id: string, quality: boolean, light = false): maplibregl.LayerSpecification {
@@ -49,7 +49,7 @@ export function buildingBlocks(source: string, id: string, quality: boolean, lig
     minzoom: 13,
     paint: {
       "fill-extrusion-color": quality ? buildingColour(light) : light ? "#9d978a" : "#3a4258",
-      "fill-extrusion-height": ["coalesce", ["get", "height"], ["get", "est_height"], 10],
+      "fill-extrusion-height": ["coalesce", ["get", "height"], ["get", "est_height"], 6],
       "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
       "fill-extrusion-opacity": quality ? 0.96 : 0.9,
       "fill-extrusion-vertical-gradient": true,
@@ -187,7 +187,9 @@ function qualityLayers(source: string, dem: string, prefix: string, threeD: bool
           { id: `${prefix}-buildings`, type: "fill", source, "source-layer": "buildings", minzoom: 13, paint: { "fill-color": buildingColour(false), "fill-opacity": 0.95 } },
           { id: `${prefix}-buildings-edge`, type: "line", source, "source-layer": "buildings", minzoom: 14, paint: { "line-color": "#5d688a", "line-width": 0.5, "line-opacity": 0.8 } },
         ] as maplibregl.LayerSpecification[])),
-    { id: `${prefix}-rail`, type: "line", source, "source-layer": "roads", filter: kind(["rail"]), paint: { "line-color": "#5a5f72", "line-width": 1.2, "line-dasharray": [3, 2] } },
+    // Railways as track: sleepers (short cross-ticks) under the rails.
+    { id: `${prefix}-rail-ties`, type: "line", source, "source-layer": "roads", minzoom: 13, filter: kind(["rail"]), paint: { "line-color": "#6a6f82", "line-width": ["interpolate", ["linear"], ["zoom"], 13, 3, 17, 7], "line-dasharray": [0.25, 0.75], "line-opacity": 0.8 } },
+    { id: `${prefix}-rail`, type: "line", source, "source-layer": "roads", filter: kind(["rail"]), paint: { "line-color": "#8a8fa2", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 17, 1.8] } },
     { id: `${prefix}-paths`, type: "line", source, "source-layer": "roads", minzoom: 13, filter: kind(["path"]), paint: { "line-color": "#3c4356", "line-width": 0.7, "line-dasharray": [2, 1.5] } },
     ...road("minor", ["minor_road", "other"], "#525a70", "#10141f", [0.4, 2.6], 11),
     ...road("major", ["major_road"], "#9a8a58", "#1a1408", [0.6, 4.2]),

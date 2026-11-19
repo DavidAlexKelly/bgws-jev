@@ -285,6 +285,7 @@ impl Lab {
             sim.terrain = Some(g.terrain);
             sim.roads = Some(g.roads);
             sim.rivers = Some(g.rivers);
+            sim.rails = Some(g.rails);
             sim.sight = g.sight;
             sim.appreciation = g.appreciation;
         }

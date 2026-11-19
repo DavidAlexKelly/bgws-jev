@@ -565,6 +565,58 @@ mod tests {
         assert_eq!(p.parts[0], vec![[0.0, 0.0], [4.0, 0.0], [4.0, 4.0], [0.0, 4.0], [0.0, 0.0]]);
     }
 
+    #[test]
+    fn railways_on_the_ground_are_read_from_the_roads_layer() {
+        // keys: kind, kind_detail, is_bridge; values: rail, tram, true, major_road.
+        let line = |tags: &[u32], y: i32| {
+            let mut f = Vec::new();
+            pb_varint(&mut f, (3 << 3) as u64);
+            pb_varint(&mut f, 2);
+            field_bytes(&mut f, 2, &packed(tags));
+            field_bytes(&mut f, 4, &packed(&[(1 << 3) | 1, zz(-200), zz(y), (1 << 3) | 2, zz(4_500), zz(0)]));
+            f
+        };
+        let s = |v: &[u8]| {
+            let mut o = Vec::new();
+            field_bytes(&mut o, 1, v);
+            o
+        };
+        let mut val_true = Vec::new();
+        pb_varint(&mut val_true, 7 << 3);
+        pb_varint(&mut val_true, 1);
+        let mut layer = Vec::new();
+        field_bytes(&mut layer, 1, b"roads");
+        field_bytes(&mut layer, 2, &line(&[0, 0, 1, 0], 1_000)); // a railway
+        field_bytes(&mut layer, 2, &line(&[0, 0, 1, 1], 2_000)); // a tram: in the street
+        field_bytes(&mut layer, 2, &line(&[0, 0, 1, 0, 2, 2], 3_000)); // a railway on a bridge
+        field_bytes(&mut layer, 2, &line(&[0, 3], 3_500)); // a road
+        for k in [&b"kind"[..], b"kind_detail", b"is_bridge"] {
+            field_bytes(&mut layer, 3, k);
+        }
+        field_bytes(&mut layer, 4, &s(b"rail"));
+        field_bytes(&mut layer, 4, &s(b"tram"));
+        field_bytes(&mut layer, 4, &val_true);
+        field_bytes(&mut layer, 4, &s(b"major_road"));
+        pb_varint(&mut layer, 5 << 3);
+        pb_varint(&mut layer, 4096);
+        let mut tile = Vec::new();
+        field_bytes(&mut tile, 3, &layer);
+
+        let (z, x, y) = (14u8, 9124u32, 5157u32);
+        let (lon, lat) = crate::mercator::tile_lonlat(x as f64 + 0.5, y as f64 + 0.5, z);
+        let frame = bgws_core::EnuFrame::new(bgws_core::Geodetic::new(lat, lon, 0.0));
+        // A zoom-13 tile is passed over: the deepest zoom up to 14 is read.
+        let tiles = vec![((13, x / 2, y / 2), tile.clone()), ((z, x, y), tile)];
+        let rails = crate::build::railways_from_tiles(&tiles, crate::pmtiles::Compression::None, &frame).unwrap();
+        assert_eq!(rails.len(), 1, "only the railway on the ground");
+        assert_eq!(rails[0].kind, "rail");
+        // Clipped to the tile: about 2.4 km of line at zoom 14, at 54.7°N.
+        let len: f64 = rails[0].line.windows(2).map(|w| (w[1].0 - w[0].0).hypot(w[1].1 - w[0].1)).sum();
+        let tile_m = crate::mercator::tile_size_m(lat, z);
+        assert!((len - tile_m).abs() < 5.0, "{len:.0} m against a {tile_m:.0} m tile");
+        assert!(rails[0].line.iter().all(|p| p.1 > 0.0), "north of the tile's middle (y = 1000 of 4096)");
+    }
+
     /// A rectangle w × h tile units at (x, y), as polygon commands.
     fn rect(x: i32, y: i32, w: i32, h: i32) -> Vec<u32> {
         vec![(1 << 3) | 1, zz(x), zz(y), (3 << 3) | 2, zz(w), zz(0), zz(0), zz(h), zz(-w), zz(0), 7 | (1 << 3)]

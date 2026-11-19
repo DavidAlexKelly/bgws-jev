@@ -39,6 +39,9 @@ pub struct Ground {
     /// River depth in each cell a river crosses, m (0 none).
     pub rivers: Option<Arc<Raster<f32>>>,
     pub ford: FordLimits,
+    /// The cells a railway on the ground runs through (1; 0 none), joined
+    /// edge to edge so no move steps over the line between cells.
+    pub rails: Option<Arc<Raster<u8>>>,
     /// A pack's buildings and woods on a fine grid, for sight lines.
     pub sight: Option<bgws_env::SightView>,
     /// The share of each terrain cell under buildings (×255), from the sight surface.
@@ -155,6 +158,7 @@ impl Ground {
             road_net: None,
             rivers: None,
             ford: FordLimits::from_figures(figures),
+            rails: None,
             craters: None,
             sight: None,
             built: None,
@@ -214,6 +218,69 @@ impl Ground {
         }
         self.rivers = Some(Arc::new(d));
         self
+    }
+
+    /// The ground with railway lines on it: every cell a line runs through.
+    pub fn with_railways(mut self, rails: &[bgws_env::Railway]) -> Ground {
+        let spec = self.terrain.spec;
+        let mut d = Raster::filled(spec, 0u8);
+        let mut any = false;
+        for r in rails {
+            for seg in r.line.windows(2) {
+                let (a, b) = (seg[0], seg[1]);
+                let steps = ((b.0 - a.0).hypot(b.1 - a.1) / (spec.cell * 0.25)).ceil().max(1.0) as usize;
+                let mut last: Option<(usize, usize)> = None;
+                for k in 0..=steps {
+                    let t = k as f64 / steps as f64;
+                    let Some((i, j)) = spec.nearest(a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t) else {
+                        last = None;
+                        continue;
+                    };
+                    d.data[spec.idx(i, j)] = 1;
+                    any = true;
+                    // A diagonal step joins through a side cell, so the line has no gaps a move could slip through.
+                    if let Some((li, lj)) = last {
+                        if li != i && lj != j {
+                            d.data[spec.idx(i, lj)] = 1;
+                        }
+                    }
+                    last = Some((i, j));
+                }
+            }
+        }
+        self.rails = any.then(|| Arc::new(d));
+        self
+    }
+
+    /// Whether a railway on the ground runs through the cell at a point.
+    pub fn rail_at(&self, e: f64, n: f64) -> bool {
+        let Some(r) = self.rails.as_ref() else { return false };
+        r.spec.nearest(e, n).is_some_and(|(i, j)| r.data[r.spec.idx(i, j)] != 0)
+    }
+
+    /// Whether a straight move from `a` to `b` crosses or runs on a railway
+    /// cell with no road in it (a road there is a level crossing, or runs
+    /// beside the line, and goes at its own speed).
+    pub fn rail_between(&self, a: (f64, f64), b: (f64, f64)) -> bool {
+        if self.rails.is_none() {
+            return false;
+        }
+        let n = ((b.0 - a.0).hypot(b.1 - a.1) / (self.terrain.spec.cell * 0.5)).ceil().max(1.0) as usize;
+        (0..=n).any(|k| {
+            let t = k as f64 / n as f64;
+            let (e, n) = (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+            self.rail_at(e, n) && self.road_at(e, n).is_none()
+        })
+    }
+
+    /// The most a vehicle of this class makes over a railway away from a
+    /// road, km/h (no limit for troops on foot).
+    pub fn rail_kmh(&self, class: EnvVehicle) -> Option<f64> {
+        match class {
+            EnvVehicle::Tracked => Some(self.route_params.rail_kmh[0]),
+            EnvVehicle::Wheeled => Some(self.route_params.rail_kmh[1]),
+            EnvVehicle::Foot => None,
+        }
     }
 
     /// Drop a bridge (the edge's structure cells): what is under it, a river or a road, is what is left.
@@ -425,6 +492,11 @@ impl Ground {
                     t.speed_kmh /= 1.0 + self.route_params.crater_slow * c as f64;
                 }
             }
+        }
+        // A railway away from a crossing: up the bank, over the rails and
+        // ballast and down, slowly (a wheeled vehicle most of all).
+        if let Some(cap) = self.rail_kmh(class).filter(|_| self.rail_at(e, n)) {
+            t.speed_kmh = t.speed_kmh.min(cap);
         }
         t
     }

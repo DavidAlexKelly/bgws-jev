@@ -229,6 +229,9 @@ pub struct PackMeta {
     pub rivers: Option<String>,
     #[serde(default)]
     pub power_lines: Option<String>,
+    /// Railway lines on the ground (`railways.json`), from a real-ground build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub railways: Option<String>,
     #[serde(default)]
     pub towns: Option<String>,
     /// A road graph folder (`roads/`: nodes.bin, edges.bin, …) from a real-ground build.
@@ -293,6 +296,7 @@ impl TheatrePack {
             roads: json("roads.json", &w.roads)?,
             rivers: json("rivers.json", &w.rivers)?,
             power_lines: json("power_lines.json", &w.power_lines)?,
+            railways: None,
             towns: json("towns.json", &w.towns)?,
             road_graph: None,
             basemap: None,
@@ -409,6 +413,9 @@ impl TheatrePack {
     }
     pub fn rivers(&self) -> Result<Option<Vec<River>>, TileError> {
         self.read_json(&self.meta.rivers)
+    }
+    pub fn railways(&self) -> Result<Option<Vec<crate::Railway>>, TileError> {
+        self.read_json(&self.meta.railways)
     }
     pub fn power_lines(&self) -> Result<Option<Vec<PowerLine>>, TileError> {
         self.read_json(&self.meta.power_lines)

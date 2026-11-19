@@ -94,6 +94,8 @@ pub struct SimOptions {
     pub roads: Option<Vec<bgws_env::RoadLine>>,
     /// The pack's rivers, in the scenario's frame: crossed at bridges or where shallow enough to ford.
     pub rivers: Option<Vec<bgws_env::River>>,
+    /// The pack's railway lines, in the scenario's frame: slow to cross away from a road.
+    pub rails: Option<Vec<bgws_env::Railway>>,
     /// The pack's buildings and woods on a fine grid: sight lines are traced through them.
     pub sight: Option<bgws_env::SightView>,
     /// The pack's terrain appreciation, in the scenario's frame.
@@ -102,7 +104,7 @@ pub struct SimOptions {
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, sight: None, appreciation: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None }
     }
 }
 
@@ -230,6 +232,9 @@ impl Sim {
         }
         if let Some(r) = &opts.rivers {
             ground = ground.with_rivers(r);
+        }
+        if let Some(r) = &opts.rails {
+            ground = ground.with_railways(r);
         }
         if let Some(v) = &opts.sight {
             ground = ground.with_sight(v.clone());

@@ -27,6 +27,7 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     meta.roads = None;
     roads.write(&dir.join("roads"))?;
     meta.road_graph = Some("roads".into());
+    write_railways(dir, &mut meta, &g.basemap, &g.frame)?;
     if !g.basemap.is_empty() {
         let b = spec.bbox;
         write_archive(
@@ -65,9 +66,46 @@ pub fn build_pack(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progres
     build_pack_with(dir, name, spec, snap_m, progress, &mut |_| Ok(()))
 }
 
-/// As [`build_pack`], with `adjust` changing the ground before the road
-/// network is made and the pack written (a partner's elevation, land cover
-/// or roads in place of ours).
+/// Read a pack's railway lines from the basemap it already has (zoom 14
+/// tiles over its box) into `railways.json`, without fetching anything:
+/// for a pack built before packs carried railways. Returns the lines written.
+pub fn railways_from_basemap(dir: &Path) -> Result<usize, GeoError> {
+    let io = |e: bgws_env::TileError| GeoError::Io(format!("{e:?}"));
+    let mut meta = TheatrePack::open(dir).map_err(io)?.meta;
+    let [w, s, e, n] = meta.bbox.ok_or_else(|| GeoError::Format(format!("{}: the pack has no bbox", dir.display())))?;
+    let file = meta.basemap.clone().ok_or_else(|| GeoError::Format(format!("{}: the pack has no basemap", dir.display())))?;
+    let osm = crate::pmtiles::Reader::open(crate::source::open_source(&dir.join(file).to_string_lossy(), None)?)?;
+    let z = osm.header.max_zoom.min(14);
+    let mut tiles = Vec::new();
+    for (x, y) in crate::mercator::tiles_covering(&crate::mercator::BBox::new(w, s, e, n).grown(500.0), z) {
+        if let Some(raw) = osm.tile_raw(z, x, y)? {
+            tiles.push(((z, x, y), raw));
+        }
+    }
+    let frame = bgws_core::EnuFrame::new(meta.frame_origin);
+    let rails = crate::build::railways_from_tiles(&tiles, osm.header.tile_compression, &frame)?;
+    let count = rails.len();
+    write_rails(dir, &mut meta, rails)?;
+    TheatrePack::write_meta(dir, &meta).map_err(io)?;
+    Ok(count)
+}
+
+fn write_rails(dir: &Path, meta: &mut PackMeta, rails: Vec<bgws_env::Railway>) -> Result<(), GeoError> {
+    if rails.is_empty() {
+        meta.railways = None;
+        let _ = std::fs::remove_file(dir.join("railways.json"));
+        return Ok(());
+    }
+    std::fs::write(dir.join("railways.json"), serde_json::to_vec(&rails).map_err(|e| GeoError::Format(e.to_string()))?)?;
+    meta.railways = Some("railways.json".into());
+    Ok(())
+}
+
+/// The railway lines in the basemap's tiles, as `railways.json` (none: no file).
+fn write_railways(dir: &Path, meta: &mut PackMeta, basemap: &[crate::build::StoredTile], frame: &bgws_core::EnuFrame) -> Result<(), GeoError> {
+    write_rails(dir, meta, crate::build::railways_from_tiles(basemap, Compression::Gzip, frame)?)
+}
+
 /// Fetch a pack's basemap again over its box, up to `max_zoom`, with the
 /// buildings' estimated heights: for a pack built before its map went to
 /// zoom 15. Everything else in the pack is left as it is. Returns the tiles written.
@@ -79,6 +117,8 @@ pub fn refresh_basemap(dir: &Path, max_zoom: u8, planet: Option<&str>, cache: Op
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(16);
     let (tiles, source) = crate::build::refetch_basemap(bbox, max_zoom, planet, cache, threads, progress)?;
     let count = tiles.len();
+    let frame = bgws_core::EnuFrame::new(meta.frame_origin);
+    write_railways(dir, &mut meta, &tiles, &frame)?;
     let tmp = dir.join("basemap.pmtiles.new");
     write_archive(&tmp, tiles, TileType::Mvt, Compression::Gzip, [w, s, e, n], &serde_json::json!({ "name": meta.name, "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps", "source": source }))?;
     std::fs::rename(&tmp, dir.join("basemap.pmtiles")).map_err(|e| GeoError::Io(e.to_string()))?;
@@ -87,6 +127,9 @@ pub fn refresh_basemap(dir: &Path, max_zoom: u8, planet: Option<&str>, cache: Op
     Ok(count)
 }
 
+/// As [`build_pack`], with `adjust` changing the ground before the road
+/// network is made and the pack written (a partner's elevation, land cover
+/// or roads in place of ours).
 pub fn build_pack_with(dir: &Path, name: &str, spec: &BuildSpec, snap_m: f64, progress: &(dyn Fn(&str, f64) + Sync), adjust: &mut dyn FnMut(&mut crate::build::Ground) -> Result<(), String>) -> Result<PackMeta, GeoError> {
     let mut ground = crate::build::build(spec, progress)?;
     progress("partner terrain", 0.0);
