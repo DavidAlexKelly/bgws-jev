@@ -9,6 +9,7 @@ pub mod elevation;
 pub mod fill;
 pub mod mercator;
 pub mod mvt;
+pub mod overture;
 pub mod pack;
 pub mod pmtiles;
 pub mod preview;

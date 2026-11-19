@@ -28,16 +28,11 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     roads.write(&dir.join("roads"))?;
     meta.road_graph = Some("roads".into());
     write_railways(dir, &mut meta, &g.basemap, &g.frame)?;
+    let overture = g.stats.get("overture").and_then(|o| o.get("added")).and_then(|n| n.as_u64()).unwrap_or(0) > 0;
+    let attribution = if overture { "© OpenStreetMap contributors (ODbL) · Protomaps · buildings also © Overture Maps Foundation (ODbL)" } else { "© OpenStreetMap contributors (ODbL) · Protomaps" };
     if !g.basemap.is_empty() {
         let b = spec.bbox;
-        write_archive(
-            &dir.join("basemap.pmtiles"),
-            g.basemap,
-            TileType::Mvt,
-            Compression::Gzip,
-            [b.west, b.south, b.east, b.north],
-            &serde_json::json!({ "name": name, "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps", "source": g.planet }),
-        )?;
+        write_archive(&dir.join("basemap.pmtiles"), g.basemap, TileType::Mvt, Compression::Gzip, [b.west, b.south, b.east, b.north], &serde_json::json!({ "name": name, "attribution": attribution, "source": g.planet }))?;
         meta.basemap = Some("basemap.pmtiles".into());
     }
     let b = spec.bbox;

@@ -209,7 +209,7 @@ export function ViewPanel(props: {
           onClick={() => props.onThreeD(!props.threeD)}
           title={
             props.can3D
-              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks (over the satellite imagery too). Right-drag or Ctrl-drag to tilt and turn."
+              ? "The pack's elevation as 3D terrain (×1.5), buildings as blocks (over the satellite imagery too, each roof showing its own imagery). Right-drag or Ctrl-drag to tilt and turn."
               : props.no3D
           }
         >

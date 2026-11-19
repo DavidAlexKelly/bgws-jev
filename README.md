@@ -453,6 +453,44 @@ to reach openrouter.ai.
   so nothing is fetched. **3D terrain** now also works over the
   **satellite** basemap: the imagery drapes over the pack's elevation, with
   its buildings standing up in pale stone.
+  - **Roofs:** each building's top shows the imagery of its own roof
+    (`frontend/viewer/src/roofs.ts`).
+    - It is a MapLibre custom layer, so it shares the depth buffer: roofs
+      hide behind nearer blocks and hills like the blocks do.
+    - The roofs are the buildings MapLibre has loaded, triangulated at the
+      top of their block: the same height, above the terrain at the same
+      centroid, 0.25 m higher.
+    - Each roof is drawn from every imagery tile it touches, with the
+      tile's own pixels and the rest cut away, so it joins up across tile
+      edges. The tiles are a zoom deeper than the map, up to 19; 120 at most
+      are drawn (240 in quality mode), nearest the middle first.
+    - Built again when the map settles, from zoom 14.5.
+    - Checked with synthetic imagery seen from straight above: near the
+      middle of the view the roofed blocks vanish into the ground's imagery
+      (81% of their pixels match it, against none for plain blocks).
+    - **Lean:** imagery is taken a little off straight down, so a roof shows
+      in the photograph shifted from its footprint, away from the satellite,
+      by the building's height times a lean. The tile service does not say
+      where the satellite was, so the viewer measures it from the imagery
+      (`frontend/viewer/src/lean.ts`):
+      - It tries leans and keeps the one at which the tall buildings' roof
+        outlines (10 m and up, the 60 tallest) fall on the picture's edges.
+      - Edges are colour steps, capped, so an outline edged all the way
+        round beats a few strong shadow edges.
+      - The search goes coarse to fine; each pass is tolerant of half its
+        step, so it cannot step over the right lean.
+      - It measures per area (zoom-14 tiles, about 1.4 km) where an area
+        has 4 or more tall buildings, else uses the view's lean.
+      - Each building then takes its own share of the lean (0.4–2×) where
+        its outline fits clearly better: its height may be off.
+      - A lean is used only if the outlines fit at least 8% better than with
+        none. What has been measured is kept, so panning back costs nothing.
+    - Checked with synthetic imagery of the pack's real buildings
+      photographed at a known lean (`npm test` for the measurement alone):
+      - Leans of (0.25, −0.35) and (−0.38, 0.12) were found exactly.
+      - The share of roof pixels showing the photographed roof rose from
+        73% to 99% and from 88% to 100%.
+      - Measuring an area took about 0.6 s once; after that, 2 ms.
 - **Giving orders mid-game:** select one of your units (any unit, as the
   umpire). Under its orders, *Give orders* has:
   - **Move** and **Road march**: click the map; it goes there tactically, or
@@ -577,6 +615,35 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
   `roads/`: `nodes.bin`, `edges.bin`, `edge_geom.bin` and `adjacency.bin`
   (fixed-width little-endian), with `graph.json` describing the layout and
   the build's statistics.
+- **Buildings OpenStreetMap lacks:** from Overture Maps
+  (`overturemaps-us-west-2` on S3, ODbL; latest release unless
+  `--overture-release`). Overture merges OpenStreetMap with footprints
+  detected in satellite imagery (Microsoft's and Google's) and Esri's
+  community maps.
+  - A build keeps Overture's buildings that are not from OpenStreetMap
+    and do not overlap an OpenStreetMap footprint by more than 20% of their
+    5 m surface cells. Each takes its height from its source where there is
+    one (or 3 m a floor), else 6 m (`--overture-height-m`).
+  - They go wherever OpenStreetMap's do: land cover (urban by footprint
+    cover), the sight surface (line of sight, vehicles kept out of built-up
+    cells, town blocks) and the viewer's basemap at zoom 15, as new
+    features tagged `est_height`.
+  - How it reads: a list of the theme's ~500 GeoParquet files and the last
+    64 KB of each gives each file's box. That index is about 30 MB and is
+    cached once per release. Then it reads the footer of each file
+    touching the box, and only the needed columns of the row groups whose
+    `bbox` statistics touch it. The Kaliningrad box needed one file and
+    took about 3 s after the 17 s index.
+  - In that box (20.35–20.60 E, 54.65–54.76 N) it added 41,818 buildings,
+    all Microsoft's, to OpenStreetMap's 37,000 or so. Most are in the
+    garden-plot and dacha belts round the city, which OpenStreetMap maps
+    thinly; the centre is nearly all OpenStreetMap's. 30,721 more were
+    already in OpenStreetMap and left out.
+  - `--no-overture` leaves them out. If Overture cannot be reached, the
+    build goes on without them and `pack.json` records why (under
+    `sources.ground.overture`, with the release and counts by source).
+  - Packs built before this need building again to gain them:
+    `bgws basemap` refreshes only the viewer's map, not the ground.
 - **Railways:** the lines on the ground (rail, light rail, narrow gauge,
   heritage lines) from the basemap's zoom-14 roads layer, as
   `railways.json`. Trams run in the street and are left out, and so are

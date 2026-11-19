@@ -13,5 +13,6 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src", "../../protocol/types"]
+  "include": ["src", "../../protocol/types"],
+  "exclude": ["src/**/*.test.ts"]
 }

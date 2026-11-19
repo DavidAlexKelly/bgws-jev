@@ -15,6 +15,9 @@ thiserror.workspace = true
 rayon.workspace = true
 flate2 = "1"
 image-webp = "0.2"
+# Overture Maps building footprints (GeoParquet), read by row group over HTTP ranges.
+parquet = { version = "60", default-features = false, features = ["zstd", "snap"] }
+bytes = "1"
 reqwest = { workspace = true, features = ["blocking", "rustls-tls-native-roots"] }
 
 [dev-dependencies]
