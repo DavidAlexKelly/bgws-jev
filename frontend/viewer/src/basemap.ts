@@ -21,7 +21,7 @@ const WOODS = ["wood", "forest", "nature_reserve"];
 
 /** A building's colour by its height (and a little per building, so a town is not one block). */
 function buildingColour(light: boolean): maplibregl.ExpressionSpecification {
-  const height = ["coalesce", ["get", "height"], 10] as maplibregl.ExpressionSpecification;
+  const height = ["coalesce", ["get", "height"], ["get", "est_height"], 10] as maplibregl.ExpressionSpecification;
   const [low, mid, high] = light ? ["#8a8478", "#9d978a", "#b7b2a6"] : ["#363f56", "#434d68", "#56617f"];
   const shade = ["%", ["coalesce", ["to-number", ["id"]], 0], 3] as maplibregl.ExpressionSpecification;
   return [
@@ -36,7 +36,8 @@ function buildingColour(light: boolean): maplibregl.ExpressionSpecification {
 }
 
 /**
- * Buildings as blocks at their mapped height (10 m where none is mapped), on
+ * Buildings as blocks at their mapped height (else the pack's estimate from
+ * the footprint, `est_height`, else 10 m), on
  * the 3D terrain. `light`: pale stone, for draping over satellite imagery.
  */
 export function buildingBlocks(source: string, id: string, quality: boolean, light = false): maplibregl.LayerSpecification {
@@ -48,7 +49,7 @@ export function buildingBlocks(source: string, id: string, quality: boolean, lig
     minzoom: 13,
     paint: {
       "fill-extrusion-color": quality ? buildingColour(light) : light ? "#9d978a" : "#3a4258",
-      "fill-extrusion-height": ["coalesce", ["get", "height"], 10],
+      "fill-extrusion-height": ["coalesce", ["get", "height"], ["get", "est_height"], 10],
       "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
       "fill-extrusion-opacity": quality ? 0.96 : 0.9,
       "fill-extrusion-vertical-gradient": true,

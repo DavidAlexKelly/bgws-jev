@@ -580,6 +580,25 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
 - **For the viewer:** `basemap.pmtiles` and `dem.pmtiles`, extracts of the
   same archives that `bgws-server` serves under `/packs/`. The "terrain"
   basemap draws them, with hillshade and town names, with no internet.
+  - **Zoom 15:** the basemap goes to zoom 15 (`--basemap-max-zoom`),
+    because Protomaps keeps every building footprint only there. At zoom 14
+    a town keeps only its largest buildings: in Kaliningrad, an
+    8 × 8-tile patch went from 244 buildings to 7,192.
+  - **Estimated heights:** each building with no mapped height (most of
+    them) gets an `est_height` from its footprint, which the viewer's 3D
+    blocks use. It is a guess for the picture only; the simulation reads
+    its buildings from the planet archive. The estimate goes:
+    - a long, thin footprint is a row of garages or sheds (3.5 m);
+    - a long block is a five- or nine-storey panel block (15 m or 27 m);
+    - a big compact one is a hall (about 12 m);
+    - a small one is a house (7 m) or a shed (3 m).
+
+    Only the tile's protobuf framing is touched (`mvt::with_estimated_heights`);
+    the geometry is copied as it is.
+  - **Older packs:** `bgws basemap <pack>` fetches the map tiles again, to
+    zoom 15 with the heights, and leaves the rest of the pack alone. For
+    `kaliningrad-big` it took about 3 minutes, and the basemap went from
+    8.3 to 14.5 MB.
 - **To check a build:** `preview.png` shows land cover over hillshade, with
   rivers, roads by class and bridges. `pack.json` records the box, the
   archives used and their attributions.
