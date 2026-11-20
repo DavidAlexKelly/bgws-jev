@@ -390,9 +390,16 @@ enum Cmd {
         vignette: String,
         #[arg(long, default_value_t = 40)]
         replicates: usize,
-        /// Only figures whose key starts with this.
+        /// Only figures whose key starts with one of these (comma-separated;
+        /// `land` for the land fight's: direct fire, people, sensing, cover).
         #[arg(long)]
         prefix: Option<String>,
+        /// Morris trajectories (default `analysis.morris.trajectories`); cost trajectories × (figures + 1) batches.
+        #[arg(long)]
+        trajectories: Option<usize>,
+        /// How many of Morris's leading figures get Sobol indices (0: Morris only; default `analysis.sobol.top_k`).
+        #[arg(long)]
+        sobol_top: Option<usize>,
         #[arg(long, default_value_t = 1)]
         seed: u64,
         /// Also write the workbench page (figures ranked by influence).
@@ -1214,8 +1221,9 @@ fn main() -> Result<()> {
                 eprintln!("workbench written to {}", p.display());
             }
         }
-        Cmd::Sensitivity { vignette, replicates, prefix, seed, html } => {
-            let report = bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed))?;
+        Cmd::Sensitivity { vignette, replicates, prefix, trajectories, sobol_top, seed, html } => {
+            let size = experiments::SensitivitySize { trajectories, sobol_top };
+            let report = bgws_run::experiments::sensitivity(&vignette, replicates, prefix.as_deref(), Seed(seed), &vignette_scenarios(), size)?;
             println!("{}", bgws_analysis::report::sensitivity_markdown(&report));
             if let Some(p) = &html {
                 let data = serde_json::json!({ "title": format!("Sensitivity: {vignette}"), "generated": format!("{replicates} replicates, seed {seed}"), "sensitivity": [report] });

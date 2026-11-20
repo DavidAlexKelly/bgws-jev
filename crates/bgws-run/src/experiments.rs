@@ -580,11 +580,42 @@ impl<F: Fn(&Figures, Seed) -> Value + Sync> Experiment for Wrap<'_, F> {
 
 /// Morris screening then Sobol indices for a vignette over its figures, and
 /// the research backlog of unsourced figures ranked by sensitivity (§15.4).
-pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed) -> anyhow::Result<bgws_analysis::sensitivity::SensitivityReport> {
+/// How a sensitivity run is sized: Morris trajectories and how many of its
+/// leading figures go on to Sobol (0: Morris only), each defaulting to the
+/// `analysis.*` figures.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SensitivitySize {
+    pub trajectories: Option<usize>,
+    pub sobol_top: Option<usize>,
+}
+
+/// The figures that drive a land fight (`--prefix land`): direct fire,
+/// people, sensing, land cover and feature cover, and the sim's own fire,
+/// sensing and posture figures.
+pub const LAND_FIGHT: &[&str] = &[
+    "direct.",
+    "people.",
+    "sensing.acquire",
+    "sensing.observer",
+    "env.landcover",
+    "env.optics",
+    "sim.cover",
+    "sim.sense",
+    "sim.fire",
+    "sim.posture",
+    "sim.doctrine",
+    "decide.heuristic",
+];
+
+pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed, scenarios: &VignetteScenarios, size: SensitivitySize) -> anyhow::Result<bgws_analysis::sensitivity::SensitivityReport> {
     use bgws_analysis::sensitivity::*;
     let figures = crate::default_figures();
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
     let exp: Box<ExperimentFn> = match id {
+        "attack-halt" => {
+            let sc = scenarios.attack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt needs its scenario"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt(&sc)(f, s))
+        }
         "mbt-engagement" => Box::new(mbt_engagement),
         "atgm-engagement" => Box::new(atgm_engagement),
         "tank-engagement-range" => Box::new(tank_engagement_range),
@@ -602,8 +633,9 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
         "red-sea-magazine" => Box::new(red_sea),
         _ => anyhow::bail!("vignette `{id}` has no experiment here"),
     };
+    // Several prefixes, comma-separated; `land` for the land fight's.
     let prefixes: Vec<String> = match prefix {
-        Some(p) => vec![p.to_string()],
+        Some(p) => p.split(',').flat_map(|x| if x == "land" { LAND_FIGHT.iter().map(|s| s.to_string()).collect() } else { vec![x.to_string()] }).collect(),
         None => v.driving_figures.iter().map(|k| k.split('.').take(2).collect::<Vec<_>>().join(".")).collect(),
     };
     let filter = |f: &bgws_core::Figure| prefixes.is_empty() || prefixes.iter().any(|p| f.key.starts_with(p.as_str()));
@@ -615,8 +647,14 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let metric = MetricFn::new(v.metric.name.clone(), v.metric.unit.clone(), |o: &Value| *o);
     let wrap = |f: &Figures, s: Seed| exp(f, s);
     let resp = BatchResponse { experiment: &Wrap(&wrap), metric: &metric, config: bgws_analysis::batch::BatchConfig::new(replicates, seed), statistic: v.band.statistic };
-    let morris = MorrisOptions::from_figures(&figures);
-    let sobol = SobolOptions::from_figures(&figures);
+    let mut morris = MorrisOptions::from_figures(&figures);
+    let mut sobol = SobolOptions::from_figures(&figures);
+    if let Some(t) = size.trajectories {
+        morris.trajectories = t.max(2);
+    }
+    if let Some(k) = size.sobol_top {
+        sobol.top_k = k;
+    }
     Ok(analyse(&v.id, &figures, &facs, &resp, &morris, &sobol, seed))
 }
 

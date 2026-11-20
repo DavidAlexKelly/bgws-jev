@@ -81,7 +81,8 @@ pub struct FeatureCover {
 }
 
 /// The eight directions round a point.
-const RING: [(f64, f64); 8] = [(1.0, 0.0), (0.7071, 0.7071), (0.0, 1.0), (-0.7071, 0.7071), (-1.0, 0.0), (-0.7071, -0.7071), (0.0, -1.0), (0.7071, -0.7071)];
+const D: f64 = std::f64::consts::FRAC_1_SQRT_2;
+const RING: [(f64, f64); 8] = [(1.0, 0.0), (D, D), (0.0, 1.0), (-D, D), (-1.0, 0.0), (-D, -D), (0.0, -1.0), (D, -D)];
 
 /// The cover the features round (e, n) give.
 pub fn feature_cover(g: &Ground, e: f64, n: f64) -> FeatureCover {
