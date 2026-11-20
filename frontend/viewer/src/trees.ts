@@ -357,7 +357,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     // (which moves with every pan, and would move every tree with it).
     cell ??= SPACING_M * perMetre(Math.round(centre.toLngLat().lat));
     const seen = new Set<number>();
-    const found: { ix: number; iy: number; d: number }[] = [];
+    const found: { ix: number; iy: number; d: number; wood: boolean }[] = [];
     const grid = cell;
     // Cells taken by buildings: no tree there; and by carriageways: no tree from the cover there.
     const built = new Set<number>();
@@ -367,17 +367,17 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
         for (const rs of mercatorPolygons(f)) cellsInside(rs, builtBox, grid, (ix, iy) => built.add(ix * 4194304 + iy));
       }
     }
-    const take = (ix: number, iy: number) => {
+    const take = (ix: number, iy: number, wood: boolean) => {
       // Each cell once (woods repeat across the tiles they straddle), some left clear, none in a building.
       const key = ix * 4194304 + iy;
       if (seen.has(key) || built.has(key) || hash(ix, iy, 7) < 0.12) return false;
       seen.add(key);
-      found.push({ ix, iy, d: Math.hypot((ix + 0.5) * grid - centre.x, (iy + 0.5) * grid - centre.y) });
+      found.push({ ix, iy, d: Math.hypot((ix + 0.5) * grid - centre.x, (iy + 0.5) * grid - centre.y), wood });
       return true;
     };
     // The mapped woods.
     for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.sourceLayer, filter: ["in", ["get", "kind"], ["literal", o.kinds]] })) {
-      for (const rs of mercatorPolygons(f)) cellsInside(rs, builtBox, grid, take);
+      for (const rs of mercatorPolygons(f)) cellsInside(rs, builtBox, grid, (ix, iy) => take(ix, iy, true));
     }
     // And wherever the tree cover shows trees, off the carriageways.
     let fromCover = 0;
@@ -420,13 +420,16 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
         for (let ix = Math.ceil(builtBox[0] / grid - 0.5); (ix + 0.5) * grid <= builtBox[2]; ix++) {
           const col = Math.floor(((ix + 0.5) * grid * 360 - 180 - c.west) / c.step);
           if (col < 0 || col >= c.width || !mask[row * c.width + col] || road.has(ix * 4194304 + iy)) continue;
-          if (take(ix, iy)) fromCover++;
+          if (take(ix, iy, false)) fromCover++;
         }
       }
     }
     stats.fromCover = fromCover;
-    // The nearest to the middle of the view, as many as are allowed.
+    // More than may be drawn: thinned out with distance rather than cut off at a ring. Each
+    // tree's distance is weighed by a fixed draw of its own, so near the middle nearly all
+    // stand and further out fewer and fewer, the same ones each time.
     if (found.length > o.maxTrees) {
+      for (const t of found) t.d *= 0.35 + hash(t.ix, t.iy, 11) * 1.3;
       found.sort((a, b) => a.d - b.d);
       found.length = o.maxTrees;
     }
@@ -434,16 +437,25 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     const camEle = camElevation();
     const pine: number[] = [];
     const broad: number[] = [];
-    for (const { ix, iy } of found) {
+    for (const { ix, iy, wood } of found) {
       const r = (s: number) => hash(ix, iy, s);
       const x = (ix + 0.5 + (r(1) - 0.5) * 0.8) * cell;
       const y = (iy + 0.5 + (r(2) - 0.5) * 0.8) * cell;
       const ll = new maplibregl.MercatorCoordinate(x, y, 0).toLngLat();
       const ground = (m.queryTerrainElevation(ll) ?? 0) + camEle;
-      const conifer = r(3) < 0.33;
-      const young = r(4) < 0.12 ? 0.55 : 1;
-      const height = (9 + r(5) * 11) * young;
-      const crown = (conifer ? 1.8 + r(6) * 1.4 : 2.6 + r(6) * 2.2) * Math.sqrt(young);
+      // Heights as trees grow: in a wood mostly 10–13 m, up to about 20 m, a few young ones
+      // lower; in gardens, yards and streets mostly 6–8 m (about a house's eaves to its ridge),
+      // one in ten 13–16 m. The tall ones are the rarer (r^1.3, r^1.6). Fewer conifers in town.
+      const conifer = r(3) < (wood ? 0.33 : 0.15);
+      let height: number;
+      if (wood) {
+        height = r(4) < 0.08 ? 18 + r(5) * 3 : 8 + 10 * r(5) ** 1.3;
+        if (r(12) < 0.12) height *= 0.6;
+      } else {
+        height = r(4) < 0.1 ? 13 + r(5) * 3 : 4 + 8 * r(5) ** 1.6;
+      }
+      // Crowns in proportion: a broadleaf crown about three-fifths as wide as the tree is tall, a conifer's narrower.
+      const crown = conifer ? Math.max(1, height * (0.15 + r(6) * 0.06)) : Math.max(1.6, height * (0.26 + r(6) * 0.12));
       const shade = 0.8 + r(8) * 0.4;
       // Greens: broadleaf trees lighter and warmer, some turning yellower; conifers darker and bluer.
       const tint = conifer ? [0.15 * shade, 0.31 * shade, 0.2 * shade] : [(0.24 + r(9) * 0.14) * shade, (0.43 + r(9) * 0.08) * shade, 0.17 * shade];
@@ -504,6 +516,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
       gl = g;
       // The tree cover, read once: its pixels that are trees (ESA WorldCover's class 10).
       const coverUrl = o.cover?.url;
+      if (!coverUrl) console.info("trees: this pack has no tree cover, so trees stand only in its mapped woods (bgws basemap <pack> --tree-cover-only adds it)");
       if (o.cover && coverUrl) {
         const c = o.cover;
         const img = new Image();
@@ -526,6 +539,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
             // Not readable: the mapped woods only.
           }
         };
+        img.onerror = () => console.warn("trees: the tree cover did not load:", coverUrl);
         img.src = coverUrl;
       }
       if (typeof WebGL2RenderingContext !== "undefined" && g instanceof WebGL2RenderingContext) {

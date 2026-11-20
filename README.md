@@ -532,10 +532,17 @@ to reach openrouter.ai.
       the same trees are kept.
       - Checked: after a pan and zoom, and after a far pan and back, all
         3,086 trees in a wood stood where they had, on both basemaps.
-    - Each tree's kind, height (9–20 m, some young ones about half that),
-      crown, shade and turn come from its place on the grid. About a third
-      are conifers, with two stacked cones; the rest are broadleaf, with a
-      lumpy dome.
+    - Each tree's kind, height, crown, shade and turn come from its place on
+      the grid. Heights follow where it stands:
+      - in a wood mostly 10–13 m, up to about 20 m, with some young ones
+        lower;
+      - in gardens, yards and streets (from the tree cover) mostly 6–8 m,
+        about a house's eaves to its ridge, with one in ten 13–16 m.
+
+      Crowns are in proportion: a broadleaf crown about three-fifths as wide
+      as the tree is tall, a conifer's narrower. Conifers have two stacked
+      cones and broadleaf trees a lumpy dome. About a third of the trees in
+      woods are conifers, and fewer in town.
     - The crowns are cut through with a pattern of small gaps, about a metre
       and a fifth of a metre across. The inside of a crown, seen through
       them, is in shade, so a crown reads as foliage, not a shell.
