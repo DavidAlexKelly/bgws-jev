@@ -50,8 +50,13 @@ pub enum GroundSpec {
     Flat,
     /// Generated ground (hills, woods, towns from a seed).
     Generated,
-    /// A theatre pack, by name (`packs/<name>`).
-    Pack { name: String },
+    /// A theatre pack, by name (`packs/<name>`); the fight is put at `at`
+    /// (latitude, longitude) when given, else where its kind suits.
+    Pack {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<[f64; 2]>,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -262,7 +267,13 @@ pub fn build(spec: &Spec) -> Result<Value> {
     let forces = [Force { side: "blue", elements: blue, hqs: std::mem::take(&mut blue_hqs) }, Force { side: "red", elements: red, hqs: std::mem::take(&mut red_hqs) }];
     // Where it is: a frame and a rotation (packs put the axis across a river, into a town).
     let (frame, centre, axis) = match &spec.ground {
-        GroundSpec::Pack { name } => pack_site(name, spec.kind)?,
+        GroundSpec::Pack { name, at } => {
+            let (frame, centre, axis) = pack_site(name, spec.kind)?;
+            match at {
+                Some([lat, lon]) => (frame, frame.geodetic_to_enu(bgws_core::Geodetic::new(*lat, *lon, 0.0)), 0.0),
+                None => (frame, centre, axis),
+            }
+        }
         _ => (EnuFrame::new(Geodetic::new(54.2, 18.6, 0.0)), Enu::new(0.0, 0.0, 0.0), 0.0),
     };
     // Packs: the river or the town edge is where the objective's approach crosses.
@@ -298,7 +309,11 @@ pub fn build(spec: &Spec) -> Result<Value> {
         }
         hqs.extend(f.hqs.iter().cloned());
     }
-    let radius = if company { 600.0 } else { 900.0 };
+    // The objective is the defended position: it takes in the whole front
+    // (platoons at its ends), so taking it means clearing the defence. At
+    // 600 m the end platoons of a 1,200 m front stood just outside it, and
+    // an attacker that beat only the centre held it "with no enemy on it".
+    let radius = front / 2.0 + 200.0;
     let victory: Vec<Value> = objectives.iter().map(|(side, x, y)| json!({ "kind": "objective", "side": side, "at": place(*x, *y), "radiusM": radius, "holdS": 600.0, "label": format!("{side}'s objective") })).chain(std::iter::once(json!({ "kind": "breakpoint", "pct": 60.0 }))).collect();
     let centre_g = frame.enu_to_geodetic(centre);
     let utc = (spec.hour - centre_g.lon / 15.0).rem_euclid(24.0);
@@ -315,7 +330,7 @@ pub fn build(spec: &Spec) -> Result<Value> {
     v["theatre"] = match &spec.ground {
         GroundSpec::Flat => json!({ "origin": centre_g, "ground": "flat" }),
         GroundSpec::Generated => json!({ "origin": centre_g, "ground": "generated", "groundSeed": format!("{}-ground", spec.name) }),
-        GroundSpec::Pack { name } => json!({ "origin": centre_g, "ground": "generated", "pack": name }),
+        GroundSpec::Pack { name, .. } => json!({ "origin": centre_g, "ground": "generated", "pack": name }),
     };
     v["forces"] = Value::Array(list);
     v["command"]["hqs"] = Value::Array(hqs);
@@ -347,7 +362,7 @@ fn describe(spec: &Spec, blue: usize, red: usize) -> String {
 pub fn standard() -> Vec<Spec> {
     let s = |name: &str, kind: Kind, echelon: Echelon, ratio: f64, gap_km: f64, hour: f64, weather: &str, ground: GroundSpec, minutes: f64, seed: u64| Spec { name: name.into(), kind, echelon, ratio, gap_km, hour, weather: weather.into(), ground, minutes, seed };
     let gen = GroundSpec::Generated;
-    let kgd = GroundSpec::Pack { name: "kaliningrad-big".into() };
+    let kgd = GroundSpec::Pack { name: "kaliningrad-big".into(), at: None };
     vec![
         s("gen-company-attack", Kind::Attack, Echelon::Company, 3.0, 4.0, 10.0, "clear", gen.clone(), 90.0, 101),
         s("gen-company-attack-night", Kind::Attack, Echelon::Company, 3.0, 4.0, 1.0, "clear", gen.clone(), 90.0, 102),

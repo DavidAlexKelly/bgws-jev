@@ -141,6 +141,75 @@ add. Feature cover should matter in open country with hedgerows and tree
 lines. A test scenario there, for example east of Kaliningrad, would
 measure it.
 
+## Fixed after the real-ground runs
+
+Watching single games of the 1:1 attack showed two faults behind those
+results.
+
+**1. Generated objectives missed the defence.**
+- A company defence is three elements on a 1,200 m front: platoons at
+  ±600 m, the anti-tank team in the middle.
+- The objective was a 600 m circle, so the flank platoons stood 608 m
+  from its centre, just outside it.
+- Blue "held the objective with no enemy on it" after beating only the
+  middle element. In half the games, blue walked in after 13 minutes
+  without a fight.
+- A battalion attack was worse: a 2,800 m front under a 900 m circle.
+- The objective now takes in the whole front: radius = half the front
+  plus 200 m (800 m for a company, 1,600 m for a battalion). The
+  generated scenarios in `data/scenarios/gen-*.json` were regenerated.
+- The vignettes now count an attack as successful when blue is on the
+  objective and no defender is, as the victory rule has it.
+
+**2. The HQ halted late, or not at all.**
+- Losses were counted over all of the HQ's units, mortars and command
+  post included. Those rarely lose anything, so 23% losses among the
+  fighting platoons could read as under 20%.
+- Even when the check fired, the halt came only with the hasty plan,
+  10–30 minutes later (`c2.hasty.company_h`). That new plan then
+  re-attacked: it judged the odds 5:1, because the HQ had seen only part
+  of the defence.
+- Now both the HQ's loss check and its planner's culmination test count
+  losses among manoeuvre units only.
+- When the check fires, the HQ orders its advancing units to go firm
+  (stop and watch) at once, by radio (`c2.go_firm` in the log), and plans
+  while they hold.
+
+**Results:**
+
+| Vignette | Before | After | Halted |
+|---|---|---|---|
+| attack-halt-real-ground (town, 1:1) | 37.5% | 31% | 26 of 60 (was 22) |
+| attack-halt-open-country (new, 1:1) | — | 19% (in band) | 27 of 60 |
+| attack-halt (generated, no HQ planner) | 25% | 25% | unchanged |
+
+- **Town:** five games now halt at 19%. The rest overshoot, because losses
+  come in lumps and reports reach the HQ late.
+- **Open country:** farmland broken by tree lines south-west of the city,
+  at 54.606 N, 20.398 E.
+
+## Feature cover in open country
+
+Packs built before tree cover went into the simulation had only
+OpenStreetMap's woods on their 5 m sight surface. Hedgerows, tree lines
+and garden trees were missing. `bgws basemap <pack> --tree-cover-only`
+now adds WorldCover's trees to an existing pack's surface as light
+woodland, where a cell has no building and no mapped wood. It was run on
+`kaliningrad-big`.
+
+Even with those trees in, switching feature cover off does not change
+the open-country attack. Over 100 games each:
+
+| Variant | Median losses at halt | Halted |
+|---|---|---|
+| Feature cover on | 15.4% | 43 |
+| Feature cover off | 17.1% | 42 |
+
+Kolmogorov–Smirnov p 0.89, Mann–Whitney p 0.98. So neither town nor
+country shows the features in this outcome. Either units seldom stand on
+them, or a dug-in defence's cover outweighs them. Telling the two apart
+needs a trace of where units stand and what cover they get.
+
 ## The search model: what could not yet be sourced
 
 The primary sources are NVESD and ACQUIRE reports on DTIC, plus SPIE

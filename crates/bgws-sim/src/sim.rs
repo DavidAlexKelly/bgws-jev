@@ -580,6 +580,12 @@ impl Sim {
         self.ctx.order.iter().filter(|&&e| self.world.get::<Ident>(e).is_some_and(|i| i.side == side)).filter_map(|&e| self.world.get::<Health>(e)).map(|h| h.fit).sum()
     }
 
+    /// Whether a land unit is a manoeuvre unit (it assaults: tanks,
+    /// infantry, anti-tank teams), not a post, fires, ISR or support.
+    pub fn is_manoeuvre(&self, i: &Ident) -> bool {
+        unit_role(i, crate::domains::drones::drones::team_reach(self, i.id)) == "manoeuvre"
+    }
+
     /// The HQ's picture: own units as reported, and the side's tracks. Never truth.
     pub fn hq_situation(&self, side: Side, why: &str) -> HqSituation {
         let mut units = Vec::new();
@@ -597,16 +603,7 @@ impl Sim {
             // fire units, reconnaissance teams watch.
             let team = crate::domains::drones::drones::team_reach(self, i.id);
             let reach = team.map(|t| t.0).unwrap_or(reach);
-            let role = match i.platform.template.as_str() {
-                _ if i.hq => "post",
-                _ if team.is_some_and(|t| t.1) => "fires",
-                _ if team.is_some() => "isr",
-                "core/artillery" | "core/mortar" | "core/coastal" => "fires",
-                "core/engineer" => "engineer",
-                // EW and air defence cover the force: none of them assaults.
-                "core/convoy" | "core/node" | "core/sensor" | "core/droneTeam" | "core/ewEsm" | "core/ewJammer" | "core/gbad" | "core/cyber" => "support",
-                _ => "manoeuvre",
-            };
+            let role = unit_role(i, team);
             // With nets, the HQ knows its units as they last reported (§9.2).
             let rep = crate::domains::drones::hq_unit_report(self, side, i.id);
             units.push(HqUnit {
@@ -966,4 +963,19 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
         }
     }
     e
+}
+
+/// A unit's role for its HQ, by its platform template (`team`: a drone
+/// team's reach and whether it strikes).
+fn unit_role(i: &Ident, team: Option<(f64, bool)>) -> &'static str {
+    match i.platform.template.as_str() {
+        _ if i.hq => "post",
+        _ if team.is_some_and(|t| t.1) => "fires",
+        _ if team.is_some() => "isr",
+        "core/artillery" | "core/mortar" | "core/coastal" => "fires",
+        "core/engineer" => "engineer",
+        // EW and air defence cover the force: none of them assaults.
+        "core/convoy" | "core/node" | "core/sensor" | "core/droneTeam" | "core/ewEsm" | "core/ewJammer" | "core/gbad" | "core/cyber" => "support",
+        _ => "manoeuvre",
+    }
 }

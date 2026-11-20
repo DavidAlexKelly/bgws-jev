@@ -294,7 +294,7 @@
         "lon": 18.6,
         "h": 0.0
       },
-      "radiusM": 600.0,
+      "radiusM": 800.0,
       "holdS": 600.0,
       "label": "blue's objective"
     },
@@ -306,7 +306,7 @@
         "lon": 18.6,
         "h": 0.0
       },
-      "radiusM": 600.0,
+      "radiusM": 800.0,
       "holdS": 600.0,
       "label": "red's objective"
     },

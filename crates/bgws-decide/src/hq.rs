@@ -440,8 +440,12 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
     let per = if units.is_empty() { p.strength_per_track } else { own / units.len() as f64 };
     let enemy = s.cop.iter().filter(|t| t.domain == "land" && t.at.is_some_and(|a| a.surface_distance(objective) <= p.enemy_radius_m)).count() as f64 * per;
     let ratio = own / enemy.max(1.0);
-    let total: u32 = s.units.iter().map(|u| u.vehicles_total).sum();
-    let fit: u32 = s.units.iter().map(|u| u.vehicles_fit).sum();
+    // Losses among the fighting units (the attacking force; mortars and
+    // posts would thin the share).
+    let fighting: Vec<&HqUnit> = s.units.iter().filter(|u| u.role == UnitRole::Manoeuvre).collect();
+    let counted: Vec<&HqUnit> = if fighting.is_empty() { s.units.iter().collect() } else { fighting };
+    let total: u32 = counted.iter().map(|u| u.vehicles_total).sum();
+    let fit: u32 = counted.iter().map(|u| u.vehicles_fit).sum();
     let lost = if total > 0 { 1.0 - fit as f64 / total as f64 } else { 0.0 };
     let culminated = lost >= p.culmination_loss && anchor.surface_distance(objective) > p.culmination_min_distance_m;
     // A side told to defend holds, whatever the odds.

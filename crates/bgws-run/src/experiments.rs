@@ -348,8 +348,9 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
 pub fn attack_halt_on(scenario: &ScenarioV4, opts: SimOptions) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         let mut sc = scenario.clone();
-        // Blue's objective, if it has one: an attack that gets there has not
-        // halted (P14 is about attacks stopped short), so that game gives no value.
+        // Blue's objective, if it has one: an attack that takes it (blue on
+        // it and no defender left on it) has not halted (P14 is about attacks
+        // stopped short), so that game gives no value.
         let objective = sc.victory.iter().find_map(|v| match v {
             bgws_scenario::v4::VictoryCondition::Objective { side: Side::Blue, at, radius_m, .. } => Some((sc.frame().geodetic_to_enu(*at), *radius_m)),
             _ => None,
@@ -360,9 +361,15 @@ pub fn attack_halt_on(scenario: &ScenarioV4, opts: SimOptions) -> impl Fn(&Figur
         let mut last_loss = 0.0;
         for step in 1..=720 {
             let out = play_with_rules(&mut sim, SimTime::from_secs(step as f64 * 10.0));
-            let (mut fit, mut start, mut advancing, mut arrived) = (0.0, 0.0, 0usize, false);
+            let (mut fit, mut start, mut advancing, mut on_it, mut held_against) = (0.0, 0.0, 0usize, false, false);
             for &e in &sim.ctx.order {
                 let (Some(i), Some(h), Some(a)) = (sim.world.get::<Ident>(e), sim.world.get::<Health>(e), sim.world.get::<Act>(e)) else { continue };
+                // A defender still on the objective: blue has not taken it.
+                if i.side == Side::Red && !h.destroyed {
+                    if let (Some((at, r)), Some(k)) = (objective, sim.world.get::<Kin>(e)) {
+                        held_against |= k.pos.sub(at).horizontal() <= r;
+                    }
+                }
                 if i.side != Side::Blue || i.hq {
                     continue;
                 }
@@ -373,10 +380,11 @@ pub fn attack_halt_on(scenario: &ScenarioV4, opts: SimOptions) -> impl Fn(&Figur
                     advancing += 1;
                 }
                 if let (false, Some((at, r)), Some(k)) = (h.destroyed, objective, sim.world.get::<Kin>(e)) {
-                    arrived |= k.pos.sub(at).horizontal() <= r;
+                    on_it |= k.pos.sub(at).horizontal() <= r;
                 }
             }
-            if arrived {
+            // Taken (as the victory rule has it: on it, and no enemy on it).
+            if on_it && !held_against {
                 return None;
             }
             let loss = 1.0 - fit / start.max(1.0);
@@ -514,6 +522,23 @@ pub fn even_attack_on_pack() -> Option<ScenarioV4> {
     ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
 }
 
+/// The same attack in open country on the Kaliningrad pack: farmland broken
+/// by tree lines south-west of the city (80% fields, 9% trees, 2% built in
+/// the 3 × 5 km round it, by ESA WorldCover), for attack-halt-open-country.
+pub fn open_country_attack_on_pack() -> Option<ScenarioV4> {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
+    spec.ratio = 1.0;
+    spec.ground = crate::scengen::GroundSpec::Pack { name: "kaliningrad-big".into(), at: Some([54.6057, 20.3976]) };
+    ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
+}
+
+/// A scenario with its theatre pack's ground loaded, if the pack is built here.
+pub fn with_pack_ground(sc: ScenarioV4) -> Option<(ScenarioV4, SimOptions)> {
+    let g = crate::host::load_pack(&sc).ok()??;
+    let opts = SimOptions { terrain: Some(g.terrain), roads: Some(g.roads), rivers: Some(g.rivers), rails: Some(g.rails), sight: g.sight, appreciation: g.appreciation, ..Default::default() };
+    Some((sc, opts))
+}
+
 /// The scenarios the sim-played vignettes run on.
 #[derive(Default)]
 pub struct VignetteScenarios {
@@ -522,6 +547,8 @@ pub struct VignetteScenarios {
     /// A company attack on a theatre pack, with the pack's ground loaded
     /// (attack-halt-real-ground); none where the pack is not built.
     pub attack_pack: Option<(ScenarioV4, SimOptions)>,
+    /// The same in open country with tree lines (attack-halt-open-country).
+    pub attack_open: Option<(ScenarioV4, SimOptions)>,
     /// The M4 drone line (detect-to-strike).
     pub drone_line: Option<ScenarioV4>,
     /// The counter-battery scene (`counter_battery_scene`).
@@ -579,6 +606,10 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
                 None => continue,
             },
             "attack-halt-real-ground" => match &scenarios.attack_pack {
+                Some((sc, opts)) => check(&attack_halt_on(sc, opts.clone())),
+                None => continue,
+            },
+            "attack-halt-open-country" => match &scenarios.attack_open {
                 Some((sc, opts)) => check(&attack_halt_on(sc, opts.clone())),
                 None => continue,
             },
@@ -652,6 +683,10 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
         }
         "attack-halt-real-ground" => {
             let (sc, opts) = scenarios.attack_pack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt-real-ground needs the kaliningrad-big pack (bgws terrain build)"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt_on(&sc, opts.clone())(f, s))
+        }
+        "attack-halt-open-country" => {
+            let (sc, opts) = scenarios.attack_open.clone().ok_or_else(|| anyhow::anyhow!("attack-halt-open-country needs the kaliningrad-big pack (bgws terrain build)"))?;
             Box::new(move |f: &Figures, s: Seed| attack_halt_on(&sc, opts.clone())(f, s))
         }
         "mbt-engagement" => Box::new(mbt_engagement),

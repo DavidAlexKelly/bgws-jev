@@ -465,12 +465,8 @@ fn vignette_scenarios() -> experiments::VignetteScenarios {
         attack: load("skirmish-advance-to-contact-v1"),
         // The Kaliningrad company attack at even odds (1:1), so the
         // attack can fail: at 3:1 it takes its objective every time.
-        attack_pack: experiments::even_attack_on_pack().and_then(|sc| {
-            // The pack's ground, if it is built here.
-            let g = bgws_run::host::load_pack(&sc).ok()??;
-            let opts = bgws_sim::SimOptions { terrain: Some(g.terrain), roads: Some(g.roads), rivers: Some(g.rivers), rails: Some(g.rails), sight: g.sight, appreciation: g.appreciation, ..Default::default() };
-            Some((sc, opts))
-        }),
+        attack_pack: experiments::even_attack_on_pack().and_then(experiments::with_pack_ground),
+        attack_open: experiments::open_country_attack_on_pack().and_then(experiments::with_pack_ground),
         drone_line: load("m4-drone-line"),
         counter_battery: load("m2-mech-company-hasty-attack").and_then(|b| experiments::counter_battery_scene(&b).ok()),
     }
