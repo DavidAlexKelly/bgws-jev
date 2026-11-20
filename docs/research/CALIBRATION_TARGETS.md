@@ -94,3 +94,71 @@ really in doubt.
   (`skirmish-advance-to-contact-v1`): it has no 5 m surface or railways, and
   its smooth relief leaves few points below their surroundings. To weigh
   walls, tree lines and folds, add a vignette on a theatre pack.
+
+## On real ground: attack-halt-real-ground
+
+A new vignette plays the company attack on the Kaliningrad theatre pack
+(`gen-kgd-company-attack`) with the pack's buildings, trees, railways and
+roads. It runs only where that pack is built (packs are not in git), so CI
+skips it.
+
+**How a halt is counted:** when no blue manoeuvre unit has moved for a
+minute. A game in which the attack reaches its objective (within its 600 m
+radius) gives no value. P14 is about attacks stopped short; this rule also
+applies to `attack-halt` wherever its scenario has an objective.
+
+**At the generator's 3:1, the attack never halts.** In 40 games out of 40
+the attack takes its objective. The fight is in town: first sightings come
+at 36–156 m, between buildings. At 1.5:1 it still takes the objective in 38
+games out of 40. The vignette therefore plays the attack at 1:1.
+
+**At 1:1 (100 games):**
+
+- In 25 games the attack halts, at a median of 37.5% losses (range 25–44%).
+  The P14 band is 10–30%.
+- In 75 games it takes the objective, though the attackers are not
+  stronger than the defence in town.
+- On generated ground (`attack-halt`), the attack halts at a median of 33%.
+  This branch's sight-line and cover changes moved that up from 25%.
+
+So on both grounds attacks press on past the losses at which P14 says real
+attacks stop, and on real ground they succeed too often at even odds. The
+HQ is set to halt the attack at 20% losses (`decide.heuristic.culmination_loss`,
+P14). Losses come in lumps, though: one volley can knock out a whole
+platoon, about 19% of the company, before the halt takes effect. These
+settings are worth a look next:
+
+- the HQ's culmination check and how quickly it acts;
+- the defence's strength in town;
+- the morale settings that hold attacking units in the fight.
+
+**Feature cover changes nothing here.** With every `sim.cover` setting set
+to 0, the attack halts in 26 games out of 100 instead of 25, at the same
+median of 37.5% losses (Kolmogorov–Smirnov p 0.69, Mann–Whitney p 0.39).
+The town fight is decided at close range between buildings, where the
+town blocks' own cover (0.6–0.9) already outweighs anything the features
+add. Feature cover should matter in open country with hedgerows and tree
+lines. A test scenario there, for example east of Kaliningrad, would
+measure it.
+
+## The search model: what could not yet be sourced
+
+The primary sources are NVESD and ACQUIRE reports on DTIC, plus SPIE
+papers. Search snippets and recollection point to the following, none of
+it read in the original yet:
+
+- **Detection over time levels off at P∞:**
+  P(t) = P∞·(1 − e^(−t/τ)), with τ = 3.4/P∞ s per field of view (Howe,
+  *IR & EO Systems Handbook* vol. 4, 1993, DTIC ADA364024). Our model's
+  detection rate is λ = −ln(1 − P∞)/τ. Its chance keeps rising towards 1
+  however low P∞ is, so long searches overstate detection. Mid-range P∞
+  gives similar early rates.
+- **Search time over a sector:** t ≈ n_FOV × τ_FOV, that is, linear in
+  area. That would make `fov_exponent` about 1 with `fov_ref_deg` the
+  instrument's field of view, not the current 0.5.
+- **Field check (TETAM, 1972, DTIC ADP000598):** target handoffs succeeded
+  51–68% of the time, taking 18–31 s when they did.
+- **Cueing and observer movement:** no ratio found.
+
+DTIC turns away this environment's downloads, so none of this is
+confirmed. Each needs reading in the original before any value changes.

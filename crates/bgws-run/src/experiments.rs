@@ -13,7 +13,7 @@ use bgws_domains::air_defence::{engage_raid, AdSystem, Assignment, KillChain, Th
 use bgws_domains::missile::{Flight, FlightClass, Profile};
 use bgws_domains::V3;
 use bgws_scenario::v4::{Network, ScenarioV4};
-use bgws_sim::components::{Act, Activity, Health, Ident};
+use bgws_sim::components::{Act, Activity, Health, Ident, Kin};
 use bgws_sim::{Sim, SimOptions};
 use rand::Rng;
 use rand_chacha::ChaCha8Rng;
@@ -340,15 +340,27 @@ pub fn casevac(f: &Figures, seed: Seed) -> Value {
 /// attack before its morale can halt it, so the halt is a property of
 /// terrain with cover, which is where P14's data come from.
 pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
+    attack_halt_on(scenario, SimOptions::default())
+}
+
+/// `attack_halt` on ground the host loaded (a theatre pack's terrain,
+/// roads, railways and sight surface).
+pub fn attack_halt_on(scenario: &ScenarioV4, opts: SimOptions) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         let mut sc = scenario.clone();
+        // Blue's objective, if it has one: an attack that gets there has not
+        // halted (P14 is about attacks stopped short), so that game gives no value.
+        let objective = sc.victory.iter().find_map(|v| match v {
+            bgws_scenario::v4::VictoryCondition::Objective { side: Side::Blue, at, radius_m, .. } => Some((sc.frame().geodetic_to_enu(*at), *radius_m)),
+            _ => None,
+        });
         sc.victory.clear();
-        let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
+        let mut sim = Sim::with_options(&sc, seed, f.clone(), opts.clone()).ok()?;
         let mut still = 0.0;
         let mut last_loss = 0.0;
         for step in 1..=720 {
             let out = play_with_rules(&mut sim, SimTime::from_secs(step as f64 * 10.0));
-            let (mut fit, mut start, mut advancing) = (0.0, 0.0, 0usize);
+            let (mut fit, mut start, mut advancing, mut arrived) = (0.0, 0.0, 0usize, false);
             for &e in &sim.ctx.order {
                 let (Some(i), Some(h), Some(a)) = (sim.world.get::<Ident>(e), sim.world.get::<Health>(e), sim.world.get::<Act>(e)) else { continue };
                 if i.side != Side::Blue || i.hq {
@@ -360,6 +372,12 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
                 if !h.destroyed && matches!(a.activity, Activity::Move { .. }) {
                     advancing += 1;
                 }
+                if let (false, Some((at, r)), Some(k)) = (h.destroyed, objective, sim.world.get::<Kin>(e)) {
+                    arrived |= k.pos.sub(at).horizontal() <= r;
+                }
+            }
+            if arrived {
+                return None;
             }
             let loss = 1.0 - fit / start.max(1.0);
             if loss > 0.0 && advancing == 0 {
@@ -487,11 +505,23 @@ pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value +
     }
 }
 
+/// The Kaliningrad company attack (`gen-kgd-company-attack`) at even odds,
+/// 1:1, for attack-halt-real-ground: at 3:1 it took its objective in 40 of
+/// 40 games and at 1.5:1 in 38, so it never halted.
+pub fn even_attack_on_pack() -> Option<ScenarioV4> {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
+    spec.ratio = 1.0;
+    ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
+}
+
 /// The scenarios the sim-played vignettes run on.
 #[derive(Default)]
 pub struct VignetteScenarios {
     /// A company attack on a defended position (attack-halt).
     pub attack: Option<ScenarioV4>,
+    /// A company attack on a theatre pack, with the pack's ground loaded
+    /// (attack-halt-real-ground); none where the pack is not built.
+    pub attack_pack: Option<(ScenarioV4, SimOptions)>,
     /// The M4 drone line (detect-to-strike).
     pub drone_line: Option<ScenarioV4>,
     /// The counter-battery scene (`counter_battery_scene`).
@@ -546,6 +576,10 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
             "red-sea-magazine" => check(&red_sea),
             "attack-halt" => match &scenarios.attack {
                 Some(sc) => check(&attack_halt(sc)),
+                None => continue,
+            },
+            "attack-halt-real-ground" => match &scenarios.attack_pack {
+                Some((sc, opts)) => check(&attack_halt_on(sc, opts.clone())),
                 None => continue,
             },
             "detect-to-strike-networked" => match &scenarios.drone_line {
@@ -615,6 +649,10 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
         "attack-halt" => {
             let sc = scenarios.attack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt needs its scenario"))?;
             Box::new(move |f: &Figures, s: Seed| attack_halt(&sc)(f, s))
+        }
+        "attack-halt-real-ground" => {
+            let (sc, opts) = scenarios.attack_pack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt-real-ground needs the kaliningrad-big pack (bgws terrain build)"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt_on(&sc, opts.clone())(f, s))
         }
         "mbt-engagement" => Box::new(mbt_engagement),
         "atgm-engagement" => Box::new(atgm_engagement),
