@@ -1,8 +1,8 @@
 // Ground textures for the quality graphics mode: small tiles drawn once on a
 // canvas, in the map's dark palette, and registered with MapLibre as images
-// for `fill-pattern` (land cover, water) and `fill-extrusion-pattern` (tree
-// canopy in 3D). Drawn here rather than shipped as files so the viewer
-// stays one bundle with nothing to fetch, and so they match the palette.
+// for `fill-pattern` (land cover, water). Drawn here rather than shipped as
+// files so the viewer stays one bundle with nothing to fetch, and so they
+// match the palette.
 //
 // Every tile is seamless: anything drawn near an edge is drawn again on the
 // far side. A seeded random keeps them the same every run.
@@ -203,23 +203,6 @@ const PATTERNS: Record<string, { base: string; draw: Draw }> = {
           g.beginPath();
           g.arc(px, py + w, w, Math.PI * 1.25, Math.PI * 1.75);
           g.stroke();
-        });
-      }
-    },
-  },
-  // Tree canopy in 3D: the tops of the woods' extruded crowns.
-  "tex-canopy": {
-    base: "#1f3a27",
-    draw: (g, r) => {
-      for (let i = 0; i < 36; i++) {
-        const x = r() * SIZE;
-        const y = r() * SIZE;
-        const rad = 4 + r() * 4;
-        wrap(x, y, rad, (px, py) => {
-          g.fillStyle = r() < 0.5 ? "#26492f" : "#1a3022";
-          g.beginPath();
-          g.arc(px, py, rad, 0, Math.PI * 2);
-          g.fill();
         });
       }
     },

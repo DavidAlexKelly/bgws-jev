@@ -224,7 +224,7 @@ export function ViewPanel(props: {
             onClick={() => props.onGraphics(g)}
             title={
               g === "quality"
-                ? "Textured ground (woods, fields, towns, water), shaded buildings with shadows, road casings, a tree canopy, sky and haze in 3D, and the screen's full resolution. Smoothed edges after a reload."
+                ? "Textured ground (woods, fields, towns, water), shaded buildings with shadows, road casings, trees in the woods, sky and haze in 3D, and the screen's full resolution. Smoothed edges after a reload."
                 : "Flat colours, one pixel per screen point, no sky: lighter on the graphics card for long games and big battles."
             }
           >
