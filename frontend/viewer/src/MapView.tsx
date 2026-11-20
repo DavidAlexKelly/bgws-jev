@@ -59,6 +59,9 @@ function registerPmtiles() {
   pmtilesProtocol = true;
 }
 
+/** Most trees drawn in 3D: fewer in performance graphics. */
+const maxTrees = (quality: boolean) => (quality ? 30000 : 12000);
+
 const BASEMAPS: Record<Exclude<Basemap, "terrain">, { tiles: string[]; attribution: string; paint?: Record<string, number> }> = {
   dark: {
     tiles: ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
@@ -198,7 +201,7 @@ export function MapView(props: {
         for (const l of terrainLayers("base", "base-dem", "base", solid, quality)) if (l.id !== "base-hillshade" || packDem) m.addLayer(l);
         if (!solid) return flat();
         // In 3D, the woods stand as trees.
-        if (quality) m.addLayer(treeLayer("base-trees", { source: "base", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: 30000 }));
+        m.addLayer(treeLayer("base-trees", { source: "base", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality) }));
         return terrain(abs);
       }
       // Satellite imagery can drape over the pack's terrain, with its buildings standing up.
@@ -222,6 +225,8 @@ export function MapView(props: {
         m.addLayer({ id: "base-ghosts", type: "fill", source: "base-ghosts", paint: { "fill-color": "#0b0d0c", "fill-opacity": 0.62, "fill-antialias": false } });
         m.addLayer(buildingBlocks("base-vec", "base-buildings", quality, true));
         // Each block's top shows the imagery of its own roof.
+        // The woods stand as trees here too, over the imagery's own.
+        m.addLayer(treeLayer("base-trees", { source: "base-vec", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality) }));
         m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", terrainSource: "base-terrain", ghostSource: "base-ghosts", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
       }
       return terrain(abs);

@@ -233,6 +233,8 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
   let conifers = 0;
   let origin: [number, number] = [0, 0];
   let pmView = 0;
+  /** The planting grid's cell, mercator: set once. */
+  let cell: number | null = null;
   let builtBox: [number, number, number, number] = [0, 0, 0, 0];
   let dirty = true;
   /** Whether the woods round the view have been planted (perhaps with no trees: no woods there). */
@@ -267,25 +269,29 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     if (!dirty && inside && planted) return;
     dirty = false;
     const t0 = performance.now();
-    plant(v);
+    plant(v, inside);
     planted = true;
     stats.plantMs = Math.round(performance.now() - t0);
     stats.plants++;
   }
 
   /** Plant the woods round the view. */
-  function plant(v: [number, number, number, number]) {
+  function plant(v: [number, number, number, number], keep: boolean) {
     const m = map!;
     const g = gl!;
-    const centre = maplibregl.MercatorCoordinate.fromLngLat(m.getCenter());
+    // A new place to plant round, unless only more of the map has loaded where it is: then the
+    // same, so the same trees stand (the nearest to it, when there are more than are drawn).
+    const centre = keep && planted ? new maplibregl.MercatorCoordinate(origin[0], origin[1], 0) : maplibregl.MercatorCoordinate.fromLngLat(m.getCenter());
     origin = [centre.x, centre.y];
-    pmView = perMetre(m.getCenter().lat);
+    pmView = perMetre(centre.toLngLat().lat);
     const w = v[2] - v[0];
     const h = v[3] - v[1];
     // Round the view, but no further than the reach (a pitched view's box runs to the horizon).
     const reach = REACH_M * Math.min(1, 2 ** (15 - m.getZoom())) * pmView;
     builtBox = [Math.max(v[0] - w * MARGIN, centre.x - reach), Math.max(v[1] - h * MARGIN, centre.y - reach), Math.min(v[2] + w * MARGIN, centre.x + reach), Math.min(v[3] + h * MARGIN, centre.y + reach)];
-    const cell = SPACING_M * pmView;
+    // The grid, fixed for good: its size from the latitude to the nearest degree, not the view's
+    // (which moves with every pan, and would move every tree with it).
+    cell ??= SPACING_M * perMetre(Math.round(centre.toLngLat().lat));
     const seen = new Set<number>();
     const found: { ix: number; iy: number; d: number }[] = [];
     for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.sourceLayer, filter: ["in", ["get", "kind"], ["literal", o.kinds]] })) {
