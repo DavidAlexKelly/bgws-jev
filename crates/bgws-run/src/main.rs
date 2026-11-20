@@ -188,6 +188,10 @@ enum Cmd {
         /// (no fetching): for a pack built before packs carried railways.
         #[arg(long)]
         rails_only: bool,
+        /// Only read the tree cover (ESA WorldCover, 10 m) for the viewer's trees: for a pack
+        /// built before packs carried it (its ground gains the trees only when built again).
+        #[arg(long)]
+        tree_cover_only: bool,
     },
     /// Run the mock Federate Protocol server (a small RTI) for trying BGWS
     /// federates on one machine.
@@ -239,6 +243,14 @@ enum Cmd {
         /// Highest basemap zoom kept for the viewer (15: every building).
         #[arg(long, default_value_t = 15)]
         basemap_max_zoom: u8,
+        /// Leave out the tree cover from ESA WorldCover (trees at 10 m: for the viewer's
+        /// trees, and in the ground, open land under trees as light woodland).
+        #[arg(long)]
+        no_tree_cover: bool,
+        /// Use the tree cover for the viewer's trees only, leaving the ground (and the game) to
+        /// OpenStreetMap's woods.
+        #[arg(long)]
+        tree_cover_viewer_only: bool,
         /// Leave out the buildings Overture Maps adds to OpenStreetMap's
         /// (footprints found in satellite imagery); they are added by default.
         #[arg(long)]
@@ -768,12 +780,18 @@ fn main() -> Result<()> {
             let opts = bgws_run::federate::FederateOptions { packs, allow_generated: allow_generated_ground, speed, records, cell_m };
             bgws_run::federate::Federate::new(link, spec, opts).serve()?;
         }
-        Cmd::Basemap { pack, max_zoom, planet, cache, rails_only } => {
+        Cmd::Basemap { pack, max_zoom, planet, cache, rails_only, tree_cover_only } => {
             let dir = if pack.join("pack.json").exists() { pack.clone() } else { data_dir().join("..").join("packs").join(&pack) };
             if !dir.join("pack.json").exists() {
                 bail!("{}: not a theatre pack (no pack.json)", pack.display());
             }
             let started = Instant::now();
+            if tree_cover_only {
+                let cache = cache.clone().or_else(bgws_geodata::build::default_cache);
+                let share = bgws_geodata::pack::refresh_tree_cover(&dir, cache.as_deref(), &|_, _| {}).map_err(|e| anyhow!("{e}"))?;
+                eprintln!("{}: tree cover read, {:.0}% under trees, {:.1} s", dir.display(), share * 100.0, started.elapsed().as_secs_f64());
+                return Ok(());
+            }
             if rails_only {
                 let n = bgws_geodata::pack::railways_from_basemap(&dir).map_err(|e| anyhow!("{e}"))?;
                 eprintln!("{}: {n} railway lines read from its basemap, {:.1} s", dir.display(), started.elapsed().as_secs_f64());
@@ -832,7 +850,7 @@ fn main() -> Result<()> {
                 host.finished_record().save(&p).map_err(|e| anyhow!("{e}"))?;
             }
         }
-        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, no_overture, overture_release, overture_height_m, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
+        Cmd::Terrain { out, bbox, name, cell_m, planet, elevation, ground_filter_m, snap_m, basemap_max_zoom, no_tree_cover, tree_cover_viewer_only, no_overture, overture_release, overture_height_m, cache, partner_elevation, partner_ellipsoidal, partner_land_cover, partner_roads, replace_roads, partner_map } => {
             let partner = bgws_run::partner::PartnerTerrain { elevation: partner_elevation, ellipsoidal: partner_ellipsoidal, land_cover: partner_land_cover, roads: partner_roads, replace_roads, ..Default::default() }
                 .with_mapping_file(partner_map.as_deref())?;
             let bbox = bgws_geodata::mercator::BBox::parse(&bbox).map_err(|e| anyhow!(e))?;
@@ -843,6 +861,8 @@ fn main() -> Result<()> {
             spec.ground_filter_m = ground_filter_m;
             spec.basemap_max_zoom = basemap_max_zoom;
             spec.overture = !no_overture;
+            spec.tree_cover = !no_tree_cover;
+            spec.tree_cover_sim = !tree_cover_viewer_only;
             spec.overture_release = overture_release;
             spec.overture_height_m = overture_height_m;
             if cache.is_some() {

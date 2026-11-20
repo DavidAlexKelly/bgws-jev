@@ -339,7 +339,7 @@ mod tests {
     fn ground() -> Ground {
         let frame = EnuFrame::new(Geodetic::new(54.7, 20.5, 0.0));
         let terrain = bgws_env::Terrain::flat(frame.origin, bgws_env::GridSpec::new(41, 41, 50.0, -1000.0, -1000.0), 10.0);
-        Ground { frame, terrain, rivers: vec![], towns: vec![], roads: vec![], zoom: 14, extent: 4096, basemap: vec![], dem: vec![], planet: String::new(), stats: serde_json::Value::Null, surface: None }
+        Ground { frame, terrain, rivers: vec![], towns: vec![], roads: vec![], zoom: 14, extent: 4096, basemap: vec![], dem: vec![], planet: String::new(), stats: serde_json::Value::Null, surface: None, tree_cover: None }
     }
 
     fn lonlat(g: &Ground, e: f64, n: f64) -> [f64; 2] {

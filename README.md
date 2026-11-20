@@ -513,6 +513,15 @@ to reach openrouter.ai.
   - **Trees:** in 3D, on the terrain basemap and over satellite imagery,
     woods stand as trees, each with a trunk and a crown
     (`frontend/viewer/src/trees.ts`).
+    - They stand in the mapped woods, and wherever the pack's tree cover
+      (ESA WorldCover, 10 m) shows trees: gardens, courtyards, avenues,
+      overgrown ground.
+      - None is planted inside a building.
+      - No tree from the cover is planted on a carriageway (the cover counts
+        an avenue's overhanging crowns as trees; the trunks stand beside
+        it).
+      - In a district of houses and gardens in Kaliningrad, 12,115 trees
+        came from the cover, and planting took about 50 ms.
     - It is a MapLibre custom layer, so trees stand on the terrain and hide
       behind buildings and hills like the blocks do.
     - They are planted on a grid about 7.5 m apart, each nudged off it, with
@@ -689,6 +698,30 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
     `sources.ground.overture`, with the release and counts by source).
   - Packs built before this need building again to gain them:
     `bgws basemap` refreshes only the viewer's map, not the ground.
+- **Tree cover:** where the trees are at 10 m, from ESA WorldCover 2021
+  (v200, CC BY 4.0), read straight from its cloud-optimised GeoTIFFs on
+  S3. A build reads only the 1024-pixel tiles under the box (about a second
+  for a 16 × 12 km box, once cached). It catches the trees OpenStreetMap
+  does not draw as woods: gardens, courtyards, avenues, overgrown ground.
+  - **Placement checked:** over the `kaliningrad` box, where the pack
+    (OpenStreetMap) has water WorldCover has water 89% of the time, and
+    elsewhere 0.4%.
+  - **The pack** keeps the classes as `treecover.png`, placed on a
+    longitude–latitude grid in `pack.json` (`tree_cover`). The viewer
+    plants its trees from it.
+  - **The ground** (and so the game; `--tree-cover-viewer-only` leaves it
+    out):
+    - open ground, fields and scrub mostly under trees (5 of 9 points
+      across a 30 m cell) become light woodland;
+    - the 5 m sight surface gains the trees wherever it has none, except
+      on water; buildings clear their own cells.
+    - Over the `kaliningrad` box, open ground fell from 34% to 21%, 13%
+      became light woodland, and the sight surface gained 2.3 million
+      tree cells (29% of it), mostly gardens and street trees.
+  - `--no-tree-cover` leaves it out altogether.
+  - Older packs: `bgws basemap <pack> --tree-cover-only` adds
+    `treecover.png` for the viewer's trees (about 7 s). Their ground gains
+    the trees only when the pack is built again.
 - **Railways:** the lines on the ground (rail, light rail, narrow gauge,
   heritage lines) from the basemap's zoom-14 roads layer, as
   `railways.json`. Trams run in the street and are left out, and so are

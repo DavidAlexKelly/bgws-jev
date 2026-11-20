@@ -16,6 +16,7 @@
 // inside is shaded darker, so a crown reads as a mass of foliage, not a shell.
 
 import maplibregl from "maplibre-gl";
+import type { TreeCover } from "./protocol";
 
 /** Trees about this far apart, m. */
 const SPACING_M = 7.5;
@@ -35,10 +36,20 @@ export interface TreeOptions {
   terrainSource?: string;
   /** Most trees drawn at once (the nearest the middle of the view). */
   maxTrees: number;
+  /** Land cover at 10 m (the pack's ESA WorldCover raster): trees are planted where it shows
+   * trees too, beyond the mapped woods (gardens, avenues, overgrown ground). */
+  cover?: TreeCover | null;
+  /** The buildings' layer in `source`: no tree is planted inside a building. */
+  buildingLayer?: string;
+  /** The roads' layer in `source`: no tree from the tree cover is planted on a carriageway
+   * (the cover counts an avenue's overhanging crowns as trees, but the trunks stand beside it). */
+  roadLayer?: string;
 }
 
 export interface TreeStats {
   trees: number;
+  /** Of them, planted from the tree cover (not in a mapped wood). */
+  fromCover: number;
   conifers: number;
   plants: number;
   plantMs: number;
@@ -50,6 +61,57 @@ function hash(ix: number, iy: number, salt: number): number {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
+}
+
+/** Each grid cell (size `cell`, mercator) whose middle lies inside the rings (outer and holes,
+ * even–odd), within the box: row by row, where the row crosses the rings' edges. */
+function cellsInside(rs: number[][][], box: [number, number, number, number], cell: number, visit: (ix: number, iy: number) => void) {
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (const p of rs[0]) {
+    x0 = Math.min(x0, p[0]);
+    x1 = Math.max(x1, p[0]);
+    y0 = Math.min(y0, p[1]);
+    y1 = Math.max(y1, p[1]);
+  }
+  x0 = Math.max(x0, box[0]);
+  x1 = Math.min(x1, box[2]);
+  y0 = Math.max(y0, box[1]);
+  y1 = Math.min(y1, box[3]);
+  if (x0 >= x1 || y0 >= y1) return;
+  for (let iy = Math.ceil(y0 / cell - 0.5); (iy + 0.5) * cell <= y1; iy++) {
+    const y = (iy + 0.5) * cell;
+    const xs: number[] = [];
+    for (const r of rs) {
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        const a = r[j];
+        const b = r[i];
+        if (a[1] <= y !== b[1] <= y) xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const from = Math.max(xs[k], x0);
+      const to = Math.min(xs[k + 1], x1);
+      for (let ix = Math.ceil(from / cell - 0.5); (ix + 0.5) * cell < to; ix++) visit(ix, iy);
+    }
+  }
+}
+
+/** A feature's polygons, each as rings in mercator. */
+function mercatorPolygons(f: maplibregl.MapGeoJSONFeature): number[][][][] {
+  const gm = f.geometry;
+  const polys = gm.type === "Polygon" ? [gm.coordinates] : gm.type === "MultiPolygon" ? gm.coordinates : [];
+  return polys.map((rings) =>
+    rings.map((r) =>
+      r.map((p) => {
+        const c = maplibregl.MercatorCoordinate.fromLngLat([p[0], p[1]]);
+        return [c.x, c.y];
+      }),
+    ),
+  );
 }
 
 /** The meshes, in a unit space (z up): a trunk, a broadleaf crown, a conifer crown. */
@@ -233,6 +295,8 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
   let conifers = 0;
   let origin: [number, number] = [0, 0];
   let pmView = 0;
+  /** Where the tree cover shows trees (1), pixel by pixel, once it has loaded. */
+  let mask: Uint8Array | null = null;
   /** The planting grid's cell, mercator: set once. */
   let cell: number | null = null;
   let builtBox: [number, number, number, number] = [0, 0, 0, 0];
@@ -242,7 +306,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let divisor: ((index: number, d: number) => void) | null = null;
   let drawInstanced: ((mode: number, count: number, type: number, offset: number, instances: number) => void) | null = null;
-  const stats: TreeStats = { trees: 0, conifers: 0, plants: 0, plantMs: 0 };
+  const stats: TreeStats = { trees: 0, fromCover: 0, conifers: 0, plants: 0, plantMs: 0 };
 
   const camElevation = () => ((map as unknown as { transform?: { elevation?: number } })?.transform?.elevation ?? 0);
   const perMetre = (lat: number) => maplibregl.MercatorCoordinate.fromLngLat([0, lat], 1).z;
@@ -294,56 +358,73 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     cell ??= SPACING_M * perMetre(Math.round(centre.toLngLat().lat));
     const seen = new Set<number>();
     const found: { ix: number; iy: number; d: number }[] = [];
+    const grid = cell;
+    // Cells taken by buildings: no tree there; and by carriageways: no tree from the cover there.
+    const built = new Set<number>();
+    const road = new Set<number>();
+    if (o.buildingLayer) {
+      for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.buildingLayer })) {
+        for (const rs of mercatorPolygons(f)) cellsInside(rs, builtBox, grid, (ix, iy) => built.add(ix * 4194304 + iy));
+      }
+    }
+    const take = (ix: number, iy: number) => {
+      // Each cell once (woods repeat across the tiles they straddle), some left clear, none in a building.
+      const key = ix * 4194304 + iy;
+      if (seen.has(key) || built.has(key) || hash(ix, iy, 7) < 0.12) return false;
+      seen.add(key);
+      found.push({ ix, iy, d: Math.hypot((ix + 0.5) * grid - centre.x, (iy + 0.5) * grid - centre.y) });
+      return true;
+    };
+    // The mapped woods.
     for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.sourceLayer, filter: ["in", ["get", "kind"], ["literal", o.kinds]] })) {
-      const gm = f.geometry;
-      const polys = gm.type === "Polygon" ? [gm.coordinates] : gm.type === "MultiPolygon" ? gm.coordinates : [];
-      for (const rings of polys) {
-        // Its rings in mercator, and its box.
-        const rs = rings.map((r) => r.map((p) => {
-          const c = maplibregl.MercatorCoordinate.fromLngLat([p[0], p[1]]);
-          return [c.x, c.y];
-        }));
-        let y0 = Infinity;
-        let y1 = -Infinity;
-        let x0 = Infinity;
-        let x1 = -Infinity;
-        for (const p of rs[0]) {
-          x0 = Math.min(x0, p[0]);
-          x1 = Math.max(x1, p[0]);
-          y0 = Math.min(y0, p[1]);
-          y1 = Math.max(y1, p[1]);
-        }
-        x0 = Math.max(x0, builtBox[0]);
-        x1 = Math.min(x1, builtBox[2]);
-        y0 = Math.max(y0, builtBox[1]);
-        y1 = Math.min(y1, builtBox[3]);
-        if (x0 >= x1 || y0 >= y1) continue;
-        // Row by row: where each row of the grid crosses the wood's edges, and the cells between.
-        for (let iy = Math.ceil(y0 / cell - 0.5); (iy + 0.5) * cell <= y1; iy++) {
-          const y = (iy + 0.5) * cell;
-          const xs: number[] = [];
-          for (const r of rs) {
-            for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-              const a = r[j];
-              const b = r[i];
-              if (a[1] <= y !== b[1] <= y) xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
-            }
-          }
-          xs.sort((p, q) => p - q);
-          for (let k = 0; k + 1 < xs.length; k += 2) {
-            const from = Math.max(xs[k], x0);
-            const to = Math.min(xs[k + 1], x1);
-            for (let ix = Math.ceil(from / cell - 0.5); (ix + 0.5) * cell < to; ix++) {
-              // Each cell once (woods repeat across the tiles they straddle), and some left clear.
-              const key = ix * 4194304 + iy;
-              if (seen.has(key) || hash(ix, iy, 7) < 0.12) continue;
-              seen.add(key);
-              found.push({ ix, iy, d: Math.hypot((ix + 0.5) * cell - centre.x, y - centre.y) });
+      for (const rs of mercatorPolygons(f)) cellsInside(rs, builtBox, grid, take);
+    }
+    // And wherever the tree cover shows trees, off the carriageways.
+    let fromCover = 0;
+    if (mask && o.cover && o.roadLayer) {
+      const half: Record<string, number> = { highway: 9, major_road: 6, minor_road: 3.5 };
+      for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.roadLayer, filter: ["in", ["get", "kind"], ["literal", Object.keys(half)]] })) {
+        const hw = (half[String(f.properties?.kind)] ?? 3.5) * pmView;
+        const gm = f.geometry;
+        const lines = gm.type === "LineString" ? [gm.coordinates] : gm.type === "MultiLineString" ? gm.coordinates : [];
+        const reach = Math.ceil(hw / grid);
+        for (const line of lines) {
+          const pts = line.map((p) => maplibregl.MercatorCoordinate.fromLngLat([p[0], p[1]]));
+          for (let i = 1; i < pts.length; i++) {
+            const a = pts[i - 1];
+            const b = pts[i];
+            const len = Math.hypot(b.x - a.x, b.y - a.y);
+            const steps = Math.max(1, Math.ceil(len / (grid * 0.5)));
+            for (let k = 0; k <= steps; k++) {
+              const x = a.x + ((b.x - a.x) * k) / steps;
+              const y = a.y + ((b.y - a.y) * k) / steps;
+              if (x < builtBox[0] - hw || x > builtBox[2] + hw || y < builtBox[1] - hw || y > builtBox[3] + hw) continue;
+              const cx = Math.round(x / grid - 0.5);
+              const cy = Math.round(y / grid - 0.5);
+              for (let dy = -reach; dy <= reach; dy++) {
+                for (let dx = -reach; dx <= reach; dx++) {
+                  if (Math.hypot((cx + dx + 0.5) * grid - x, (cy + dy + 0.5) * grid - y) <= hw) road.add((cx + dx) * 4194304 + cy + dy);
+                }
+              }
             }
           }
         }
       }
     }
+    if (mask && o.cover) {
+      const c = o.cover;
+      for (let iy = Math.ceil(builtBox[1] / grid - 0.5); (iy + 0.5) * grid <= builtBox[3]; iy++) {
+        const lat = (Math.atan(Math.sinh(Math.PI * (1 - 2 * (iy + 0.5) * grid))) * 180) / Math.PI;
+        const row = Math.floor((c.north - lat) / c.step);
+        if (row < 0 || row >= c.height) continue;
+        for (let ix = Math.ceil(builtBox[0] / grid - 0.5); (ix + 0.5) * grid <= builtBox[2]; ix++) {
+          const col = Math.floor(((ix + 0.5) * grid * 360 - 180 - c.west) / c.step);
+          if (col < 0 || col >= c.width || !mask[row * c.width + col] || road.has(ix * 4194304 + iy)) continue;
+          if (take(ix, iy)) fromCover++;
+        }
+      }
+    }
+    stats.fromCover = fromCover;
     // The nearest to the middle of the view, as many as are allowed.
     if (found.length > o.maxTrees) {
       found.sort((a, b) => a.d - b.d);
@@ -421,6 +502,32 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     onAdd(m, g) {
       map = m;
       gl = g;
+      // The tree cover, read once: its pixels that are trees (ESA WorldCover's class 10).
+      const coverUrl = o.cover?.url;
+      if (o.cover && coverUrl) {
+        const c = o.cover;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const cv = document.createElement("canvas");
+            cv.width = c.width;
+            cv.height = c.height;
+            const g2 = cv.getContext("2d", { willReadFrequently: true });
+            if (!g2) return;
+            g2.drawImage(img, 0, 0);
+            const d = g2.getImageData(0, 0, c.width, c.height).data;
+            const out = new Uint8Array(c.width * c.height);
+            for (let i = 0; i < out.length; i++) out[i] = d[i * 4] === 10 ? 1 : 0;
+            mask = out;
+            dirty = true;
+            later();
+          } catch {
+            // Not readable: the mapped woods only.
+          }
+        };
+        img.src = coverUrl;
+      }
       if (typeof WebGL2RenderingContext !== "undefined" && g instanceof WebGL2RenderingContext) {
         divisor = (i, d) => g.vertexAttribDivisor(i, d);
         drawInstanced = (mode, count, type, offset, n) => g.drawElementsInstanced(mode, count, type, offset, n);

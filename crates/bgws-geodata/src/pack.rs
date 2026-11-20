@@ -16,6 +16,7 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     std::fs::create_dir_all(dir)?;
     crate::preview::render(&g.terrain, &g.rivers, &g.towns, roads).write_png(&dir.join("preview.png"))?;
     let (towns, dem) = (g.towns, g.dem);
+    let tree_cover = g.tree_cover;
     if let Some(surface) = &g.surface {
         surface.write(&dir.join("surface.bin"))?;
     }
@@ -42,6 +43,9 @@ pub fn write_pack(dir: &Path, name: &str, spec: &BuildSpec, g: Ground, roads: &R
     }
     if has_surface {
         meta.surface = Some("surface.bin".into());
+    }
+    if let Some(c) = &tree_cover {
+        meta.tree_cover = Some(write_cover(dir, c)?);
     }
     meta.bbox = Some([b.west, b.south, b.east, b.north]);
     meta.sources = Some(serde_json::json!({
@@ -94,6 +98,26 @@ fn write_rails(dir: &Path, meta: &mut PackMeta, rails: Vec<bgws_env::Railway>) -
     std::fs::write(dir.join("railways.json"), serde_json::to_vec(&rails).map_err(|e| GeoError::Format(e.to_string()))?)?;
     meta.railways = Some("railways.json".into());
     Ok(())
+}
+
+/// Land cover at 10 m as `treecover.png` (ESA WorldCover's classes as grey levels), placed.
+fn write_cover(dir: &Path, c: &crate::worldcover::Cover) -> Result<bgws_env::CoverRef, GeoError> {
+    crate::preview::write_gray_png(&dir.join("treecover.png"), c.width, c.height, &c.class)?;
+    Ok(bgws_env::CoverRef { file: "treecover.png".into(), west: c.west, north: c.north, step: c.step, width: c.width, height: c.height })
+}
+
+/// Read where the trees are at 10 m (ESA WorldCover) over a pack's box into
+/// `treecover.png`, for the viewer's trees, without rebuilding the rest: for a
+/// pack built before packs carried it. (The simulation's ground gains the
+/// trees only when the pack is built again.) Returns the share under trees.
+pub fn refresh_tree_cover(dir: &Path, cache: Option<&Path>, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<f64, GeoError> {
+    let io = |e: bgws_env::TileError| GeoError::Io(format!("{e:?}"));
+    let mut meta = TheatrePack::open(dir).map_err(io)?.meta;
+    let [w, s, e, n] = meta.bbox.ok_or_else(|| GeoError::Format(format!("{}: the pack has no bbox", dir.display())))?;
+    let c = crate::worldcover::cover(crate::mercator::BBox::new(w, s, e, n).grown(200.0), cache, progress)?;
+    meta.tree_cover = Some(write_cover(dir, &c)?);
+    TheatrePack::write_meta(dir, &meta).map_err(io)?;
+    Ok(c.class.iter().filter(|&&v| v == crate::worldcover::TREES).count() as f64 / c.class.len().max(1) as f64)
 }
 
 /// The railway lines in the basemap's tiles, as `railways.json` (none: no file).

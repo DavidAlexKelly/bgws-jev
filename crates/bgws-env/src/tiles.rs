@@ -212,6 +212,18 @@ pub struct TileEntry {
 }
 
 /// `pack.json`.
+/// A raster on a longitude–latitude grid, kept with a pack.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CoverRef {
+    pub file: String,
+    /// The north-west corner of pixel (0, 0), degrees, and a pixel's size.
+    pub west: f64,
+    pub north: f64,
+    pub step: f64,
+    pub width: usize,
+    pub height: usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PackMeta {
     pub name: String,
@@ -232,6 +244,9 @@ pub struct PackMeta {
     /// Railway lines on the ground (`railways.json`), from a real-ground build.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub railways: Option<String>,
+    /// Land cover at 10 m (ESA WorldCover's classes, a greyscale PNG), for the viewer's trees.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree_cover: Option<CoverRef>,
     #[serde(default)]
     pub towns: Option<String>,
     /// A road graph folder (`roads/`: nodes.bin, edges.bin, …) from a real-ground build.
@@ -297,6 +312,7 @@ impl TheatrePack {
             rivers: json("rivers.json", &w.rivers)?,
             power_lines: json("power_lines.json", &w.power_lines)?,
             railways: None,
+            tree_cover: None,
             towns: json("towns.json", &w.towns)?,
             road_graph: None,
             basemap: None,

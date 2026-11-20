@@ -31,7 +31,9 @@ use std::sync::{Arc, Mutex};
 
 /// Overture's public bucket (S3, us-west-2), read anonymously.
 pub const BUCKET: &str = "https://overturemaps-us-west-2.s3.amazonaws.com";
-const THEME: &str = "theme=buildings/type=building/";
+/// The themes read: buildings, and land cover (from ESA WorldCover, 10 m).
+const BUILDINGS: &str = "theme=buildings/type=building/";
+const LAND_COVER: &str = "theme=base/type=land_cover/";
 
 /// A building's footprint and what Overture knows of its height.
 #[derive(Clone, Debug, PartialEq)]
@@ -106,15 +108,16 @@ fn tail_bbox(tail: &[u8]) -> Option<[f64; 4]> {
 
 /// The release's files with their boxes: from the cache, else listed and
 /// each file's tail read (about 30 MB once per release).
-fn index(release: &str, cache: Option<&Path>, pool: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<FileEntry>, GeoError> {
-    let file = cache.map(|c| c.join("overture").join(release).join("buildings-index.json"));
+fn index(theme: &str, release: &str, cache: Option<&Path>, pool: &rayon::ThreadPool, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<Vec<FileEntry>, GeoError> {
+    let name = theme.trim_end_matches('/').replace(['=', '/'], "-");
+    let file = cache.map(|c| c.join("overture").join(release).join(format!("{name}-index.json")));
     if let Some(f) = &file {
         if let Some(v) = std::fs::read(f).ok().and_then(|b| serde_json::from_slice::<Vec<FileEntry>>(&b).ok()) {
             return Ok(v);
         }
     }
     let c = client()?;
-    let prefix = format!("release/{release}/{THEME}");
+    let prefix = format!("release/{release}/{theme}");
     let mut files: Vec<(String, u64)> = Vec::new();
     let mut token: Option<String> = None;
     loop {
@@ -146,7 +149,7 @@ fn index(release: &str, cache: Option<&Path>, pool: &rayon::ThreadPool, progress
                 let n = (*size).min(65_536);
                 let tail = src.read(size - n, n)?;
                 let k = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-                progress("buildings (Overture): index", k as f64 / files.len() as f64);
+                progress("Overture: index", k as f64 / files.len() as f64);
                 Ok(FileEntry { key: key.clone(), size: *size, bbox: tail_bbox(&tail) })
             })
             .collect::<Result<_, GeoError>>()
@@ -219,10 +222,13 @@ fn stat_f64(s: &Statistics, min: bool) -> Option<f64> {
     }
 }
 
-/// The columns read: the rest of a building's attributes are left on the server.
-const COLUMNS: [&str; 6] = ["bbox", "geometry", "height", "num_floors", "is_underground", "sources"];
+/// The columns read for buildings: the rest of their attributes are left on the server.
+const BUILDING_COLUMNS: [&str; 6] = ["bbox", "geometry", "height", "num_floors", "is_underground", "sources"];
+/// And for land cover.
+const LAND_COVER_COLUMNS: [&str; 4] = ["bbox", "geometry", "subtype", "cartography"];
 
-fn read_file(e: &FileEntry, b: BBox, cache: Option<&Path>, pool: &rayon::ThreadPool) -> Result<Vec<Building>, GeoError> {
+/// Each row of a file whose row group touches the box, with only `columns` read.
+fn read_rows(e: &FileEntry, b: BBox, columns: &[&str], cache: Option<&Path>, pool: &rayon::ThreadPool, each: &mut dyn FnMut(&Row)) -> Result<(), GeoError> {
     let src = open_source(&format!("{BUCKET}/{}", e.key), cache)?;
     let remote = Arc::new(Remote { src, len: e.size, held: Mutex::new(Vec::new()) });
     let reader = SerializedFileReader::new(Shared(remote.clone())).map_err(pq)?;
@@ -244,27 +250,62 @@ fn read_file(e: &FileEntry, b: BBox, cache: Option<&Path>, pool: &rayon::ThreadP
         })
         .collect();
     if groups.is_empty() {
-        return Ok(Vec::new());
+        return Ok(());
     }
     // The column chunks wanted, fetched whole and in parallel.
-    let wanted = |path: &str| COLUMNS.iter().any(|c| path == *c || path.starts_with(&format!("{c}.")));
+    let wanted = |path: &str| columns.iter().any(|c| path == *c || path.starts_with(&format!("{c}.")));
     let chunks: Vec<(u64, u64)> = groups.iter().flat_map(|&g| meta.row_group(g).columns().iter().filter(|c| wanted(&c.column_path().string())).map(|c| c.byte_range()).collect::<Vec<_>>()).collect();
     pool.install(|| chunks.par_iter().try_for_each(|&(s, l)| remote.hold(s, l)))?;
 
     let root = meta.file_metadata().schema();
-    let fields: Vec<_> = root.get_fields().iter().filter(|f| COLUMNS.contains(&f.name())).cloned().collect();
+    let fields: Vec<_> = root.get_fields().iter().filter(|f| columns.contains(&f.name())).cloned().collect();
     let projection = Type::group_type_builder("schema").with_fields(fields).build().map_err(pq)?;
-    let mut out = Vec::new();
     for g in groups {
         let rg = reader.get_row_group(g).map_err(pq)?;
         for row in rg.get_row_iter(Some(projection.clone())).map_err(pq)? {
-            let row = row.map_err(pq)?;
-            if let Some(mut v) = building(&row, b) {
-                out.append(&mut v);
-            }
+            each(&row.map_err(pq)?);
         }
     }
-    Ok(out)
+    Ok(())
+}
+
+/// Whether a row's `bbox` touches the box (true when it has none).
+fn touches(row: &Row, b: BBox) -> bool {
+    for (name, f) in row.get_column_iter() {
+        if let ("bbox", Field::Group(bb)) = (name.as_str(), f) {
+            let mut v = [0f64; 4];
+            for (n, x) in bb.get_column_iter() {
+                let x = match x {
+                    Field::Float(x) => *x as f64,
+                    Field::Double(x) => *x,
+                    _ => continue,
+                };
+                match n.as_str() {
+                    "xmin" => v[0] = x,
+                    "xmax" => v[1] = x,
+                    "ymin" => v[2] = x,
+                    "ymax" => v[3] = x,
+                    _ => {}
+                }
+            }
+            return !(v[0] > b.east || v[1] < b.west || v[2] > b.north || v[3] < b.south);
+        }
+    }
+    true
+}
+
+/// The release, its files touching the box, and the pool and cache to read them with.
+fn files_touching(theme: &str, b: BBox, release: Option<&str>, cache: Option<&Path>, threads: usize, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<(String, Vec<FileEntry>, rayon::ThreadPool, Option<PathBuf>), GeoError> {
+    let release = match release {
+        Some(r) => r.to_string(),
+        None => latest_release()?,
+    };
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(threads.max(1)).build().map_err(|e| GeoError::Io(e.to_string()))?;
+    progress("Overture: index", 0.0);
+    let files = index(theme, &release, cache, &pool, progress)?;
+    let touching: Vec<FileEntry> = files.into_iter().filter(|f| f.bbox.is_none_or(|[x0, y0, x1, y1]| x0 <= b.east && x1 >= b.west && y0 <= b.north && y1 >= b.south)).collect();
+    let cache: Option<PathBuf> = cache.map(|c| c.join("overture").join(&release));
+    Ok((release, touching, pool, cache))
 }
 
 /// A row as buildings (a multipolygon is several), if it touches the box and stands above ground.
@@ -405,21 +446,74 @@ pub fn wkb(b: &[u8]) -> Option<Vec<Vec<Vec<[f64; 2]>>>> {
 
 /// Every Overture building touching `b` (from every source), and the release read.
 pub fn buildings(b: BBox, release: Option<&str>, cache: Option<&Path>, threads: usize, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<(Vec<Building>, String), GeoError> {
-    let release = match release {
-        Some(r) => r.to_string(),
-        None => latest_release()?,
-    };
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(threads.max(1)).build().map_err(|e| GeoError::Io(e.to_string()))?;
-    progress("buildings (Overture): index", 0.0);
-    let files = index(&release, cache, &pool, progress)?;
-    let touching: Vec<&FileEntry> = files.iter().filter(|f| f.bbox.is_none_or(|[x0, y0, x1, y1]| x0 <= b.east && x1 >= b.west && y0 <= b.north && y1 >= b.south)).collect();
-    let cache: Option<PathBuf> = cache.map(|c| c.join("overture").join(&release));
+    let (release, files, pool, cache) = files_touching(BUILDINGS, b, release, cache, threads, progress)?;
     let mut out = Vec::new();
-    for (k, f) in touching.iter().enumerate() {
-        progress("buildings (Overture): footprints", k as f64 / touching.len() as f64);
-        out.append(&mut read_file(f, b, cache.as_deref(), &pool)?);
+    for (k, f) in files.iter().enumerate() {
+        progress("buildings (Overture): footprints", k as f64 / files.len() as f64);
+        read_rows(f, b, &BUILDING_COLUMNS, cache.as_deref(), &pool, &mut |row| {
+            if let Some(mut v) = building(row, b) {
+                out.append(&mut v);
+            }
+        })?;
     }
     progress("buildings (Overture): footprints", 1.0);
+    Ok((out, release))
+}
+
+/// A patch of land cover: its class and its outline at the detail it is drawn at.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LandCover {
+    /// forest, shrub, grass, crop, wetland, mangrove, moss, barren, snow, urban.
+    pub subtype: String,
+    /// The map zooms this outline is meant for (the same ground comes at several levels of detail).
+    pub min_zoom: i32,
+    pub max_zoom: i32,
+    /// Outer ring then holes, (lon, lat) degrees.
+    pub rings: Vec<Vec<[f64; 2]>>,
+}
+
+/// Overture's land cover touching `b` (from ESA WorldCover, 10 m), every class and level of detail.
+pub fn land_cover(b: BBox, release: Option<&str>, cache: Option<&Path>, threads: usize, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<(Vec<LandCover>, String), GeoError> {
+    let (release, files, pool, cache) = files_touching(LAND_COVER, b, release, cache, threads, progress)?;
+    let mut out = Vec::new();
+    for (k, f) in files.iter().enumerate() {
+        progress("land cover (Overture)", k as f64 / files.len() as f64);
+        read_rows(f, b, &LAND_COVER_COLUMNS, cache.as_deref(), &pool, &mut |row| {
+            if !touches(row, b) {
+                return;
+            }
+            let (mut subtype, mut geom, mut zooms) = (String::new(), None, (0, 99));
+            for (name, f) in row.get_column_iter() {
+                match (name.as_str(), f) {
+                    ("subtype", Field::Str(s)) => subtype = s.clone(),
+                    ("geometry", Field::Bytes(g)) => geom = Some(g.data().to_vec()),
+                    ("cartography", Field::Group(c)) => {
+                        for (n, x) in c.get_column_iter() {
+                            let v = match x {
+                                Field::Int(v) => *v,
+                                Field::Byte(v) => *v as i32,
+                                Field::Short(v) => *v as i32,
+                                Field::Long(v) => *v as i32,
+                                _ => continue,
+                            };
+                            match n.as_str() {
+                                "min_zoom" => zooms.0 = v,
+                                "max_zoom" => zooms.1 = v,
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(polys) = geom.as_deref().and_then(wkb) {
+                for rings in polys {
+                    out.push(LandCover { subtype: subtype.clone(), min_zoom: zooms.0, max_zoom: zooms.1, rings });
+                }
+            }
+        })?;
+    }
+    progress("land cover (Overture)", 1.0);
     Ok((out, release))
 }
 

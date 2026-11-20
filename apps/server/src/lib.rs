@@ -358,6 +358,7 @@ fn pack_json(name: &str) -> Option<serde_json::Value> {
     Some(json!({
         "name": folder, "bbox": meta.bbox, "cellM": meta.cell, "basemap": url(&meta.basemap), "dem": url(&meta.dem),
         "preview": url(&Some("preview.png".to_string())), "roadsKm": roads_km, "towns": towns,
+        "treeCover": meta.tree_cover.as_ref().filter(|c| dir.join(&c.file).exists()).map(|c| json!({ "url": url(&Some(c.file.clone())), "west": c.west, "north": c.north, "step": c.step, "width": c.width, "height": c.height })),
         "analysis": meta.analysis.as_ref().filter(|_| dir.join("exposure.png").exists()).map(|_| json!({
             "exposure": url(&Some("exposure.png".to_string())), "going": url(&Some("going.png".to_string())), "keyTerrain": url(&Some("keyterrain.json".to_string())),
         })),

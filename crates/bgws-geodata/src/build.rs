@@ -58,6 +58,11 @@ pub struct BuildSpec {
     pub overture_release: Option<String>,
     /// The height given to an added building with none, m.
     pub overture_height_m: f64,
+    /// Read where the trees are at 10 m (ESA WorldCover), for the viewer's trees.
+    pub tree_cover: bool,
+    /// And let it reach the simulation: open ground under trees becomes light woodland, and
+    /// the sight surface gains the trees (where no building stands).
+    pub tree_cover_sim: bool,
 }
 
 impl BuildSpec {
@@ -79,6 +84,8 @@ impl BuildSpec {
             overture: true,
             overture_release: None,
             overture_height_m: 6.0,
+            tree_cover: true,
+            tree_cover_sim: true,
         }
     }
 }
@@ -152,6 +159,8 @@ pub struct Ground {
     pub stats: serde_json::Value,
     /// Buildings at their height and woods by class, on a fine grid, for sight lines.
     pub surface: Option<bgws_env::SightSurface>,
+    /// Land cover at 10 m over the box (ESA WorldCover), when it was read.
+    pub tree_cover: Option<crate::worldcover::Cover>,
 }
 
 impl Ground {
@@ -585,6 +594,35 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     // ── Overture: the buildings OpenStreetMap does not have ───────────────
     let (added, overture_stats) = if spec.overture { overture_buildings(spec, &frame, &to_grid, fspec, fine as f64, outs.iter().chain(&bouts), progress) } else { (AddedBuildings::default(), serde_json::json!({ "used": false })) };
 
+    // ── Where the trees are, at 10 m (ESA WorldCover) ─────────────────────
+    let (tree_cover, mut tree_stats) = if spec.tree_cover {
+        match crate::worldcover::cover(b.grown(200.0), spec.cache.as_deref(), progress) {
+            Ok(c) => {
+                let share = c.class.iter().filter(|&&v| v == crate::worldcover::TREES).count() as f64 / c.class.len().max(1) as f64;
+                (
+                    Some(c),
+                    serde_json::json!({ "used": true, "treeShare": share, "simulation": spec.tree_cover_sim, "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)" }),
+                )
+            }
+            Err(e) => {
+                progress(&format!("tree cover: not used ({e})"), 1.0);
+                (None, serde_json::json!({ "used": false, "error": e.to_string() }))
+            }
+        }
+    } else {
+        (None, serde_json::json!({ "used": false }))
+    };
+    // ENU to longitude and latitude along a row of cells: exact at its ends, straight between
+    // (a row of a pack's grid is close enough to straight in degrees, and this is fast).
+    let row_ll = |e0: f64, e1: f64, n: f64| {
+        let a = frame.enu_to_geodetic(Enu::new(e0, n, 0.0));
+        let z = frame.enu_to_geodetic(Enu::new(e1, n, 0.0));
+        move |e: f64| {
+            let t = if e1 > e0 { (e - e0) / (e1 - e0) } else { 0.0 };
+            (a.lon + (z.lon - a.lon) * t, a.lat + (z.lat - a.lat) * t)
+        }
+    };
+
     progress("land cover", 0.0);
     let mut cover = Raster::filled(gspec, LandCover::Open);
     let mut prio = vec![0u8; gspec.len()];
@@ -625,6 +663,33 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     }
     drop(built);
     drop(prio);
+    // Open ground, fields and scrub mostly under trees (5 of 9 points across the cell): light woodland.
+    if let (Some(tc), true) = (&tree_cover, spec.tree_cover_sim) {
+        let mut woods = 0usize;
+        for j in 0..h {
+            let n0 = gspec.origin_n + j as f64 * cell;
+            let rows: Vec<_> = [-1.0, 0.0, 1.0].iter().map(|d| row_ll(gspec.origin_e, gspec.origin_e + (w - 1) as f64 * cell, n0 + d * cell / 3.0)).collect();
+            for i in 0..w {
+                let k = gspec.idx(i, j);
+                if !matches!(cover.data[k], LandCover::Open | LandCover::Crops | LandCover::Scrub) {
+                    continue;
+                }
+                let e0 = gspec.origin_e + i as f64 * cell;
+                let mut under = 0;
+                for r in &rows {
+                    for d in [-1.0, 0.0, 1.0] {
+                        let (lon, lat) = r(e0 + d * cell / 3.0);
+                        under += usize::from(tc.at(lon, lat) == crate::worldcover::TREES);
+                    }
+                }
+                if under >= 5 {
+                    cover.data[k] = LandCover::ForestLight;
+                    woods += 1;
+                }
+            }
+        }
+        tree_stats["lightWoodCells"] = serde_json::json!(woods);
+    }
 
     // ── The sight surface: woods and buildings on a fine grid ─────────────
     progress("sight surface", 0.0);
@@ -645,6 +710,29 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
                 }
             });
         }
+    }
+    // Trees on the sight surface where the map has none (gardens, avenues, overgrown ground):
+    // light woodland, not on water; buildings, laid next, clear their own cells.
+    if let (Some(tc), true) = (&tree_cover, spec.tree_cover_sim) {
+        let v = LandCover::ForestLight as u8 + 1;
+        let mut cells = 0usize;
+        for j in 0..fspec.height {
+            let n = fspec.origin_n + j as f64 * fspec.cell;
+            let r = row_ll(fspec.origin_e, fspec.origin_e + (fspec.width - 1) as f64 * fspec.cell, n);
+            let gj = (j / fine).min(h - 1);
+            for i in 0..fspec.width {
+                let k = fspec.idx(i, j);
+                if surface.tree[k] != 0 || cover.data[gspec.idx((i / fine).min(w - 1), gj)] == LandCover::Water {
+                    continue;
+                }
+                let (lon, lat) = r(fspec.origin_e + i as f64 * fspec.cell);
+                if tc.at(lon, lat) == crate::worldcover::TREES {
+                    surface.tree[k] = v;
+                    cells += 1;
+                }
+            }
+        }
+        tree_stats["surfaceCells"] = serde_json::json!(cells);
     }
     let mut footprints = 0usize;
     for o in outs.iter().chain(&bouts).chain(std::iter::once(&added.out)) {
@@ -718,10 +806,10 @@ pub fn build(spec: &BuildSpec, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<
     let stats = serde_json::json!({
         "grid": [w, h], "cellM": cell, "elevationM": [emin, emax], "landCover": counts, "denseUrbanCells": dense,
         "rivers": rivers.len(), "towns": towns.len(), "roadParts": roads.len(), "basemapTiles": basemap.len(),
-        "elevationZoom": ez, "vectorZoom": vz, "surfaceCellM": fspec.cell, "buildingFootprints": footprints, "overture": overture_stats,
+        "elevationZoom": ez, "vectorZoom": vz, "surfaceCellM": fspec.cell, "buildingFootprints": footprints, "overture": overture_stats, "treeCover": tree_stats,
     });
     let terrain = Terrain { frame_origin: frame.origin, spec: gspec, elevation, land_cover: cover, soil, wetness, obstacle_gap };
-    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats, surface: Some(surface) })
+    Ok(Ground { frame, terrain, rivers, towns, roads, zoom: vz, extent, basemap, dem, planet, stats, surface: Some(surface), tree_cover })
 }
 
 /// Woods and towns back to bare ground: a morphological opening (the lowest
