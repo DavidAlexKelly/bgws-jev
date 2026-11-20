@@ -1546,6 +1546,44 @@ Ground sensing and drone cameras both work this way. *Can it see…?* shows
 `openWhereTheyStand`, and gives the chance of detection over the window on
 that line.
 
+### Searching for a target: the NVESD search model
+
+Detection follows the US Army's NVESD search model, as Howe gives it in
+the *IR/EO Systems Handbook* (vol. 4, 1993, pp. 110–114). Notes with page
+references are in `docs/papers/notes/howe-1993-search.md`.
+
+- **Only some observers ever find a target.** The model gives
+  P(t) = P∞·[1 − exp(−t/τ)]. P∞ is the share of observers who ever find
+  the target, from the cycles they resolve across it (ACQUIRE).
+  - Whether this observer will is drawn once for the pair where they
+    stand, as for a sight line through trees. Moving draws it again.
+  - Before this change, the chance of detection kept rising towards 1
+    however hard the target was to pick out. Now a target this observer
+    cannot pick out stays unseen while neither moves.
+- **One that will find it does so in about τ.**
+  - Within one field of view, τ = 3.4/P∞ s, or 6.8·N50/N s when
+    P∞ ≥ 0.9.
+  - A sector is searched one field of view at a time (`fov_ref_deg`, 10°),
+    so it takes as many times longer as it holds fields of view.
+  - A cue and the observer's state scale it.
+- **Clutter at the target sets how hard it is to find.** Fields and open
+  ground are low clutter, woods and light town medium, dense woods and
+  dense town high. The detection N50 is half the medium value in low
+  clutter and twice it in high (Howe Table 2.5).
+
+**What the change did:**
+- The vignettes stay in band, except attack halt on generated ground: its
+  median moved from 25% to 33% losses (200 games; band 10–30%). That
+  scenario has no HQ planner, so only morale halts the attack.
+- From first sighting to first shot takes a median of 7 s over 60 shots
+  in three generated scenarios. TETAM measured 8–11 s for anti-tank
+  missile crews (`docs/papers/notes/bryson-tetam.md`).
+- **Not sourced yet:**
+  - the cue factor;
+  - the observer multipliers;
+  - the 10° reference field of view;
+  - use of the model for the naked eye, which Howe excludes.
+
 ### Cover from the features on the ground
 
 A unit's cover (against direct fire, suppression and blast) and

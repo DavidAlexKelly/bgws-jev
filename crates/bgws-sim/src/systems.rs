@@ -14,7 +14,7 @@ use bgws_env::{transmission, OpticalBand};
 use bgws_know::{ClassEvidence, Detection, Hypothesis, IdLevel, Measurement, MotionHint, SensorKind, TruthTag};
 use bgws_models::direct_fire::{self as df, ArmourZones, FireControl, Gun, PersonPosture, Protection, Shot, StrikeOutcome, VehicleDims, VehiclePosture, Warhead, Zone};
 use bgws_models::people::{IncomingFire, MoraleState, StressInputs, UnitQuality, WorkLoad};
-use bgws_models::sensing::acquire::{acquire, AcquireInput, Contrast, Metric, Search, Stage};
+use bgws_models::sensing::acquire::{acquire, AcquireInput, Clutter, Contrast, Metric, Search, Stage};
 use bgws_models::sensing::observer::{tau_multiplier, ObserverState};
 use bevy_ecs::prelude::Entity;
 use nalgebra::Matrix3;
@@ -487,7 +487,10 @@ struct Sight {
 
 /// The best sensor of an observer against one target (highest detection rate).
 struct Best {
+    /// For an observer that will find the target: 1/τ.
     rate: f64,
+    /// The share of observers that ever find it (P∞).
+    p_inf: f64,
     sensor: SensorKind,
     contrast: Contrast,
     res: f64,
@@ -553,16 +556,44 @@ fn candidate_pairs(s: &Sim, ents: &[SenseEnt], max_r: f64) -> Vec<(usize, usize,
 /// while neither moves, and either moving a cell or so draws it afresh
 /// (other gaps in the leaves). It is the same both ways round.
 pub fn sight_line_open(seed: Seed, a: u64, b: u64, pa: Enu, pb: Enu, cell_m: f64, p_visible: f64) -> bool {
-    if p_visible >= 1.0 {
+    let ((a, pa), (b, pb)) = if a <= b { ((a, pa), (b, pb)) } else { ((b, pb), (a, pa)) };
+    keyed_at(seed, "sight-line", a, b, pa, pb, cell_m, p_visible)
+}
+
+/// Will this observer ever find this target, searching from where it is?
+/// The search model's P∞ is the share of observers that ever do (Howe 1993,
+/// eq. 2.33); which way it falls is drawn once for the pair where the two
+/// stand (`cell_m` cells), like a sight line through trees, so looking longer
+/// does not find a target this observer cannot pick out. Either moving
+/// draws it again. Unlike a sight line it is one way: observer, then target.
+pub fn findable(seed: Seed, observer: u64, target: u64, po: Enu, pt: Enu, cell_m: f64, p_inf: f64) -> bool {
+    keyed_at(seed, "findable", observer, target, po, pt, cell_m, p_inf)
+}
+
+/// A draw against `p`, the same for a pair while both stay in their cells.
+#[allow(clippy::too_many_arguments)]
+fn keyed_at(seed: Seed, purpose: &'static str, a: u64, b: u64, pa: Enu, pb: Enu, cell_m: f64, p: f64) -> bool {
+    if p >= 1.0 {
         return true;
     }
-    if p_visible <= 0.0 {
+    if p <= 0.0 {
         return false;
     }
-    let ((a, pa), (b, pb)) = if a <= b { ((a, pa), (b, pb)) } else { ((b, pb), (a, pa)) };
     let q = |v: f64| (v / cell_m.max(0.1)).floor() as i64 as u64;
     let cells = mix64(q(pa.e) ^ mix64(q(pa.n) ^ mix64(q(pb.e) ^ mix64(q(pb.n)))));
-    seed.uniform(StreamKey::new("sight-line", a, b, cells as i64)) < p_visible
+    seed.uniform(StreamKey::new(purpose, a, b, cells as i64)) < p
+}
+
+/// The clutter round a target in search, from the land cover where it is
+/// (Howe 1993 Table 2.5: low, a target in a field or on a road; high, a
+/// vehicle among similar ones; woods and towns between).
+pub fn clutter_at(g: &crate::ground::Ground, at: Enu) -> Clutter {
+    use bgws_env::LandCover::*;
+    match g.land_cover(at.e, at.n) {
+        Open | Crops | Bare | Water | Wetland => Clutter::Low,
+        Scrub | ForestLight | UrbanLight => Clutter::Medium,
+        ForestDense | UrbanDense => Clutter::High,
+    }
 }
 
 /// Sensing (§8.2): candidate pairs in range on the hash grid, the best
@@ -604,6 +635,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
                 let cued = cued(o, t);
                 let tau_mult = tau_multiplier(&o.observer, &p.observer);
+                let clutter = clutter_at(ground, t.pos);
                 // Smoke between them, by band (heights above the ground).
                 let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
                 let mut best: Option<Best> = None;
@@ -628,11 +660,12 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                         atmos_mtf: 1.0,
                         contrast,
                         stage: Stage::Detect,
-                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
                     };
                     let det = acquire(&input, &ap);
-                    if best.as_ref().map(|b| det.rate_per_s > b.rate).unwrap_or(true) {
-                        best = Some(Best { rate: det.rate_per_s, sensor: sk, contrast, res, n50, u: 1.0 });
+                    // The sensor that finds it soonest on average (P∞/τ).
+                    if best.as_ref().map(|b| det.p_inf * det.rate_per_s > b.p_inf * b.rate).unwrap_or(true) {
+                        best = Some(Best { rate: det.rate_per_s, p_inf: det.p_inf, sensor: sk, contrast, res, n50, u: 1.0 });
                     }
                 }
                 // The pair's first die, drawn now from its keyed stream (the
@@ -640,6 +673,11 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 // lowers the chance, so a die that fails with a clear line
                 // fails anyway: those pairs need no terrain at all.
                 let b = best.filter(|b| b.rate > 0.0)?;
+                // Only an observer that will ever find it does (P∞, drawn
+                // for where the two are), at the rate 1/τ.
+                if !findable(seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, b.p_inf) {
+                    return None;
+                }
                 let mut rng = seed.stream(StreamKey::new("sense", o.id.0 as u64, t.id.0 as u64, now.0));
                 let u: f64 = rng.gen();
                 (u < hazard_probability(b.rate, dt)).then_some(Best { u, ..b })
@@ -708,7 +746,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let _first: f64 = rng.gen();
                 let mut ap = p.acquire.clone();
                 ap.n50 = b.n50;
-                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer) };
+                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer), clutter: clutter_at(ground, t.pos) };
                 let input = |stage| AcquireInput { critical_dim_m: t.crit, range_m: range, cycles_per_mrad: b.res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: b.contrast, stage, search };
                 let rec = acquire(&input(Stage::Recognise), &ap).p_inf;
                 let idn = acquire(&input(Stage::Identify), &ap).p_inf;
@@ -808,7 +846,8 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
     let (smoke_visual, smoke_thermal) = (through(bgws_models::signature::Band::Visual), through(bgws_models::signature::Band::FarIr));
     let mut sensors = Vec::new();
-    let mut best_rate = 0.0f64;
+    let (mut best_rate, mut best_p_inf) = (0.0f64, 0.0f64);
+    let clutter = clutter_at(&s.ctx.ground, t.pos);
     for &(kind, rmax, res0, n50) in &o.sensors {
         let in_range = range <= rmax && range <= p.sense_max_m;
         let (contrast, mut res) = match kind {
@@ -829,11 +868,11 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
             atmos_mtf: 1.0,
             contrast,
             stage: Stage::Detect,
-            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
         };
         let det = acquire(&input, &ap);
-        if in_range {
-            best_rate = best_rate.max(det.rate_per_s);
+        if in_range && det.p_inf * det.rate_per_s > best_p_inf * best_rate {
+            (best_rate, best_p_inf) = (det.rate_per_s, det.p_inf);
         }
         sensors.push(json!({ "sensor": format!("{kind:?}"), "maxRangeM": rmax, "inRange": in_range, "cyclesPerMrad": res, "nightDegraded": night_degraded, "contrast": contrast_json(&contrast), "acquire": det }));
     }
@@ -849,7 +888,9 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     // Through trees the line is open or not for where the two stand now (the
     // keyed draw sensing makes; reading it changes nothing).
     let open = sight_line_open(s.ctx.seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, p_elements);
-    let p_window = if open { hazard_probability(best_rate, over_s) } else { 0.0 };
+    // Whether this observer will ever pick it out from here (P∞, drawn as sensing draws it).
+    let will_find = findable(s.ctx.seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, best_p_inf);
+    let p_window = if open && will_find { hazard_probability(best_rate, over_s) } else { 0.0 };
     Some(json!({
         "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
@@ -861,9 +902,13 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         // it fell for where they stand, which holds until one moves; the rest is the line between the two units' centres.
         "lineOfSight": { "pVisible": p_elements, "openWhereTheyStand": open, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
         "sensors": sensors,
+        // The search model (Howe 1993): P∞ of observers ever find it; one that will finds it at bestRatePerS (1/τ).
+        "clutter": clutter,
+        "pInfinity": best_p_inf,
+        "findableFromHere": will_find,
         "bestRatePerS": best_rate,
         "windowS": over_s,
-        // While neither moves.
+        // While neither moves (0 if the line is blocked or it cannot pick the target out from here).
         "pDetectInWindow": p_window,
         "alreadySeen": cued,
     }))

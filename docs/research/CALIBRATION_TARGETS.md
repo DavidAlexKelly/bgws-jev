@@ -210,7 +210,61 @@ country shows the features in this outcome. Either units seldom stand on
 them, or a dug-in defence's cover outweighs them. Telling the two apart
 needs a trace of where units stand and what cover they get.
 
-## The search model: what could not yet be sourced
+## The search model: sourced and in (Howe 1993, TETAM)
+
+Volume 4 of the *IR/EO Systems Handbook* (Howe, pp. 110–114) and the TETAM
+paper (Bryson) were read in the original. The notes are in
+`docs/papers/notes/`.
+
+**What changed:**
+- Detection levels off at P∞, drawn once per pair and position
+  (eq. 2.33). The rate for an observer that will find the target is 1/τ.
+- τ for one field of view is 3.4/P∞, or 6.8·N50/N when P∞ ≥ 0.9
+  (eq. 2.38). Howe's worked example reproduces: 2.65 s and 4.52 s.
+- `fov_exponent` goes from 0.5 to 1.0: n fields of view take n times as
+  long (eq. 2.40).
+- The search detection N50 is scaled by clutter at the target: ×0.5 low,
+  ×2 high (Table 2.5).
+- `sensing.acquire.tau_base_s` (8 s, unsourced) is gone.
+
+**Vignettes, 60 games each, before → after:**
+
+| Vignette | Before | After |
+|---|---|---|
+| Attack halt (generated) | 25% | 33%, out of band (200 games, interval 25–33%) |
+| Attack halt (real ground) | 25% | 19% |
+| Attack halt (open country) | 19% | 25% |
+| ATGM engagement | 0.73 | 0.70 |
+| Spot report latency | 2.04 | 1.79 min |
+| Detect-to-strike (networked) | 3.42 | 3.20 min |
+
+Every other vignette is unchanged.
+
+**The generated attack-halt result needs explaining.** Its scenario has no
+HQ planner, so only units' own morale halts the attack. With slower,
+capped search, the defence finds the attackers later and the attack gets
+further before morale breaks. Giving that scenario a company HQ (as the
+generated `gen-*` attacks have) would test the HQ's halt there too.
+
+**TETAM check:** first sighting to first shot is a median 7 s (quartiles
+4.5–15 s) over 60 shots in `gen-company-attack`,
+`gen-meeting-engagement` and `gen-company-defence`. TETAM's anti-tank
+missile crews took 8–11 s to engage after detecting. The lay time
+(`sim.fire.lay_min_s`, 6 s minimum) stands.
+
+**Still unsourced:**
+- `cue_factor`;
+- `fov_ref_deg`;
+- the observer multipliers;
+- the clutter mapping from land cover.
+
+ADA447823, the cueing report, could not be found. The file added as
+"cueing" is a 2024 laboratory study of contextual cueing (Su, Zhao & Ma,
+*Frontiers in Psychology*), not a field source. It is not used.
+
+## Superseded: the search model before the sources were read
+
+
 
 The primary sources are NVESD and ACQUIRE reports on DTIC, plus SPIE
 papers. Search snippets and recollection point to the following, none of

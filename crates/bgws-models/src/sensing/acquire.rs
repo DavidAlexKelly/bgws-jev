@@ -11,8 +11,18 @@
 //!
 //! P∞ = (N/N₅₀)^E / (1 + (N/N₅₀)^E), E = 2.7 + 0.7·(N/N₅₀), with separate
 //! N₅₀ for detect, recognise and identify. A TTP sensor's cycles are compared
-//! with N₅₀ × the TTP ratio (~2.7). The search rate is λ = −ln(1 − P∞)/τ with
-//! τ from the field of view, cueing and the observer (see `observer`).
+//! with N₅₀ × the TTP ratio (~2.7).
+//!
+//! Search follows the NVESD search model (Howe 1993, *IR/EO Systems
+//! Handbook* vol. 4 ch. 2, §2.6.3, pp. 110–114; notes in
+//! `docs/papers/notes/howe-1993-search.md`): P(t) = P∞·[1 − exp(−t/τ)]
+//! (eq. 2.33). Only a share P∞ of observers ever find the target; those that
+//! do find it at the rate 1/τ. τ for one field of view is 3.4/P∞ s for
+//! P∞ < 0.9 and 6.8·N₅₀/N s above (eq. 2.38); searching a sector of n
+//! fields of view takes n times as long (eq. 2.40). A cue and the observer's
+//! state scale τ (see `observer`). For search the detection N₅₀ follows the
+//! clutter round the target (Table 2.5): half the medium value in low
+//! clutter (a target in a field, on a road), twice it in high.
 
 use crate::math::norm_cdf;
 use crate::math::norm_inv;
@@ -56,6 +66,21 @@ pub struct Search {
     pub cued: bool,
     /// Observer multiplier on τ (≥ 1 slower) from `observer::tau_multiplier`.
     pub observer_tau_mult: f64,
+    /// The clutter round the target, which sets the detection N₅₀ in search.
+    pub clutter: Clutter,
+}
+
+/// Clutter round a target in search (Howe 1993, Table 2.5).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Clutter {
+    /// A target in a field or on a road.
+    Low,
+    /// A tank in a desert of tank-size bushes.
+    #[default]
+    Medium,
+    /// A vehicle among similar vehicles.
+    High,
 }
 
 /// One acquisition question.
@@ -85,8 +110,12 @@ pub struct AcquireResult {
     pub n50: f64,
     pub ratio: f64,
     pub exponent: f64,
+    /// The share of observers that ever find the target (searching).
     pub p_inf: f64,
+    /// Mean time to find it, for one that will, s.
     pub tau_s: f64,
+    /// 1/τ: the rate at which an observer that will find the target finds
+    /// it. Draw whether it ever will (P∞) once, then this rate (eq. 2.33).
     pub rate_per_s: f64,
 }
 
@@ -101,7 +130,12 @@ pub struct AcquireParams {
     pub visual_c_ref: f64,
     pub thermal_dt_threshold_k: f64,
     pub thermal_dt_ref_k: f64,
-    pub tau_base_s: f64,
+    /// τ_FOV·P∞ for P∞ < 0.9 (3.4 s), and τ_FOV·N/N₅₀ above (6.8 s).
+    pub tfov_k: f64,
+    pub tfov_k_high: f64,
+    /// Detection N₅₀ in low and high clutter, relative to medium.
+    pub clutter_low: f64,
+    pub clutter_high: f64,
     pub fov_ref_deg: f64,
     pub fov_exponent: f64,
     pub cue_factor: f64,
@@ -121,7 +155,10 @@ impl AcquireParams {
             visual_c_ref: f.get("sensing.acquire.visual_contrast_ref"),
             thermal_dt_threshold_k: f.get("sensing.acquire.thermal_dt_threshold_k"),
             thermal_dt_ref_k: f.get("sensing.acquire.thermal_dt_ref_k"),
-            tau_base_s: f.get("sensing.acquire.tau_base_s"),
+            tfov_k: f.get("sensing.acquire.tfov_k_s"),
+            tfov_k_high: f.get("sensing.acquire.tfov_k_high_s"),
+            clutter_low: f.get("sensing.acquire.clutter_low"),
+            clutter_high: f.get("sensing.acquire.clutter_high"),
             fov_ref_deg: f.get("sensing.acquire.fov_ref_deg"),
             fov_exponent: f.get("sensing.acquire.fov_exponent"),
             cue_factor: f.get("sensing.acquire.cue_factor"),
@@ -160,11 +197,25 @@ pub fn contrast_factor(apparent: f64, threshold: f64, reference: f64) -> f64 {
     ((apparent / threshold).ln() / (reference / threshold).ln()).clamp(0.0, 1.0)
 }
 
-/// The search time constant τ, seconds.
-pub fn search_tau(s: &Search, p: &AcquireParams) -> f64 {
-    let fov = (s.fov_deg.max(0.1) / p.fov_ref_deg).powf(p.fov_exponent);
+/// How much longer than one field of view a search takes: the sector in
+/// fields of view (eq. 2.40), a cue, and the observer's state.
+pub fn search_scale(s: &Search, p: &AcquireParams) -> f64 {
+    let fov = (s.fov_deg.max(0.1) / p.fov_ref_deg).powf(p.fov_exponent).max(1.0);
     let cue = if s.cued { p.cue_factor } else { 1.0 };
-    p.tau_base_s * fov * cue * s.observer_tau_mult.max(0.1)
+    fov * cue * s.observer_tau_mult.max(0.1)
+}
+
+/// The mean time to find a target in one field of view, for an observer
+/// that will, s (Howe 1993, eq. 2.38).
+pub fn tau_fov(p_inf: f64, cycles: f64, n50: f64, p: &AcquireParams) -> f64 {
+    if p_inf <= 0.0 {
+        return f64::INFINITY;
+    }
+    if p_inf < 0.9 || cycles <= 0.0 {
+        p.tfov_k / p_inf
+    } else {
+        p.tfov_k_high * n50 / cycles
+    }
 }
 
 /// Resolved cycles, P∞ and the acquisition hazard for one observer–target pair.
@@ -181,10 +232,17 @@ pub fn acquire(i: &AcquireInput, p: &AcquireParams) -> AcquireResult {
     };
     let subtense_mrad = i.critical_dim_m.max(0.0) / i.range_m.max(1.0) * 1000.0;
     let cycles = subtense_mrad * i.cycles_per_mrad.max(0.0) * i.atmos_mtf.clamp(0.0, 1.0) * cf;
-    let n50 = p.n50(i.stage, i.metric);
+    let mut n50 = p.n50(i.stage, i.metric);
+    if i.stage == Stage::Detect {
+        n50 *= match i.search.clutter {
+            Clutter::Low => p.clutter_low,
+            Clutter::Medium => 1.0,
+            Clutter::High => p.clutter_high,
+        };
+    }
     let (p_inf, e) = p_infinity(cycles, n50, p);
-    let tau = search_tau(&i.search, p);
-    let rate = if p_inf <= 0.0 { 0.0 } else { -(-p_inf).ln_1p() / tau };
+    let tau = tau_fov(p_inf, cycles, n50, p) * search_scale(&i.search, p);
+    let rate = if p_inf <= 0.0 || !tau.is_finite() { 0.0 } else { 1.0 / tau };
     AcquireResult { stage: i.stage, apparent_contrast: apparent, contrast_factor: cf, cycles, n50, ratio: cycles / n50, exponent: e, p_inf, tau_s: tau, rate_per_s: rate }
 }
 
@@ -221,9 +279,12 @@ pub fn figures() -> Vec<Figure> {
         figure!("sensing.acquire.visual_contrast_ref", 0.5, "fraction", 0.1, 1.0, "default", Default, "contrast at which full resolution is reached"),
         figure!("sensing.acquire.thermal_dt_threshold_k", 0.05, "K", 0.01, 0.3, "default", Default, "MRTD floor (≈ NETD) of a modern imager"),
         figure!("sensing.acquire.thermal_dt_ref_k", 4.0, "K", 0.5, 20.0, "default", Default, "ΔT at which full resolution is reached"),
-        figure!("sensing.acquire.tau_base_s", 8.0, "s", 1.0, 60.0, "default", Default, "search time constant at the reference FoV"),
-        figure!("sensing.acquire.fov_ref_deg", 10.0, "deg", 1.0, 60.0, "default", Default, "reference search field"),
-        figure!("sensing.acquire.fov_exponent", 0.5, "1", 0.0, 2.0, "default", Default, "τ grows as (FoV/ref)^k"),
+        figure!("sensing.acquire.tfov_k_s", 3.4, "s", 2.0, 6.0, "Howe 1993 eq. 2.35/2.38", Medium, "mean time to find a target in one field of view is this / P∞ (P∞ < 0.9, low to medium clutter; NVESD search model, validated mainly with thermal imagers)"),
+        figure!("sensing.acquire.tfov_k_high_s", 6.8, "s", 4.0, 12.0, "Howe 1993 eq. 2.36/2.38", Medium, "for P∞ ≥ 0.9 the time in one field of view is this × N50/N"),
+        figure!("sensing.acquire.clutter_low", 0.5, "×", 0.3, 1.0, "Howe 1993 Table 2.5", Medium, "search detection N50 in low clutter (a target in a field, on a road), relative to medium (0.5 vs 1.0 cycles)"),
+        figure!("sensing.acquire.clutter_high", 2.0, "×", 1.0, 3.0, "Howe 1993 Table 2.5", Medium, "search detection N50 in high clutter (a vehicle among similar vehicles), relative to medium (2.0 vs 1.0 cycles)"),
+        figure!("sensing.acquire.fov_ref_deg", 10.0, "deg", 3.0, 20.0, "default", Default, "the field of view a sector is searched with (a gunner's sight's wide field is about 10–15°); a sector of n of these takes n times as long"),
+        figure!("sensing.acquire.fov_exponent", 1.0, "1", 0.5, 1.0, "Howe 1993 eq. 2.40", Medium, "search time grows as (sector / field of view)^k: n fields of view take n times as long (k = 1 for a band of fixed height)"),
         figure!("sensing.acquire.cue_factor", 0.25, "fraction", 0.05, 1.0, "default", Default, "τ multiplier when cued"),
         figure!("sensing.acquire.p_inf_max", 0.999, "fraction", 0.9, 0.999999, "default", Default, "cap on P∞ so λ stays finite"),
         figure!("sensing.irst.pfa", 1e-6, "fraction", 1e-9, 1e-2, "default", Default, "IRST per-frame per-pixel false alarm probability"),
@@ -247,7 +308,7 @@ mod tests {
             atmos_mtf: 0.8,
             contrast,
             stage,
-            search: Search { fov_deg: 10.0, cued: false, observer_tau_mult: 1.0 },
+            search: Search { fov_deg: 10.0, cued: false, observer_tau_mult: 1.0, clutter: Clutter::Medium },
         }
     }
 
@@ -272,12 +333,45 @@ mod tests {
         assert!(d.p_inf > r.p_inf && r.p_inf > i.p_inf);
         let far = acquire(&tank_at(6000.0, c, 2.9, Stage::Identify), &p);
         assert!(far.p_inf < i.p_inf);
-        // λ = −ln(1 − P∞)/τ.
-        assert_relative_eq!(d.rate_per_s, -(1.0 - d.p_inf).ln() / d.tau_s, epsilon = 1e-12);
+        // The rate for an observer that will find it: 1/τ.
+        assert_relative_eq!(d.rate_per_s, 1.0 / d.tau_s, epsilon = 1e-12);
         // Cueing searches a small area: faster.
         let mut cued = tank_at(2000.0, c, 2.9, Stage::Detect);
         cued.search.cued = true;
         assert!(acquire(&cued, &p).rate_per_s > d.rate_per_s);
+    }
+
+    /// Howe's worked example (p. 114): N = 2.56 cycles in medium clutter
+    /// (N50 = 1) gives P∞ = 0.99 and τ_FOV = 2.65 s; N = 1.34 gives P∞ = 0.74
+    /// and τ_FOV = 4.52 s (1-D cycles; the 2-D model scales N50 by 0.75).
+    /// A sector five fields of view wide takes five times as long.
+    #[test]
+    fn howe_worked_example() {
+        let p = AcquireParams::from_figures(&figs());
+        let (good, _) = p_infinity(2.56, 1.0, &p);
+        assert!((good - 0.99).abs() < 0.01, "{good}");
+        assert!((tau_fov(good, 2.56, 1.0, &p) - 2.65).abs() < 0.02);
+        let (poor, _) = p_infinity(1.34, 1.0, &p);
+        assert!((poor - 0.74).abs() < 0.01, "{poor}");
+        assert!((tau_fov(poor, 1.34, 1.0, &p) - 4.52).abs() < 0.15, "{}", tau_fov(poor, 1.34, 1.0, &p));
+        let one = Search { fov_deg: p.fov_ref_deg, cued: false, observer_tau_mult: 1.0, clutter: Clutter::Medium };
+        let five = Search { fov_deg: 5.0 * p.fov_ref_deg, ..one };
+        assert_relative_eq!(search_scale(&five, &p), 5.0 * search_scale(&one, &p), epsilon = 1e-12);
+    }
+
+    /// The same target is found more often in low clutter than in high.
+    #[test]
+    fn clutter_moves_detection() {
+        let p = AcquireParams::from_figures(&figs());
+        let c = Contrast::Visual { inherent: 0.4, transmission: 0.8 };
+        let at = |clutter| {
+            let mut i = tank_at(12_000.0, c, 2.9, Stage::Detect);
+            i.search.clutter = clutter;
+            acquire(&i, &p)
+        };
+        let (low, mid, high) = (at(Clutter::Low), at(Clutter::Medium), at(Clutter::High));
+        assert!(low.p_inf > mid.p_inf && mid.p_inf > high.p_inf, "{} {} {}", low.p_inf, mid.p_inf, high.p_inf);
+        assert!(low.rate_per_s >= mid.rate_per_s && mid.rate_per_s >= high.rate_per_s);
     }
 
     #[test]
