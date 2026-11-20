@@ -444,26 +444,6 @@ to reach openrouter.ai.
       In 2D they cast a shadow and have an edge.
     - In 3D, buildings are lit by a low sun, and there is sky and haze on
       the horizon.
-    - **Trees:** in 3D, woods stand as trees, each with a trunk and a crown
-      (`frontend/viewer/src/trees.ts`).
-      - It is a MapLibre custom layer, so trees stand on the terrain and hide
-        behind buildings and hills like the blocks do.
-      - They are planted on a grid about 7.5 m apart, each nudged off it,
-        with about one cell in eight left clear. The grid is fixed to the
-        map, so a tree stands in the same place whenever the woods are
-        planted again.
-      - Each tree's kind, height (9–20 m, some young ones about half that),
-        crown, shade and turn come from its place on the grid. About a third
-        are conifers, with two stacked cones; the rest are broadleaf, with a
-        lumpy dome.
-      - The crowns are cut through with a pattern of small gaps, about a
-        metre and a fifth of a metre across. The inside of a crown, seen
-        through them, is in shade, so a crown reads as foliage, not a shell.
-      - All trees are drawn in three instanced calls (trunks, domes, cones):
-        the 30,000 nearest the middle of the view, out to 2.5 km at zoom 15
-        and half that each zoom further in, from zoom 13.5.
-      - Planting a view took 3–60 ms. Frame times with and without trees
-        were alike on the test machine's software GPU.
     - It draws at the screen's full resolution, and smooths edges after a
       reload.
   - **Performance:** flat colours, one pixel per screen point, and no sky:
@@ -530,6 +510,32 @@ to reach openrouter.ai.
       - A rebuild took 3–40 ms. The main-thread stalls while zooming were
         the same with the roof layer removed: MapLibre's own, on that
         machine's software GPU.
+  - **Trees:** in 3D, on the terrain basemap and over satellite imagery,
+    woods stand as trees, each with a trunk and a crown
+    (`frontend/viewer/src/trees.ts`).
+    - It is a MapLibre custom layer, so trees stand on the terrain and hide
+      behind buildings and hills like the blocks do.
+    - They are planted on a grid about 7.5 m apart, each nudged off it, with
+      about one cell in eight left clear.
+    - **Trees stay put:** the grid is fixed to the map. Its size is set once
+      from the latitude to the nearest degree, not from the view (which
+      moved the whole grid on every pan). When only more of the map loads,
+      the same trees are kept.
+      - Checked: after a pan and zoom, and after a far pan and back, all
+        3,086 trees in a wood stood where they had, on both basemaps.
+    - Each tree's kind, height (9–20 m, some young ones about half that),
+      crown, shade and turn come from its place on the grid. About a third
+      are conifers, with two stacked cones; the rest are broadleaf, with a
+      lumpy dome.
+    - The crowns are cut through with a pattern of small gaps, about a metre
+      and a fifth of a metre across. The inside of a crown, seen through
+      them, is in shade, so a crown reads as foliage, not a shell.
+    - All trees are drawn in three instanced calls (trunks, domes, cones):
+      the nearest the middle of the view (30,000 in quality graphics, 12,000
+      in performance), out to 2.5 km at zoom 15 and half that each zoom
+      further in, from zoom 13.5.
+    - Planting a view took 3–60 ms. Frame times with and without trees were
+      alike on the test machine's software GPU.
 - **Giving orders mid-game:** select one of your units (any unit, as the
   umpire). Under its orders, *Give orders* has:
   - **Move** and **Road march**: click the map; it goes there tactically, or
