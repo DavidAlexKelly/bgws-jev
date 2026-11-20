@@ -8,7 +8,8 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { buildingBlocks, terrainLayers, worldLayers } from "./basemap";
+import { buildingBlocks, terrainLayers, WOODS, worldLayers } from "./basemap";
+import { treeLayer } from "./trees";
 import { roofLayer } from "./roofs";
 import { addTextures } from "./textures";
 import { setTerrainZ, TERRAIN_EXAGGERATION } from "./layers";
@@ -17,7 +18,7 @@ export type Basemap = "terrain" | "dark" | "streets" | "satellite";
 
 /**
  * Graphics. `performance`: flat colours, one pixel per CSS pixel, no sky.
- * `quality`: textured ground, shaded buildings, road casings, canopy, sky,
+ * `quality`: textured ground, shaded buildings, road casings, trees, sky,
  * fog and light in 3D, the screen's full resolution and smoothed edges.
  */
 export type Graphics = "performance" | "quality";
@@ -33,7 +34,7 @@ const SKY = {
   "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 0.6, 15, 0],
 } as const;
 
-/** Light for buildings and canopy: low sun from the south-west. */
+/** Light for buildings: low sun from the south-west (the trees take the same). */
 const LIGHT_QUALITY: maplibregl.LightSpecification = { anchor: "map", color: "#fff4e0", intensity: 0.45, position: [1.4, 215, 40] };
 const LIGHT_PLAIN: maplibregl.LightSpecification = { anchor: "viewport", color: "#ffffff", intensity: 0.5, position: [1.15, 210, 30] };
 
@@ -178,7 +179,7 @@ export function MapView(props: {
       setSky(m, false);
       for (const l of m.getStyle().layers ?? []) if (l.id.startsWith("base") || l.id.startsWith("world")) m.removeLayer(l.id);
       // Custom layers are not in the style's list.
-      if (m.getLayer("base-roofs")) m.removeLayer("base-roofs");
+      for (const id of ["base-roofs", "base-trees"]) if (m.getLayer(id)) m.removeLayer(id);
       for (const id of ["base", "base-dem", "base-terrain", "base-vec", "base-ghosts", "world"]) if (m.getSource(id)) m.removeSource(id);
       const flat = () => {
         if (m.getPitch() > 0) m.easeTo({ pitch: 0, bearing: 0, duration: 600 });
@@ -196,6 +197,8 @@ export function MapView(props: {
         if (packDem) m.addSource("base-dem", { type: "raster-dem", url: abs(packDem), encoding: "terrarium", tileSize: 512, attribution: "© Mapterhorn" });
         for (const l of terrainLayers("base", "base-dem", "base", solid, quality)) if (l.id !== "base-hillshade" || packDem) m.addLayer(l);
         if (!solid) return flat();
+        // In 3D, the woods stand as trees.
+        if (quality) m.addLayer(treeLayer("base-trees", { source: "base", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: 30000 }));
         return terrain(abs);
       }
       // Satellite imagery can drape over the pack's terrain, with its buildings standing up.

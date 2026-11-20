@@ -442,8 +442,28 @@ to reach openrouter.ai.
     - Roads have casings, and the hillshade is stronger.
     - Buildings are coloured by height and vary a little one to the next.
       In 2D they cast a shadow and have an edge.
-    - In 3D, woods stand up as a canopy about 15 m tall, buildings are lit
-      by a low sun, and there is sky and haze on the horizon.
+    - In 3D, buildings are lit by a low sun, and there is sky and haze on
+      the horizon.
+    - **Trees:** in 3D, woods stand as trees, each with a trunk and a crown
+      (`frontend/viewer/src/trees.ts`).
+      - It is a MapLibre custom layer, so trees stand on the terrain and hide
+        behind buildings and hills like the blocks do.
+      - They are planted on a grid about 7.5 m apart, each nudged off it,
+        with about one cell in eight left clear. The grid is fixed to the
+        map, so a tree stands in the same place whenever the woods are
+        planted again.
+      - Each tree's kind, height (9–20 m, some young ones about half that),
+        crown, shade and turn come from its place on the grid. About a third
+        are conifers, with two stacked cones; the rest are broadleaf, with a
+        lumpy dome.
+      - The crowns are cut through with a pattern of small gaps, about a
+        metre and a fifth of a metre across. The inside of a crown, seen
+        through them, is in shade, so a crown reads as foliage, not a shell.
+      - All trees are drawn in three instanced calls (trunks, domes, cones):
+        the 30,000 nearest the middle of the view, out to 2.5 km at zoom 15
+        and half that each zoom further in, from zoom 13.5.
+      - Planting a view took 3–60 ms. Frame times with and without trees
+        were alike on the test machine's software GPU.
     - It draws at the screen's full resolution, and smooths edges after a
       reload.
   - **Performance:** flat colours, one pixel per screen point, and no sky:

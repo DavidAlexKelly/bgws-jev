@@ -1,0 +1,521 @@
+// Trees: in 3D, the woods stand as trees, a trunk and a crown each, instead
+// of a block of canopy.
+//
+// A MapLibre custom layer, so it shares the map's depth buffer: trees stand
+// on the terrain, behind and in front of buildings as they should. The trees
+// are planted in the woods MapLibre has loaded round the view, on a grid
+// about 7.5 m apart, each nudged off it, with gaps here and there. The grid
+// is fixed to the map, so a tree stands in the same place whenever the woods
+// are planted again. What each tree is like (broadleaf or conifer, height,
+// crown, shade, turn) comes from its place on the grid.
+//
+// All the trees are drawn in a few calls (instancing): a six-sided trunk, and
+// a crown, a rounded dome for broadleaf trees and two stacked cones for
+// conifers. The crowns are cut through with a pattern of small holes, so
+// light and the inside of the crown show through as between leaves; the
+// inside is shaded darker, so a crown reads as a mass of foliage, not a shell.
+
+import maplibregl from "maplibre-gl";
+
+/** Trees about this far apart, m. */
+const SPACING_M = 7.5;
+/** Trees are planted from this map zoom (below it the woods' ground texture shows them). */
+const MIN_ZOOM = 13.5;
+/** Planted out to this far from the middle of the view, m (at zoom 15; half that a zoom further in). */
+const REACH_M = 2500;
+/** Planted round the view and this much again each side, so a pan does not plant again. */
+const MARGIN = 0.4;
+
+export interface TreeOptions {
+  /** The vector source, layer and kinds of land use that are woods. */
+  source: string;
+  sourceLayer: string;
+  kinds: string[];
+  /** The terrain's source: trees are set on the ground again once more of it has loaded. */
+  terrainSource?: string;
+  /** Most trees drawn at once (the nearest the middle of the view). */
+  maxTrees: number;
+}
+
+export interface TreeStats {
+  trees: number;
+  conifers: number;
+  plants: number;
+  plantMs: number;
+}
+
+/** A small, fixed hash of a grid cell: the same tree every time. */
+function hash(ix: number, iy: number, salt: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(salt, 2147483647)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/** The meshes, in a unit space (z up): a trunk, a broadleaf crown, a conifer crown. */
+function meshes() {
+  const out: Record<"trunk" | "dome" | "cone", { pos: number[]; normal: number[]; idx: number[] }> = {
+    trunk: { pos: [], normal: [], idx: [] },
+    dome: { pos: [], normal: [], idx: [] },
+    cone: { pos: [], normal: [], idx: [] },
+  };
+  // Trunk: six sides, radius 1, height 1 (no caps: the crown and the ground hide them).
+  {
+    const m = out.trunk;
+    for (let i = 0; i <= 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      for (const z of [0, 1]) {
+        m.pos.push(Math.cos(a), Math.sin(a), z);
+        m.normal.push(Math.cos(a), Math.sin(a), 0);
+      }
+    }
+    for (let i = 0; i < 6; i++) m.idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  }
+  // Broadleaf crown: a sphere of radius 1, a little lumpy, so no two crowns' outlines are smooth.
+  {
+    const m = out.dome;
+    const rings = 7;
+    const segs = 12;
+    for (let j = 0; j <= rings; j++) {
+      const v = j / rings;
+      const phi = v * Math.PI;
+      for (let i = 0; i <= segs; i++) {
+        const a = (i / segs) * Math.PI * 2;
+        const lump = j === 0 || j === rings ? 1 : 1 + 0.12 * Math.sin(a * 3 + j * 1.7) * Math.sin(phi);
+        const nx = Math.sin(phi) * Math.cos(a);
+        const ny = Math.sin(phi) * Math.sin(a);
+        const nz = Math.cos(phi);
+        m.pos.push(nx * lump, ny * lump, nz * lump);
+        m.normal.push(nx, ny, nz);
+      }
+    }
+    for (let j = 0; j < rings; j++) {
+      for (let i = 0; i < segs; i++) {
+        const a = j * (segs + 1) + i;
+        const b = a + segs + 1;
+        m.idx.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+  }
+  // Conifer crown: two stacked cones, base radius 1 and 0.7, from z 0 to 1.
+  {
+    const m = out.cone;
+    const segs = 10;
+    for (const [z0, z1, r] of [
+      [0, 0.68, 1],
+      [0.36, 1, 0.68],
+    ]) {
+      const base = m.pos.length / 3;
+      const slope = r / (z1 - z0);
+      for (let i = 0; i <= segs; i++) {
+        const a = (i / segs) * Math.PI * 2;
+        const n = Math.hypot(1, slope);
+        m.pos.push(Math.cos(a) * r, Math.sin(a) * r, z0);
+        m.normal.push(Math.cos(a) / n, Math.sin(a) / n, slope / n);
+        m.pos.push(0, 0, z1);
+        m.normal.push(Math.cos(a) / n, Math.sin(a) / n, slope / n);
+      }
+      for (let i = 0; i < segs; i++) m.idx.push(base + i * 2, base + i * 2 + 2, base + i * 2 + 1);
+      // Its underside, so a crown seen from below is closed.
+      const c = m.pos.length / 3;
+      m.pos.push(0, 0, z0);
+      m.normal.push(0, 0, -1);
+      for (let i = 0; i < segs; i++) m.idx.push(c, base + i * 2 + 2, base + i * 2);
+    }
+  }
+  return out;
+}
+
+const VS = `
+uniform mat4 u_matrix;
+uniform float u_z_offset;
+uniform float u_pm;
+uniform float u_kind;
+attribute vec3 a_pos;
+attribute vec3 a_normal;
+attribute vec3 i_pos;
+attribute vec4 i_size;
+attribute vec3 i_tint;
+varying vec3 v_normal;
+varying vec3 v_local;
+varying vec3 v_tint;
+varying float v_kind;
+varying float v_up;
+void main() {
+  float h = i_size.x;
+  float r = i_size.y;
+  float turn = i_size.z * 6.2831853;
+  vec3 p;
+  vec3 n = a_normal;
+  if (u_kind < 0.5) {
+    // Trunk: up into the crown.
+    float tr = 0.12 + 0.012 * h;
+    p = vec3(a_pos.xy * tr, a_pos.z * h * 0.62);
+    v_up = a_pos.z * 0.6;
+  } else if (u_kind < 1.5) {
+    // Broadleaf crown: from about a third of the way up to the top.
+    float rv = 0.33 * h;
+    p = vec3(a_pos.xy * r, h - rv + a_pos.z * rv);
+    n = normalize(vec3(a_normal.xy / r, a_normal.z / rv));
+    v_up = a_pos.z * 0.5 + 0.5;
+  } else {
+    // Conifer crown: from a fifth of the way up.
+    float z0 = 0.2 * h;
+    p = vec3(a_pos.xy * r, z0 + a_pos.z * (h - z0));
+    v_up = a_pos.z;
+  }
+  float c = cos(turn);
+  float s = sin(turn);
+  p.xy = vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+  n.xy = vec2(c * n.x - s * n.y, s * n.x + c * n.y);
+  v_normal = n;
+  // Metres, for the pattern of gaps between the leaves (the same size on every tree).
+  v_local = p + vec3(i_size.w * 97.0);
+  v_tint = i_tint;
+  v_kind = u_kind;
+  gl_Position = u_matrix * vec4(i_pos.xy + p.xy * u_pm, i_pos.z + p.z * u_pm + u_z_offset, 1.0);
+}`;
+
+const FS = `
+precision highp float;
+uniform vec3 u_light;
+uniform float u_holes;
+varying vec3 v_normal;
+varying vec3 v_local;
+varying vec3 v_tint;
+varying float v_kind;
+varying float v_up;
+float hash3(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float noise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+void main() {
+  vec3 n = normalize(v_normal);
+  float inside = 1.0;
+  if (v_kind > 0.5) {
+    // Gaps between the leaves: clumps of foliage about a metre across, leaves at a fifth of that.
+    float leaf = 0.65 * noise(v_local * 1.1) + 0.35 * noise(v_local * 4.3);
+    if (leaf < u_holes) discard;
+    // The far side of the crown, seen through a gap: in its own shade.
+    if (!gl_FrontFacing) {
+      n = -n;
+      inside = 0.55;
+    }
+  }
+  float sun = max(dot(n, u_light), 0.0);
+  // Lower down, and on the shaded side, darker: the crown shades itself.
+  float light = (0.5 + 0.6 * sun) * mix(0.72, 1.0, clamp(v_up, 0.0, 1.0)) * inside;
+  // Bark, or the crown's own green.
+  vec3 colour = v_kind < 0.5 ? vec3(0.24, 0.18, 0.13) : v_tint;
+  gl_FragColor = vec4(colour * light, 1.0);
+}`;
+
+export type TreeLayer = maplibregl.CustomLayerInterface & { stats: TreeStats };
+
+/** The custom layer. Add it after the ground's layers. */
+export function treeLayer(id: string, o: TreeOptions): TreeLayer {
+  let map: maplibregl.Map | null = null;
+  let gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
+  let program: WebGLProgram | null = null;
+  const loc: Record<string, number> = {};
+  const uni: Record<string, WebGLUniformLocation | null> = {};
+  const mesh: Record<string, { vbo: WebGLBuffer | null; nbo: WebGLBuffer | null; ibo: WebGLBuffer | null; count: number }> = {};
+  let inst: WebGLBuffer | null = null;
+  let broadleaf = 0;
+  let conifers = 0;
+  let origin: [number, number] = [0, 0];
+  let pmView = 0;
+  let builtBox: [number, number, number, number] = [0, 0, 0, 0];
+  let dirty = true;
+  /** Whether the woods round the view have been planted (perhaps with no trees: no woods there). */
+  let planted = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let divisor: ((index: number, d: number) => void) | null = null;
+  let drawInstanced: ((mode: number, count: number, type: number, offset: number, instances: number) => void) | null = null;
+  const stats: TreeStats = { trees: 0, conifers: 0, plants: 0, plantMs: 0 };
+
+  const camElevation = () => ((map as unknown as { transform?: { elevation?: number } })?.transform?.elevation ?? 0);
+  const perMetre = (lat: number) => maplibregl.MercatorCoordinate.fromLngLat([0, lat], 1).z;
+
+  const viewBox = (m: maplibregl.Map): [number, number, number, number] => {
+    const b = m.getBounds();
+    const a = maplibregl.MercatorCoordinate.fromLngLat([b.getWest(), b.getNorth()]);
+    const c = maplibregl.MercatorCoordinate.fromLngLat([b.getEast(), b.getSouth()]);
+    return [a.x, a.y, c.x, c.y];
+  };
+
+  function check() {
+    if (!map || !gl) return;
+    const m = map;
+    if (m.getZoom() < MIN_ZOOM || !m.getSource(o.source)) {
+      stats.trees = 0;
+      broadleaf = conifers = 0;
+      planted = false;
+      m.triggerRepaint();
+      return;
+    }
+    const v = viewBox(m);
+    const inside = v[0] >= builtBox[0] && v[1] >= builtBox[1] && v[2] <= builtBox[2] && v[3] <= builtBox[3];
+    if (!dirty && inside && planted) return;
+    dirty = false;
+    const t0 = performance.now();
+    plant(v);
+    planted = true;
+    stats.plantMs = Math.round(performance.now() - t0);
+    stats.plants++;
+  }
+
+  /** Plant the woods round the view. */
+  function plant(v: [number, number, number, number]) {
+    const m = map!;
+    const g = gl!;
+    const centre = maplibregl.MercatorCoordinate.fromLngLat(m.getCenter());
+    origin = [centre.x, centre.y];
+    pmView = perMetre(m.getCenter().lat);
+    const w = v[2] - v[0];
+    const h = v[3] - v[1];
+    // Round the view, but no further than the reach (a pitched view's box runs to the horizon).
+    const reach = REACH_M * Math.min(1, 2 ** (15 - m.getZoom())) * pmView;
+    builtBox = [Math.max(v[0] - w * MARGIN, centre.x - reach), Math.max(v[1] - h * MARGIN, centre.y - reach), Math.min(v[2] + w * MARGIN, centre.x + reach), Math.min(v[3] + h * MARGIN, centre.y + reach)];
+    const cell = SPACING_M * pmView;
+    const seen = new Set<number>();
+    const found: { ix: number; iy: number; d: number }[] = [];
+    for (const f of m.querySourceFeatures(o.source, { sourceLayer: o.sourceLayer, filter: ["in", ["get", "kind"], ["literal", o.kinds]] })) {
+      const gm = f.geometry;
+      const polys = gm.type === "Polygon" ? [gm.coordinates] : gm.type === "MultiPolygon" ? gm.coordinates : [];
+      for (const rings of polys) {
+        // Its rings in mercator, and its box.
+        const rs = rings.map((r) => r.map((p) => {
+          const c = maplibregl.MercatorCoordinate.fromLngLat([p[0], p[1]]);
+          return [c.x, c.y];
+        }));
+        let y0 = Infinity;
+        let y1 = -Infinity;
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        for (const p of rs[0]) {
+          x0 = Math.min(x0, p[0]);
+          x1 = Math.max(x1, p[0]);
+          y0 = Math.min(y0, p[1]);
+          y1 = Math.max(y1, p[1]);
+        }
+        x0 = Math.max(x0, builtBox[0]);
+        x1 = Math.min(x1, builtBox[2]);
+        y0 = Math.max(y0, builtBox[1]);
+        y1 = Math.min(y1, builtBox[3]);
+        if (x0 >= x1 || y0 >= y1) continue;
+        // Row by row: where each row of the grid crosses the wood's edges, and the cells between.
+        for (let iy = Math.ceil(y0 / cell - 0.5); (iy + 0.5) * cell <= y1; iy++) {
+          const y = (iy + 0.5) * cell;
+          const xs: number[] = [];
+          for (const r of rs) {
+            for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+              const a = r[j];
+              const b = r[i];
+              if (a[1] <= y !== b[1] <= y) xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+            }
+          }
+          xs.sort((p, q) => p - q);
+          for (let k = 0; k + 1 < xs.length; k += 2) {
+            const from = Math.max(xs[k], x0);
+            const to = Math.min(xs[k + 1], x1);
+            for (let ix = Math.ceil(from / cell - 0.5); (ix + 0.5) * cell < to; ix++) {
+              // Each cell once (woods repeat across the tiles they straddle), and some left clear.
+              const key = ix * 4194304 + iy;
+              if (seen.has(key) || hash(ix, iy, 7) < 0.12) continue;
+              seen.add(key);
+              found.push({ ix, iy, d: Math.hypot((ix + 0.5) * cell - centre.x, y - centre.y) });
+            }
+          }
+        }
+      }
+    }
+    // The nearest to the middle of the view, as many as are allowed.
+    if (found.length > o.maxTrees) {
+      found.sort((a, b) => a.d - b.d);
+      found.length = o.maxTrees;
+    }
+    // Each tree: where it stands (relative to the origin; its foot's altitude), its size, turn and shade.
+    const camEle = camElevation();
+    const pine: number[] = [];
+    const broad: number[] = [];
+    for (const { ix, iy } of found) {
+      const r = (s: number) => hash(ix, iy, s);
+      const x = (ix + 0.5 + (r(1) - 0.5) * 0.8) * cell;
+      const y = (iy + 0.5 + (r(2) - 0.5) * 0.8) * cell;
+      const ll = new maplibregl.MercatorCoordinate(x, y, 0).toLngLat();
+      const ground = (m.queryTerrainElevation(ll) ?? 0) + camEle;
+      const conifer = r(3) < 0.33;
+      const young = r(4) < 0.12 ? 0.55 : 1;
+      const height = (9 + r(5) * 11) * young;
+      const crown = (conifer ? 1.8 + r(6) * 1.4 : 2.6 + r(6) * 2.2) * Math.sqrt(young);
+      const shade = 0.8 + r(8) * 0.4;
+      // Greens: broadleaf trees lighter and warmer, some turning yellower; conifers darker and bluer.
+      const tint = conifer ? [0.15 * shade, 0.31 * shade, 0.2 * shade] : [(0.24 + r(9) * 0.14) * shade, (0.43 + r(9) * 0.08) * shade, 0.17 * shade];
+      (conifer ? pine : broad).push(x - origin[0], y - origin[1], ground * pmView, height, crown, r(7), r(10), ...tint);
+    }
+    broadleaf = broad.length / 10;
+    conifers = pine.length / 10;
+    stats.trees = broadleaf + conifers;
+    stats.conifers = conifers;
+    // Broadleaf trees first, then conifers: each crown draws its own run.
+    g.bindBuffer(g.ARRAY_BUFFER, inst);
+    g.bufferData(g.ARRAY_BUFFER, new Float32Array([...broad, ...pine]), g.STATIC_DRAW);
+    m.triggerRepaint();
+  }
+
+  const later = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(check, 150);
+  };
+  const loaded = (e: maplibregl.MapSourceDataEvent) => {
+    if ((e.sourceId === o.source || e.sourceId === o.terrainSource) && e.tile) dirty = true;
+  };
+
+  /** Bind the instance attributes from tree `first` on, and draw a mesh for `count` trees. */
+  function draw(g: WebGLRenderingContext | WebGL2RenderingContext, name: string, kind: number, first: number, count: number) {
+    const ms = mesh[name];
+    if (!count || !drawInstanced || !divisor) return;
+    g.uniform1f(uni.kind, kind);
+    g.bindBuffer(g.ARRAY_BUFFER, ms.vbo);
+    g.enableVertexAttribArray(loc.pos);
+    g.vertexAttribPointer(loc.pos, 3, g.FLOAT, false, 0, 0);
+    g.bindBuffer(g.ARRAY_BUFFER, ms.nbo);
+    g.enableVertexAttribArray(loc.normal);
+    g.vertexAttribPointer(loc.normal, 3, g.FLOAT, false, 0, 0);
+    g.bindBuffer(g.ARRAY_BUFFER, inst);
+    const stride = 40;
+    const at = first * stride;
+    for (const [l, size, off] of [
+      [loc.ipos, 3, 0],
+      [loc.isize, 4, 12],
+      [loc.itint, 3, 28],
+    ] as [number, number, number][]) {
+      g.enableVertexAttribArray(l);
+      g.vertexAttribPointer(l, size, g.FLOAT, false, stride, at + off);
+      divisor(l, 1);
+    }
+    g.bindBuffer(g.ELEMENT_ARRAY_BUFFER, ms.ibo);
+    drawInstanced(g.TRIANGLES, ms.count, g.UNSIGNED_SHORT, 0, count);
+  }
+
+  const self: TreeLayer = {
+    id,
+    type: "custom",
+    renderingMode: "3d",
+    stats,
+    onAdd(m, g) {
+      map = m;
+      gl = g;
+      if (typeof WebGL2RenderingContext !== "undefined" && g instanceof WebGL2RenderingContext) {
+        divisor = (i, d) => g.vertexAttribDivisor(i, d);
+        drawInstanced = (mode, count, type, offset, n) => g.drawElementsInstanced(mode, count, type, offset, n);
+      } else {
+        const ext = g.getExtension("ANGLE_instanced_arrays");
+        if (ext) {
+          divisor = (i, d) => ext.vertexAttribDivisorANGLE(i, d);
+          drawInstanced = (mode, count, type, offset, n) => ext.drawElementsInstancedANGLE(mode, count, type, offset, n);
+        }
+      }
+      const shader = (type: number, src: string) => {
+        const s = g.createShader(type)!;
+        g.shaderSource(s, src);
+        g.compileShader(s);
+        if (!g.getShaderParameter(s, g.COMPILE_STATUS)) console.warn("trees:", g.getShaderInfoLog(s));
+        return s;
+      };
+      program = g.createProgram()!;
+      g.attachShader(program, shader(g.VERTEX_SHADER, VS));
+      g.attachShader(program, shader(g.FRAGMENT_SHADER, FS));
+      g.linkProgram(program);
+      for (const [k, n] of [
+        ["pos", "a_pos"],
+        ["normal", "a_normal"],
+        ["ipos", "i_pos"],
+        ["isize", "i_size"],
+        ["itint", "i_tint"],
+      ]) loc[k] = g.getAttribLocation(program, n);
+      for (const [k, n] of [
+        ["matrix", "u_matrix"],
+        ["z", "u_z_offset"],
+        ["pm", "u_pm"],
+        ["kind", "u_kind"],
+        ["light", "u_light"],
+        ["holes", "u_holes"],
+      ]) uni[k] = g.getUniformLocation(program, n);
+      for (const [name, md] of Object.entries(meshes())) {
+        const b = { vbo: g.createBuffer(), nbo: g.createBuffer(), ibo: g.createBuffer(), count: md.idx.length };
+        g.bindBuffer(g.ARRAY_BUFFER, b.vbo);
+        g.bufferData(g.ARRAY_BUFFER, new Float32Array(md.pos), g.STATIC_DRAW);
+        g.bindBuffer(g.ARRAY_BUFFER, b.nbo);
+        g.bufferData(g.ARRAY_BUFFER, new Float32Array(md.normal), g.STATIC_DRAW);
+        g.bindBuffer(g.ELEMENT_ARRAY_BUFFER, b.ibo);
+        g.bufferData(g.ELEMENT_ARRAY_BUFFER, new Uint16Array(md.idx), g.STATIC_DRAW);
+        mesh[name] = b;
+      }
+      inst = g.createBuffer();
+      m.on("idle", later);
+      m.on("moveend", later);
+      m.on("sourcedata", loaded);
+      later();
+    },
+    onRemove(_m, g) {
+      map?.off("idle", later);
+      map?.off("moveend", later);
+      map?.off("sourcedata", loaded);
+      if (timer) clearTimeout(timer);
+      for (const b of Object.values(mesh)) {
+        g.deleteBuffer(b.vbo);
+        g.deleteBuffer(b.nbo);
+        g.deleteBuffer(b.ibo);
+      }
+      if (inst) g.deleteBuffer(inst);
+      if (program) g.deleteProgram(program);
+      map = null;
+      gl = null;
+    },
+    render(g, args) {
+      if (!program || !map || !stats.trees) return;
+      const matrix = (Array.isArray(args) || ArrayBuffer.isView(args) ? args : (args as { defaultProjectionData?: { mainMatrix: ArrayLike<number> } }).defaultProjectionData?.mainMatrix) as ArrayLike<number>;
+      // The matrix with the origin moved in (in double precision, then to the GPU).
+      const mm = Array.from(matrix);
+      const [ox, oy] = origin;
+      const shifted = new Float32Array(16);
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) shifted[c * 4 + r] = mm[c * 4 + r];
+        shifted[12 + r] = mm[r] * ox + mm[4 + r] * oy + mm[12 + r];
+      }
+      if (typeof WebGL2RenderingContext !== "undefined" && g instanceof WebGL2RenderingContext) g.bindVertexArray(null);
+      g.useProgram(program);
+      g.uniformMatrix4fv(uni.matrix, false, shifted);
+      g.uniform1f(uni.z, -camElevation() * pmView);
+      g.uniform1f(uni.pm, pmView);
+      // The sun low in the south-west, as the map's light (y runs south).
+      const l = [-0.55, 0.5, 0.67];
+      const len = Math.hypot(l[0], l[1], l[2]);
+      g.uniform3f(uni.light, l[0] / len, l[1] / len, l[2] / len);
+      g.uniform1f(uni.holes, 0.4);
+      g.disable(g.BLEND);
+      g.disable(g.CULL_FACE);
+      draw(g, "trunk", 0, 0, broadleaf + conifers);
+      draw(g, "dome", 1, 0, broadleaf);
+      draw(g, "cone", 2, broadleaf, conifers);
+      // Leave the attributes as MapLibre expects them: no instancing.
+      for (const k of ["ipos", "isize", "itint"]) {
+        divisor?.(loc[k], 0);
+        g.disableVertexAttribArray(loc[k]);
+      }
+      g.disableVertexAttribArray(loc.pos);
+      g.disableVertexAttribArray(loc.normal);
+    },
+  };
+  return self;
+}

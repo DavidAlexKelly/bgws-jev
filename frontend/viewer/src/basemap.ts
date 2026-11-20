@@ -17,7 +17,7 @@ const LANDUSE_TEXTURES: [string[], string][] = [
   [["sand", "beach", "bare_rock", "quarry", "landfill"], "tex-sand"],
 ];
 
-const WOODS = ["wood", "forest", "nature_reserve"];
+export const WOODS = ["wood", "forest", "nature_reserve"];
 
 /** A building's colour by its height (and a little per building, so a town is not one block). */
 function buildingColour(light: boolean): maplibregl.ExpressionSpecification {
@@ -63,7 +63,7 @@ export function buildingBlocks(source: string, id: string, quality: boolean, lig
  *
  * `quality` (the viewer's quality graphics) textures the ground by what it
  * is, gives water ripples and a shoreline, roads casings, buildings shading
- * by height and a cast shadow in 2D, and woods a canopy in 3D. It needs the
+ * by height and a cast shadow in 2D (in 3D, woods stand as trees: `trees.ts`). It needs the
  * textures registered first (`addTextures`). Without it, flat colours: the
  * performance mode, and what other pages that share this get.
  */
@@ -166,20 +166,6 @@ function qualityLayers(source: string, dem: string, prefix: string, threeD: bool
       source: dem,
       paint: { "hillshade-shadow-color": "#02040a", "hillshade-highlight-color": "#56688c", "hillshade-accent-color": "#0a1020", "hillshade-exaggeration": 0.85, "hillshade-illumination-direction": 315 },
     },
-    // Woods stand up as canopy in 3D, about 15 m tall.
-    ...(threeD
-      ? [
-          {
-            id: `${prefix}-canopy`,
-            type: "fill-extrusion",
-            source,
-            "source-layer": "landuse",
-            minzoom: 11,
-            filter: kind(WOODS),
-            paint: { "fill-extrusion-pattern": "tex-canopy", "fill-extrusion-height": 15, "fill-extrusion-opacity": 0.92, "fill-extrusion-vertical-gradient": true },
-          } as maplibregl.LayerSpecification,
-        ]
-      : []),
     ...(threeD
       ? [buildingBlocks(source, `${prefix}-buildings`, true)]
       : ([
