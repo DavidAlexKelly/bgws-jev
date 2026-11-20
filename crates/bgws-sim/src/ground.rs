@@ -61,6 +61,8 @@ pub struct Ground {
     pub sights: std::sync::Mutex<std::collections::HashMap<(i64, i64, i64), Arc<Sight>>>,
     /// The route planner's weights.
     pub route_params: crate::routing::RouteParams,
+    /// What walls, tree lines, railway banks and folds of the ground give.
+    pub feature_cover: crate::cover::FeatureCoverParams,
 }
 
 /// The ground a believed threat sees, on a square grid round it.
@@ -169,6 +171,7 @@ impl Ground {
             sights: Default::default(),
             road_speeds: RoadSpeeds::from_figures(figures),
             route_params: crate::routing::RouteParams::from_figures(figures),
+            feature_cover: crate::cover::FeatureCoverParams::from_figures(figures),
         }
     }
 
@@ -449,12 +452,15 @@ impl Ground {
         self.terrain.land_cover_at(e, n)
     }
 
-    /// Cover and concealment where a unit stands.
+    /// Cover and concealment where a unit stands: the class's draw for its
+    /// cell, the features round it (`cover`), and a town block's buildings.
     pub fn micro(&self, e: f64, n: f64) -> bgws_env::landcover::MicroTerrain {
         let s = self.terrain.spec;
         let i = ((e - s.origin_e) / s.cell).round().max(0.0) as u64;
         let j = ((n - s.origin_n) / s.cell).round().max(0.0) as u64;
-        let mut m = self.cover.micro_terrain(self.land_cover(e, n), self.micro_seed, j * s.width as u64 + i);
+        let m = self.cover.micro_terrain(self.land_cover(e, n), self.micro_seed, j * s.width as u64 + i);
+        // The walls, tree lines, railway banks and folds round it (only ever adding).
+        let mut m = crate::cover::with_features(m, &crate::cover::feature_cover(self, e, n));
         // Among a block's buildings: its walls' cover, and hidden by them.
         if let Some(u) = self.urban.as_ref() {
             if let Some(b) = u.at(e, n) {

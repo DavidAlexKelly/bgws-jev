@@ -909,7 +909,7 @@ fn signature(s: &Sim, c4: &C4, e: bevy_ecs::prelude::Entity) -> Option<(f64, f64
 }
 
 /// Probability per second that a drone's cameras detect a target, and the sensor.
-fn camera_p(s: &Sim, c4: &C4, f: &Flight, e: bevy_ecs::prelude::Entity, tpos: Enu) -> Option<(f64, SensorKind, f64)> {
+fn camera_p(s: &Sim, c4: &C4, f: &Flight, fid: u64, e: bevy_ecs::prelude::Entity, tid: EntityId, tpos: Enu) -> Option<(f64, SensorKind, f64)> {
     let ground = ground_at(s, f.pos);
     let slant = (tpos.sub(Enu::new(f.pos.e, f.pos.n, ground + f.agl))).norm();
     let max_r = f.platform.sensors.iter().filter(|x| x.kind.is_imaging_eo()).map(|x| x.range_max_m).fold(0.0, f64::max);
@@ -917,7 +917,8 @@ fn camera_p(s: &Sim, c4: &C4, f: &Flight, e: bevy_ecs::prelude::Entity, tpos: En
         return None;
     }
     let los = s.ctx.ground.los(Enu::new(f.pos.e, f.pos.n, ground), f.agl, tpos, 1.5);
-    if los.p_visible <= 0.0 {
+    // Through trees: open or blocked for where the two are (see sensing).
+    if !crate::systems::sight_line_open(s.ctx.seed, fid, tid.0 as u64, f.pos, tpos, s.ctx.p.sight_line_cell_m, los.p_visible) {
         return None;
     }
     let (crit, contrast, dt, conc, _) = signature(s, c4, e)?;
@@ -942,7 +943,7 @@ fn camera_p(s: &Sim, c4: &C4, f: &Flight, e: bevy_ecs::prelude::Entity, tpos: En
         }
     }
     let (rate, sk) = best?;
-    Some((los.p_visible * hazard_probability(rate, 1.0), sk, slant))
+    Some((hazard_probability(rate, 1.0), sk, slant))
 }
 
 fn hypothesis(p: &Platform) -> Hypothesis {
@@ -1008,7 +1009,7 @@ fn cameras(s: &mut Sim, c4: &mut C4) {
                     continue;
                 }
             }
-            let Some((p, sk, slant)) = camera_p(s, c4, &f, *e, *tpos) else { continue };
+            let Some((p, sk, slant)) = camera_p(s, c4, &f, fid, *e, *tid, *tpos) else { continue };
             let mut rng = s.ctx.rng("drones.camera", fid, tid.0 as u64);
             if rng.gen::<f64>() < p {
                 let val = s.world.get::<Ident>(*e).map(|i| value_of(&i.platform, i.hq)).unwrap_or(1.0);

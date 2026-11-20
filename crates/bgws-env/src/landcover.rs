@@ -203,8 +203,13 @@ pub fn figures() -> Vec<Figure> {
         v.push(figure!(format!("env.landcover.{k}.cover_sd"), d[1], "fraction", 0.0, 0.5, "default", Default, "cell-to-cell spread of cover"));
         v.push(figure!(format!("env.landcover.{k}.conceal_mean"), d[2], "fraction", 0.0, 1.0, "R4.1", Default, "mean concealment from observation"));
         v.push(figure!(format!("env.landcover.{k}.conceal_sd"), d[3], "fraction", 0.0, 0.5, "default", Default, "cell-to-cell spread of concealment"));
-        v.push(figure!(format!("env.landcover.{k}.canopy_m"), d[4], "m", 0.0, 60.0, "default", Default, "canopy or roof height"));
-        v.push(figure!(format!("env.landcover.{k}.los_block_per_100m"), d[5], "fraction", 0.0, 1.0, "default", Default,
+        // Open ground, bare ground and water have at most a bush or a reed
+        // bed: their canopy and blocking stay small (a wide range would let a
+        // sensitivity sweep grow a wood on open ground).
+        let bare = matches!(c, LandCover::Open | LandCover::Bare | LandCover::Water);
+        let (canopy_max, block_max) = if bare { (2.0, 0.1) } else { (60.0, 1.0) };
+        v.push(figure!(format!("env.landcover.{k}.canopy_m"), d[4], "m", 0.0, canopy_max, "default", Default, "canopy or roof height"));
+        v.push(figure!(format!("env.landcover.{k}.los_block_per_100m"), d[5], "fraction", 0.0, block_max, "default", Default,
             "probability 100 m of sight line through the canopy/buildings is blocked"));
     }
     v

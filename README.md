@@ -373,7 +373,13 @@ to reach openrouter.ai.
 - **Morale:** a unit can cascade from steady to routed within seconds under
   heavy fire. The hazard rates in `bgws_models::people` want playtesting.
 - **Mostly unsourced figures:** most figures are `[default]`.
-  `bgws sensitivity <vignette>` ranks which ones matter.
+  `bgws sensitivity <vignette>` ranks which ones matter (`--prefix land`
+  for the land fight's figures, `--sobol-top 0` for Morris only). A first
+  pass over five land-fight vignettes is in
+  [docs/research/CALIBRATION_TARGETS.md](docs/research/CALIBRATION_TARGETS.md).
+  The search model (cueing, search sector and time) is the common thread,
+  then the guided missile's hit chance, lay time, and how fast suppression
+  builds and fades.
 
 ### Known gaps
 
@@ -727,8 +733,11 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
       tree cells (29% of it), mostly gardens and street trees.
   - `--no-tree-cover` leaves it out altogether.
   - Older packs: `bgws basemap <pack> --tree-cover-only` adds
-    `treecover.png` for the viewer's trees (about 7 s). Their ground gains
-    the trees only when the pack is built again.
+    `treecover.png` for the viewer's trees (about 7 s). It also lays the
+    trees on the pack's 5 m sight surface, as light woodland wherever a cell
+    has no building and no mapped wood (hedgerows, tree lines, gardens).
+    Sight lines and feature cover in the simulation then see them. The 30 m
+    land cover gains them only when the pack is built again.
 - **Railways:** the lines on the ground (rail, light rail, narrow gauge,
   heritage lines) from the basemap's zoom-14 roads layer, as
   `railways.json`. Trams run in the street and are left out, and so are
@@ -1517,6 +1526,47 @@ second.
 The unit panel shows the block a unit is in. The figures are estimates
 (confidence low) until they are checked against trials or history. The
 calibration vignettes are on open ground, so blocks do not move them.
+
+### Sight through trees holds until someone moves
+
+Trees give a sight line a chance of being clear (`p_visible`, from the
+canopy along it). That chance used to be drawn afresh at every sensing
+step. So a target behind 200 m of light wood, with a 20% chance of a clear
+line, was nearly certain to be seen within a minute or two, though neither
+side had moved.
+
+Now the line falls one way, open or blocked, for where the two stand. The
+draw is keyed to the pair and to the 10 m cells they stand in
+(`sim.sense.sight_line_cell_m`), not to the clock, and is the same both
+ways round. A blocked line stays blocked while neither moves. Moving a cell
+draws it again (the leaves have other gaps). Across many places a line is
+open as often as its chance says.
+
+Ground sensing and drone cameras both work this way. *Can it see…?* shows
+`openWhereTheyStand`, and gives the chance of detection over the window on
+that line.
+
+### Cover from the features on the ground
+
+A unit's cover (against direct fire, suppression and blast) and
+concealment used to come from its 30 m land-cover class, with a random
+draw per cell. Now they also come from the 5–20 m features small units
+actually use (`crates/bgws-sim/src/cover.rs`), read round the point where
+the unit stands:
+
+| Feature | Read from | Cover | Concealment |
+|---|---|---|---|
+| A wall or building corner | the pack's 5 m surface, within 6 m (half at 12 m) | 0.6 | 0.5 |
+| A tree line, hedgerow or garden trees | the share of the ground within 10 m under trees (full at 25%: a line through the point) | 0.3 | 0.7 |
+| A railway's bank and ballast | the railway cells, on or beside the line | 0.45 | 0.3 |
+| A fold, hollow or ditch | how far the point lies below the ground 25 m round it (at least a terrain cell) | 0.3 a metre, to 0.6 | 0.8 × cover |
+
+The features join as `1 − Π(1 − each)`, capped at 0.95. The result is
+combined with the class's draw by taking the better of the two. The draw
+stays for the walls, ditches and shell scrapes the map does not show, so
+mapped features only ever add. A town block's buildings then apply as
+before. Generated ground has no 5 m surface, so only folds and railways
+count there. The figures are `sim.cover.*`, all estimates.
 
 ### Units occupy space
 

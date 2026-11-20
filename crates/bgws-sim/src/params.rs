@@ -17,6 +17,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.sense.search_fov_deg", 60.0, "deg", 10.0, 180.0, "default", Default, "sector a unit searches without a cue"),
         figure!("sim.sense.max_range_m", 6_000.0, "m", 1_000.0, 20_000.0, "default", Default, "longest range a ground observer searches"),
         figure!("sim.sense.forget_s", 300.0, "s", 30.0, 1_800.0, "default", Default, "a sighting not refreshed this long is dropped from the unit's own picture"),
+        figure!("sim.sense.sight_line_cell_m", 10.0, "m", 1.0, 100.0, "default", Default, "a line of sight through trees is open or blocked, the same each time it is looked along, until one end moves into another cell this wide"),
         figure!("sim.sense.position_sigma_m", 30.0, "m", 5.0, 200.0, "default", Default, "1-sigma position error of a visual fix"),
         figure!("sim.light.eye_night_factor", 0.15, "fraction", 0.02, 0.6, "default", Default, "naked-eye resolution factor under 1 lux"),
         figure!("sim.light.night_lux", 1.0, "lux", 0.01, 50.0, "default", Default, "illuminance below which eyes and day optics degrade"),
@@ -83,6 +84,7 @@ pub fn all_figures() -> Vec<Figure> {
     v.extend(crate::routing::figures());
     v.extend(crate::formation::figures());
     v.extend(crate::urban::figures());
+    v.extend(crate::cover::figures());
     v.extend(crate::appreciation::figures());
     v.extend(crate::smoke::figures());
     v.extend(crate::designation::figures());
@@ -119,6 +121,7 @@ pub struct Params {
     pub search_fov_deg: f64,
     pub sense_max_m: f64,
     pub forget_s: f64,
+    pub sight_line_cell_m: f64,
     pub fix_sigma_m: f64,
     pub eye_night_factor: f64,
     pub night_lux: f64,
@@ -177,6 +180,7 @@ impl Params {
             search_fov_deg: f.get("sim.sense.search_fov_deg"),
             sense_max_m: f.get("sim.sense.max_range_m"),
             forget_s: f.get("sim.sense.forget_s"),
+            sight_line_cell_m: f.get("sim.sense.sight_line_cell_m"),
             fix_sigma_m: f.get("sim.sense.position_sigma_m"),
             eye_night_factor: f.get("sim.light.eye_night_factor"),
             night_lux: f.get("sim.light.night_lux"),

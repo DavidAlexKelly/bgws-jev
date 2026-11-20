@@ -13,7 +13,7 @@ use bgws_domains::air_defence::{engage_raid, AdSystem, Assignment, KillChain, Th
 use bgws_domains::missile::{Flight, FlightClass, Profile};
 use bgws_domains::V3;
 use bgws_scenario::v4::{Network, ScenarioV4};
-use bgws_sim::components::{Act, Activity, Health, Ident};
+use bgws_sim::components::{Act, Activity, Health, Ident, Kin};
 use bgws_sim::{Sim, SimOptions};
 use rand::Rng;
 use rand_chacha::ChaCha8Rng;
@@ -340,17 +340,36 @@ pub fn casevac(f: &Figures, seed: Seed) -> Value {
 /// attack before its morale can halt it, so the halt is a property of
 /// terrain with cover, which is where P14's data come from.
 pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
+    attack_halt_on(scenario, SimOptions::default())
+}
+
+/// `attack_halt` on ground the host loaded (a theatre pack's terrain,
+/// roads, railways and sight surface).
+pub fn attack_halt_on(scenario: &ScenarioV4, opts: SimOptions) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
         let mut sc = scenario.clone();
+        // Blue's objective, if it has one: an attack that takes it (blue on
+        // it and no defender left on it) has not halted (P14 is about attacks
+        // stopped short), so that game gives no value.
+        let objective = sc.victory.iter().find_map(|v| match v {
+            bgws_scenario::v4::VictoryCondition::Objective { side: Side::Blue, at, radius_m, .. } => Some((sc.frame().geodetic_to_enu(*at), *radius_m)),
+            _ => None,
+        });
         sc.victory.clear();
-        let mut sim = Sim::with_options(&sc, seed, f.clone(), SimOptions::default()).ok()?;
+        let mut sim = Sim::with_options(&sc, seed, f.clone(), opts.clone()).ok()?;
         let mut still = 0.0;
         let mut last_loss = 0.0;
         for step in 1..=720 {
             let out = play_with_rules(&mut sim, SimTime::from_secs(step as f64 * 10.0));
-            let (mut fit, mut start, mut advancing) = (0.0, 0.0, 0usize);
+            let (mut fit, mut start, mut advancing, mut on_it, mut held_against) = (0.0, 0.0, 0usize, false, false);
             for &e in &sim.ctx.order {
                 let (Some(i), Some(h), Some(a)) = (sim.world.get::<Ident>(e), sim.world.get::<Health>(e), sim.world.get::<Act>(e)) else { continue };
+                // A defender still on the objective: blue has not taken it.
+                if i.side == Side::Red && !h.destroyed {
+                    if let (Some((at, r)), Some(k)) = (objective, sim.world.get::<Kin>(e)) {
+                        held_against |= k.pos.sub(at).horizontal() <= r;
+                    }
+                }
                 if i.side != Side::Blue || i.hq {
                     continue;
                 }
@@ -360,6 +379,13 @@ pub fn attack_halt(scenario: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + 
                 if !h.destroyed && matches!(a.activity, Activity::Move { .. }) {
                     advancing += 1;
                 }
+                if let (false, Some((at, r)), Some(k)) = (h.destroyed, objective, sim.world.get::<Kin>(e)) {
+                    on_it |= k.pos.sub(at).horizontal() <= r;
+                }
+            }
+            // Taken (as the victory rule has it: on it, and no enemy on it).
+            if on_it && !held_against {
+                return None;
             }
             let loss = 1.0 - fit / start.max(1.0);
             if loss > 0.0 && advancing == 0 {
@@ -487,11 +513,42 @@ pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value +
     }
 }
 
+/// The Kaliningrad company attack (`gen-kgd-company-attack`) at even odds,
+/// 1:1, for attack-halt-real-ground: at 3:1 it took its objective in 40 of
+/// 40 games and at 1.5:1 in 38, so it never halted.
+pub fn even_attack_on_pack() -> Option<ScenarioV4> {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
+    spec.ratio = 1.0;
+    ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
+}
+
+/// The same attack in open country on the Kaliningrad pack: farmland broken
+/// by tree lines south-west of the city (80% fields, 9% trees, 2% built in
+/// the 3 × 5 km round it, by ESA WorldCover), for attack-halt-open-country.
+pub fn open_country_attack_on_pack() -> Option<ScenarioV4> {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
+    spec.ratio = 1.0;
+    spec.ground = crate::scengen::GroundSpec::Pack { name: "kaliningrad-big".into(), at: Some([54.6057, 20.3976]) };
+    ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
+}
+
+/// A scenario with its theatre pack's ground loaded, if the pack is built here.
+pub fn with_pack_ground(sc: ScenarioV4) -> Option<(ScenarioV4, SimOptions)> {
+    let g = crate::host::load_pack(&sc).ok()??;
+    let opts = SimOptions { terrain: Some(g.terrain), roads: Some(g.roads), rivers: Some(g.rivers), rails: Some(g.rails), sight: g.sight, appreciation: g.appreciation, ..Default::default() };
+    Some((sc, opts))
+}
+
 /// The scenarios the sim-played vignettes run on.
 #[derive(Default)]
 pub struct VignetteScenarios {
     /// A company attack on a defended position (attack-halt).
     pub attack: Option<ScenarioV4>,
+    /// A company attack on a theatre pack, with the pack's ground loaded
+    /// (attack-halt-real-ground); none where the pack is not built.
+    pub attack_pack: Option<(ScenarioV4, SimOptions)>,
+    /// The same in open country with tree lines (attack-halt-open-country).
+    pub attack_open: Option<(ScenarioV4, SimOptions)>,
     /// The M4 drone line (detect-to-strike).
     pub drone_line: Option<ScenarioV4>,
     /// The counter-battery scene (`counter_battery_scene`).
@@ -548,6 +605,14 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
                 Some(sc) => check(&attack_halt(sc)),
                 None => continue,
             },
+            "attack-halt-real-ground" => match &scenarios.attack_pack {
+                Some((sc, opts)) => check(&attack_halt_on(sc, opts.clone())),
+                None => continue,
+            },
+            "attack-halt-open-country" => match &scenarios.attack_open {
+                Some((sc, opts)) => check(&attack_halt_on(sc, opts.clone())),
+                None => continue,
+            },
             "detect-to-strike-networked" => match &scenarios.drone_line {
                 Some(sc) => check(&detect_to_strike(sc, Network::Datalink, 3.0)),
                 None => continue,
@@ -580,11 +645,50 @@ impl<F: Fn(&Figures, Seed) -> Value + Sync> Experiment for Wrap<'_, F> {
 
 /// Morris screening then Sobol indices for a vignette over its figures, and
 /// the research backlog of unsourced figures ranked by sensitivity (§15.4).
-pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed) -> anyhow::Result<bgws_analysis::sensitivity::SensitivityReport> {
+/// How a sensitivity run is sized: Morris trajectories and how many of its
+/// leading figures go on to Sobol (0: Morris only), each defaulting to the
+/// `analysis.*` figures.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SensitivitySize {
+    pub trajectories: Option<usize>,
+    pub sobol_top: Option<usize>,
+}
+
+/// The figures that drive a land fight (`--prefix land`): direct fire,
+/// people, sensing, land cover and feature cover, and the sim's own fire,
+/// sensing and posture figures.
+pub const LAND_FIGHT: &[&str] = &[
+    "direct.",
+    "people.",
+    "sensing.acquire",
+    "sensing.observer",
+    "env.landcover",
+    "env.optics",
+    "sim.cover",
+    "sim.sense",
+    "sim.fire",
+    "sim.posture",
+    "sim.doctrine",
+    "decide.heuristic",
+];
+
+pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed, scenarios: &VignetteScenarios, size: SensitivitySize) -> anyhow::Result<bgws_analysis::sensitivity::SensitivityReport> {
     use bgws_analysis::sensitivity::*;
     let figures = crate::default_figures();
     let v = vignettes::find(id).ok_or_else(|| anyhow::anyhow!("no vignette `{id}`"))?;
     let exp: Box<ExperimentFn> = match id {
+        "attack-halt" => {
+            let sc = scenarios.attack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt needs its scenario"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt(&sc)(f, s))
+        }
+        "attack-halt-real-ground" => {
+            let (sc, opts) = scenarios.attack_pack.clone().ok_or_else(|| anyhow::anyhow!("attack-halt-real-ground needs the kaliningrad-big pack (bgws terrain build)"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt_on(&sc, opts.clone())(f, s))
+        }
+        "attack-halt-open-country" => {
+            let (sc, opts) = scenarios.attack_open.clone().ok_or_else(|| anyhow::anyhow!("attack-halt-open-country needs the kaliningrad-big pack (bgws terrain build)"))?;
+            Box::new(move |f: &Figures, s: Seed| attack_halt_on(&sc, opts.clone())(f, s))
+        }
         "mbt-engagement" => Box::new(mbt_engagement),
         "atgm-engagement" => Box::new(atgm_engagement),
         "tank-engagement-range" => Box::new(tank_engagement_range),
@@ -602,8 +706,9 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
         "red-sea-magazine" => Box::new(red_sea),
         _ => anyhow::bail!("vignette `{id}` has no experiment here"),
     };
+    // Several prefixes, comma-separated; `land` for the land fight's.
     let prefixes: Vec<String> = match prefix {
-        Some(p) => vec![p.to_string()],
+        Some(p) => p.split(',').flat_map(|x| if x == "land" { LAND_FIGHT.iter().map(|s| s.to_string()).collect() } else { vec![x.to_string()] }).collect(),
         None => v.driving_figures.iter().map(|k| k.split('.').take(2).collect::<Vec<_>>().join(".")).collect(),
     };
     let filter = |f: &bgws_core::Figure| prefixes.is_empty() || prefixes.iter().any(|p| f.key.starts_with(p.as_str()));
@@ -615,8 +720,14 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
     let metric = MetricFn::new(v.metric.name.clone(), v.metric.unit.clone(), |o: &Value| *o);
     let wrap = |f: &Figures, s: Seed| exp(f, s);
     let resp = BatchResponse { experiment: &Wrap(&wrap), metric: &metric, config: bgws_analysis::batch::BatchConfig::new(replicates, seed), statistic: v.band.statistic };
-    let morris = MorrisOptions::from_figures(&figures);
-    let sobol = SobolOptions::from_figures(&figures);
+    let mut morris = MorrisOptions::from_figures(&figures);
+    let mut sobol = SobolOptions::from_figures(&figures);
+    if let Some(t) = size.trajectories {
+        morris.trajectories = t.max(2);
+    }
+    if let Some(k) = size.sobol_top {
+        sobol.top_k = k;
+    }
     Ok(analyse(&v.id, &figures, &facs, &resp, &morris, &sobol, seed))
 }
 

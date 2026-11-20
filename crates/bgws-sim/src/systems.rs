@@ -8,7 +8,8 @@
 use crate::components::*;
 use crate::sim::{Ctx, Outcome, Sim, Trigger};
 use bgws_catalogue::{Domain, MoverKind, SensorKind as CatSensor, Vulnerability};
-use bgws_core::{hazard_probability, Enu, EntityId, Side, SimTime, StreamKey};
+use bgws_core::rng::mix64;
+use bgws_core::{hazard_probability, Enu, EntityId, Seed, Side, SimTime, StreamKey};
 use bgws_env::{transmission, OpticalBand};
 use bgws_know::{ClassEvidence, Detection, Hypothesis, IdLevel, Measurement, MotionHint, SensorKind, TruthTag};
 use bgws_models::direct_fire::{self as df, ArmourZones, FireControl, Gun, PersonPosture, Protection, Shot, StrikeOutcome, VehicleDims, VehiclePosture, Warhead, Zone};
@@ -545,6 +546,25 @@ fn candidate_pairs(s: &Sim, ents: &[SenseEnt], max_r: f64) -> Vec<(usize, usize,
         .collect()
 }
 
+/// Is a line of sight through trees open? `p_visible` is the chance a line
+/// like it is (the canopy along it); which way it falls is drawn once for the
+/// two ends where they are, keyed to the pair and the cells (`cell_m` wide)
+/// the two stand in, not to the time. So a line blocked now stays blocked
+/// while neither moves, and either moving a cell or so draws it afresh
+/// (other gaps in the leaves). It is the same both ways round.
+pub fn sight_line_open(seed: Seed, a: u64, b: u64, pa: Enu, pb: Enu, cell_m: f64, p_visible: f64) -> bool {
+    if p_visible >= 1.0 {
+        return true;
+    }
+    if p_visible <= 0.0 {
+        return false;
+    }
+    let ((a, pa), (b, pb)) = if a <= b { ((a, pa), (b, pb)) } else { ((b, pb), (a, pa)) };
+    let q = |v: f64| (v / cell_m.max(0.1)).floor() as i64 as u64;
+    let cells = mix64(q(pa.e) ^ mix64(q(pa.n) ^ mix64(q(pb.e) ^ mix64(q(pb.n)))));
+    seed.uniform(StreamKey::new("sight-line", a, b, cells as i64)) < p_visible
+}
+
 /// Sensing (§8.2): candidate pairs in range on the hash grid, the best
 /// sensor's ACQUIRE/TTP detection rate, line of sight over the terrain for
 /// the pairs that could detect (batched through the kernel layer, §11), then
@@ -674,7 +694,13 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let (oi, ti, range) = pairs[i];
                 let (o, t) = (&ents[oi], &ents[ti]);
                 let b = best[i].as_ref()?;
-                let pdet = p_visible * hazard_probability(b.rate, dt);
+                // Through trees the line is open or blocked, the same each
+                // step until one of them moves (not a fresh chance each step,
+                // which would see through any wood given time).
+                if !sight_line_open(seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, p_visible) {
+                    return None;
+                }
+                let pdet = hazard_probability(b.rate, dt);
                 if b.u >= pdet {
                     return None;
                 }
@@ -820,7 +846,10 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let lines: Vec<bgws_gpu::LosQuery> = from.iter().flat_map(|a| to.iter().map(move |b| (a, b))).map(|(a, b)| bgws_gpu::LosQuery { obs_x: a.e, obs_y: a.n, obs_agl: o.eye_h + o.agl, tgt_x: b.e, tgt_y: b.n, tgt_agl: 1.5 + t.agl }).collect();
     let r = s.ctx.ground.los_batch(&lines);
     let p_elements = (0..from.len()).map(|a| 1.0 - (0..to.len()).map(|b| 1.0 - r[a * to.len() + b].p_visible).product::<f64>()).fold(0.0, f64::max);
-    let p_window = p_elements * hazard_probability(best_rate, over_s);
+    // Through trees the line is open or not for where the two stand now (the
+    // keyed draw sensing makes; reading it changes nothing).
+    let open = sight_line_open(s.ctx.seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, p_elements);
+    let p_window = if open { hazard_probability(best_rate, over_s) } else { 0.0 };
     Some(json!({
         "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
@@ -828,11 +857,13 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         "smoke": { "visual": smoke_visual, "thermal": smoke_thermal },
         "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
         "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
-        // pVisible is what sensing uses (any element seen); the rest is the line between the two units' centres.
-        "lineOfSight": { "pVisible": p_elements, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
+        // pVisible is the chance a line like theirs is clear (any element seen); openWhereTheyStand is how
+        // it fell for where they stand, which holds until one moves; the rest is the line between the two units' centres.
+        "lineOfSight": { "pVisible": p_elements, "openWhereTheyStand": open, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
         "sensors": sensors,
         "bestRatePerS": best_rate,
         "windowS": over_s,
+        // While neither moves.
         "pDetectInWindow": p_window,
         "alreadySeen": cued,
     }))
@@ -2064,4 +2095,30 @@ pub fn victory(s: &mut Sim) {
 #[allow(dead_code)]
 pub(crate) fn ctx_now(c: &Ctx) -> SimTime {
     c.now
+}
+
+#[cfg(test)]
+mod sight_line_tests {
+    use super::*;
+
+    /// Looked along again and again, a line through trees falls the same way
+    /// while neither end moves, either way round; over many places it is open
+    /// about as often as its chance says.
+    #[test]
+    fn a_line_through_trees_holds_until_someone_moves() {
+        let seed = Seed(9);
+        let (a, b) = (Enu::new(3.0, 4.0, 0.0), Enu::new(203.0, 4.0, 0.0));
+        let first = sight_line_open(seed, 1, 2, a, b, 10.0, 0.2);
+        for _ in 0..50 {
+            assert_eq!(sight_line_open(seed, 1, 2, a, b, 10.0, 0.2), first);
+            assert_eq!(sight_line_open(seed, 2, 1, b, a, 10.0, 0.2), first);
+        }
+        // Moving within the cell keeps it; the chance only lowering keeps a blocked line blocked.
+        assert_eq!(sight_line_open(seed, 1, 2, Enu::new(6.0, 7.0, 0.0), b, 10.0, 0.2), first);
+        assert!(sight_line_open(seed, 1, 2, a, b, 10.0, 1.0));
+        assert!(!sight_line_open(seed, 1, 2, a, b, 10.0, 0.0));
+        let open = (0..4000).filter(|i| sight_line_open(seed, 1, 2, Enu::new(*i as f64 * 10.0, 0.0, 0.0), b, 10.0, 0.2)).count();
+        let share = open as f64 / 4000.0;
+        assert!((share - 0.2).abs() < 0.03, "open {share}");
+    }
 }

@@ -753,10 +753,14 @@ fn ccir(s: &mut Sim, c4: &mut C4, after: &mut Vec<After>) {
         }
         let last = c4.c2.hqs[h].last_plan.unwrap_or(SimTime::ZERO);
         let since = (now - last).secs();
-        // Heavy losses among its units: a hasty plan at once, once.
+        // Heavy losses among its fighting units (not its mortars or posts,
+        // which rarely lose any and would thin the share): a hasty plan at
+        // once, once.
         let subs = all_units_under(c4, h);
+        let fighting: Vec<EntityId> = subs.iter().copied().filter(|u| ent(s, *u).and_then(|e| s.world.get::<Ident>(e)).is_some_and(|i| s.is_manoeuvre(i))).collect();
+        let counted = if fighting.is_empty() { &subs } else { &fighting };
         let (mut fit, mut total) = (0.0, 0.0);
-        for u in &subs {
+        for u in counted {
             let start = ent(s, *u).and_then(|e| s.world.get::<Health>(e)).map(|x| x.start as f64).unwrap_or(0.0);
             let (st, _) = strength_of(s, c4, c4.c2.unit_hq.get(u).copied().unwrap_or(h), *u);
             fit += st * start;
@@ -767,6 +771,27 @@ fn ccir(s: &mut Sim, c4: &mut C4, after: &mut Vec<After>) {
         if lost >= c4.p.culmination_loss && !c4.c2.hqs[h].marks.contains("culmination") {
             c4.c2.hqs[h].marks.insert("culmination".into());
             why = Some((format!("CCIR: {:.0}% losses", lost * 100.0), true));
+            // The attack goes firm at once, by radio, while the HQ decides
+            // whether it goes on: units still advancing stop and watch. The
+            // new plan may send them on again.
+            for u in fighting.iter().copied() {
+                let advancing = ent(s, u).and_then(|e| s.world.get::<Act>(e)).is_some_and(|a| matches!(a.activity, Activity::Move { .. }));
+                if advancing && alive_id(s, u) {
+                    let unit = s.ctx.scenario.forces.get(u.index()).map(|f| f.id.clone()).unwrap_or_default();
+                    let order = UnitOrder {
+                        unit,
+                        task: "go firm".into(),
+                        intent: "heavy losses: halt where you are and watch while the HQ decides".into(),
+                        urgency: Some("now".into()),
+                        roe: None,
+                        on_contact: None,
+                        phases: vec![Phase { label: "go firm".into(), action: "overwatch".into(), to: None, mode: None }],
+                    };
+                    send_order(s, c4, h, u, order);
+                }
+            }
+            let text = format!("{} orders its units to go firm ({:.0}% losses)", c4.c2.hqs[h].key, lost * 100.0);
+            s.ctx.log.push(now, "c2.go_firm").side(side).entity(c4.c2.hqs[h].post).text(text).data(serde_json::json!({ "lost": lost }));
         } else if c4.c2.hqs[h].new_contacts >= c4.p.ccir_new_contacts && since >= c4.p.ccir_min_gap_s {
             why = Some((format!("CCIR: {} new enemy contacts", c4.c2.hqs[h].new_contacts), true));
         } else if since >= c4.p.rhythm_s {
