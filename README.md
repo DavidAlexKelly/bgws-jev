@@ -733,8 +733,11 @@ and keeps them in a disk cache (`$BGWS_CACHE`, else `~/.cache/bgws/pmtiles` or
       tree cells (29% of it), mostly gardens and street trees.
   - `--no-tree-cover` leaves it out altogether.
   - Older packs: `bgws basemap <pack> --tree-cover-only` adds
-    `treecover.png` for the viewer's trees (about 7 s). Their ground gains
-    the trees only when the pack is built again.
+    `treecover.png` for the viewer's trees (about 7 s). It also lays the
+    trees on the pack's 5 m sight surface, as light woodland wherever a cell
+    has no building and no mapped wood (hedgerows, tree lines, gardens).
+    Sight lines and feature cover in the simulation then see them. The 30 m
+    land cover gains them only when the pack is built again.
 - **Railways:** the lines on the ground (rail, light rail, narrow gauge,
   heritage lines) from the basemap's zoom-14 roads layer, as
   `railways.json`. Trams run in the street and are left out, and so are
