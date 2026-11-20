@@ -425,8 +425,11 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
       }
     }
     stats.fromCover = fromCover;
-    // The nearest to the middle of the view, as many as are allowed.
+    // More than may be drawn: thinned out with distance rather than cut off at a ring. Each
+    // tree's distance is weighed by a fixed draw of its own, so near the middle nearly all
+    // stand and further out fewer and fewer, the same ones each time.
     if (found.length > o.maxTrees) {
+      for (const t of found) t.d *= 0.35 + hash(t.ix, t.iy, 11) * 1.3;
       found.sort((a, b) => a.d - b.d);
       found.length = o.maxTrees;
     }
@@ -504,6 +507,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
       gl = g;
       // The tree cover, read once: its pixels that are trees (ESA WorldCover's class 10).
       const coverUrl = o.cover?.url;
+      if (!coverUrl) console.info("trees: this pack has no tree cover, so trees stand only in its mapped woods (bgws basemap <pack> --tree-cover-only adds it)");
       if (o.cover && coverUrl) {
         const c = o.cover;
         const img = new Image();
@@ -526,6 +530,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
             // Not readable: the mapped woods only.
           }
         };
+        img.onerror = () => console.warn("trees: the tree cover did not load:", coverUrl);
         img.src = coverUrl;
       }
       if (typeof WebGL2RenderingContext !== "undefined" && g instanceof WebGL2RenderingContext) {
