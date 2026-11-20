@@ -24,6 +24,10 @@ const SPACING_M = 7.5;
 const MIN_ZOOM = 13.5;
 /** Planted out to this far from the middle of the view, m (at zoom 15; half that a zoom further in). */
 const REACH_M = 2500;
+/** Trees further than this from the middle of the view are drawn plainer: coarser crowns, no gaps, no trunks, m. */
+const FAR_M = 400;
+/** Planted again at most this often while more of the map loads, ms (a pan past what is planted plants at once). */
+const REPLANT_MS = 1500;
 /** Planted round the view and this much again each side, so a pan does not plant again. */
 const MARGIN = 0.4;
 
@@ -48,8 +52,9 @@ export interface TreeOptions {
 
 export interface TreeStats {
   trees: number;
-  /** Of them, planted from the tree cover (not in a mapped wood). */
+  /** Of them, planted from the tree cover (not in a mapped wood), and drawn plainer far off. */
   fromCover: number;
+  far: number;
   conifers: number;
   plants: number;
   plantMs: number;
@@ -114,11 +119,35 @@ function mercatorPolygons(f: maplibregl.MapGeoJSONFeature): number[][][][] {
   );
 }
 
-/** The meshes, in a unit space (z up): a trunk, a broadleaf crown, a conifer crown. */
+/** A small seamless value-noise tile (64², 8 × 8 lattice cells), for the gaps between the
+ * leaves: read from a texture, three lookups a pixel instead of computing noise in 3D. */
+function noiseTile(): Uint8Array {
+  const n = 64;
+  const cells = 8;
+  const lattice = (i: number, j: number) => hash(((i % cells) + cells) % cells, ((j % cells) + cells) % cells, 13);
+  const out = new Uint8Array(n * n);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const fx = (x / n) * cells;
+      const fy = (y / n) * cells;
+      const i = Math.floor(fx);
+      const j = Math.floor(fy);
+      const sx = (fx - i) * (fx - i) * (3 - 2 * (fx - i));
+      const sy = (fy - j) * (fy - j) * (3 - 2 * (fy - j));
+      const a = lattice(i, j) + (lattice(i + 1, j) - lattice(i, j)) * sx;
+      const b = lattice(i, j + 1) + (lattice(i + 1, j + 1) - lattice(i, j + 1)) * sx;
+      out[y * n + x] = Math.round((a + (b - a) * sy) * 255);
+    }
+  }
+  return out;
+}
+
+/** The meshes, in a unit space (z up): a trunk, a broadleaf crown (near and far), a conifer crown. */
 function meshes() {
-  const out: Record<"trunk" | "dome" | "cone", { pos: number[]; normal: number[]; idx: number[] }> = {
+  const out: Record<"trunk" | "dome" | "domeLow" | "cone", { pos: number[]; normal: number[]; idx: number[] }> = {
     trunk: { pos: [], normal: [], idx: [] },
     dome: { pos: [], normal: [], idx: [] },
+    domeLow: { pos: [], normal: [], idx: [] },
     cone: { pos: [], normal: [], idx: [] },
   };
   // Trunk: six sides, radius 1, height 1 (no caps: the crown and the ground hide them).
@@ -133,11 +162,13 @@ function meshes() {
     }
     for (let i = 0; i < 6; i++) m.idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
   }
-  // Broadleaf crown: a sphere of radius 1, a little lumpy, so no two crowns' outlines are smooth.
-  {
-    const m = out.dome;
-    const rings = 7;
-    const segs = 12;
+  // Broadleaf crown: a sphere of radius 1, a little lumpy, so no two crowns' outlines are smooth;
+  // and a coarser one for trees far off (a third of the triangles).
+  for (const [name, rings, segs] of [
+    ["dome", 6, 10],
+    ["domeLow", 4, 6],
+  ] as ["dome" | "domeLow", number, number][]) {
+    const m = out[name];
     for (let j = 0; j <= rings; j++) {
       const v = j / rings;
       const phi = v * Math.PI;
@@ -242,30 +273,24 @@ const FS = `
 precision highp float;
 uniform vec3 u_light;
 uniform float u_holes;
+uniform sampler2D u_noise;
 varying vec3 v_normal;
 varying vec3 v_local;
 varying vec3 v_tint;
 varying float v_kind;
 varying float v_up;
-float hash3(vec3 p) {
-  p = fract(p * 0.3183099 + 0.1);
-  p *= 17.0;
-  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-float noise(vec3 x) {
-  vec3 i = floor(x);
-  vec3 f = fract(x);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}
 void main() {
   vec3 n = normalize(v_normal);
   float inside = 1.0;
-  if (v_kind > 0.5) {
-    // Gaps between the leaves: clumps of foliage about a metre across, leaves at a fifth of that.
-    float leaf = 0.65 * noise(v_local * 1.1) + 0.35 * noise(v_local * 4.3);
+  if (v_kind > 0.5 && u_holes > 0.0) {
+    // Gaps between the leaves: clumps of foliage about a metre across (two crossed lookups of the
+    // noise tile, so no surface of the crown streaks), leaves at a quarter of that. Trees far off
+    // have none: their gaps would be smaller than a pixel, and a solid crown is cheaper to draw.
+    float clump = 0.5 * (texture2D(u_noise, v_local.xy * 0.139).r + texture2D(u_noise, vec2(v_local.x + v_local.y, v_local.z) * 0.139 + 0.5).r);
+    float leaf = 0.65 * clump + 0.35 * texture2D(u_noise, v_local.yz * 0.54 + 0.3).r;
     if (leaf < u_holes) discard;
+  }
+  if (v_kind > 0.5) {
     // The far side of the crown, seen through a gap: in its own shade.
     if (!gl_FrontFacing) {
       n = -n;
@@ -291,8 +316,12 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
   const uni: Record<string, WebGLUniformLocation | null> = {};
   const mesh: Record<string, { vbo: WebGLBuffer | null; nbo: WebGLBuffer | null; ibo: WebGLBuffer | null; count: number }> = {};
   let inst: WebGLBuffer | null = null;
+  let noise: WebGLTexture | null = null;
+  /** Trees near and far off, by kind: drawn in that order from the instance buffer. */
   let broadleaf = 0;
-  let conifers = 0;
+  let pinesNear = 0;
+  let broadFar = 0;
+  let pinesFar = 0;
   let origin: [number, number] = [0, 0];
   let pmView = 0;
   /** Where the tree cover shows trees (1), pixel by pixel, once it has loaded. */
@@ -303,10 +332,11 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
   let dirty = true;
   /** Whether the woods round the view have been planted (perhaps with no trees: no woods there). */
   let planted = false;
+  let lastPlant = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let divisor: ((index: number, d: number) => void) | null = null;
   let drawInstanced: ((mode: number, count: number, type: number, offset: number, instances: number) => void) | null = null;
-  const stats: TreeStats = { trees: 0, fromCover: 0, conifers: 0, plants: 0, plantMs: 0 };
+  const stats: TreeStats = { trees: 0, fromCover: 0, far: 0, conifers: 0, plants: 0, plantMs: 0 };
 
   const camElevation = () => ((map as unknown as { transform?: { elevation?: number } })?.transform?.elevation ?? 0);
   const perMetre = (lat: number) => maplibregl.MercatorCoordinate.fromLngLat([0, lat], 1).z;
@@ -323,7 +353,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     const m = map;
     if (m.getZoom() < MIN_ZOOM || !m.getSource(o.source)) {
       stats.trees = 0;
-      broadleaf = conifers = 0;
+      broadleaf = pinesNear = broadFar = pinesFar = 0;
       planted = false;
       m.triggerRepaint();
       return;
@@ -331,7 +361,15 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     const v = viewBox(m);
     const inside = v[0] >= builtBox[0] && v[1] >= builtBox[1] && v[2] <= builtBox[2] && v[3] <= builtBox[3];
     if (!dirty && inside && planted) return;
+    // Only more of the map has loaded where it is: not more often than every REPLANT_MS.
+    const since = performance.now() - lastPlant;
+    if (inside && planted && since < REPLANT_MS) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(check, REPLANT_MS - since);
+      return;
+    }
     dirty = false;
+    lastPlant = performance.now();
     const t0 = performance.now();
     plant(v, inside);
     planted = true;
@@ -435,8 +473,8 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
     }
     // Each tree: where it stands (relative to the origin; its foot's altitude), its size, turn and shade.
     const camEle = camElevation();
-    const pine: number[] = [];
-    const broad: number[] = [];
+    // Near the middle of the view and far off: far ones are drawn plainer (see `render`).
+    const groups: number[][] = [[], [], [], []];
     for (const { ix, iy, wood } of found) {
       const r = (s: number) => hash(ix, iy, s);
       const x = (ix + 0.5 + (r(1) - 0.5) * 0.8) * cell;
@@ -459,15 +497,16 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
       const shade = 0.8 + r(8) * 0.4;
       // Greens: broadleaf trees lighter and warmer, some turning yellower; conifers darker and bluer.
       const tint = conifer ? [0.15 * shade, 0.31 * shade, 0.2 * shade] : [(0.24 + r(9) * 0.14) * shade, (0.43 + r(9) * 0.08) * shade, 0.17 * shade];
-      (conifer ? pine : broad).push(x - origin[0], y - origin[1], ground * pmView, height, crown, r(7), r(10), ...tint);
+      const far = Math.hypot(x - origin[0], y - origin[1]) / pmView > FAR_M;
+      groups[(far ? 2 : 0) + (conifer ? 1 : 0)].push(x - origin[0], y - origin[1], ground * pmView, height, crown, r(7), r(10), ...tint);
     }
-    broadleaf = broad.length / 10;
-    conifers = pine.length / 10;
-    stats.trees = broadleaf + conifers;
-    stats.conifers = conifers;
-    // Broadleaf trees first, then conifers: each crown draws its own run.
+    [broadleaf, pinesNear, broadFar, pinesFar] = groups.map((a) => a.length / 10);
+    stats.trees = broadleaf + pinesNear + broadFar + pinesFar;
+    stats.conifers = pinesNear + pinesFar;
+    stats.far = broadFar + pinesFar;
+    // In runs: near broadleaf, near conifers (the near ones' trunks drawn together), far broadleaf, far conifers.
     g.bindBuffer(g.ARRAY_BUFFER, inst);
-    g.bufferData(g.ARRAY_BUFFER, new Float32Array([...broad, ...pine]), g.STATIC_DRAW);
+    g.bufferData(g.ARRAY_BUFFER, new Float32Array(groups.flat()), g.STATIC_DRAW);
     m.triggerRepaint();
   }
 
@@ -577,7 +616,19 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
         ["kind", "u_kind"],
         ["light", "u_light"],
         ["holes", "u_holes"],
+        ["noise", "u_noise"],
       ]) uni[k] = g.getUniformLocation(program, n);
+      // The noise tile for the gaps between the leaves: repeating, smoothed, mipmapped.
+      noise = g.createTexture();
+      g.bindTexture(g.TEXTURE_2D, noise);
+      g.pixelStorei(g.UNPACK_ALIGNMENT, 1);
+      g.texImage2D(g.TEXTURE_2D, 0, g.LUMINANCE, 64, 64, 0, g.LUMINANCE, g.UNSIGNED_BYTE, noiseTile());
+      g.pixelStorei(g.UNPACK_ALIGNMENT, 4);
+      g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_S, g.REPEAT);
+      g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.REPEAT);
+      g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.LINEAR);
+      g.generateMipmap(g.TEXTURE_2D);
+      g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.LINEAR_MIPMAP_LINEAR);
       for (const [name, md] of Object.entries(meshes())) {
         const b = { vbo: g.createBuffer(), nbo: g.createBuffer(), ibo: g.createBuffer(), count: md.idx.length };
         g.bindBuffer(g.ARRAY_BUFFER, b.vbo);
@@ -605,6 +656,7 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
         g.deleteBuffer(b.ibo);
       }
       if (inst) g.deleteBuffer(inst);
+      if (noise) g.deleteTexture(noise);
       if (program) g.deleteProgram(program);
       map = null;
       gl = null;
@@ -629,12 +681,21 @@ export function treeLayer(id: string, o: TreeOptions): TreeLayer {
       const l = [-0.55, 0.5, 0.67];
       const len = Math.hypot(l[0], l[1], l[2]);
       g.uniform3f(uni.light, l[0] / len, l[1] / len, l[2] / len);
-      g.uniform1f(uni.holes, 0.4);
       g.disable(g.BLEND);
       g.disable(g.CULL_FACE);
-      draw(g, "trunk", 0, 0, broadleaf + conifers);
+      g.activeTexture(g.TEXTURE0);
+      g.bindTexture(g.TEXTURE_2D, noise);
+      g.uniform1i(uni.noise, 0);
+      // Near: trunks, full crowns with gaps between the leaves.
+      const near = broadleaf + pinesNear;
+      g.uniform1f(uni.holes, 0.4);
+      draw(g, "trunk", 0, 0, near);
       draw(g, "dome", 1, 0, broadleaf);
-      draw(g, "cone", 2, broadleaf, conifers);
+      draw(g, "cone", 2, broadleaf, pinesNear);
+      // Far: coarser crowns, solid, no trunks (hidden under them at that distance).
+      g.uniform1f(uni.holes, -1);
+      draw(g, "domeLow", 1, near, broadFar);
+      draw(g, "cone", 2, near + broadFar, pinesFar);
       // Leave the attributes as MapLibre expects them: no instancing.
       for (const k of ["ipos", "isize", "itint"]) {
         divisor?.(loc[k], 0);
