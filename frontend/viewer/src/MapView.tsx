@@ -10,6 +10,7 @@ import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { buildingBlocks, terrainLayers, WOODS, worldLayers } from "./basemap";
 import { treeLayer } from "./trees";
+import type { TreeCover } from "./protocol";
 import { roofLayer } from "./roofs";
 import { addTextures } from "./textures";
 import { setTerrainZ, TERRAIN_EXAGGERATION } from "./layers";
@@ -79,7 +80,7 @@ export function MapView(props: {
   layers: Layer[];
   basemap: Basemap;
   /** The pack's PMTiles (URLs under /packs/), for the terrain basemap. */
-  pack: { basemap: string | null; dem: string | null } | null;
+  pack: { basemap: string | null; dem: string | null; treeCover?: TreeCover | null } | null;
   /** Elevation as 3D terrain (the pack's own), with buildings as blocks. */
   threeD: boolean;
   /** Performance or quality graphics. Smoothed edges (antialiasing) take effect when the map is next created. */
@@ -169,6 +170,8 @@ export function MapView(props: {
   // The basemap: swapped in place, under everything deck.gl draws.
   const packBasemap = props.pack?.basemap ?? null;
   const packDem = props.pack?.dem ?? null;
+  const treeCover = props.pack?.treeCover?.url ? props.pack.treeCover : null;
+  const coverKey = treeCover?.url ?? null;
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -201,7 +204,7 @@ export function MapView(props: {
         for (const l of terrainLayers("base", "base-dem", "base", solid, quality)) if (l.id !== "base-hillshade" || packDem) m.addLayer(l);
         if (!solid) return flat();
         // In 3D, the woods stand as trees.
-        m.addLayer(treeLayer("base-trees", { source: "base", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality) }));
+        m.addLayer(treeLayer("base-trees", { source: "base", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality), cover: treeCover, buildingLayer: "buildings", roadLayer: "roads" }));
         return terrain(abs);
       }
       // Satellite imagery can drape over the pack's terrain, with its buildings standing up.
@@ -226,7 +229,7 @@ export function MapView(props: {
         m.addLayer(buildingBlocks("base-vec", "base-buildings", quality, true));
         // Each block's top shows the imagery of its own roof.
         // The woods stand as trees here too, over the imagery's own.
-        m.addLayer(treeLayer("base-trees", { source: "base-vec", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality) }));
+        m.addLayer(treeLayer("base-trees", { source: "base-vec", sourceLayer: "landuse", kinds: WOODS, terrainSource: "base-terrain", maxTrees: maxTrees(quality), cover: treeCover, buildingLayer: "buildings", roadLayer: "roads" }));
         m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", terrainSource: "base-terrain", ghostSource: "base-ghosts", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
       }
       return terrain(abs);
@@ -244,7 +247,7 @@ export function MapView(props: {
     // The latest basemap wins: before the first load, only it is applied.
     if (loaded.current) apply();
     else pending.current = apply;
-  }, [props.basemap, packBasemap, packDem, props.threeD, graphics]);
+  }, [props.basemap, packBasemap, packDem, coverKey, props.threeD, graphics]);
 
   // Resolution follows the graphics setting at once; the overlay's too.
   useEffect(() => {

@@ -37,6 +37,16 @@ export interface SideDeciders {
 }
 
 /** The game as the server describes it on `hello` and after a new one is opened. */
+/** A raster on a longitude–latitude grid: pixel (0, 0)'s north-west corner, a pixel's size, degrees. */
+export interface TreeCover {
+  url: string | null;
+  west: number;
+  north: number;
+  step: number;
+  width: number;
+  height: number;
+}
+
 /** A theatre pack (`bgws terrain`), as the server describes it. */
 export interface PackInfo {
   name: string;
@@ -49,6 +59,9 @@ export interface PackInfo {
   roadsKm: number | null;
   sizeKm: [number, number];
   towns: { name: string; lat: number; lon: number; radiusM: number }[];
+  /** Land cover at 10 m (ESA WorldCover's classes as grey levels, 10 = trees), placed on a
+   * longitude–latitude grid: where the viewer plants trees beyond the mapped woods. */
+  treeCover?: TreeCover | null;
   /** The terrain analysis' overlays (over `bbox`) and key terrain, when the pack has one. */
   analysis?: { exposure: string | null; going: string | null; keyTerrain: string | null } | null;
 }

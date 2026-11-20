@@ -15,6 +15,7 @@ pub mod pmtiles;
 pub mod preview;
 pub mod roads;
 pub mod source;
+pub mod worldcover;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GeoError {

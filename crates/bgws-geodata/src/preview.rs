@@ -107,6 +107,34 @@ pub fn write_rgba_png(path: &Path, w: usize, h: usize, px: &[[u8; 4]]) -> std::i
     std::fs::write(path, out)
 }
 
+/// A greyscale PNG, one byte a pixel, row by row from the top (a raster of codes, such as land classes).
+pub fn write_gray_png(path: &Path, w: usize, h: usize, px: &[u8]) -> std::io::Result<()> {
+    let mut raw = Vec::with_capacity(h * (1 + w));
+    for row in px.chunks(w) {
+        raw.push(0);
+        raw.extend_from_slice(row);
+    }
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+    z.write_all(&raw)?;
+    let idat = z.finish()?;
+    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+    let chunk = |out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]| {
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        let mut c = kind.to_vec();
+        c.extend_from_slice(data);
+        out.extend_from_slice(&c);
+        out.extend_from_slice(&crc32(&c).to_be_bytes());
+    };
+    let mut ihdr = Vec::new();
+    ihdr.extend_from_slice(&(w as u32).to_be_bytes());
+    ihdr.extend_from_slice(&(h as u32).to_be_bytes());
+    ihdr.extend_from_slice(&[8, 0, 0, 0, 0]);
+    chunk(&mut out, b"IHDR", &ihdr);
+    chunk(&mut out, b"IDAT", &idat);
+    chunk(&mut out, b"IEND", &[]);
+    std::fs::write(path, out)
+}
+
 fn crc32(b: &[u8]) -> u32 {
     let mut c = 0xffff_ffffu32;
     for &x in b {

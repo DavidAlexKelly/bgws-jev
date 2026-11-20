@@ -90,7 +90,11 @@ then streams.
 
 A `pack` is { `name`, `bbox`, `cellM`, `basemap`, `dem`, `preview` (URLs
 under `/packs/`), `roadsKm`, `towns`: [{ name, lat, lon, radiusM }],
-`sizeKm`, `analysis` }. `analysis`, when the pack has a terrain analysis, is
+`sizeKm`, `treeCover`, `analysis` }. `treeCover`, when the pack has one, is
+{ `url` (a greyscale PNG of ESA WorldCover's classes at 10 m: 10 trees, 20
+shrubs, 30 grass, 40 crops, 50 built up, 60 bare, 80 water, 90 wetland),
+`west`, `north` (pixel (0, 0)'s north-west corner), `step` (a pixel's size,
+degrees), `width`, `height` }. `analysis`, when the pack has a terrain analysis, is
 { `exposure`, `going` (RGBA PNG overlays over `bbox`), `keyTerrain` (JSON:
 `key`: [{ kind: observation | chokepoint | crossing, lat, lon, score,
 classes, note }]) }. A `unit` reply carries `terrain`: { `exposure` (0 dead
