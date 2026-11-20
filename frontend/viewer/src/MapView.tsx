@@ -179,7 +179,7 @@ export function MapView(props: {
       for (const l of m.getStyle().layers ?? []) if (l.id.startsWith("base") || l.id.startsWith("world")) m.removeLayer(l.id);
       // Custom layers are not in the style's list.
       if (m.getLayer("base-roofs")) m.removeLayer("base-roofs");
-      for (const id of ["base", "base-dem", "base-terrain", "base-vec", "world"]) if (m.getSource(id)) m.removeSource(id);
+      for (const id of ["base", "base-dem", "base-terrain", "base-vec", "base-ghosts", "world"]) if (m.getSource(id)) m.removeSource(id);
       const flat = () => {
         if (m.getPitch() > 0) m.easeTo({ pitch: 0, bearing: 0, duration: 600 });
         lift.current?.();
@@ -213,9 +213,13 @@ export function MapView(props: {
       }
       if (packBasemap) {
         m.addSource("base-vec", { type: "vector", url: abs(packBasemap), attribution: "© OpenStreetMap contributors · Protomaps" });
+        // Where the imagery shows each building lying on the ground (its roof and the wall the
+        // satellite saw, photographed at a slant): shaded like a shadow, under the blocks.
+        m.addSource("base-ghosts", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        m.addLayer({ id: "base-ghosts", type: "fill", source: "base-ghosts", paint: { "fill-color": "#0b0d0c", "fill-opacity": 0.62, "fill-antialias": false } });
         m.addLayer(buildingBlocks("base-vec", "base-buildings", quality, true));
         // Each block's top shows the imagery of its own roof.
-        m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", terrainSource: "base-terrain", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
+        m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", terrainSource: "base-terrain", ghostSource: "base-ghosts", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
       }
       return terrain(abs);
     };

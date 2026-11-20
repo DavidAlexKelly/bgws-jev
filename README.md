@@ -460,24 +460,37 @@ to reach openrouter.ai.
     - The roofs are the buildings MapLibre has loaded round the view, at the
       top of their blocks (the same height, above the terrain at the same
       centroid, 0.25 m higher).
-    - **The imagery as a blanket, seen from the satellite:** imagery is taken
-      a little off straight down, so everything at a height shows in the
-      photograph shifted from where it stands. The shift is its height times
-      one lean for the whole picture, so each roof reads the imagery at its
-      footprint plus its height times the lean.
+    - **The imagery seen from the satellite:** imagery is taken a little off
+      straight down, so everything at a height shows in the photograph
+      shifted from where it stands, by its height times a lean. Each roof
+      reads the imagery at its footprint plus its height times the lean.
     - **Measuring the lean:** the tile service does not say where the
-      satellite was, so the lean is measured once per area of about 6 km
-      (a zoom-12 tile) and kept (`frontend/viewer/src/lean.ts`).
-      - It tries leans and keeps the one at which the tallest buildings'
-        roof outlines (the 60 tallest, 10 m and up) fall on the picture's
-        edges.
+      satellite was, so the lean is measured from the imagery
+      (`frontend/viewer/src/lean.ts`). Each part is measured once and kept:
+      - for the view, per area of about 6 km (a zoom-12 tile), as the
+        fallback;
+      - per area of about 1.4 km (a zoom-14 tile) with 4 or more buildings
+        10 m tall or more, since the mosaic's images change from place to
+        place;
+      - then each building 8 m tall or more takes its own share of its
+        area's lean (0.4–2×), where its outline fits clearly better; its
+        height may be off.
+    - **How a lean is measured:** it is the lean at which the tallest
+      buildings' roof outlines (up to 60) fall on the picture's edges.
       - Edges are colour steps, capped, so an outline edged all the way
         round beats a few strong shadow edges.
       - The search goes coarse to fine; each pass is tolerant of half its
         step.
       - A lean is used only if it fits at least 8% better than none.
-      - The search runs in 12 ms slices between frames, so it never stalls
-        the map.
+      - An area whose imagery is in but gives no clear lean is tried 3
+        times, then left to the view's lean.
+      - All of it runs as background work in 12 ms slices between frames.
+    - **Ghosts:** the flat imagery still holds every building as
+      photographed: its roof, shifted, and the wall that faced the
+      satellite. So beside each block lay a flat copy of it. That patch (the
+      footprint swept along its shift, `frontend/viewer/src/ghost.ts`) is
+      shaded like a shadow under the blocks, a draped fill layer at 62%.
+      Over satellite imagery the walls are a darker, weathered concrete.
     - **No blinking:** a new set of roofs (after a zoom, a pan beyond the view
       and half a view again each side, or more buildings or terrain loading)
       takes over only when 95% of its imagery is in (or after 3 s). Until
@@ -485,12 +498,16 @@ to reach openrouter.ai.
       - The imagery's zoom (16–19, a level deeper than the map's) changes
         only once the map's zoom is well past it.
     - **Checked** with synthetic imagery of the pack's real buildings,
-      photographed at a known lean (`npm test` for the measurement alone):
-      - Leans of (0.25, −0.35) and (−0.38, 0.12) were found exactly.
-      - The share of roof pixels showing the photographed roof rose from
-        73% to 99% and from 88% to 100%.
+      photographed at known leans (`npm test` for the measurement and the
+      ghost outlines alone):
+      - Two neighbouring 1.4 km areas were given leans of (0.25, −0.35) and
+        (−0.15, −0.4), and one building in three was 1.4× its mapped height.
+        Both areas' leans were found exactly, and 125 buildings measured
+        their own share.
+      - Roof pixels showing the photographed roof: 95%, against 77% with no
+        correction.
       - Zooming in and out seven times, the roofs never blinked out.
-      - A rebuild took 3–30 ms. The main-thread stalls while zooming were
+      - A rebuild took 3–40 ms. The main-thread stalls while zooming were
         the same with the roof layer removed: MapLibre's own, on that
         machine's software GPU.
 - **Giving orders mid-game:** select one of your units (any unit, as the

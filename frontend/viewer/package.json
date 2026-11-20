@@ -18,6 +18,7 @@
     "maplibre-gl": "4.7.1",
     "milsymbol": "2.2.0",
     "pmtiles": "3.2.1",
+    "polygon-clipping": "0.15.7",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
