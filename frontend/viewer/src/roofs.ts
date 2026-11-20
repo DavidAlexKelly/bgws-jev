@@ -23,7 +23,8 @@
 
 import earcut from "earcut";
 import maplibregl from "maplibre-gl";
-import { edgeImage, leanSearch, MAX_K, RADII, spread, type EdgeMap, type Lean, type LeanBuilding } from "./lean";
+import { ghostOutline } from "./ghost";
+import { edgeImage, leanSearch, MAX_K, RADII, refineScale, spread, type EdgeMap, type Lean, type LeanBuilding } from "./lean";
 
 /** Height of a building as the blocks draw it (see `buildingBlocks`). */
 function heightOf(p: Record<string, unknown>): number {
@@ -38,8 +39,15 @@ const MIN_ZOOM = 14;
 /** Buildings at least this tall measure the lean (lower ones barely show it); the tallest this many. */
 const LEAN_MIN_H = 10;
 const LEAN_BUILDINGS = 60;
-/** The lean is kept per zoom-12 tile (about 6 km): one image of the mosaic, roughly. */
+/** A lean is measured for the view per zoom-12 tile (about 6 km), and per zoom-14 tile (about 1.4 km)
+ * where that has enough tall buildings: the mosaic's images change from place to place. */
 const LEAN_ZOOM = 12;
+const AREA_ZOOM = 14;
+const AREA_MIN_BUILDINGS = 4;
+/** Buildings at least this tall take their own share of the lean. */
+const SHARE_MIN_H = 8;
+/** A ghost is laid where the shift is at least this, m. */
+const GHOST_MIN_M = 0.5;
 /** Roofs are built over the view and this much again on each side, so a pan does not rebuild them. */
 const MARGIN = 0.5;
 /** A new set of roofs takes over once this share of its imagery is in, or after `SWAP_MS`. */
@@ -69,6 +77,16 @@ interface Roof {
   pm: number;
   ring: [number, number][];
   box: [number, number, number, number];
+  /** Where it is, for its lean: its zoom-12 and zoom-14 tiles; and who it is, for its share. */
+  place: string;
+  area: string;
+  id: string;
+}
+
+/** A piece of background work, run a slice at a time. */
+interface Job {
+  key: string;
+  run: Generator<void, void>;
 }
 
 /** A set of roofs in the GPU's buffers, grouped by the imagery tile they read from. */
@@ -115,6 +133,8 @@ export interface RoofOptions {
   sourceLayer: string;
   /** The terrain's source: roofs are placed again once more of it has loaded. */
   terrainSource?: string;
+  /** A GeoJSON source the buildings' ghosts (where the imagery shows them lying on the ground) are written to. */
+  ghostSource?: string;
   /** The imagery's tile URL, `{z}/{y}/{x}` as for the raster source. */
   tiles: string;
   /** The imagery's brightness as the ground draws it (`raster-brightness-max`). */
@@ -126,10 +146,14 @@ export interface RoofOptions {
 /** What the layer last measured, for display and checks. */
 export interface RoofStats {
   roofs: number;
-  /** The lean in use, and where it was measured (zoom-12 tile), if it has been. */
+  /** The view's lean, and where it was measured (zoom-12 tile), if it has been. */
   lean: Lean | null;
   place: string | null;
-  /** Sets of roofs built, and swapped in; how long the last build took, and the lean's measurement in all (spread over frames), ms. */
+  /** Areas with a lean of their own (by zoom-14 tile), buildings with a share measured, ghosts laid. */
+  areas: Record<string, [number, number]>;
+  shares: number;
+  ghosts: number;
+  /** Sets of roofs built, and swapped in; how long the last build took, and background work in all (spread over frames), ms. */
   builds: number;
   swaps: number;
   buildMs: number;
@@ -163,15 +187,27 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
   let band = 0;
   /** Buildings or terrain loaded since the roofs were built. */
   let dirty = true;
-  /** The lean in use (roof shift east, south per metre of height), and those measured, by place. */
-  let k: [number, number] = [0, 0];
+  /** Leans measured (roof shift east, south per metre of height): for views by zoom-12 tile, for
+   * areas by zoom-14 tile; buildings' shares by lean and building. Each measured once and kept. */
   const leans = new Map<string, Lean>();
-  /** A lean measurement under way. */
-  let measuring = false;
+  const areaLeans = new Map<string, Lean>();
+  const shares = new Map<string, number>();
+  /** The last lean measured anywhere: for places not measured yet. */
+  let fallback: [number, number] | null = null;
+  /** Background work: measuring, then laying the ghosts. */
+  const jobs: Job[] = [];
+  let running = false;
+  let uploadTimer: ReturnType<typeof setTimeout> | null = null;
+  const ghostCache = new Map<string, [number, number][][][]>();
+  /** The ghosts need laying again (new roofs, or a lean or share measured). */
+  let ghostDirty = true;
+  /** Tries at each lean, by job: one whose imagery never gives a clear answer is left after a few. */
+  const tries = new Map<string, number>();
+  const MAX_TRIES = 3;
   const textures = new Map<TileKey, Tex>();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let leanTimer: ReturnType<typeof setTimeout> | null = null;
-  const stats: RoofStats = { roofs: 0, lean: null, place: null, builds: 0, swaps: 0, buildMs: 0, measureMs: 0 };
+  const stats: RoofStats = { roofs: 0, lean: null, place: null, areas: {}, shares: 0, ghosts: 0, builds: 0, swaps: 0, buildMs: 0, measureMs: 0 };
 
   const url = (z: number, x: number, y: number) => o.tiles.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
   /** The camera's ground elevation, m (what queryTerrainElevation is relative to). */
@@ -204,7 +240,8 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
       g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.LINEAR_MIPMAP_LINEAR);
       entry.ready = true;
       map?.triggerRepaint();
-      if (!leans.has(place())) measureSoon();
+      // More imagery to measure on.
+      planSoon();
     };
     img.onerror = () => {
       entry.failed = true;
@@ -263,12 +300,13 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
     return edges[level][py * 256 + px];
   };
 
-  /** Where the view is, for keeping the lean: its zoom-12 tile. */
+  /** The tile at `z` a mercator point is in, as a key. */
+  const tileKey = (x: number, y: number, z: number) => `${z}/${Math.floor(x * 2 ** z)}/${Math.floor(y * 2 ** z)}`;
+  /** Where the view is: its zoom-12 tile. */
   const place = () => {
     if (!map) return "";
     const c = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
-    const n = 2 ** LEAN_ZOOM;
-    return `${LEAN_ZOOM}/${Math.floor(c.x * n)}/${Math.floor(c.y * n)}`;
+    return tileKey(c.x, c.y, LEAN_ZOOM);
   };
 
   /** The view's mercator box. */
@@ -299,11 +337,12 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
     const shown = pending ?? current;
     if (!dirty && shown && shown.zoom === band && inside) return;
     dirty = false;
+    ghostDirty = true;
     const t0 = performance.now();
     build(v);
     upload();
     stats.buildMs = Math.round(performance.now() - t0);
-    if (!leans.has(place())) measureSoon();
+    planSoon();
   }
 
   /** Roofs for the buildings loaded round the view. */
@@ -356,82 +395,172 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
         }
         const tri = earcut(flat, holes.length ? holes : undefined, 2);
         if (!tri.length) continue;
-        roofs.push({ flat, tri, z: (ground + hgt + LIFT_M) * pm, h: hgt, pm, ring, box });
+        roofs.push({ flat, tri, z: (ground + hgt + LIFT_M) * pm, h: hgt, pm, ring, box, place: tileKey(cm.x, cm.y, LEAN_ZOOM), area: tileKey(cm.x, cm.y, AREA_ZOOM), id: `${ring[0][0]},${ring[0][1]},${hgt}` });
       }
     }
     stats.roofs = roofs.length;
     stats.builds++;
   }
 
-  /** Measure the lean here once, from the tallest buildings, when the map is quiet. */
-  function measureSoon() {
-    if (leanTimer) clearTimeout(leanTimer);
-    leanTimer = setTimeout(measure, 400);
+  /** A roof's lean (view's, or its area's), as far as it is known. */
+  const leanOf = (r: Roof): [number, number] | null => (self.lean ? (areaLeans.get(r.area)?.k ?? leans.get(r.place)?.k ?? fallback) : null);
+  const shareKey = (k: [number, number], r: Roof) => `${k[0].toFixed(3)},${k[1].toFixed(3)}|${r.id}`;
+  /** A roof's shift, mercator: its height times its lean, times its own share. */
+  const shiftOf = (r: Roof): [number, number] => {
+    const k = leanOf(r);
+    if (!k) return [0, 0];
+    const m = r.h * r.pm * (shares.get(shareKey(k, r)) ?? 1);
+    return [k[0] * m, k[1] * m];
+  };
+
+  /** Load the imagery the roofs of these buildings could have been photographed in. */
+  function want(bs: Roof[]) {
+    const n = 2 ** band;
+    for (const b of bs) {
+      const reach = MAX_K * b.h * b.pm * 2;
+      for (let tx = Math.floor((b.box[0] - reach) * n); tx <= Math.floor((b.box[2] + reach) * n); tx++) {
+        for (let ty = Math.floor((b.box[1] - reach) * n); ty <= Math.floor((b.box[3] + reach) * n); ty++) texture(`${band}/${tx}/${ty}`, band, tx, ty);
+      }
+    }
   }
 
-  function measure() {
-    if (!map || !gl || !roofs.length || measuring) return;
-    const key = place();
-    const known = leans.get(key);
-    if (known) {
-      use(known, key);
-      return;
-    }
-    const tall: LeanBuilding[] = roofs
+  const tallest = (rs: Roof[]): LeanBuilding[] =>
+    rs
       .filter((r) => r.h >= LEAN_MIN_H)
       .sort((a, b) => b.h - a.h)
       .slice(0, LEAN_BUILDINGS)
       .map((r) => ({ ring: r.ring, h: r.h, pm: r.pm }));
-    if (tall.length < 4) return;
-    // The imagery their roofs could have been photographed in.
-    const n = 2 ** band;
-    for (const b of tall) {
-      const reach = MAX_K * b.h * b.pm;
-      const xs = b.ring.map((p) => p[0]);
-      const ys = b.ring.map((p) => p[1]);
-      for (let tx = Math.floor((Math.min(...xs) - reach) * n); tx <= Math.floor((Math.max(...xs) + reach) * n); tx++) {
-        for (let ty = Math.floor((Math.min(...ys) - reach) * n); ty <= Math.floor((Math.max(...ys) + reach) * n); ty++) texture(`${band}/${tx}/${ty}`, band, tx, ty);
-      }
-    }
-    // In slices of a few milliseconds between frames, so the map never stalls on it.
+
+  /** Measure a lean for these buildings; kept under `key` once measured on enough of them. */
+  function* leanJob(rs: Roof[], into: Map<string, Lean>, key: string, job: string): Generator<void, void> {
+    const tall = tallest(rs);
+    if (tall.length < AREA_MIN_BUILDINGS) return;
+    want(rs.filter((r) => r.h >= LEAN_MIN_H));
     const zoomAt = band;
     const search = leanSearch(tall, edge, 1 / (2 ** band * 256));
-    let spent = 0;
-    measuring = true;
-    const slice = () => {
-      // The imagery's zoom changed under it, or the layer went: measured again later.
-      if (!map || band !== zoomAt) {
-        measuring = false;
-        return;
-      }
-      const t0 = performance.now();
+    let r = search.next();
+    while (!r.done) {
+      yield;
+      // The imagery's zoom changed under it: measured again later.
+      if (band !== zoomAt) return;
       last = { key: -1, edges: null };
-      let r = search.next();
-      while (!r.done && performance.now() - t0 < SLICE_MS) r = search.next();
-      spent += performance.now() - t0;
-      if (!r.done) {
-        setTimeout(slice, 0);
-        return;
-      }
-      measuring = false;
-      stats.measureMs = Math.round(spent);
-      const l = r.value;
-      // Kept once measured on enough of them; else tried again as more imagery comes in.
-      if (l.used >= Math.min(20, tall.length)) {
-        leans.set(key, l);
-        use(l, key);
-      }
-    };
-    slice();
+      r = search.next();
+    }
+    if (r.value.used >= Math.min(20, tall.length)) {
+      into.set(key, r.value);
+      fallback = r.value.k;
+      changed();
+    } else if (r.value.used >= tall.length * 0.8) {
+      // Its imagery was in and still no clear lean: a try. (One cut short by imagery still loading is not.)
+      tries.set(job, (tries.get(job) ?? 0) + 1);
+    }
   }
 
-  function use(l: Lean, key: string) {
-    stats.lean = l;
-    stats.place = key;
-    const next: [number, number] = self.lean ? l.k : [0, 0];
-    if (next[0] === k[0] && next[1] === k[1]) return;
-    k = next;
-    upload();
+  /** Each tall building's own share of its lean, where its imagery is in. */
+  function* shareJob(): Generator<void, void> {
+    const zoomAt = band;
+    const px = 1 / (2 ** band * 256);
+    let n = 0;
+    for (const r of roofs) {
+      const k = leanOf(r);
+      if (!k || r.h < SHARE_MIN_H || shares.has(shareKey(k, r))) continue;
+      if (band !== zoomAt) return;
+      last = { key: -1, edges: null };
+      const s = refineScale({ ring: r.ring, h: r.h, pm: r.pm }, k, edge, px);
+      if (s !== null) {
+        shares.set(shareKey(k, r), s);
+        n++;
+      }
+      yield;
+    }
+    if (n) changed();
+  }
+
+  /** The ghosts of the buildings round the view, written to the ghost source. */
+  function* ghostJob(): Generator<void, void> {
+    if (!o.ghostSource) return;
+    ghostDirty = false;
+    const features: GeoJSON.Feature[] = [];
+    let i = 0;
+    for (const r of roofs) {
+      const d = shiftOf(r);
+      if (Math.hypot(d[0], d[1]) / r.pm < GHOST_MIN_M) continue;
+      const key = `${r.id}|${d[0].toExponential(4)},${d[1].toExponential(4)}`;
+      let g = ghostCache.get(key);
+      if (!g) {
+        // Worked out in mercator, then to longitude and latitude.
+        g = ghostOutline(r.ring, d).map((poly) => poly.map((ring) => ring.map((p) => {
+          const ll = new maplibregl.MercatorCoordinate(p[0], p[1], 0).toLngLat();
+          return [ll.lng, ll.lat] as [number, number];
+        })));
+        if (ghostCache.size > 50000) ghostCache.clear();
+        ghostCache.set(key, g);
+      }
+      if (g.length) features.push({ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: g } });
+      if (++i % 25 === 0) yield;
+    }
+    const src = map?.getSource(o.ghostSource) as maplibregl.GeoJSONSource | undefined;
+    src?.setData({ type: "FeatureCollection", features });
+    stats.ghosts = features.length;
+  }
+
+  /** Queue a job unless it is queued already. */
+  function queue(key: string, make: () => Generator<void, void>, limited = false) {
+    if (jobs.some((j) => j.key === key)) return;
+    if (limited && (tries.get(key) ?? 0) >= MAX_TRIES) return;
+    jobs.push({ key, run: make() });
+    if (!running) {
+      running = true;
+      setTimeout(work, 0);
+    }
+  }
+
+  /** Background work in slices of a few milliseconds between frames, so the map never stalls on it. */
+  function work() {
+    const t0 = performance.now();
+    while (jobs.length && performance.now() - t0 < SLICE_MS) {
+      if (jobs[0].run.next().done) jobs.shift();
+    }
+    stats.measureMs += Math.round(performance.now() - t0);
+    if (jobs.length && map) setTimeout(work, 0);
+    else running = false;
+  }
+
+  /** What is still to measure round the view, queued: the view's lean, its areas', the buildings' shares, then the ghosts. */
+  function plan() {
+    if (!map || !gl || !roofs.length) return;
+    if (self.lean) {
+      const byPlace = new Map<string, Roof[]>();
+      const byArea = new Map<string, Roof[]>();
+      for (const r of roofs) {
+        byPlace.set(r.place, [...(byPlace.get(r.place) ?? []), r]);
+        if (r.h >= LEAN_MIN_H) byArea.set(r.area, [...(byArea.get(r.area) ?? []), r]);
+      }
+      for (const [p, rs] of byPlace) if (!leans.has(p)) queue(`view:${p}:${band}`, () => leanJob(rs, leans, p, `view:${p}:${band}`), true);
+      for (const [a, rs] of byArea) if (!areaLeans.has(a) && rs.length >= AREA_MIN_BUILDINGS) queue(`area:${a}:${band}`, () => leanJob(rs, areaLeans, a, `area:${a}:${band}`), true);
+      queue("shares", shareJob);
+    }
+    if (ghostDirty) queue("ghosts", ghostJob);
+    const here = leans.get(place());
+    stats.lean = here ?? null;
+    stats.place = here ? place() : null;
+    stats.areas = Object.fromEntries([...areaLeans].map(([a, l]) => [a, l.k]));
+    stats.shares = shares.size;
+  }
+
+  function planSoon() {
+    if (leanTimer) clearTimeout(leanTimer);
+    leanTimer = setTimeout(plan, 400);
+  }
+
+  /** A lean or share was measured: draw the roofs with it (soon, once for several), and measure what follows from it. */
+  function changed() {
+    if (uploadTimer) clearTimeout(uploadTimer);
+    ghostDirty = true;
+    uploadTimer = setTimeout(() => {
+      upload();
+      plan();
+    }, 250);
   }
 
   function drop(b: Built | null) {
@@ -448,8 +577,7 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
     const data: number[] = [];
     const byTile = new Map<TileKey, { x: number; y: number; idx: number[]; d: number }>();
     for (const r of roofs) {
-      const sx = k[0] * r.h * r.pm;
-      const sy = k[1] * r.h * r.pm;
+      const [sx, sy] = shiftOf(r);
       const base = data.length / 5;
       for (let q = 0; q < r.flat.length; q += 2) data.push(r.flat[q], r.flat[q + 1], r.z, sx, sy);
       // Every tile its roof reads from draws its part of it.
@@ -517,9 +645,9 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
     stats,
     lean: true,
     refresh: () => {
-      const l = leans.get(place());
-      if (l) use(l, place());
-      else upload();
+      ghostDirty = true;
+      upload();
+      plan();
     },
     onAdd(m, g) {
       map = m;
@@ -557,6 +685,8 @@ export function roofLayer(id: string, o: RoofOptions): RoofLayer {
       map?.off("sourcedata", loaded);
       if (timer) clearTimeout(timer);
       if (leanTimer) clearTimeout(leanTimer);
+      if (uploadTimer) clearTimeout(uploadTimer);
+      jobs.length = 0;
       drop(current);
       drop(pending);
       current = pending = null;

@@ -181,3 +181,23 @@ export function* leanSearch(bs: LeanBuilding[], edge: EdgeMap, px: number): Gene
   const used = bs.filter((b) => Number.isFinite(edgeScore(b.ring, 0, 0, edge, px))).length;
   return gain >= MIN_GAIN ? { k: best, gain, used } : { ...none, gain, used };
 }
+
+/** A building's own share of the lean (1: as its height says), where its
+ * outline fits clearly better with another: its height may be off. Null
+ * while its imagery is not in. */
+export function refineScale(b: LeanBuilding, k: [number, number], edge: EdgeMap, px: number): number | null {
+  const m = b.h * b.pm;
+  const at = (s: number) => edgeScore(b.ring, k[0] * m * s, k[1] * m * s, edge, px);
+  const one = at(1);
+  if (!Number.isFinite(one)) return null;
+  let best = 1;
+  let bestS = one;
+  for (let s = 0.4; s <= 2.0001; s += 0.05) {
+    const v = at(s);
+    if (v > bestS) {
+      bestS = v;
+      best = s;
+    }
+  }
+  return bestS > one * 1.05 ? Math.round(best * 100) / 100 : 1;
+}

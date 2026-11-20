@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { edgeImage, edgeScore, estimateLean, RADII, spread, type EdgeMap, type LeanBuilding } from "./lean.ts";
+import { edgeImage, edgeScore, estimateLean, RADII, refineScale, spread, type EdgeMap, type LeanBuilding } from "./lean.ts";
 
 /** Seeded random (mulberry32). */
 function rng(seed: number) {
@@ -114,6 +114,18 @@ test("straight down: no lean is found", () => {
   const bs: LeanBuilding[] = t.boxes.map((b) => ({ ring: t.ring(b), h: b.h, pm: 1 }));
   const lean = estimateLean(bs, t.edge, PX);
   assert.ok(Math.hypot(lean.k[0], lean.k[1]) < 0.02, `found ${lean.k}`);
+});
+
+test("a building whose height is wrong takes its own share of the lean", () => {
+  const k: [number, number] = [0.3, -0.2];
+  const t = town(5, k, [-0.5, 0.4]);
+  const b = t.boxes.reduce((a, c) => (c.h > a.h ? c : a));
+  // Mapped at 60% of its real height: its roof shows 1/0.6 as far off as that suggests.
+  const s = refineScale({ ring: t.ring(b), h: b.h * 0.6, pm: 1 }, k, t.edge, PX);
+  assert.ok(s !== null && Math.abs(s - 1 / 0.6) < 0.1, `share ${s}`);
+  // Right as it is: left alone; off the imagery: not known yet.
+  assert.equal(refineScale({ ring: t.ring(b), h: b.h, pm: 1 }, k, t.edge, PX), 1);
+  assert.equal(refineScale({ ring: t.ring(b), h: b.h, pm: 1 }, k, () => NaN, PX), null);
 });
 
 test("an outline off the loaded imagery scores nothing", () => {
