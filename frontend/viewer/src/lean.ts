@@ -6,9 +6,7 @@
 // for a whole image, `k`: the roof's shift (east, south) per metre of height.
 // The tile service does not say where the satellite was, so `k` is measured
 // from the imagery: the shift at which the outlines of the tall buildings'
-// roofs fall on the strongest edges in the picture. Each building can then
-// adjust its own share of the shift, since a mapped or estimated height can
-// be off.
+// roofs fall on the strongest edges in the picture.
 //
 // The imagery is read as edges: per tile, how sharply the colour changes at
 // each pixel (capped, so an outline edged all the way round beats one with a
@@ -141,6 +139,15 @@ export const MIN_GAIN = 1.08;
 
 /** The lean that best lays the buildings' roof outlines on the imagery's edges. */
 export function estimateLean(bs: LeanBuilding[], edge: EdgeMap, px: number): Lean {
+  const search = leanSearch(bs, edge, px);
+  let r = search.next();
+  while (!r.done) r = search.next();
+  return r.value;
+}
+
+/** As `estimateLean`, a step at a time: it pauses after each row of
+ * candidates, so a caller can spread the work over several frames. */
+export function* leanSearch(bs: LeanBuilding[], edge: EdgeMap, px: number): Generator<void, Lean> {
   const none: Lean = { k: [0, 0], gain: 1, used: 0 };
   const base = score(bs, [0, 0], edge, px);
   if (!Number.isFinite(base) || base <= 0) return none;
@@ -166,29 +173,11 @@ export function estimateLean(bs: LeanBuilding[], edge: EdgeMap, px: number): Lea
           next = k;
         }
       }
+      yield;
     }
     best = next;
   }
   const gain = score(bs, best, edge, px) / base;
   const used = bs.filter((b) => Number.isFinite(edgeScore(b.ring, 0, 0, edge, px))).length;
   return gain >= MIN_GAIN ? { k: best, gain, used } : { ...none, gain, used };
-}
-
-/** A building's own share of the lean (1: as its height says), where its
- * outline fits clearly better with another: its height may be off. */
-export function refineScale(b: LeanBuilding, k: [number, number], edge: EdgeMap, px: number): number {
-  const m = b.h * b.pm;
-  const at = (s: number) => edgeScore(b.ring, k[0] * m * s, k[1] * m * s, edge, px);
-  const one = at(1);
-  if (!Number.isFinite(one)) return 1;
-  let best = 1;
-  let bestS = one;
-  for (let s = 0.4; s <= 2.0001; s += 0.05) {
-    const v = at(s);
-    if (v > bestS) {
-      bestS = v;
-      best = s;
-    }
-  }
-  return bestS > one * 1.05 ? Math.round(best * 100) / 100 : 1;
 }

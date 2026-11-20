@@ -215,7 +215,7 @@ export function MapView(props: {
         m.addSource("base-vec", { type: "vector", url: abs(packBasemap), attribution: "© OpenStreetMap contributors · Protomaps" });
         m.addLayer(buildingBlocks("base-vec", "base-buildings", quality, true));
         // Each block's top shows the imagery of its own roof.
-        m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
+        m.addLayer(roofLayer("base-roofs", { source: "base-vec", sourceLayer: "buildings", terrainSource: "base-terrain", tiles: b.tiles[0], brightness: b.paint?.["raster-brightness-max"] ?? 1, maxTiles: quality ? 240 : 120 }));
       }
       return terrain(abs);
     };
