@@ -373,7 +373,13 @@ to reach openrouter.ai.
 - **Morale:** a unit can cascade from steady to routed within seconds under
   heavy fire. The hazard rates in `bgws_models::people` want playtesting.
 - **Mostly unsourced figures:** most figures are `[default]`.
-  `bgws sensitivity <vignette>` ranks which ones matter.
+  `bgws sensitivity <vignette>` ranks which ones matter (`--prefix land`
+  for the land fight's figures, `--sobol-top 0` for Morris only). A first
+  pass over five land-fight vignettes is in
+  [docs/research/CALIBRATION_TARGETS.md](docs/research/CALIBRATION_TARGETS.md).
+  The search model (cueing, search sector and time) is the common thread,
+  then the guided missile's hit chance, lay time, and how fast suppression
+  builds and fades.
 
 ### Known gaps
 
