@@ -540,10 +540,9 @@ to reach openrouter.ai.
         about a house's eaves to its ridge, with one in ten 13–16 m.
 
       Crowns are in proportion: a broadleaf crown about three-fifths as wide
-      as the tree is tall, a conifer's narrower. There are fewer conifers in
-      town. About a third
-      are conifers, with two stacked cones; the rest are broadleaf, with a
-      lumpy dome.
+      as the tree is tall, a conifer's narrower. Conifers have two stacked
+      cones and broadleaf trees a lumpy dome. About a third of the trees in
+      woods are conifers, and fewer in town.
     - The crowns are cut through with a pattern of small gaps, about a metre
       and a fifth of a metre across. The inside of a crown, seen through
       them, is in shade, so a crown reads as foliage, not a shell.
