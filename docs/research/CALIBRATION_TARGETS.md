@@ -449,6 +449,53 @@ morale, covering fire or the HQ's halt can act. Indirect fire on the
 launcher once it has fired (counter-fire from the company's mortars),
 not yet in the plan, is the next thing to try.
 
+## Mortar counter-fire on the launcher (21 November)
+
+**Why blue never fired on the missile team.** In every traced game, all
+the calls for fire were red's. There were three reasons:
+- **Only fully steady units called for fire.** After the first missile
+  hit, the tanks were Shaken. Now shaken and pinned units call too; only
+  broken and routed ones don't.
+- **A launcher had to be "seen" to be called on.** Now a noticed launch is
+  a target report in itself: the unit calls fire on where the missile came
+  from, with twice the usual aiming error, at priority 4 ("a missile
+  launched at us from there"). The sim records each launcher's last launch
+  position for this (`missiles_launched`).
+- **The company's mortars were driving.** They start 6.6 km from the
+  objective, within their 7 km range. The planner still sent them forward
+  ("move up into range", since they were beyond 70% of their range): 13
+  minutes on the road, out of action through the first contact at 7
+  minutes. Fire units now move up only if they cannot reach the objective
+  at all (`decide.heuristic.fires_move_up` 0.7 → 1.0).
+
+**What happens now.** In seed 1 the tanks call fire on the launcher one
+second after it launches (430 s). The battery's first round lands 95 s
+later, and it is smoke for an earlier screen request (missions go in
+turn). High explosive lands at 670 s, after the tank platoon was
+destroyed at 532 s, and knocks nothing out. An unplanned call takes
+minutes; a dug-in missile team kills a platoon in one or two. Counter-fire
+cannot save the platoon that draws the fire. At most it suppresses the
+team for the next one.
+
+**Losses at the halt, 100 games each:**
+
+| Test | Before | After |
+|---|---|---|
+| Kaliningrad town | 31% (out of band) | 25% (in band) |
+| Open country | 15% (in band) | 15% (in band) |
+| Generated | 38.5% (out of band) | 38.5% (out of band) |
+
+Keeping the mortars in action accounts for most of the town change
+(31% → 25%, with 65 attacks halted against 44), though that comparison is
+not significant on its own (Mann–Whitney p 0.33).
+
+**What would help next: planned fire on the objective.** Doctrine fires on
+the objective and its likely missile positions while the assault closes,
+not only on call. The heuristic plan gives its mortars only "answer calls
+for fire". A preparatory and covering fire plan would suppress the
+missile team before it can fire: rounds on the objective timed to the
+lead platoons crossing into missile range.
+
 ## Naked-eye search
 
 Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau

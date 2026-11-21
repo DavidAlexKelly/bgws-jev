@@ -1151,6 +1151,7 @@ fn launch_missiles(s: &mut Sim, e: Entity, id: EntityId, side: Side, mount_i: us
     let text = format!("{} launches {} {} at {} ({:.0} m, {:.0} s to go)", name(s, id), rounds, mun.name, name(s, tid), range, flight);
     s.ctx.log.push(now, "fire.launch").side(side).entity(id).target(tid).text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "flightS": flight, "guidedByGunner": operator }));
     let from = s.world.get::<Kin>(e).map(|k| k.pos).unwrap_or_default();
+    s.ctx.missiles_launched.insert(id, (now, from));
     crate::smoke::missile_warning(s, tid, id, from);
     // A vehicle crew that sees it coming also drives out of the launcher's
     // sight (the same draw as for its dischargers): a missile guided by its

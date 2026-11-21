@@ -334,7 +334,9 @@ fn calls_for_fire(s: &mut Sim, st: &mut FiresWorld) {
             }
             let (oid, platform) = (i.id, i.platform.clone());
             let crew = s.world.get::<Crew>(e).expect("crew");
-            if crew.morale.state != bgws_models::people::MoraleState::Steady {
+            // A shaken or pinned unit still calls for fire on what is hurting
+            // it; a broken one does not.
+            if matches!(crew.morale.state, bgws_models::people::MoraleState::Broken | bgws_models::people::MoraleState::Routed) {
                 continue;
             }
             let last_incoming = crew.last_incoming;
@@ -375,6 +377,24 @@ fn calls_for_fire(s: &mut Sim, st: &mut FiresWorld) {
                 open.insert(tid);
                 let reason = if firing_on_me { "it is firing on us" } else { "seen beyond our reach" };
                 request(s, st, side, Some(oid), Some(tid), aim, priority, false, reason);
+            }
+            // A missile launch seen at us (the flash and dust give the spot)
+            // from a launcher not otherwise in sight: fire on where it
+            // launched from, roughly.
+            if let Some((t, by)) = last_incoming.filter(|(t, _)| (now - *t).secs() < 30.0) {
+                let launched = s.ctx.missiles_launched.get(&by).filter(|(at, _)| *at == t).map(|(_, p)| *p);
+                if let Some(at) = launched {
+                    let known = s.world.get::<Aware>(e).is_some_and(|a| a.seen.get(&by).is_some_and(|v| (now - v.last).secs() <= 1.0));
+                    let recalled = st.fires.recall.get(&(oid, by)).is_some_and(|r| (now - *r).secs() < st.p.recall_s);
+                    if !known && !open.contains(&by) && !recalled && alive(s, s.ctx.entity(by)) && shooters.iter().any(|sh| sh.reaches(at)) {
+                        let mut rng = s.ctx.rng("fires.call.launch", oid.0 as u64, by.0 as u64);
+                        let sig = st.p.observer_sigma_m * 2.0;
+                        let aim = at.add(Enu::new(normal(&mut rng, sig), normal(&mut rng, sig), 0.0));
+                        st.fires.recall.insert((oid, by), now);
+                        open.insert(by);
+                        request(s, st, side, Some(oid), Some(by), aim, 4, false, "a missile launched at us from there");
+                    }
+                }
             }
         }
     }
