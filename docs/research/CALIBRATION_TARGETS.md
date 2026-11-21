@@ -548,6 +548,51 @@ launch, which now comes within a second of the first launch and lands
 about 90 s later. The plan is kept, as doctrine, and has no measurable
 effect against this defence.
 
+## The ranking refreshed (21 November, after all of the above)
+
+The same Morris screening over the land fight's figures (`--prefix land`,
+328 figures, 3 trajectories, 3 replicates), on the current model:
+
+| Vignette | Leading figures (μ*, as % of that vignette's top figure) |
+|---|---|
+| ATGM engagement | `direct.guided.ph` 100%, `sim.fire.missile_fail_p` 44%, `sensing.acquire.fov_exponent` 35% (now sourced), `sensing.observer.moving_factor` 33%, `sim.fire.rounds_per_volley` 33%, `sim.sense.search_fov_deg` 31%, `cue_factor` 25% |
+| Tank engagement range | `sim.sense.max_range_m` 100%, `cue_factor` 52%, `sim.fire.lay_min_s` 52%, `sensing.acquire.fov_ref_deg` 45%, `search_fov_deg` 35%, `moving_factor` 27%, `visual_contrast_threshold` 24% |
+| Attack halt, open country (Kaliningrad) | `decide.heuristic.fire_and_movement` 100%, `frontage` 94%, `fm_min_units` 93%, `missile_fail_p` 80%, `visual_contrast_threshold` 75%, `direct.guided.ph` 59%, `people.morale.min_dwell_s` 58%, `env.landcover.crops.conceal_mean` 53% |
+| Attack halt, town (Kaliningrad; noisy, few games halt) | `forest_dense.canopy_m`, `people.morale.hazard_width`, `moving_factor` (each 100%), `people.stress.k_casualty` 75%, `fov_exponent` 75%, `fm_min_units` 62%, `sim.fires.lay_mortar_s` 62% |
+
+**What changed since the first pass:**
+- **The search model is still the common thread.** Of its settings,
+  `fov_exponent` and the two τ constants are now sourced (Howe). Still
+  unsourced:
+  - the cue factor;
+  - the search sector (`search_fov_deg`);
+  - the reference field of view (`fov_ref_deg`);
+  - the moving observer's factor (`moving_factor`);
+  - the longest search range (`max_range_m`).
+- **On real ground the HQ planner's figures lead.** How an attack is put
+  together (fire and movement, frontage, how many units it needs) now
+  decides the open-country fight more than any physical figure. That
+  matches what the traces showed. These figures need a source in doctrine
+  (company attack frontages, support-by-fire practice) or in the
+  historical record.
+- **Morale moves the town fight:** `hazard_width`, `k_casualty` (sourced
+  to P14 but low confidence) and the new `min_dwell_s` (20 s, unsourced).
+- **Feature cover stays at the bottom:** `sim.cover.*` is at 8% or less
+  everywhere. So is the covering fire plan (`cover_from_m` 7%). The
+  traces explain both: losses come on the move, and the missile team is
+  not where it was briefed.
+
+**Next sources to find, in order:**
+1. The ATGM's chance of reaching its target, and its failure rate. These
+   were the top two in the first pass and still are.
+2. Search sector, cueing and the moving observer. The TETAM companion
+   paper on time to detect (not yet found), and the naked-eye leads in
+   `docs/papers/notes/naked-eye-leads.md`.
+3. Company attack frontage and fire-and-movement practice, from field
+   manuals (FM 3-90 / ATP 3-90.1, company attack).
+4. Morale hazard and dwell: historical breaking points of small units
+   under fire.
+
 ## Naked-eye search
 
 Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau
