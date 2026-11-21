@@ -62,6 +62,8 @@ fn a_company_attack_published_over_dis() {
                     }
                     // Phase 4: radios, messages, emitters, aggregates (tests/phase4.rs).
                     dis_rs::model::PduBody::Transmitter(_) | dis_rs::model::PduBody::Signal(_) | dis_rs::model::PduBody::ElectromagneticEmission(_) | dis_rs::model::PduBody::AggregateState(_) => continue,
+                    // Phase 4 PDUs dis-rs does not parse (Designator, Minefield State; tests/phase4.rs).
+                    dis_rs::model::PduBody::Other(_) => continue,
                     other => panic!("unexpected PDU {other:?}"),
                 };
                 assert_eq!((es.entity_id.simulation_address.site_id, es.entity_id.simulation_address.application_id), (5, 6));
@@ -83,7 +85,10 @@ fn a_company_attack_published_over_dis() {
     // Shots went out as Fire and Detonation PDUs, each detonation with the
     // event of a fire sent before it.
     assert!(!fires.is_empty() && !detonations.is_empty(), "{} fires, {} detonations", fires.len(), detonations.len());
-    assert!(detonations.iter().all(|d| fires.contains(d)), "a detonation with no fire before it");
+    // (A round fired before we started listening may land while we listen:
+    // only detonations of shots fired since are checked.)
+    let first = fires.iter().min().copied().unwrap_or(0);
+    assert!(detonations.iter().filter(|d| **d >= first).all(|d| fires.contains(d)), "a detonation with no fire before it");
     eprintln!("{} fires, {} detonations", fires.len(), detonations.len());
     // The 5 s heartbeat (plus a second's tick).
     assert!(worst_gap <= 6.0, "an entity went {worst_gap} s without a state");
