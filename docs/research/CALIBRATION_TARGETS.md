@@ -496,6 +496,58 @@ for fire". A preparatory and covering fire plan would suppress the
 missile team before it can fire: rounds on the objective timed to the
 lead platoons crossing into missile range.
 
+## Planned covering fire on the objective (21 November)
+
+**What was added.** An attacking side's fire units fire on its objective
+while the assault closes, without waiting for a call (`covering_fire` in
+`domains/fires/indirect.rs`):
+- **When:** from when its lead manoeuvre unit is within
+  `sim.fires.cover_from_m` (3 km, about a missile team's reach) until it
+  is within `sim.fires.cover_lift_m` (400 m).
+- **How often:** a mission every `sim.fires.cover_every_s` (60 s), at
+  priority 2. Counter-fire on a seen launch, at priority 4, still comes
+  first.
+- **Where:** on each enemy the side believes is on the objective, in turn.
+  With none seen, on the fighting positions it was briefed on: where the
+  enemy's platoons and anti-tank teams started.
+- **Delivery:** the targets are planned and registered, so there is no
+  call delay, a quarter of the usual lay time (`sim.fires.cover_lay_frac`)
+  and the smaller bias of careful laying.
+- **Which side:** a side counts as attacking if it has its own objective,
+  or a plan with an "attack: take the objective" order. A defender whose
+  HQ plans a counter-attack fires its own.
+- **Off:** set `sim.fires.cover_from_m` to 0.
+
+**What it does, and why it does not change the outcome.** Losses at the
+halt, with and without, 100 games each:
+
+| Test | With | Without | Mann–Whitney p |
+|---|---|---|---|
+| Generated | 38.5% | 38.5% | 0.68 |
+| Town | 31% | 25% | 0.24 |
+| Open country | 15% | 15% | 0.21 |
+
+None of the differences can be told apart. Tracing the generated attack
+shows why:
+
+- **The missile team is not where it was briefed.** It moves about 200 m
+  forward from its starting hide to a firing position. The planned salvos
+  land on the briefed spot (within about 40 m of the aim), 170–190 m from
+  the team. That is outside the roughly 100 m at which a 120 mm burst is
+  felt (`sim.fires.suppress_radius_m` 150 m, scaled), so its suppression
+  stays at 0–0.15.
+- **Starting earlier backfires.** At 4 km the mortars fired from the first
+  minute and gave themselves away to red's counter-battery. They
+  displaced at 236 s and were out of action until 499 s, while the
+  missile team killed the tank platoon.
+
+This is realistic: fire on positions templated from the briefing misses
+defenders who have moved. What would hit the team is fire on where it
+actually is. That means an observer who sees it, or counter-fire on its
+launch, which now comes within a second of the first launch and lands
+about 90 s later. The plan is kept, as doctrine, and has no measurable
+effect against this defence.
+
 ## Naked-eye search
 
 Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau

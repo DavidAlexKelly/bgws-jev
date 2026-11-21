@@ -138,6 +138,8 @@ pub struct FiresState {
     pub missions: BTreeMap<u64, Mission>,
     pub next: u64,
     pub recall: BTreeMap<(EntityId, EntityId), SimTime>,
+    /// When each side last fired a covering mission on its objective.
+    pub covering: BTreeMap<Side, SimTime>,
     /// Shooter → the mission its `fireRequestReceived` question is about.
     pub asking: BTreeMap<EntityId, u64>,
     pub cb: BTreeMap<(EntityId, EntityId), CbTrack>,
@@ -148,7 +150,7 @@ pub struct FiresState {
 
 impl FiresState {
     pub fn new(_p: &super::FParams) -> Self {
-        FiresState { missions: BTreeMap::new(), next: ID_BASE, recall: BTreeMap::new(), asking: BTreeMap::new(), cb: BTreeMap::new(), fixes: BTreeMap::new(), next_fix: 0, traj: BTreeMap::new() }
+        FiresState { missions: BTreeMap::new(), next: ID_BASE, recall: BTreeMap::new(), asking: BTreeMap::new(), cb: BTreeMap::new(), fixes: BTreeMap::new(), next_fix: 0, traj: BTreeMap::new(), covering: BTreeMap::new() }
     }
 }
 
@@ -274,6 +276,7 @@ pub fn base(s: &mut Sim, st: &mut FiresWorld) {
         return;
     }
     calls_for_fire(s, st);
+    covering_fire(s, st);
     assign(s, st);
     fire(s, st);
     complete(s, st);
@@ -397,6 +400,91 @@ fn calls_for_fire(s: &mut Sim, st: &mut FiresWorld) {
                 }
             }
         }
+    }
+}
+
+/// The objective a side is attacking: its own in the scenario, else (with
+/// none set, but a plan that attacks) where the enemy started, as briefed.
+fn attack_objective(s: &Sim, side: Side) -> Option<Enu> {
+    let own = s.ctx.scenario.victory.iter().find_map(|v| match v {
+        bgws_scenario::v4::VictoryCondition::Objective { side: o, at, .. } if *o == side => Some(*at),
+        _ => None,
+    });
+    if let Some(at) = own {
+        return Some(s.ctx.frame.geodetic_to_enu(at));
+    }
+    let attacking = s.ctx.last_plan.get(&side).is_some_and(|p| p.orders.iter().any(|o| o.task.starts_with("attack: take")));
+    if !attacking {
+        return None;
+    }
+    let enemy = briefed_positions(s, side.enemy());
+    (!enemy.is_empty()).then(|| Enu::new(enemy.iter().map(|p| p.e).sum::<f64>() / enemy.len() as f64, enemy.iter().map(|p| p.n).sum::<f64>() / enemy.len() as f64, 0.0))
+}
+
+/// Where a side's fighting units (manoeuvre, not posts or fire units)
+/// started: what the other side was briefed on.
+fn briefed_positions(s: &Sim, side: Side) -> Vec<Enu> {
+    s.ctx
+        .scenario
+        .forces_of(side)
+        .filter(|f| s.ctx.by_name.get(&f.id).and_then(|id| s.world.get::<Ident>(s.ctx.entity(*id))).is_some_and(|i| i.domain == bgws_catalogue::Domain::Land && s.is_manoeuvre(i)))
+        .map(|f| s.ctx.frame.geodetic_to_enu(f.position))
+        .collect()
+}
+
+/// Planned covering fire (a fire plan, not a call): while a side's
+/// assault closes on its objective, from when its lead is within
+/// `sim.fires.cover_from_m` (about a missile team's reach) until it is
+/// within `sim.fires.cover_lift_m`, its fire units put a mission on the
+/// objective every `sim.fires.cover_every_s`: on an enemy it believes is
+/// there (each in turn), else the objective's centre. The targets are
+/// planned and registered beforehand, so there is no call delay and no
+/// adjusting: fire for effect at once.
+fn covering_fire(s: &mut Sim, st: &mut FiresWorld) {
+    let now = s.ctx.now;
+    for side in Side::PLAYERS {
+        let Some(obj) = attack_objective(s, side) else { continue };
+        if st.fires.covering.get(&side).is_some_and(|t| (now - *t).secs() < st.p.cover_every_s) {
+            continue;
+        }
+        let open = st.fires.missions.values().any(|m| m.side == side && m.reason.starts_with("covering fire") && !matches!(m.state, MState::Complete | MState::Refused));
+        if open {
+            continue;
+        }
+        // How near the assault is: its nearest manoeuvre unit to the objective.
+        let lead = s
+            .ctx
+            .order
+            .iter()
+            .filter(|&&e| alive(s, e) && s.world.get::<Ident>(e).is_some_and(|i| i.side == side && i.domain == bgws_catalogue::Domain::Land && s.is_manoeuvre(i)))
+            .filter_map(|&e| s.world.get::<Kin>(e).map(|k| k.pos.sub(obj).horizontal()))
+            .fold(f64::INFINITY, f64::min);
+        if lead > st.p.cover_from_m || lead < st.p.cover_lift_m {
+            continue;
+        }
+        let shooters = shooters_of(s, side);
+        if shooters.is_empty() {
+            continue;
+        }
+        // The fire plan's targets: the enemy it believes is on the objective,
+        // else the fighting positions it was briefed on there (where its
+        // platoons and anti-tank teams started), each in turn.
+        let mut on_it: Vec<Enu> = crate::decide::believed_threats(s, side).into_iter().map(|(e, n)| Enu::new(e, n, 0.0)).filter(|p| p.sub(obj).horizontal() <= st.p.cover_spread_m).collect();
+        if on_it.is_empty() {
+            on_it = briefed_positions(s, side.enemy()).into_iter().filter(|p| p.sub(obj).horizontal() <= st.p.cover_spread_m).collect();
+        }
+        on_it.sort_by(|a, b| a.e.total_cmp(&b.e).then(a.n.total_cmp(&b.n)));
+        on_it.dedup_by(|a, b| a.sub(*b).horizontal() < 50.0);
+        let k = st.fires.missions.values().filter(|m| m.side == side && m.reason.starts_with("covering fire")).count();
+        let aim = if on_it.is_empty() { obj } else { on_it[k % on_it.len()] };
+        if !shooters.iter().any(|sh| sh.reaches(aim)) {
+            continue;
+        }
+        let id = request(s, st, side, None, None, aim, 2, false, "covering fire on the objective");
+        if let Some(m) = st.fires.missions.get_mut(&id) {
+            m.heard_at = now;
+        }
+        st.fires.covering.insert(side, now);
     }
 }
 
@@ -527,10 +615,16 @@ fn accept(s: &mut Sim, st: &mut FiresWorld, mid: u64, careful: bool, scoot: bool
     let Some(sh) = m.shooter else { return };
     let e = s.ctx.entity(sh);
     let mortar = s.world.get::<Gun>(e).map(|g| g.system == FiringSystem::Mortar).unwrap_or(false);
-    let lay = if mortar { st.p.lay_mortar_s } else { st.p.lay_gun_s } * if careful { st.p.careful_lay_mult } else { 1.0 };
+    let mut lay = if mortar { st.p.lay_mortar_s } else { st.p.lay_gun_s } * if careful { st.p.careful_lay_mult } else { 1.0 };
+    // A target of the fire plan was laid on beforehand: fire at once, or nearly.
+    if m.reason.starts_with("covering fire") {
+        lay *= st.p.cover_lay_frac;
+    }
     m.state = MState::Laying;
     m.fire_at = now + SimDuration::from_secs(lay);
-    m.careful = careful;
+    // A fire plan's target is registered: delivered with the careful
+    // laying's smaller bias, without its time.
+    m.careful = careful || m.reason.starts_with("covering fire");
     m.scoot = scoot;
     if let Some(mut a) = s.world.get_mut::<Act>(e) {
         if a.activity.moving() {
@@ -712,7 +806,7 @@ fn fire(s: &mut Sim, st: &mut FiresWorld) {
                 n,
                 mun.id,
                 range / 1000.0,
-                m.observer.map(|o| name(s, o)).unwrap_or_else(|| "counter-battery".into())
+                m.observer.map(|o| name(s, o)).unwrap_or_else(|| if m.reason.starts_with("covering fire") { "the covering fire plan".into() } else { "counter-battery".into() })
             );
             let data = serde_json::json!({
                 "mission": mid - ID_BASE, "munition": mun.id, "rounds": n, "rangeM": range, "tofS": tr.tof_s, "qeMil": tr.qe_rad * 3200.0 / std::f64::consts::PI, "charge": tr.charge + 1,

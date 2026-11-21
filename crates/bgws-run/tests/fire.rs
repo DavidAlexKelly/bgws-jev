@@ -128,3 +128,27 @@ fn crews_vary_and_replay_the_same() {
     let skills: std::collections::BTreeSet<u64> = a.iter().map(|x| x.0.to_bits()).collect();
     assert!(skills.len() > a.len() / 2, "crews of one quality all alike");
 }
+
+/// The covering fire plan: in a company attack the attacker's mortars fire
+/// on the objective while its lead closes (missions "covering fire on the
+/// objective", logged for "the covering fire plan"), and not at all with
+/// `sim.fires.cover_from_m` 0.
+#[test]
+fn an_attack_fires_its_covering_plan_on_the_objective() {
+    let sc = bgws_run::experiments::even_attack_generated().expect("generated attack");
+    let mut sc = sc;
+    sc.victory.clear();
+    let count = |figures: bgws_core::Figures| {
+        let mut sim = bgws_sim::Sim::new(&sc, bgws_core::Seed(1), figures).unwrap();
+        bgws_run::experiments::play_with_rules(&mut sim, bgws_core::SimTime::from_secs(8.0 * 60.0));
+        let ev = sim.drain_events();
+        let asked = ev.iter().filter(|e| e.kind == "fires.request" && e.text.contains("covering fire on the objective")).count();
+        let fired = ev.iter().filter(|e| e.kind == "fires.fire" && e.text.contains("the covering fire plan") && e.text.starts_with("Blue")).count();
+        (asked, fired)
+    };
+    let (asked, fired) = count(bgws_run::default_figures());
+    assert!(asked >= 1 && fired >= 1, "covering fire asked {asked}, fired {fired}");
+    let mut off = bgws_run::default_figures();
+    off.set("sim.fires.cover_from_m", 0.0).unwrap();
+    assert_eq!(count(off), (0, 0));
+}
