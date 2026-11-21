@@ -67,11 +67,13 @@ fn one_gives_fire_while_the_others_bound_in() {
 }
 
 #[test]
-fn two_lead_units_attack_together_and_the_hurt_give_fire() {
-    // Three manoeuvre units: one is the reserve, two lead. Too few to split.
+fn three_units_cover_and_assault_and_the_hurt_give_fire() {
+    // Three manoeuvre units (a company's three platoons): no reserve; one
+    // supports by fire and two assault, rather than two going in uncovered.
     let units = vec![unit("B1", 54.0, 19.99, 4, 3000.0), unit("B2", 54.0, 20.0, 4, 3000.0), unit("B3", 53.99, 20.0, 4, 3000.0)];
     let plan = heuristic_plan(&situation(units, vec![]), &params(true));
-    assert!(plan["orders"].as_array().unwrap().iter().all(|o| !o["task"].as_str().unwrap().starts_with("support by fire")));
+    assert!(plan.get("reserve").is_none(), "{plan}");
+    assert_eq!(plan["orders"].as_array().unwrap().iter().filter(|o| o["task"] == "support by fire onto the objective").count(), 1);
     // Four, one badly hurt: it gives fire from where it is, and the reserve joins the attack.
     let units = vec![unit("B1", 54.0, 19.99, 1, 3000.0), unit("B2", 54.0, 20.0, 4, 3000.0), unit("B3", 54.0, 20.01, 4, 3000.0), unit("B4", 53.99, 20.0, 4, 3000.0)];
     let plan = heuristic_plan(&situation(units, vec![]), &params(true));

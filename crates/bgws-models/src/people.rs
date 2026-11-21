@@ -50,6 +50,7 @@ pub struct PeopleParams {
     pub hazard_width: f64,
     pub r_up: f64,
     pub r_down: f64,
+    pub min_dwell_s: f64,
     pub fat_debt_rate: f64,
     pub fat_onset_debt_h: f64,
     pub fat_loss_per_day: f64,
@@ -100,6 +101,7 @@ impl PeopleParams {
             hazard_width: g("morale.hazard_width"),
             r_up: g("morale.r_up"),
             r_down: g("morale.r_down"),
+            min_dwell_s: g("morale.min_dwell_s"),
             fat_debt_rate: g("fatigue.debt_per_hour_awake"),
             fat_onset_debt_h: g("fatigue.onset_debt_h"),
             fat_loss_per_day: g("fatigue.loss_per_day"),
@@ -225,6 +227,10 @@ pub struct Morale {
     pub cohesion: f64,
     pub casualties: f64,
     pub state: MoraleState,
+    /// Seconds in the present state: it gets worse again only after
+    /// `people.morale.min_dwell_s`.
+    #[serde(default)]
+    pub in_state_s: f64,
 }
 
 /// A morale change and why.
@@ -238,7 +244,7 @@ pub struct MoraleChange {
 
 impl Morale {
     pub fn new(cohesion: f64) -> Self {
-        Morale { stress: 0.0, cohesion: cohesion.clamp(0.0, 1.0), casualties: 0.0, state: MoraleState::Steady }
+        Morale { stress: 0.0, cohesion: cohesion.clamp(0.0, 1.0), casualties: 0.0, state: MoraleState::Steady, in_state_s: 0.0 }
     }
 
     /// How much of each stressor gets through: 1 − Σ mᵢ·qualityᵢ.
@@ -270,7 +276,14 @@ impl Morale {
             s -= p.stress_k_success;
         }
         self.stress = s.clamp(0.0, 1.5);
-        let (up, down) = self.hazards(q, p);
+        self.in_state_s += dt;
+        let (mut up, down) = self.hazards(q, p);
+        // A unit takes time to go from one state to the next worse one (it
+        // goes to ground, then the fear spreads, then men start to leave): no
+        // step down within `min_dwell_s` of the last. Recovery is not held.
+        if self.in_state_s < p.min_dwell_s {
+            up = 0.0;
+        }
         let u1: f64 = rng.gen();
         let u2: f64 = rng.gen();
         let total = up + down;
@@ -280,6 +293,7 @@ impl Morale {
         let from = self.state;
         let i = from.idx();
         self.state = if u2 * total < up { MoraleState::ORDER[i + 1] } else { MoraleState::ORDER[i - 1] };
+        self.in_state_s = 0.0;
         Some(MoraleChange { from, to: self.state, stress: self.stress, casualties: self.casualties })
     }
 }
@@ -473,6 +487,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("people.morale.theta.routed", 0.95, "1", 0.6, 1.3, "default", Default, "stress threshold: routed"),
         figure!("people.morale.hazard_width", 0.05, "1", 0.01, 0.2, "default", Default, "stress scale of the transition hazards"),
         figure!("people.morale.r_up", 0.0167, "1/s", 0.001, 0.1, "default", Default, "transition rate at the threshold (worse)"),
+        figure!("people.morale.min_dwell_s", 20.0, "s", 0.0, 300.0, "default", Default, "least time a unit stays in a morale state before it can get worse again (no Steady to Routed in four seconds); recovery is not held"),
         figure!("people.morale.r_down", 0.0028, "1/s", 0.0001, 0.05, "default", Default, "recovery rate one band below (better)"),
         figure!("people.fatigue.debt_per_hour_awake", 0.333, "h/h", 0.2, 0.5, "default", Default, "sleep owed per hour awake (8 h per 24 h)"),
         figure!("people.fatigue.onset_debt_h", 8.0, "h", 4.0, 16.0, "P31", Low, "debt at which effectiveness starts falling (24 h awake)"),
@@ -586,7 +601,7 @@ mod tests {
         assert!(m.susceptibility(&elite, &p) < Morale::new(0.0).susceptibility(&green, &p));
         // A shaken unit out of contact recovers to steady.
         let mut r = rng(11);
-        let mut m = Morale { stress: 0.4, cohesion: 0.6, casualties: 0.1, state: MoraleState::Shaken };
+        let mut m = Morale { stress: 0.4, cohesion: 0.6, casualties: 0.1, state: MoraleState::Shaken, in_state_s: 0.0 };
         for _ in 0..7200 {
             m.step(1.0, &StressInputs::default(), &elite, &p, &mut r);
         }

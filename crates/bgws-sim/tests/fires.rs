@@ -150,8 +150,11 @@ fn breach_once(seed: u64) -> Option<f64> {
     let done = ev.iter().find(|e| e.kind == "land.breach" && e.data["phase"] == "done").and_then(|e| e.data["seconds"].as_f64());
     let mines = ev.iter().filter(|e| e.kind == "land.mine").count();
     eprintln!("seed {seed}: breach {done:?}, through {through}, mines {mines}, tanks fit {} immobilised {}", h.fit, h.mobility_kills);
-    // Through the lane unless the mines left it unable to move.
-    if done.is_some() && h.can_move() {
+    // Through the lane unless the mines left it unable to move, or their
+    // losses broke it (a broken unit falls back; one mine strike, a quarter of
+    // the platoon, can do that).
+    let broke = ev.iter().any(|x| x.kind == "people.morale" && x.text.starts_with("b-tanks") && (x.text.contains("is Broken") || x.text.contains("is Routed")));
+    if done.is_some() && h.can_move() && !broke {
         assert!(through, "seed {seed}: a lane was made but the tanks did not go through");
     }
     done

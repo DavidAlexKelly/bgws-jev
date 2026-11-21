@@ -391,6 +391,64 @@ defended front sees, or the HQ's own terrain appreciation, may do better.
 - **Bounding with overwatch at small odds:** at 1:1 the plan gives no unit
   the support-by-fire task, so every unit moves at once.
 
+## Morale in steps, and covering fire at even odds (21 November)
+
+**Morale takes time to collapse.** A unit now stays in a morale state at
+least `people.morale.min_dwell_s` (20 s, unsourced) before it can get
+worse. Recovery is not held back.
+
+- **Before:** a tank platoon that lost two of four tanks to one volley went
+  Steady → Shaken → Pinned → Broken → Routed in four ticks. The loss is a
+  burst of stress that makes every next step near-certain.
+- **Now:** the same collapse takes 60–75 s, and in one seed of four the
+  platoon steadies once before breaking.
+- **Losses at the halt don't change** (100 games each, p 0.46–0.92). The
+  missiles destroy the tanks whatever their morale. This is a realism fix
+  for what units do in the meantime: firing back, taking orders, the HQ
+  pulling them out.
+
+**Covering fire with three platoons.** The planner used to hold one of a
+company's three platoons back as the reserve. That left two to lead,
+fewer than the three needed for one to give fire, so both went in with no
+one covering them. Now a reserve is held only if enough are left to lead
+with one giving fire. With three platoons, one supports by fire and two
+assault; with four or more, there is still a reserve. This reverses an
+earlier choice that three were "too few to split", in favour of the
+doctrinal company attack.
+
+Losses at the halt, 100 games each, against the run before (break-contact
+drill on, neither change):
+
+| Test | Before | After | Attacks halted |
+|---|---|---|---|
+| Open country | 23% | 15% | 56 → 67 |
+| Generated | 34% | 38.5% | 84 → 94 |
+| Kaliningrad town | 25% | 31% (out of band) | 66 → 45 |
+
+The effect is mixed, as the doctrine would expect. In town, more attacks
+now take the objective (55 of 100, from 34). In open country they halt
+sooner and at lower losses. On generated ground the covering platoon,
+standing off at 1.8 km, still meets the anti-tank team it can't
+out-range.
+
+**A mine strike can break a tank platoon out of contact.** In the breach
+test (seed 6), one tank in four lost to a mine, with no enemy near, takes
+the platoon from Steady to Routed (now over a minute). It stays Broken or
+Routed for 40 minutes and never uses the lane the engineers cleared. The
+test now excuses a platoon that broke, as it already excused one left
+immobilised.
+
+Whether a quarter of a platoon lost to one mine should break it is a
+calibration question. It turns on `people.stress.k_casualty` (3.0, tied
+to the 20% attack halt), and on slow recovery out of contact
+(`people.stress.recover_tau_s`, an hour).
+
+**What still decides the generated attack:** a dug-in missile team on
+open farmland with no dead ground near. The losses there come before
+morale, covering fire or the HQ's halt can act. Indirect fire on the
+launcher once it has fired (counter-fire from the company's mortars),
+not yet in the plan, is the next thing to try.
+
 ## Naked-eye search
 
 Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau

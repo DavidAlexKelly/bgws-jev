@@ -496,7 +496,11 @@ pub fn heuristic_plan(s: &HqSituation, p: &HeuristicParams) -> Value {
 
     let mut manoeuvre: Vec<&HqUnit> = units.iter().copied().filter(|u| u.role == UnitRole::Manoeuvre).collect();
     manoeuvre.sort_by(|a, b| a.id.cmp(&b.id));
-    let mut reserve = (attack && manoeuvre.len() >= p.min_units_for_reserve).then(|| manoeuvre[manoeuvre.len() - 1].id.clone());
+    // A reserve only when enough are left to lead with one giving fire:
+    // with three, one supports by fire and two assault (a company's three
+    // platoons), rather than two going in with no one covering them.
+    let enough_to_cover = !p.fire_and_movement || manoeuvre.len().saturating_sub(1) >= p.fm_min_units.max(2);
+    let mut reserve = (attack && manoeuvre.len() >= p.min_units_for_reserve && enough_to_cover).then(|| manoeuvre[manoeuvre.len() - 1].id.clone());
     let mut lead: Vec<&HqUnit> = manoeuvre.iter().copied().filter(|u| Some(&u.id) != reserve.as_ref()).collect();
     let axis = anchor.bearing_to(objective).to_degrees();
     let mut orders = Vec::new();
