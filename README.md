@@ -1567,9 +1567,10 @@ references are in `docs/papers/notes/howe-1993-search.md`.
     so it takes as many times longer as it holds fields of view.
   - A cue and the observer's state scale it.
 - **Clutter at the target sets how hard it is to find.** Fields and open
-  ground are low clutter, woods and light town medium, dense woods and
-  dense town high. The detection N50 is half the medium value in low
-  clutter and twice it in high (Howe Table 2.5).
+  ground are low clutter, so the detection N50 is half the medium value
+  (Howe Table 2.5). Woods and towns are medium: what they hide is already
+  the target's concealment and the canopy on the sight line. Rating them
+  high as well doubled the threshold and counted the wood twice.
 
 **What the change did:**
 - The vignettes stay in band, except attack halt on generated ground: its
@@ -1598,6 +1599,11 @@ the unit stands:
 | A tree line, hedgerow or garden trees | the share of the ground within 10 m under trees (full at 25%: a line through the point) | 0.3 | 0.7 |
 | A railway's bank and ballast | the railway cells, on or beside the line | 0.45 | 0.3 |
 | A fold, hollow or ditch | how far the point lies below the ground 25 m round it (at least a terrain cell) | 0.3 a metre, to 0.6 | 0.8 × cover |
+
+A vehicle halted behind features that mask its hull (walls, railway banks
+and folds that give 0.4 or more cover: `sim.cover.hull_mask`) counts as
+hull-down at once, without waiting to settle. Trees and hedges don't
+count: they hide a vehicle but do not stop rounds.
 
 The features join as `1 − Π(1 − each)`, capped at 0.95. The result is
 combined with the class's draw by taking the better of the two. The draw

@@ -94,10 +94,13 @@ times those for the 1-D case. This factor also should be applied to the
 - The catalogue's detection N50 (0.75, the 2-D medium value) is scaled by
   the clutter at the target's land cover:
   - fields, open, bare, water and wetland count as low;
-  - scrub, light woods and light town as medium;
-  - dense woods and dense town as high.
+  - everything else counts as medium.
 
-  That mapping is ours, not Howe's.
+  That mapping is ours, not Howe's. Woods and towns are not high: Howe's
+  high is a vehicle among similar vehicles. What woods and buildings hide
+  is already the target's concealment and the canopy on the sight line,
+  and rating them high doubled the threshold. Infantry with eyes then
+  could not see a tank in a wood at 520 m at all.
 - Whether an observer ever finds a target (P∞) is drawn once for the pair
   where they stand, like a sight line. One that will find it does so at
   the rate 1/τ, with τ = τ_FOV · n · cue · observer.

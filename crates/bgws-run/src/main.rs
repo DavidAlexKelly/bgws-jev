@@ -462,7 +462,9 @@ fn data_dir() -> PathBuf {
 fn vignette_scenarios() -> experiments::VignetteScenarios {
     let load = |name: &str| load_scenario(&scenario_path(name)).ok();
     experiments::VignetteScenarios {
-        attack: load("skirmish-advance-to-contact-v1"),
+        // The generated company attack at 1:1, with its company HQ (the
+        // skirmish preset it replaced had none, so only morale halted it).
+        attack: experiments::even_attack_generated(),
         // The Kaliningrad company attack at even odds (1:1), so the
         // attack can fail: at 3:1 it takes its objective every time.
         attack_pack: experiments::even_attack_on_pack().and_then(experiments::with_pack_ground),

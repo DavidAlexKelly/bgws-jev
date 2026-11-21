@@ -585,14 +585,17 @@ fn keyed_at(seed: Seed, purpose: &'static str, a: u64, b: u64, pa: Enu, pb: Enu,
 }
 
 /// The clutter round a target in search, from the land cover where it is
-/// (Howe 1993 Table 2.5: low, a target in a field or on a road; high, a
-/// vehicle among similar ones; woods and towns between).
+/// (Howe 1993 Table 2.5): low for a target in a field or on a road (open
+/// ground, crops, bare ground, water, wetland), medium elsewhere. Woods and
+/// towns are not high clutter: Howe's high is "a vehicle in an array of
+/// similar vehicles", and what woods and buildings hide is already the
+/// target's concealment and the canopy on the sight line (rating them high
+/// too doubled the detection threshold and counted the wood twice).
 pub fn clutter_at(g: &crate::ground::Ground, at: Enu) -> Clutter {
     use bgws_env::LandCover::*;
     match g.land_cover(at.e, at.n) {
         Open | Crops | Bare | Water | Wetland => Clutter::Low,
-        Scrub | ForestLight | UrbanLight => Clutter::Medium,
-        ForestDense | UrbanDense => Clutter::High,
+        Scrub | ForestLight | ForestDense | UrbanLight | UrbanDense => Clutter::Medium,
     }
 }
 
@@ -1004,7 +1007,10 @@ fn aim(s: &Sim, e: Entity, cat_mount: &bgws_catalogue::Mount, mun: &bgws_catalog
     } else {
         let b = &tplat.body;
         let dims = VehicleDims { length_m: b.length_m.max(3.0), width_m: b.width_m.max(2.0), hull_height_m: (b.height_m * 0.6).max(1.0), turret_height_m: (b.height_m * 0.4).max(0.3) };
-        df::presented_vehicle(&dims, aspect, if tposture == Posture::HullDown { VehiclePosture::HullDown } else { VehiclePosture::Exposed }, p)
+        // Hull-down once settled into a position, or at once when halted
+        // behind a wall, a railway bank or a fold that masks the hull.
+        let masked = tposture != Posture::Moving && crate::cover::masks_hull(&s.ctx.ground, tk.pos.e, tk.pos.n);
+        df::presented_vehicle(&dims, aspect, if tposture == Posture::HullDown || masked { VehiclePosture::HullDown } else { VehiclePosture::Exposed }, p)
     };
     (pres, budget, soft, tplat)
 }

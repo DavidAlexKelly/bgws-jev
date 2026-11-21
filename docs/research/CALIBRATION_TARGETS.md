@@ -262,6 +262,65 @@ ADA447823, the cueing report, could not be found. The file added as
 "cueing" is a 2024 laboratory study of contextual cueing (Su, Zhao & Ma,
 *Frontiers in Psychology*), not a field source. It is not used.
 
+## Why feature cover does not move the attack (21 November)
+
+**1. The generated attack-halt test now has an HQ.** It plays
+`gen-company-attack` at 1:1 on generated ground, with its company HQ, as
+the two Kaliningrad tests do. It replaces the skirmish preset, which had
+none. Losses at the halt are a median of 38.5% over 100 games, still out
+of band (10–30%). The HQ's halt works; the losses come before it can act.
+In most seeds a single dug-in ATGM team destroys blue's four-tank platoon
+at 1.7–1.9 km, within one to two minutes of first contact, in about three
+two-missile volleys. Four tanks are 31% of the company, so it is past 20%
+before the HQ's 10-second check and its radio order to go firm.
+
+**2. A trace of where units stand and what cover they get** (6 games each,
+sampled every 30 s for units within 2.5 km of an enemy):
+
+| Ground | Attacker cover: class draw → final | Halted attackers masked | Defender cover: class → final |
+|---|---|---|---|
+| Open country (Kaliningrad) | 0.20 → 0.29 (folds 45%, trees 31%, rail 14%) | 16% | 0.35 → 0.36 |
+| Town (Kaliningrad) | 0.44 → 0.63 (walls 35%, trees 88%) | 43% | 0.48 → 0.55 |
+| Generated | 0.42 → 0.42 (folds only, shallow) | 0% | 0.20 → 0.21 |
+
+The features do reach the attackers. Defenders gain little: their land
+cover and digging in already give more.
+
+**3. Two reasons this did not move outcomes:**
+- **Vehicles ignored ground cover.** Direct fire at a vehicle used only
+  its posture: hull-down after settling, or in a firing position chosen
+  for it. A tank halted behind a railway bank or in a fold was fully
+  exposed. Now a halted vehicle counts as hull-down at once behind
+  features that mask its hull (`sim.cover.hull_mask`, 0.4 of cover from
+  walls, railway banks and folds). Trees and hedges don't count: they
+  hide a vehicle but do not stop rounds.
+- **Most losses happen on the move,** where no cover helps. Over 12
+  games each:
+
+  | Ground | Lost moving | Lost halted | Halted and masked or hull-down |
+  |---|---|---|---|
+  | Open country | 31 | 10 | 4 |
+  | Town | 20 | 13 | 13 |
+  | Generated | 65 | 4 | 0 |
+
+  Even with masking, switching feature cover off makes no detectable
+  difference to losses at the halt (open country p 0.28, town p 0.45,
+  generated p 0.97; 100 games each).
+
+**What decides these fights, and so what to look at next:**
+- how attackers cross ground the defence can see: bounding with
+  overwatch, smoke, and routes through dead ground;
+- how quickly a dug-in missile team kills a platoon that keeps coming:
+  its volley rate, and the tanks going to ground when fired on from
+  beyond their reach.
+
+## Naked-eye search
+
+Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau
+(2022), on Soviet trials: an unaided eye finds a tank against forest in
+3–7 s at 0.5–2.5 km. That is consistent with what the model does now.
+Each was seen only in search snippets, so none is used.
+
 ## Superseded: the search model before the sources were read
 
 
