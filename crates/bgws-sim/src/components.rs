@@ -246,6 +246,9 @@ pub struct Act {
     pub bound: Option<(Enu, Option<SimTime>)>,
     /// Guiding a missile it launched: it stays put until then.
     pub guiding_until: Option<SimTime>,
+    /// Breaking contact (a drill): until it reaches the dead ground, or this
+    /// time, decisions do not send it back into the threat's sight.
+    pub breaking_until: Option<SimTime>,
 }
 
 impl Act {

@@ -314,6 +314,83 @@ cover and digging in already give more.
   its volley rate, and the tanks going to ground when fired on from
   beyond their reach.
 
+## Crossing observed ground, and the missile team's kill rate (21 November)
+
+**One game, second by second** (`gen-company-attack` at 1:1, seed 1):
+- 418 s: the red anti-tank team launches two missiles at the tank
+  platoon, 1.8 km off. The tanks fire their smoke dischargers.
+- 429 s: both missiles hit. The platoon goes Steady → Shaken → Pinned →
+  Broken → Routed in four ticks (losing half its tanks at once is a burst
+  of stress that makes each next step near-certain). Its leader is hit, so
+  it can take no new orders for 120 s.
+- It then sits in the open, or runs in a straight line away. The team
+  finishes it 3½ minutes later, still at 1.9 km.
+
+**The missile team's rate is not the problem.** It is two firing posts
+(`generic/atgmTeam`, count 2), each firing one missile a volley, about 30 s
+apart: a launcher's reload plus about 10 s of flight. That is close to real
+practice. TETAM's crews took 8–11 s from detection to engagement.
+
+**What changed: a break-contact drill.**
+- **A vehicle that notices a missile launched at it** fires its smoke, as
+  before, and now also drives to the nearest ground the launcher cannot
+  see, within `sim.react.break_contact_m` (400 m). It searches 25 m rings,
+  straight back before the sides (`Ground::dead_ground`).
+- **A vehicle hit by a missile** from a launcher it cannot see does the
+  same; the hit shows where it came from.
+- **A broken or routed unit** runs to that dead ground instead of in a
+  straight line.
+- **A noticed launch counts as fire from the launcher,** so a unit that is
+  still steady calls smoke on it.
+- **It's a drill:** it needs no orders. Until the unit reaches the dead
+  ground, decisions and late answers don't send it back.
+- **The chance of noticing a launch** (`smoke.vehicle.warning_p`) is now
+  0.35, from TETAM Phase IIA: armour crews detected 18–47% of simulated
+  launches. It was 0.5, unsourced.
+
+**What it can and can't do:**
+- Retreating tanks make about 3–4 m/s.
+- On the generated farmland the nearest dead ground from 1.8 km is about
+  400 m away, too far to reach within a 10 s missile flight.
+- TETAM's 70 m median to break line of sight was on rolling hills
+  (Hunter Liggett).
+- So the drill saves tanks where there is ground to use, not on open
+  plains.
+
+**Effect, 100 games each, losses at the halt:**
+
+| Test | Drill off | Drill on | Halted (off → on) |
+|---|---|---|---|
+| Open country | 31% (out of band) | 23% (in band) | 40 → 56 |
+| Generated | 38.5% | 34% | 84 → 84 |
+| Kaliningrad town | 19% | 25% (p 0.02) | 55 → 66 |
+
+It helps in open country and costs a little in town, where vehicles
+pulling back are exposed in the streets.
+
+**Tried and switched off: approach routes that avoid the objective's
+view.** A route request can now carry the position its destination
+overlooks (`overlook`): ground the objective sees costs as exposure, its
+dead ground does not. At weight 0.6, attacks lost more before halting:
+
+| Test | Without | With |
+|---|---|---|
+| Real ground | 25% | 37.5% |
+| Open country | 23% | 31% |
+
+Both differences are significant (p 0.04 and 0.02). Routing round what the
+objective's centre sees takes longer detours, and the flank platoons still
+overlook them. It stays in the code at weight 0
+(`sim.route.overlook_weight`). A version that takes in what the whole
+defended front sees, or the HQ's own terrain appreciation, may do better.
+
+**Still open:**
+- **The morale cascade:** four states in four ticks after a lumped loss.
+  A minimum time in each state, or stress that builds over seconds, would
+  stop it.
+- **Bounding with overwatch at small odds:** at 1:1 the plan gives no unit
+  the support-by-fire task, so every unit moves at once.
+
 ## Naked-eye search
 
 Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau

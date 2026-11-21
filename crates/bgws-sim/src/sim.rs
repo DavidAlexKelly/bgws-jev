@@ -950,6 +950,7 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 fire_position: None,
                 bound: None,
                 guiding_until: None,
+                breaking_until: None,
             },
             Aware::default(),
             SigState { engine_on: domain != Domain::Land || platform.mover.kind != bgws_catalogue::MoverKind::Foot, ..Default::default() },

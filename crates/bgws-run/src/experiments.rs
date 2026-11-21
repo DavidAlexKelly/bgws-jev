@@ -299,7 +299,7 @@ pub fn dismounted(f: &Figures, seed: Seed) -> Value {
     if water(a) || water(b) {
         return None;
     }
-    let req = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Foot, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 4.0, cross_kmh: 2.5, threats: &[], obstacles: &[], urgent: false };
+    let req = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Foot, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 4.0, cross_kmh: 2.5, threats: &[], obstacles: &[], urgent: false, overlook: None };
     let p = g.plan(&req, &g.route_params);
     (p.time_s > 0.0).then(|| (p.road_m + p.open_m) / 1000.0 / (p.time_s / 3600.0))
 }

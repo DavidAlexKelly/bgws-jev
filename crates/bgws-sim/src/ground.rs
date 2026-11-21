@@ -422,6 +422,40 @@ impl Ground {
         Some(v)
     }
 
+    /// The nearest ground within `reach` m of `pos`, not towards `threat`,
+    /// that a threat there cannot see (its viewshed over the ground and the
+    /// pack's roofs and woods): where a unit breaks contact to. Nearest ring
+    /// first (25 m steps); on a ring, straight back before the sides. `None`
+    /// if there is none that near.
+    pub fn dead_ground(&self, pos: Enu, threat: Enu, reach: f64) -> Option<Enu> {
+        if reach <= 0.0 {
+            return None;
+        }
+        let r = pos.sub(threat).horizontal();
+        let sight = self.sight(threat.e, threat.n, r + reach + 200.0)?;
+        let away = pos.sub(threat).bearing();
+        let step = 25.0;
+        for ring in 1..=(reach / step).ceil().max(1.0) as usize {
+            let d = ring as f64 * step;
+            let mut best: Option<(f64, Enu)> = None;
+            for k in 0..24 {
+                let b = k as f64 * std::f64::consts::TAU / 24.0;
+                let off = ((b - away + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI).abs();
+                if off > 100f64.to_radians() {
+                    continue;
+                }
+                let p = Enu::new(pos.e + b.sin() * d, pos.n + b.cos() * d, 0.0);
+                if !sight.sees(p.e, p.n) && best.is_none_or(|x| off < x.0) {
+                    best = Some((off, p));
+                }
+            }
+            if let Some((_, p)) = best {
+                return Some(p);
+            }
+        }
+        None
+    }
+
     /// River depth under a point, m (0 where there is none).
     pub fn river_depth(&self, e: f64, n: f64) -> f64 {
         let Some(r) = self.rivers.as_ref() else { return 0.0 };
@@ -705,7 +739,7 @@ impl Ground {
             EnvVehicle::Wheeled => (90.0, 40.0),
             EnvVehicle::Foot => (5.0, 4.0),
         };
-        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[], obstacles: &[], urgent: false };
+        let r = crate::routing::RouteRequest { from: a, to: b, class, mode: crate::components::MoveModeS::Tactical, road_kmh, cross_kmh, threats: &[], obstacles: &[], urgent: false, overlook: None };
         self.plan(&r, &self.route_params).waypoints
     }
 
@@ -847,5 +881,31 @@ mod tests {
         let without = woods.route(a, b, tracked);
         assert!(on(&with) > 0.8, "the route keeps to the road: {:.2}", on(&with));
         assert!(on(&without) < 0.5, "without roads it cuts through the woods: {:.2}", on(&without));
+    }
+
+    /// Behind a crest: a unit on the forward slope, fired on from 1 km off,
+    /// finds the dead ground just behind the crest; on open flat ground
+    /// there is none within reach.
+    #[test]
+    fn dead_ground_lies_behind_a_crest() {
+        let f = crate::params::default_figures();
+        let spec = GridSpec::new(161, 161, 30.0, -2_400.0, -2_400.0);
+        let flat = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
+        let open = Ground::from_terrain(flat.clone(), 1, &f);
+        let (unit, threat) = (Enu::new(0.0, 0.0, 0.0), Enu::new(0.0, 1_000.0, 0.0));
+        assert_eq!(open.dead_ground(unit, threat, 400.0), None, "flat open ground hides nothing");
+        // A crest 8 m high along n = -60, falling away behind it.
+        let mut t = flat;
+        for j in 0..spec.height {
+            for i in 0..spec.width {
+                let (_, n) = spec.pos(i, j);
+                let k = spec.idx(i, j);
+                t.elevation.data[k] = (if n >= -60.0 { 8.0 * (1.0 - (n + 60.0) / 1_200.0).max(0.0) } else { (8.0 + (n + 60.0) * 0.2).max(0.0) }) as f32;
+            }
+        }
+        let ridge = Ground::from_terrain(t, 1, &f);
+        let p = ridge.dead_ground(unit, threat, 400.0).expect("dead ground behind the crest");
+        assert!(p.n < -60.0 && p.sub(unit).horizontal() <= 200.0, "{p:?}");
+        assert_eq!(ridge.dead_ground(unit, threat, 0.0), None, "reach 0: no drill");
     }
 }

@@ -1152,6 +1152,24 @@ fn launch_missiles(s: &mut Sim, e: Entity, id: EntityId, side: Side, mount_i: us
     s.ctx.log.push(now, "fire.launch").side(side).entity(id).target(tid).text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "flightS": flight, "guidedByGunner": operator }));
     let from = s.world.get::<Kin>(e).map(|k| k.pos).unwrap_or_default();
     crate::smoke::missile_warning(s, tid, id, from);
+    // A vehicle crew that sees it coming also drives out of the launcher's
+    // sight (the same draw as for its dischargers): a missile guided by its
+    // gunner then goes astray.
+    let te = s.ctx.entity(tid);
+    if !crate::remote::is_remote(s, te) && crate::smoke::notices_launch(s, tid, id) {
+        // A launch seen is fire from that launcher: the unit can call smoke on it.
+        if let Some(mut c) = s.world.get_mut::<Crew>(te) {
+            c.last_incoming = Some((now, id));
+        }
+        if is_vehicle(s, te) {
+            break_contact(s, te, from, "a missile launch seen");
+        }
+    }
+}
+
+/// A land vehicle (not troops on foot).
+fn is_vehicle(s: &Sim, e: Entity) -> bool {
+    s.world.get::<Ident>(e).is_some_and(|i| i.domain == bgws_catalogue::Domain::Land && !matches!(i.platform.body.vulnerability, Vulnerability::Personnel))
 }
 
 /// Missile volleys that arrive now: each lands (hits resolved as a volley
@@ -1190,6 +1208,15 @@ fn missiles(s: &mut Sim) {
         };
         let quality = s.world.get::<Ident>(e).map(|i| i.quality).unwrap_or(0);
         fire_volley(s, e, m.firer, m.side, m.fit, quality, m.mount, &mun, &cat_mount, m.target, range, Some(m.rounds));
+        // Hit by a missile from out of its reach: what is left of a vehicle
+        // platoon gets out of the launcher's sight (the hit gives it away).
+        // One that has the launcher in sight fights it instead.
+        let sees_it = s.world.get::<Aware>(te).and_then(|a| a.seen.get(&m.firer)).is_some_and(|v| (now - v.last).secs() < 10.0);
+        if alive(s, te) && is_vehicle(s, te) && !sees_it && !crate::remote::is_remote(s, te) {
+            if let Some(from) = s.world.get::<Kin>(e).map(|k| k.pos) {
+                break_contact(s, te, from, "hit by a missile");
+            }
+        }
     }
 }
 
@@ -1962,12 +1989,14 @@ pub fn people(s: &mut Sim, dt: f64) {
             { let __text = format!("{} is {:?} (was {:?})", name(s, id), ch.to, ch.from); s.ctx.log.push(now, "people.morale").side(side).entity(id).text(__text).data(serde_json::json!({ "stress": ch.stress, "casualties": ch.casualties })); }
             match ch.to {
                 MoraleState::Broken | MoraleState::Routed => {
-                    // Runs itself: falls back away from the threat.
+                    // Runs itself: falls back away from the threat, to the
+                    // nearest ground it cannot see if there is any near,
+                    // else straight back.
                     let away = threat_bearing(s, e).map(|b| b + std::f64::consts::PI).unwrap_or(match side {
                         Side::Blue => std::f64::consts::PI,
                         _ => 0.0,
                     });
-                    let to = pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m * 1.5));
+                    let to = nearest_threat(s, e).and_then(|t| dead_ground_from(s, pos, t)).unwrap_or_else(|| pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m * 1.5)));
                     let mut a = s.world.get_mut::<Act>(e).expect("act");
                     a.activity = Activity::Withdraw { route: vec![to], then: Some(Box::new(Activity::Quiet)) };
                     a.roe = RoeS::IfFiredUpon;
@@ -2012,6 +2041,51 @@ impl FriendGrid {
 }
 
 /// Bearing to the nearest thing that threatens a unit (seen enemy or suspect).
+/// The nearest ground within `sim.react.break_contact_m` that a threat at
+/// `threat` cannot see (its viewshed, over the ground and through what it
+/// knows of the roofs and woods), not towards it: where a unit breaks
+/// contact to. TETAM's tanks, fired on, broke line of sight in a median 70 m
+/// of evasive driving. `None` if there is none that near.
+pub(crate) fn dead_ground_from(s: &Sim, pos: Enu, threat: Enu) -> Option<Enu> {
+    s.ctx.ground.dead_ground(pos, threat, s.ctx.p.break_contact_m)
+}
+
+/// A unit breaks contact from a threat: off to the nearest dead ground from
+/// it (else straight back `sim.withdraw_m`), then holds there on overwatch.
+/// A drill: it needs no orders, so a unit whose leader is down does it too.
+pub(crate) fn break_contact(s: &mut Sim, e: Entity, threat: Enu, why: &str) {
+    // `sim.react.break_contact_m` 0: no drill.
+    if s.ctx.p.break_contact_m <= 0.0 {
+        return;
+    }
+    let Some(pos) = s.world.get::<Kin>(e).map(|k| k.pos) else { return };
+    if s.world.get::<Act>(e).is_some_and(|a| matches!(a.activity, Activity::Withdraw { .. })) {
+        return;
+    }
+    let to = dead_ground_from(s, pos, threat).unwrap_or_else(|| {
+        let away = pos.sub(threat).bearing();
+        pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m))
+    });
+    let id = s.world.get::<Ident>(e).map(|i| i.id);
+    let secs = to.sub(pos).horizontal() / 3.0 + 20.0;
+    if let Some(mut a) = s.world.get_mut::<Act>(e) {
+        a.activity = Activity::Withdraw { route: vec![to], then: Some(Box::new(Activity::Overwatch)) };
+        a.last_event = s.ctx.now;
+        a.breaking_until = Some(s.ctx.now + bgws_core::SimDuration::from_secs(secs));
+    }
+    if let Some(id) = id {
+        let side = s.world.get::<Ident>(e).map(|i| i.side).unwrap_or(Side::Neutral);
+        let text = format!("{} breaks contact ({why}): {:.0} m to ground the threat cannot see", name(s, id), to.sub(pos).horizontal());
+        s.ctx.log.push(s.ctx.now, "unit.break_contact").side(side).entity(id).text(text).data(serde_json::json!({ "why": why, "m": to.sub(pos).horizontal() }));
+    }
+}
+
+/// The nearest enemy a unit has seen, where it was.
+pub(crate) fn nearest_threat(s: &Sim, e: Entity) -> Option<Enu> {
+    let pos = s.world.get::<Kin>(e)?.pos;
+    s.world.get::<Aware>(e)?.seen.values().map(|v| v.at).min_by(|a, b| a.sub(pos).horizontal().total_cmp(&b.sub(pos).horizontal()))
+}
+
 pub(crate) fn threat_bearing(s: &Sim, e: Entity) -> Option<f64> {
     let pos = s.world.get::<Kin>(e)?.pos;
     let aw = s.world.get::<Aware>(e)?;

@@ -26,7 +26,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("smoke.vehicle.salvos", 2.0, "salvos", 0.0, 6.0, "default", Default, "smoke discharger salvos an armoured vehicle carries ready to fire"),
         figure!("smoke.vehicle.salvo_g", 2500.0, "g", 200.0, 10000.0, "default", Default, "obscurant in one discharger salvo (several grenades of a few hundred grams)"),
         figure!("smoke.vehicle.distance_m", 30.0, "m", 5.0, 100.0, "default", Default, "how far towards the threat the discharger grenades burst"),
-        figure!("smoke.vehicle.warning_p", 0.5, "p", 0.0, 1.0, "default", Default, "chance a crew notices a missile launched at it in time to fire its dischargers, when it has not seen the launcher"),
+        figure!("smoke.vehicle.warning_p", 0.35, "p", 0.0, 1.0, "Bryson TETAM Phase IIA", Low, "chance a crew notices a missile launched at it, when it has not seen the launcher: attacking armour crews detected 18-47% of simulated ATGM launches (TOW 32-47%, Shillelagh 22-35%, Dragon 18-29%)"),
         figure!("smoke.vehicle.armour_mm", 20.0, "mm", 0.0, 200.0, "default", Default, "frontal KE armour (RHA) from which a land vehicle counts as armoured and carries dischargers"),
         figure!("smoke.screen.cooldown_s", 300.0, "s", 30.0, 1800.0, "default", Default, "a unit asks for a smoke screen on the same enemy at most this often"),
         figure!("smoke.screen.rounds", 6.0, "rounds", 1.0, 24.0, "default", Default, "rounds in a smoke screen mission"),
@@ -219,13 +219,8 @@ pub fn missile_warning(s: &mut Sim, target: EntityId, firer: EntityId, from: Enu
     if fired >= p.vehicle_salvos {
         return;
     }
-    let knows = s.world.get::<crate::components::Aware>(e).is_some_and(|a| a.seen.get(&firer).is_some_and(|x| (s.ctx.now - x.last).secs() < 60.0));
-    if !knows {
-        use rand::Rng;
-        let mut rng = s.ctx.rng("smoke.warning", target.0 as u64, s.ctx.now.0 as u64);
-        if rng.gen::<f64>() >= p.vehicle_warning_p {
-            return;
-        }
+    if !notices_launch(s, target, firer) {
+        return;
     }
     let d = from.sub(k.pos);
     let len = d.horizontal().max(1.0);
@@ -238,6 +233,22 @@ pub fn missile_warning(s: &mut Sim, target: EntityId, firer: EntityId, from: Enu
     }
     // Red phosphorus or similar: visual and some infrared.
     release(s, side, Some(target), Source::Vehicle, SmokeKind::Wp, &points, 2.0, p.vehicle_salvo_g);
+}
+
+/// Does the crew of `target` notice a missile `firer` has just launched at
+/// it? At once if it has the launcher in sight or in mind (seen in the last
+/// minute), else with `smoke.vehicle.warning_p` (TETAM). The same draw for
+/// the dischargers and for breaking contact.
+pub fn notices_launch(s: &Sim, target: EntityId, firer: EntityId) -> bool {
+    let e = s.ctx.entity(target);
+    let knows = s.world.get::<crate::components::Aware>(e).is_some_and(|a| a.seen.get(&firer).is_some_and(|x| (s.ctx.now - x.last).secs() < 60.0));
+    if knows {
+        return true;
+    }
+    let Some(st) = s.world.get_resource::<SmokeState>() else { return false };
+    use rand::Rng;
+    let mut rng = s.ctx.rng("smoke.warning", target.0 as u64, s.ctx.now.0 as u64);
+    rng.gen::<f64>() < st.p.vehicle_warning_p
 }
 
 /// 1 Hz: screens that have thinned away are gone.

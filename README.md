@@ -1546,6 +1546,29 @@ Ground sensing and drone cameras both work this way. *Can it see…?* shows
 `openWhereTheyStand`, and gives the chance of detection over the window on
 that line.
 
+### Breaking contact
+
+When a missile is launched at a vehicle and the crew notices, it fires its
+smoke dischargers and drives to the nearest ground the launcher cannot
+see. The chance of noticing is `smoke.vehicle.warning_p`, 0.35 (TETAM:
+armour crews spotted 18–47% of launches).
+
+- **Where it goes:** the search covers 25 m rings out to
+  `sim.react.break_contact_m` (400 m), straight back before the sides.
+  With no dead ground that near, it goes straight back.
+- **Hit from out of sight:** a vehicle hit by a missile from a launcher it
+  cannot see does the same.
+- **Broken units:** a broken or routed unit runs to that dead ground, not
+  in a straight line.
+- **Smoke:** a noticed launch counts as fire from the launcher, so a unit
+  still steady calls smoke on it.
+- **A drill:** until the unit reaches the dead ground, decisions and late
+  answers don't send it back. Each logs `unit.break_contact`.
+
+On open plains the nearest dead ground can be too far to reach within a
+missile's 10 s flight. Where there is a fold or a crest near, it saves the
+vehicle. Details are in `docs/research/CALIBRATION_TARGETS.md`.
+
 ### Searching for a target: the NVESD search model
 
 Detection follows the US Army's NVESD search model, as Howe gives it in
