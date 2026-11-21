@@ -1569,6 +1569,31 @@ On open plains the nearest dead ground can be too far to reach within a
 missile's 10 s flight. Where there is a fold or a crest near, it saves the
 vehicle. Details are in `docs/research/CALIBRATION_TARGETS.md`.
 
+### Fire on missile teams, and planned covering fire
+
+- **Counter-fire on a launch:** a unit that notices a missile launched at
+  it calls fire on where it came from, priority 4, with twice the usual
+  aiming error. The sim keeps each launcher's last launch position for
+  this (`missiles_launched`).
+- **Who can call:** shaken and pinned units still call for fire; broken
+  and routed ones don't.
+- **Fire units stay in action:** they move up only if they cannot reach
+  the objective at all (`decide.heuristic.fires_move_up` 1.0). A company's
+  mortars in range no longer drive forward through the first contact.
+- **Covering fire plan:** while an attacking side's lead closes from 3 km
+  to 400 m of its objective (`sim.fires.cover_from_m`, `cover_lift_m`), its
+  fire units put a mission on the objective every 60 s. They fire on enemy
+  believed there, else on the fighting positions briefed at the start.
+  The targets count as registered: no call delay, a quarter of the lay
+  time, careful laying's bias. Logged as "the covering fire plan"; 0 for
+  `cover_from_m` turns it off.
+
+Against a dug-in missile team neither changes losses much. An unplanned
+call lands about 90 s after the launch, after the platoon that drew it is
+usually lost. The covering fire falls on the team's briefed hide, while
+the team fires from about 200 m away. Details are in
+`docs/research/CALIBRATION_TARGETS.md`.
+
 ### Searching for a target: the NVESD search model
 
 Detection follows the US Army's NVESD search model, as Howe gives it in
