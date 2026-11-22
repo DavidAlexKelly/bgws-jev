@@ -238,6 +238,12 @@
       "fingerprint": "cd5d99dbad5049c5",
       "replaced": "cd5d99dbad5049c5",
       "verdict": "pass"
+    },
+    {
+      "explanation": "Cue factors sourced from Yeh et al. 2001 (ADA447823): a friend's report now shortens search to 0.6 of uncued (0.25 before, unsourced), so drone-cued units take longer to find the targets they are told of; networked detect-to-strike 3.40 -> 4.19 min, inside its 2-5 min band",
+      "fingerprint": "cd5d99dbad5049c5",
+      "replaced": "cd5d99dbad5049c5",
+      "verdict": "accepted"
     }
   ]
 }
