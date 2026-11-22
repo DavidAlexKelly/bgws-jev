@@ -10,8 +10,8 @@ it. Code and docs cite the note or the table, not the PDF.
 | Folder | What goes in it |
 |---|---|
 | `raw/<topic>/` | The original files, renamed only. One topic folder per subject (below). |
-| `notes/` | One Markdown note per raw file, with the **same stem**: what the source is, what in it we use, the figures with page numbers, and its limits. |
-| `data/` | CSV tables extracted from the sources, one per table, named `<source-stem>--<table>.csv`. |
+| `notes/` | One Markdown note per raw file, with the **same stem**: what the source is, what in it we use, the figures with page numbers, and its limits. Short datasheets from one maker may share a note named for the family (`rheinmetall-datasheets-medium-calibre.md`), which lists the files it covers. |
+| `data/` | CSV tables extracted from the sources, one per table, named `<note-stem>--<table>.csv`. |
 | `leads/` | Sources we know of but don't have yet: what each is said to contain and where to get it. |
 | `index.csv` | Every source: id, file, title, author or organisation, date, origin, topic, and how far it has been read. |
 | `rheinmetall-crawl.tsv` | The record of where each Rheinmetall sheet was downloaded from. |

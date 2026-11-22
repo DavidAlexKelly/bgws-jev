@@ -1,0 +1,11 @@
+round,designation,calibre,type,round_mass_g,projectile_mass_g,payload,muzzle_velocity_m_s,penetration_mm,penetration_obliquity_deg,penetration_range_m,penetration_basis,dispersion_mil,self_destruct_s,gun,source_file,page
+APFSDS-T 30x173,PMC287,30x173,apfsds,725,235,,1405,53,60,1000,NATO plate at 60 deg (106 mm line of flight),0.5,,Mk44 Bushmaster II,raw/ammunition/rheinmetall-2021-apfsds-t-30x173-pmc287.pdf,1
+APFSDS-T 30x173,PMC359,30x173,apfsds,725,235,,1405,53,60,1000,NATO plate at 60 deg (106 mm line of flight),0.5,,MK30-2/ABM,raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf,3
+ABM/KETF 30x173,PMC308,30x173,airburst,830,360,162 x 1.24 g tungsten (201 g),1100,,,,,0.5,8.2,MK30-2/ABM,raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf,4
+TP-T 30x173,PMC355,30x173,practice,830,360,,1100,,,,,0.6,,MK30-2/ABM,raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf,4
+HEI-T 30x173,PMC416,30x173,hei,820,360,,1100,,,,,0.5,yes,MK30-2/ABM,raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf,5
+TPFDS-T 30x173,PMC307,30x173,practice,710,209,,1400,,,,,,,MK30-2/ABM,raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf,5
+APFSDS-T 35x228,PMD343,35x228,apfsds,1485,297,,1400,,,,not given,0.5,,Bushmaster III / MK35-E,raw/ammunition/rheinmetall-2021-apfsds-t-35x228-pmd343.pdf,1
+ABM/KETF 35x228,PMD330,35x228,airburst,1770,750,407 x 1.24 g tungsten (500 g),1050,,,,,1.0,8.2,MK35-E,raw/weapons/rheinmetall-2026-mk35e-automatic-cannon.pdf,3
+HEI-T 35x228,PMD040,35x228,hei,1565,535,,1175,,,,,1.0,,MK35-E,raw/weapons/rheinmetall-2026-mk35e-automatic-cannon.pdf,4
+TPFDS-T 35x228,PMD346,35x228,practice,1450,376,,1400,,,,,0.5,,MK35-E,raw/weapons/rheinmetall-2026-mk35e-automatic-cannon.pdf,4

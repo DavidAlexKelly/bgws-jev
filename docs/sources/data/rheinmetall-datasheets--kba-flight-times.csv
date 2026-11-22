@@ -1,0 +1,5 @@
+range_m,flight_time_fastest_s,flight_time_slowest_s,fit_velocity_fastest_m_s,fit_velocity_slowest_m_s,note
+0,0,0,1395,1100,muzzle; fitted v0 for the fastest; 1100 from the sheet's lower bound
+1000,0.75,1.17,1276,677,
+1500,1.15,2.07,1220,502,
+2000,1.57,3.30,1167,369,
