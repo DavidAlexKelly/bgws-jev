@@ -16,6 +16,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.comms.move_tolerance_m", 50.0, "m", 5.0, 500.0, "default", Default, "path losses are recomputed when an end has moved this far"),
         figure!("sim.comms.satcom_sinr_db", 20.0, "dB", 0.0, 40.0, "default", Default, "SINR of a satcom terminal link when the satellite is up and unjammed"),
         figure!("sim.comms.sitrep_s", 900.0, "s", 120.0, 7_200.0, "R1", Default, "a unit sends its HQ a situation report this often"),
+        figure!("sim.comms.loss_report_gap_s", 30.0, "s", 5.0, 600.0, "default", Default, "a unit that has lost strength since its last report sends one at once (a casualty report), but not more often than this"),
         figure!("sim.comms.ground_antenna_m", 3.0, "m", 0.5, 20.0, "default", Default, "antenna height when the radio record gives none"),
         // C2.
         figure!("sim.c2.heartbeat_s", 600.0, "s", 60.0, 3_600.0, "default", Default, "an HQ repeats its intent to its subordinates this often"),
@@ -102,6 +103,7 @@ pub struct C4Params {
     pub move_tolerance_m: f64,
     pub satcom_sinr_db: f64,
     pub sitrep_s: f64,
+    pub loss_report_gap_s: f64,
     pub ground_antenna_m: f64,
     pub heartbeat_s: f64,
     pub out_of_comms_s: f64,
@@ -190,6 +192,7 @@ impl C4Params {
             move_tolerance_m: f.get("sim.comms.move_tolerance_m"),
             satcom_sinr_db: f.get("sim.comms.satcom_sinr_db"),
             sitrep_s: f.get("sim.comms.sitrep_s"),
+            loss_report_gap_s: f.get("sim.comms.loss_report_gap_s"),
             ground_antenna_m: f.get("sim.comms.ground_antenna_m"),
             heartbeat_s: f.get("sim.c2.heartbeat_s"),
             out_of_comms_s: f.get("sim.c2.out_of_comms_s"),

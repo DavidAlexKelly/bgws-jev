@@ -137,6 +137,8 @@ pub struct CommsState {
     pub flying: BTreeMap<u32, InFlight>,
     pub buffers: BTreeMap<EntityId, Buffer>,
     pub last_sitrep: BTreeMap<EntityId, SimTime>,
+    /// The strength each unit last reported: a loss since then is reported at once.
+    pub last_sitrep_strength: BTreeMap<EntityId, f64>,
     /// (side, LEO only) → until.
     pub satcom_down: BTreeMap<(Side, bool), Option<SimTime>>,
     /// Units whose radios are out (damage, a test, a cyber effect).
@@ -555,13 +557,22 @@ pub fn base(s: &mut Sim) {
         }
         let last = c4.comms.last_sitrep.get(&id).copied().unwrap_or(SimTime::from_secs(-1e6));
         let phase = (id.0 as f64 * 37.0) % c4.p.sitrep_s;
-        if (now - last).secs() < c4.p.sitrep_s || now.secs() < phase {
+        let routine = (now - last).secs() >= c4.p.sitrep_s && now.secs() >= phase;
+        // A loss is reported when it happens (a casualty report), not left
+        // for the next routine report: an HQ judging its attack's losses
+        // must hear of them while the attack is on.
+        let strength = ent(s, id).and_then(|e| s.world.get::<Health>(e)).map(|h| h.strength()).unwrap_or(0.0);
+        // Until its first report its HQ knows it at full strength.
+        let lost = strength < c4.comms.last_sitrep_strength.get(&id).copied().unwrap_or(1.0) - 1e-9;
+        let loss_report = lost && (now - last).secs() >= c4.p.loss_report_gap_s;
+        if !routine && !loss_report {
             continue;
         }
         if let Some(dest) = c4.c2.report_dest(id) {
             let rep = super::c2::own_report(s, &c4, id);
             c4.comms.last_sitrep.insert(id, now);
-            send(now, &mut c4, id, dest, MessageKind::VoiceContactReport, 4, None, Payload::Sitrep(rep));
+            c4.comms.last_sitrep_strength.insert(id, strength);
+            send(now, &mut c4, id, dest, MessageKind::VoiceContactReport, if loss_report { 2 } else { 4 }, None, Payload::Sitrep(rep));
         }
     }
     // Run the network to now.

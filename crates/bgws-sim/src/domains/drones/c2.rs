@@ -413,7 +413,11 @@ fn arrive(s: &mut Sim, c4: &mut C4, a: Arrived, after: &mut Vec<After>) {
         Payload::Sitrep(r) => {
             if let Some(h) = c4.c2.post_of(a.to) {
                 let w = c4.p.work_sitrep;
-                receive(c4, h, now, 4, w, Work::Sitrep(r));
+                // A report of losses (weaker than the HQ last knew the unit)
+                // is read first: it bears on whether the attack goes on.
+                let known = c4.c2.hqs[h].reported.get(&r.unit).map(|k| k.strength).unwrap_or(1.0);
+                let priority = if r.strength < known - 1e-9 { 1 } else { 4 };
+                receive(c4, h, now, priority, w, Work::Sitrep(r));
             }
         }
         Payload::Intent { hq } => {
