@@ -1,4 +1,4 @@
-//! Meta-model fitting for aggregated combat (RUST_ENGINE.md §8.13, §15.5):
+//! Meta-model fitting for aggregated combat (rust-engine.md §8.13, §15.5):
 //! the aggregate model's coefficients are fitted to entity-level runs, not
 //! hand-set. This module fits rates and distributions by maximum likelihood
 //! from samples, with goodness-of-fit checks; fits stochastic Lanchester

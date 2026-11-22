@@ -1,4 +1,4 @@
-//! Command and control as processes with time (RUST_ENGINE.md §8.12; research R1, P1, P25, R8).
+//! Command and control as processes with time (rust-engine.md §8.12; research R1, P1, P25, R8).
 //!
 //! - **Planning time** per echelon with the 1/3–2/3 rule **[P1]**: an HQ
 //!   spends at most a third of the time it has, and at most its deliberate

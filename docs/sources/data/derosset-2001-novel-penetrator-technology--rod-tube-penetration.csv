@@ -1,0 +1,7 @@
+penetrator,impact_velocity_m_s,total_yaw_deg,penetration_mm,percent_increase_over_baseline,original_source,pdf_page
+baseline,1833,,63,,Lynch et al. (1995),20
+rod-tube,1834,2.2,82.5,31,Lynch et al. (1995),20
+baseline,2621,3.8,77,,Lynch et al. (1995),20
+rod-tube,2636,3.4,117.5,52,Lynch et al. (1995),20
+baseline,2919,3.0,78,,Lynch et al. (1995),20
+rod-tube,2893,2.2,122.5,57,Lynch et al. (1995),20

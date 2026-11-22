@@ -1,4 +1,4 @@
-//! Entities owned by another simulation (docs/design/INTEROP_PLAN.md §3.2).
+//! Entities owned by another simulation (docs/design/interop-plan.md §3.2).
 //!
 //! Everything from outside comes in through [`apply`] as an
 //! [`ExternalInput`], protocol-free (the DIS or HLA adapter makes it), and

@@ -1,4 +1,4 @@
-//! Summary statistics for batch outcomes (RUST_ENGINE.md §15.3, §16): mean,
+//! Summary statistics for batch outcomes (rust-engine.md §15.3, §16): mean,
 //! standard deviation, quantiles, the t confidence interval of a mean, the
 //! Wilson interval of a proportion, a distribution-free interval for a
 //! quantile, histograms and empirical CDFs.

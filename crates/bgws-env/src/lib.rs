@@ -1,4 +1,4 @@
-//! The environment (RUST_ENGINE.md §7, §14.2): terrain grids and their
+//! The environment (rust-engine.md §7, §14.2): terrain grids and their
 //! pyramid, land cover and micro-terrain, soil and trafficability, road and
 //! river networks with routing, the change layer, the runtime tile format
 //! and theatre packs, a deterministic synthetic theatre, the sea

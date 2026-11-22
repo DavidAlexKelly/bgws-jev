@@ -405,7 +405,7 @@ pub struct PlayReport {
 }
 
 /// A game in progress with its deciders and its record.
-/// What a real-time game is connected to (docs/design/INTEROP_PLAN.md):
+/// What a real-time game is connected to (docs/design/interop-plan.md):
 /// `tick` after every second with that second's events (to publish them),
 /// `inbound` before each second for what other simulations sent.
 pub trait Link {
@@ -700,7 +700,7 @@ impl Host {
         Ok(self.rt.block_on(router.answer(questions)))
     }
 
-    /// Play to `until` in real time (docs/design/INTEROP_PLAN.md §3.4): the
+    /// Play to `until` in real time (docs/design/interop-plan.md §3.4): the
     /// clock does not stop for decisions. Questions go to the deciders in the
     /// background; a unit with a question out carries on, and each answer is
     /// given at the first second boundary after it comes back (it applies no

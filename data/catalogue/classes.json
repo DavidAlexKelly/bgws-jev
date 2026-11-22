@@ -1,5 +1,5 @@
 {
-  "$comment": "Class defaults (RUST_ENGINE.md §14.1: 'defaults per class, so a new platform can be added with a few numbers') and per-kind defaults for sensors, emitters, radios and mounts. A record names its class; the class's values sit under the record's own. Every number a class sets is a declared figure, catalogue.class.<class>.<path>. Values are synthetic and open-source-anchored; $source names a research ref where one fits, else the value is [default].",
+  "$comment": "Class defaults (rust-engine.md §14.1: 'defaults per class, so a new platform can be added with a few numbers') and per-kind defaults for sensors, emitters, radios and mounts. A record names its class; the class's values sit under the record's own. Every number a class sets is a declared figure, catalogue.class.<class>.<path>. Values are synthetic and open-source-anchored; $source names a research ref where one fits, else the value is [default].",
   "classes": {
     "base": {
       "$comment": "Every record starts here.",

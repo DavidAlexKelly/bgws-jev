@@ -1,4 +1,4 @@
-//! The regression store (RUST_ENGINE.md §15.8, §17 "statistical"): every
+//! The regression store (rust-engine.md §15.8, §17 "statistical"): every
 //! vignette's distribution is saved as JSON in a directory (one file per
 //! vignette, `<id>.json`). A new run is compared with the stored one; it fails
 //! when it is out of band, or when the distribution has shifted significantly

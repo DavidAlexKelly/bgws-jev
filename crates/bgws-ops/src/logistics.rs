@@ -1,4 +1,4 @@
-//! Logistics and maintenance (RUST_ENGINE.md §8.11; research R7, P17–P19, R5.2).
+//! Logistics and maintenance (rust-engine.md §8.11; research R7, P17–P19, R5.2).
 //!
 //! - **The supply network** is a graph of depots, railheads, ports,
 //!   airfields and supply points with stock and throughput, joined by road,

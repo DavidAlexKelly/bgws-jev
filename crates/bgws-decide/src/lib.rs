@@ -1,4 +1,4 @@
-//! The decider layer the host calls (RUST_ENGINE.md §3.3, §10.2–10.6, §12):
+//! The decider layer the host calls (rust-engine.md §3.3, §10.2–10.6, §12):
 //! decider and planner traits; the rules and fallback deciders; the Jev
 //! client (OpenRouter Decisions API), Claude planners and decider (Anthropic
 //! Messages API), a local OpenAI-compatible model, recorded answers for
@@ -42,7 +42,7 @@ use bgws_core::{figure, Figure, Figures};
 /// Every figure this crate reads (rule 3).
 pub fn figures() -> Vec<Figure> {
     vec![
-        figure!("decide.jev.min_confidence", 0.25, "fraction", 0.0, 1.0, "default", Default, "Below this confidence Jev's choice is not taken; the template fallback stands (DECISION_FLOW_GRAPHS §3.3)."),
+        figure!("decide.jev.min_confidence", 0.25, "fraction", 0.0, 1.0, "default", Default, "Below this confidence Jev's choice is not taken; the template fallback stands (decision-flow-graphs §3.3)."),
         figure!("decide.jev.timeout", 4.0, "s", 0.5, 120.0, "default", Default, "Wall-clock wait for one side's Jev request before the fallbacks decide; sim time waits, so it changes only pace."),
         figure!("decide.jev.cache_limit", 2000.0, "count", 1.0, 1.0e6, "default", Default, "Most remembered Jev answers; the oldest go first."),
         figure!("decide.jev.max_choices", 255.0, "count", 2.0, 255.0, "default", Default, "Jev's hard limit on options in one choice question."),

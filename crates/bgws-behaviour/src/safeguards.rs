@@ -1,4 +1,4 @@
-//! Safeguards on templates (RUST_ENGINE.md §10.6, **[ref R8]**): bounded
+//! Safeguards on templates (rust-engine.md §10.6, **[ref R8]**): bounded
 //! option lists, and an explicit de-escalation or withdrawal option at every
 //! decision reached from a contact-like trigger. These warn (the template
 //! still loads); the bound is also enforced when a question is built

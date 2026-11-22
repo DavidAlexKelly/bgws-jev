@@ -1,4 +1,4 @@
-//! Position, navigation and timing (RUST_ENGINE.md §8.7; research R5.3, P15, P16).
+//! Position, navigation and timing (rust-engine.md §8.7; research R5.3, P15, P16).
 //!
 //! - **GNSS under jamming:** the effective carrier-to-noise density follows
 //!   the standard spectral-separation form

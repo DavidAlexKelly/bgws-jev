@@ -1,0 +1,9 @@
+source,impact_velocity_km_s,rod_diameter_cm,residual_velocity_km_s,vr_over_v,residual_length_cm,lr_over_d,pdf_page
+experiment,1.73,1.65,1.30,0.751,7.7,4.7,40
+experiment,1.77,1.65,1.36,0.768,8.2,5.0,40
+CTH,1.775,1.65,1.40,0.789,6.60,4.00,40
+Walker-Anderson,1.775,1.65,1.52,0.856,7.00,4.24,40
+experiment,2.53,1.28,2.23,0.881,4.9,3.8,40
+experiment,2.57,1.28,2.26,0.879,4.4,3.4,40
+CTH,2.600,1.28,2.29,0.881,4.40,3.44,40
+Walker-Anderson,2.600,1.28,2.38,0.915,4.57,3.57,40

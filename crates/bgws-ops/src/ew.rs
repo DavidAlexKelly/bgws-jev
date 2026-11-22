@@ -1,4 +1,4 @@
-//! Electronic warfare (RUST_ENGINE.md §8.7; research R5.3, R8 [CMO]).
+//! Electronic warfare (rust-engine.md §8.7; research R5.3, R8 [CMO]).
 //!
 //! - **Jammers are emitters** with bands, ERP, an antenna pattern, a duty
 //!   cycle, look-through and a power budget split across the bands they

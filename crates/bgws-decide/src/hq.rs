@@ -1,4 +1,4 @@
-//! HQ plan requests (RUST_ENGINE.md §10.3): what an HQ question carries, the
+//! HQ plan requests (rust-engine.md §10.3): what an HQ question carries, the
 //! plan schemas, the prompts (a port of `world/command/claudePlanner.ts` and
 //! the shape of `engine/orders.ts`'s `ordersPrompt`), the joint-guidance
 //! checks (`parseJointGuidance`), and the heuristic planner
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
-/// Which planner an HQ seat runs (MULTI_DOMAIN_PLAN §4.4).
+/// Which planner an HQ seat runs (multi-domain-plan §4.4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PlannerKind {

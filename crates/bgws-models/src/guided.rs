@@ -1,4 +1,4 @@
-//! Air-delivered and guided munitions, basics (RUST_ENGINE.md §8.8):
+//! Air-delivered and guided munitions, basics (rust-engine.md §8.8):
 //! release envelopes for free-fall and glide weapons, terminal seekers
 //! (laser, IR, radar, GNSS/INS) with their own acquisition, countermeasures
 //! (flares, chaff, GNSS jamming) and the CEP that results. The full flyout and

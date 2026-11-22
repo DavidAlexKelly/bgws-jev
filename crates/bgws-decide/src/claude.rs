@@ -1,4 +1,4 @@
-//! Claude planners (RUST_ENGINE.md §10.3), through the Anthropic Messages API
+//! Claude planners (rust-engine.md §10.3), through the Anthropic Messages API
 //! called directly from the host: `POST {base}/v1/messages` with `x-api-key`
 //! and `anthropic-version: 2023-06-01`, key from `ANTHROPIC_API_KEY`.
 //!

@@ -1,0 +1,8 @@
+impact_velocity_km_s,kind,method,penetration_mm,p_over_l,rod_length_mm,rod_diameter_mm,l_over_d,pdf_page
+1.85,measured,experiment,546,1.10,494,16.5,30,24
+2.62,measured,experiment,541,1.41,384,12.8,30,24
+1.775,adjusted to nominal velocity,eq. 10 (linear P/L slope 0.984 per km/s for L/D 30),510,1.03,494,16.5,30,24
+1.775,adjusted to nominal velocity,eq. 12 (slope of Sorensen et al. hyperbolic fit eq. 11),515,1.04,494,16.5,30,24
+1.775,adjusted to nominal velocity,eq. 13 (ratio of velocities),524,1.06,494,16.5,30,24
+2.600,adjusted to nominal velocity,eq. 12 (slope of Sorensen et al. hyperbolic fit eq. 11),540,1.41,384,12.8,30,24
+2.600,adjusted to nominal velocity,eq. 13 (ratio of velocities),537,1.40,384,12.8,30,24

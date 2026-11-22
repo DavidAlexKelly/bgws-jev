@@ -1,5 +1,5 @@
-//! Facts: what a template's conditions may test (RUST_ENGINE.md §10.1;
-//! DECISION_FLOW_GRAPHS.md §3.1). A port of `behaviour/facts.ts` and the fact
+//! Facts: what a template's conditions may test (rust-engine.md §10.1;
+//! decision-flow-graphs.md §3.1). A port of `behaviour/facts.ts` and the fact
 //! half of `actions/world.ts`.
 //!
 //! The vocabulary is closed: the engine supplies a value for each fact named

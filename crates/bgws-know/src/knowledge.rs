@@ -3,7 +3,7 @@
 //! - [`AgentKnowledge`]: a unit's own sightings plus the side tracks it has
 //!   been told about, each with the time it heard. It knows what reached it,
 //!   not the whole side picture. As in the TypeScript side picture
-//!   (SIDE_PICTURE.md), a unit holds at most one version of each track: the
+//!   (side-picture.md), a unit holds at most one version of each track: the
 //!   newest it took. Its own sighting is preferred when it is as new.
 //! - [`Cop`]: an HQ's common operational picture, fusing every report that
 //!   reaches it with covariance intersection, so the same sighting relayed

@@ -1,4 +1,4 @@
-//! Naval and undersea (RUST_ENGINE.md §8.1 Sea, §8.2 sonar, §8.6; research
+//! Naval and undersea (rust-engine.md §8.1 Sea, §8.2 sonar, §8.6; research
 //! R6.1–R6.3, P28): surface ships, submarines, USVs and merchants on the
 //! same clock as the land battle.
 //!

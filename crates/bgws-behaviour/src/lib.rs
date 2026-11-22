@@ -1,6 +1,6 @@
 //! Behaviour templates, inheritance, the graph walk, facts, the action library
-//! and the hard gates (RUST_ENGINE.md §3.1, §10.1, §10.6, §19, §20;
-//! DECISION_FLOW_GRAPHS.md).
+//! and the hard gates (rust-engine.md §3.1, §10.1, §10.6, §19, §20;
+//! decision-flow-graphs.md).
 //!
 //! A faithful port of the TypeScript `realtime/behaviour/` with the same JSON:
 //! the shipped templates in `data/templates` load unchanged. On top of

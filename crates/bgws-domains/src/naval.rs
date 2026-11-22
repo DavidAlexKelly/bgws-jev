@@ -1,4 +1,4 @@
-//! Naval and undersea (RUST_ENGINE.md §8.1 Sea, §8.6): ship and submarine
+//! Naval and undersea (rust-engine.md §8.1 Sea, §8.6): ship and submarine
 //! movement, small craft limited by sea state [R6.3], Hughes salvo exchanges
 //! [R6.1], layered ship defence against a salvo through [`crate::air_defence`]
 //! with magazine depletion [R6.2, P28], compartment damage with fire, flooding

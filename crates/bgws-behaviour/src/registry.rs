@@ -1,5 +1,5 @@
 //! A validated set of templates, resolved once, with the vocabulary they were
-//! checked against (RUST_ENGINE.md §10.1). The registry half of
+//! checked against (rust-engine.md §10.1). The registry half of
 //! `behaviour/actions/land.ts` (`behaviourRegistry`, `resolvedTemplate`,
 //! `templateChain`) and the template choice of `world/questions.ts`
 //! (`templateForTrigger`).

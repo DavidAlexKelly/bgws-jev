@@ -1,0 +1,37 @@
+target,impact_velocity_km_s,source,model_setting,witness_penetration_cm,pitch_deg,yaw_deg,remarks,pdf_page
+RHA block 45.72 cm,1.80,experiment,,6.7,,,residual rod about 1 D long recovered from the witness pack,38
+RHA block 45.72 cm,1.775,CTH,,6.7,,,,38
+RHA block 45.72 cm,1.775,Walker-Anderson,RHA 1.2 GPa; rod 1.5 GPa,6.7,,,,38
+RHA block 45.72 cm,1.775,MITI,,6.9,,,,38
+RHA block 45.72 cm,2.59,experiment,,7.4,,,no remnant rod found,38
+RHA block 45.72 cm,2.600,CTH,,7.4,,,,38
+RHA block 45.72 cm,2.600,Walker-Anderson,RHA 1.2 GPa; rod 1.5 GPa,7.5,,,,38
+RHA block 45.72 cm,2.600,MITI,,7.4,,,,38
+six 1.90 cm high-hard plates at 65 deg,1.72,experiment,,14.4,,,flash X-ray malfunction (pitch and yaw not known),84
+six 1.90 cm high-hard plates at 65 deg,1.78,experiment,,10.0,0.45,2.34,,84
+six 1.90 cm high-hard plates at 65 deg,1.775,CTH (corrected),,18.0,,,3-D result less 3.3 cm for lack of witness confinement,84
+six 1.90 cm high-hard plates at 65 deg,1.775,Walker-Anderson,1.5 D of nose lost per plate,16.3,,,,84
+six 1.90 cm high-hard plates at 65 deg,1.775,Walker-Anderson,1.8 D of nose lost per plate,12.4,,,,84
+six 1.90 cm high-hard plates at 65 deg,1.775,MITI,,28.5,,,,84
+six 1.90 cm high-hard plates at 65 deg,2.60,experiment,,10.8,0.04,0.44,,84
+six 1.90 cm high-hard plates at 65 deg,2.62,experiment,,,-1.70,2.62,not reported; rod tail seen broken off before the witness pack,84
+six 1.90 cm high-hard plates at 65 deg,2.600,CTH (corrected),,14.1,,,3-D result less 1.5 cm for lack of witness confinement,84
+six 1.90 cm high-hard plates at 65 deg,2.600,Walker-Anderson,1.5 D of nose lost per plate,15.8,,,,84
+six 1.90 cm high-hard plates at 65 deg,2.600,Walker-Anderson,1.8 D of nose lost per plate,13.2,,,,84
+six 1.90 cm high-hard plates at 65 deg,2.600,MITI,,24.9,,,,84
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.73,experiment,,8.58,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.77,experiment,,8.20,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,CTH,Johnson-Holmquist; failed-ceramic cap 2.6 GPa,0,,,rod stopped at the ceramic-RHA interface,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,Walker-Anderson,ceramic flow stress 2.4 GPa,0,,,rod stopped at the ceramic-RHA interface,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,Walker-Anderson,ceramic flow stress 1.2 GPa,7.2,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,MITI,ceramic flow stress 2.4 GPa,4.7,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,Walker-Anderson (pressure-dependent),Y = B p; B = 0.75,6.3,,,post-test model (section 7),113
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),1.775,Walker-Anderson (pressure-dependent),Y = B p; B = 0.50,14.5,,,post-test model (section 7),113
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.59,experiment,,7.78,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.60,experiment,,7.10,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,CTH,Johnson-Holmquist; failed-ceramic cap 2.6 GPa,1.8,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,Walker-Anderson,ceramic flow stress 2.4 GPa,4.7,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,Walker-Anderson,ceramic flow stress 1.2 GPa,11.6,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,MITI,ceramic flow stress 2.4 GPa,8.8,,,,104
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,Walker-Anderson (pressure-dependent),Y = B p; B = 0.75,0,,,rod did not quite perforate the RHA back plate; post-test model,113
+ceramic laminate (5.71 RHA + 30.48 Al2O3 + 11.43 RHA cm),2.600,Walker-Anderson (pressure-dependent),Y = B p; B = 0.50,8.2,,,post-test model (section 7),113

@@ -1,6 +1,6 @@
 [package]
 name = "bgws-desktop"
-description = "The desktop shell (RUST_ENGINE.md §16): the host and the game in-process, the viewer, editor and Behaviour Manager in a native window."
+description = "The desktop shell (rust-engine.md §16): the host and the game in-process, the viewer, editor and Behaviour Manager in a native window."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

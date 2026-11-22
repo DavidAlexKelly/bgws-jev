@@ -1,4 +1,4 @@
-//! Sensing (RUST_ENGINE.md §8.2). Every sensor answers three questions the
+//! Sensing (rust-engine.md §8.2). Every sensor answers three questions the
 //! same way: **can it see** (geometry, masking — computed elsewhere and
 //! passed in as path transmission or loss), **how strongly** (resolved cycles,
 //! SNR or signal excess) and **how fast it detects** (a hazard rate from that

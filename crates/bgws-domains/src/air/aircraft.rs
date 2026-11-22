@@ -1,5 +1,5 @@
 //! The point-mass, three-degree-of-freedom energy model for aircraft
-//! (RUST_ENGINE.md §8.1 Air): thrust lapse with density, a parabolic drag
+//! (rust-engine.md §8.1 Air): thrust lapse with density, a parabolic drag
 //! polar with transonic wave-drag rise, the lift limit and structural g that
 //! together give the manoeuvre envelope, sustained and instantaneous turn
 //! rates, climb from specific excess power, and fuel flow from a thrust-

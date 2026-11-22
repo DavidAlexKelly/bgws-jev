@@ -1,4 +1,4 @@
-//! Process and network models (RUST_ENGINE.md §3.1, §8.5, §8.7, §8.11–§8.13,
+//! Process and network models (rust-engine.md §3.1, §8.5, §8.7, §8.11–§8.13,
 //! §6.4): the parts of the war that are decided by organisation, links and
 //! depletion rather than by a single physical encounter.
 //!

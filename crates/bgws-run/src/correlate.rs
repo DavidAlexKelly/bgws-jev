@@ -1,4 +1,4 @@
-//! Terrain correlation (docs/design/INTEROP_PLAN.md, phase 2): how far our
+//! Terrain correlation (docs/design/interop-plan.md, phase 2): how far our
 //! ground differs from another simulation's, before an exercise.
 //!
 //! Other simulations keep their own terrain; DIS and HLA only say where

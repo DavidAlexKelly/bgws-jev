@@ -359,7 +359,7 @@ impl Sim {
         crate::domains::lod::quiet::next_interesting_time(self)
     }
 
-    /// Advance without waiting on decisions (real time, docs/design/INTEROP_PLAN.md
+    /// Advance without waiting on decisions (real time, docs/design/interop-plan.md
     /// §3.4): stop only to hand out questions not handed out before; a unit
     /// whose question is out carries on with what it was doing, and its
     /// answer, given with [`Sim::answer`] whenever it comes back, applies no
@@ -495,7 +495,7 @@ impl Sim {
         }
     }
 
-    /// Apply one input from another simulation (docs/design/INTEROP_PLAN.md
+    /// Apply one input from another simulation (docs/design/interop-plan.md
     /// §3.2), at a tick boundary; the host records it.
     pub fn apply_external(&mut self, input: crate::remote::ExternalInput) {
         crate::remote::apply(self, input);

@@ -1,5 +1,5 @@
 //! Level of detail, aggregated combat, quiet skipping and world victory
-//! conditions in real games (RUST_ENGINE.md §6.3, §6.4, §8.13, §18 phase 7).
+//! conditions in real games (rust-engine.md §6.3, §6.4, §8.13, §18 phase 7).
 
 use bgws_core::{LogEvent, Seed, Side, SimDuration, SimTime};
 use bgws_scenario::v4::ScenarioV4;

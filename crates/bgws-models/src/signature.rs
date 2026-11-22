@@ -1,4 +1,4 @@
-//! Signatures and deception (RUST_ENGINE.md §8.3).
+//! Signatures and deception (rust-engine.md §8.3).
 //!
 //! - **Signatures change with action:** moving raises acoustic signature and
 //!   lifts dust when the ground is dry; firing makes a muzzle flash and a

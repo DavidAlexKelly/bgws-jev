@@ -1,5 +1,5 @@
-//! A scenario's scope (RUST_ENGINE.md §14.3; ports realtime/scope.ts and
-//! MULTI_DOMAIN_PLAN.md §5): how long it runs, how big it is, which command
+//! A scenario's scope (rust-engine.md §14.3; ports realtime/scope.ts and
+//! multi-domain-plan.md §5): how long it runs, how big it is, which command
 //! levels exist, which domains are simulated, abstracted or off, which
 //! planners exist, where detail is aggregated, and the time dimension.
 //!

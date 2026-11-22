@@ -1,4 +1,4 @@
-//! From a walk to a [`bgws_core::Question`] (RUST_ENGINE.md §3.2, §10.1,
+//! From a walk to a [`bgws_core::Question`] (rust-engine.md §3.2, §10.1,
 //! §10.6). The question-building half of `world/questions.ts`'s
 //! `raiseQuestion`, generalised for land and world agents alike:
 //!
@@ -186,7 +186,7 @@ fn bound(options: Vec<DecisionOption>, max: usize, keep: &[&String]) -> Vec<Deci
 }
 
 /// Does this question need a decider? One option (a drill, or the only one
-/// left) is taken at once (DECISION_FLOW_GRAPHS.md §3.3).
+/// left) is taken at once (decision-flow-graphs.md §3.3).
 pub fn needs_asking(q: &Question) -> bool {
     q.options.len() > 1
 }

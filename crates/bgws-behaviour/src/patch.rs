@@ -1,5 +1,5 @@
-//! Patches: how a derived template changes what it inherits (RUST_ENGINE.md
-//! §10.1; DECISION_FLOW_GRAPHS.md §4.3, §7 step 6 and step 10).
+//! Patches: how a derived template changes what it inherits (rust-engine.md
+//! §10.1; decision-flow-graphs.md §4.3, §7 step 6 and step 10).
 //!
 //! In the TypeScript build a variant's changes are its own fields: `remove`,
 //! `bias`, `when`, `doctrine`, and node overrides in its own `nodes` (the

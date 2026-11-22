@@ -1,4 +1,4 @@
-//! Indirect fire (RUST_ENGINE.md §8.8 "Indirect fire").
+//! Indirect fire (rust-engine.md §8.8 "Indirect fire").
 //!
 //! - **Ballistics:** a point-mass trajectory with drag (constant drag
 //!   coefficient, exponential atmosphere), integrated with RK4, gives range,

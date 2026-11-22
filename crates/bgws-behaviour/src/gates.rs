@@ -1,4 +1,4 @@
-//! Hard gates (RUST_ENGINE.md §10.1, design rule 5; DECISION_FLOW_GRAPHS.md §2
+//! Hard gates (rust-engine.md §10.1, design rule 5; decision-flow-graphs.md §2
 //! "action masking"): rules of engagement, weapon release authority, EMCON,
 //! capability and cohesion are never left to a model's judgement **[ref R8]**.
 //! They are applied to every option before it is offered, so Jev never sees a

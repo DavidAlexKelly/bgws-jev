@@ -1,4 +1,4 @@
-//! Munitions in flight (RUST_ENGINE.md §8.1 Missiles and munitions), at the
+//! Munitions in flight (rust-engine.md §8.1 Missiles and munitions), at the
 //! level a theatre wargame needs: each munition is an entity on a kinematic
 //! profile from launch point to aim point, with a speed, an altitude profile
 //! and a time of flight, so the defender's sensors and layers see it at the

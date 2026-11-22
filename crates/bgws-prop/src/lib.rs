@@ -1,4 +1,4 @@
-//! Propagation (RUST_ENGINE.md §8.4): optical line of sight with curvature,
+//! Propagation (rust-engine.md §8.4): optical line of sight with curvature,
 //! refraction and probabilistic canopy masking; radar and radio horizons;
 //! VHF/UHF path loss (free space, Deygout multiple knife-edge diffraction,
 //! clutter, a simplified ITM); HF ground wave and NVIS skywave; satellite and

@@ -1,6 +1,6 @@
 //! Batches, vignettes, distributions, sensitivity (Morris, Sobol) and
 //! meta-models: the calibration and validation layer of the BGWS engine
-//! (RUST_ENGINE.md §15, §17 "statistical", §8.13, §13 batch target, §16
+//! (rust-engine.md §15, §17 "statistical", §8.13, §13 batch target, §16
 //! analysis workbench).
 //!
 //! The crate is generic over what it runs: anything implementing

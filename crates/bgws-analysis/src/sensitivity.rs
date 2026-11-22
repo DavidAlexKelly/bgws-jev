@@ -1,4 +1,4 @@
-//! Sensitivity analysis (RUST_ENGINE.md §15.1, §15.4): Morris
+//! Sensitivity analysis (rust-engine.md §15.1, §15.4): Morris
 //! elementary-effects screening across the figures, each varied within its
 //! declared `[min, max]`, then Sobol first-order and total indices for the
 //! top-k (Saltelli sampling, Jansen estimators). The result is the research

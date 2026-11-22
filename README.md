@@ -7,7 +7,7 @@ documented protocol (WebSocket + HTTP, `protocol/PROTOCOL.md`) to any
 frontend. The React viewer in `frontend/viewer` is the default frontend. It
 can be swapped for another: `bgws-server <scenario> --web <dir>` serves any
 folder in its place, and any client that speaks the protocol can drive a
-game. The design is in `docs/design/RUST_ENGINE.md`.
+game. The design is in `docs/design/rust-engine.md`.
 
 ## Layout
 
@@ -299,7 +299,7 @@ to reach openrouter.ai.
 | `bgws-decide` | the decider and planner traits; rules, Jev (OpenRouter), Claude (Messages API, tool schemas), local (OpenAI-compatible), recorded answers, a router, a person's seat |
 | `bgws-analysis` | batches, vignettes with bands, KS and χ² tests, the regression store, Morris and Sobol sensitivity, the research backlog, meta-model fitting |
 | `bgws-run` | the host loop, the `bgws` CLI, the vignette experiments |
-| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management); HLA 4 through the Federate Protocol with the RPR FOM, time management and a mock RTI; the EGM96 geoid, WGS-84 placement and DIS orientation (`docs/design/INTEROP_PLAN.md`) |
+| `bgws-interop` | interoperability with other simulations: two-way DIS v7 (Entity State with dead reckoning, Fire, Detonation, simulation management); HLA 4 through the Federate Protocol with the RPR FOM, time management and a mock RTI; the EGM96 geoid, WGS-84 placement and DIS orientation (`docs/design/interop-plan.md`) |
 | `apps/server` | `bgws-server` (a library and a binary): the game on its own thread, speaking the protocol over HTTP and a WebSocket; bundles the default viewer (feature `bundled-viewer`), or serves any frontend folder (`--web`) |
 | `apps/desktop` | `bgws-desktop`: the Tauri 2 shell, the same host in-process and its pages in a native window |
 | `protocol/` | `PROTOCOL.md` (every message and route), TypeScript types generated from Rust (`ts-rs`) and a typed client |
@@ -376,7 +376,7 @@ to reach openrouter.ai.
   `bgws sensitivity <vignette>` ranks which ones matter (`--prefix land`
   for the land fight's figures, `--sobol-top 0` for Morris only). A first
   pass over five land-fight vignettes is in
-  [docs/research/CALIBRATION_TARGETS.md](docs/research/CALIBRATION_TARGETS.md).
+  [docs/research/calibration-targets.md](docs/research/calibration-targets.md).
   The search model (cueing, search sector and time) is the common thread,
   then the guided missile's hit chance, lay time, and how fast suppression
   builds and fades.
@@ -1567,7 +1567,7 @@ armour crews spotted 18–47% of launches).
 
 On open plains the nearest dead ground can be too far to reach within a
 missile's 10 s flight. Where there is a fold or a crest near, it saves the
-vehicle. Details are in `docs/research/CALIBRATION_TARGETS.md`.
+vehicle. Details are in `docs/research/calibration-targets.md`.
 
 ### Fire on missile teams, and planned covering fire
 
@@ -1592,13 +1592,13 @@ Against a dug-in missile team neither changes losses much. An unplanned
 call lands about 90 s after the launch, after the platoon that drew it is
 usually lost. The covering fire falls on the team's briefed hide, while
 the team fires from about 200 m away. Details are in
-`docs/research/CALIBRATION_TARGETS.md`.
+`docs/research/calibration-targets.md`.
 
 ### Searching for a target: the NVESD search model
 
 Detection follows the US Army's NVESD search model, as Howe gives it in
 the *IR/EO Systems Handbook* (vol. 4, 1993, pp. 110–114). Notes with page
-references are in `docs/papers/notes/howe-1993-search.md`.
+references are in `docs/sources/notes/irhb-1993-v4-eo-systems-design-analysis-testing.md`.
 
 - **Only some observers ever find a target.** The model gives
   P(t) = P∞·[1 − exp(−t/τ)]. P∞ is the share of observers who ever find
@@ -1626,7 +1626,7 @@ references are in `docs/papers/notes/howe-1993-search.md`.
   scenario has no HQ planner, so only morale halts the attack.
 - From first sighting to first shot takes a median of 7 s over 60 shots
   in three generated scenarios. TETAM measured 8–11 s for anti-tank
-  missile crews (`docs/papers/notes/bryson-tetam.md`).
+  missile crews (`docs/sources/notes/bryson-nd-tetam-antitank-missile-trials.md`).
 - **Not sourced yet:**
   - the cue factor;
   - the observer multipliers;
@@ -1777,7 +1777,7 @@ game. A record saved mid-game says where it stops (`endedAt`).
 simulations as DIS version 7 (IEEE 1278.1-2012) Entity State PDUs over UDP,
 and plays in real time, and (with `--dis-listen`) takes in other
 simulations' entities, fires and detonations. These are phases 1 and 2 of
-`docs/design/INTEROP_PLAN.md`. Phase 3 joins HLA 4 federations (below).
+`docs/design/interop-plan.md`. Phase 3 joins HLA 4 federations (below).
 
 ```sh
 bgws play gen-kgd-company-attack --dis 127.0.0.1:3000             # real time, published

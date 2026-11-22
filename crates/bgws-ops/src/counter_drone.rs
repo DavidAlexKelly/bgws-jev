@@ -1,4 +1,4 @@
-//! Counter-drone (RUST_ENGINE.md §8.7; research R5.1–R5.3).
+//! Counter-drone (rust-engine.md §8.7; research R5.1–R5.3).
 //!
 //! - **Detection** by RF detectors (only drones that radiate: fibre FPVs are
 //!   invisible to them **[R5.1]**), radar (echo ∝ σ/R⁴), acoustic and EO

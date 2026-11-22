@@ -1,4 +1,4 @@
-//! Two of our simulations over DIS on localhost (docs/design/INTEROP_PLAN.md
+//! Two of our simulations over DIS on localhost (docs/design/interop-plan.md
 //! phase 2): one plays blue, the other red, each owning its own side. Each
 //! sees the other's units as remote entities and fights them; each judges
 //! the damage to its own; nothing is owned twice and no detonation is judged

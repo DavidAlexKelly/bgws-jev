@@ -1,4 +1,4 @@
-//! The game record (RUST_ENGINE.md §12, §14.3): "scenario, seed, build,
+//! The game record (rust-engine.md §12, §14.3): "scenario, seed, build,
 //! machine, every order and command, every model answer, plus snapshots".
 //! With it a game replays exactly without calling Jev or Claude again —
 //! answers come back as `AnswerSource::Recorded` — and can be scrubbed and

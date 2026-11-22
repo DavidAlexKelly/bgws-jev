@@ -1,0 +1,12 @@
+delta_t_rss_k,n50_moderate_high_clutter,n50_low_clutter,ratio_moderate_high_to_baseline_1_5,ratio_low_to_baseline_0_75,note,source
+0.25,97.500,12.750,65.000,17.000,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+0.5,25.500,3.750,17.000,5.000,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+0.75,12.167,2.083,8.111,2.778,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+1.0,7.500,1.500,5.000,2.000,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+1.5,4.167,1.083,2.778,1.444,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+2.0,3.000,0.938,2.000,1.250,worked example in source (p. 25-6),"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+2.5,2.460,0.870,1.640,1.160,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+3.0,2.167,0.833,1.444,1.111,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+4.0,1.875,0.797,1.250,1.062,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+5.0,1.740,0.780,1.160,1.040,,"computed from eq. 4 and 5; p. 25-5 (PDF 6)"
+inf,1.500,0.750,1.000,1.000,uncamouflaged baseline (ACQUIRE User's Guide),"baseline stated p. 25-4 (PDF 5)"

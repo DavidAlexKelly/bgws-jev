@@ -1,4 +1,4 @@
-//! Scenario, scope and game-record formats (RUST_ENGINE.md §14.3, §19 "port
+//! Scenario, scope and game-record formats (rust-engine.md §14.3, §19 "port
 //! scope.ts, scenario.ts, presets, plus a v3 → v4 converter").
 //!
 //! - `scope`: the scenario scope (types, domains simulated/abstracted/off,

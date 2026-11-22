@@ -1,4 +1,4 @@
-//! Direct fire (RUST_ENGINE.md §8.8 "Direct fire").
+//! Direct fire (rust-engine.md §8.8 "Direct fire").
 //!
 //! **The error budget.** Each engagement has a fixed bias — range estimation
 //! (through the trajectory's angle of fall), cant (through the drop),

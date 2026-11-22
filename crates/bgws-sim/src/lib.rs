@@ -1,4 +1,4 @@
-//! The simulation (RUST_ENGINE.md §3–§6, §8–§10): an ECS world built from a
+//! The simulation (rust-engine.md §3–§6, §8–§10): an ECS world built from a
 //! scenario and the catalogue, stepped by a multi-rate clock, with every
 //! domain's systems, decision points through behaviour templates, and the
 //! sans-IO API of §3.2.

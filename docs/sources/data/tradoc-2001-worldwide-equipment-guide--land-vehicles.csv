@@ -1,0 +1,100 @@
+system,variant,type,country,crew,combat_weight_t,engine,engine_hp,hp_per_t,max_road_speed_kmh,max_cross_country_speed_kmh,swim_speed_kmh,range_km,main_armament,ammo_main,armour_note,pdf_page
+BOV-M,BOV-M,APC (wheeled),Yugoslavia,2,7.0-9.0,148-hp Diesel,148,16.4-21.1,95,,N/A,800,7.62-mm MG M86,"2,000 (est)",6-10 mm; defeats 7.62-mm AP at 300 m,69
+BTR-152,BTR-152,APC (wheeled),Russia,2,9.0,110-hp Gasoline,110,12.2,65,,N/A,650,7.62-mm MG SGMB (12.7-mm MG can be used instead),"1,250",11-15 mm on hull front (no turret),70
+BTR-60,BTR-60PA,APC (wheeled),Russia,2,10.1,2 x 180-hp Gasoline (as printed; see note),,,80,60,10,500,12.7-mm heavy MG DShK,500,7-9 mm hull front (no turret),71
+BTR-60,BTR-60PB,APC (wheeled),Russia,2,10.3,2 x 90-hp Gasoline,180,17.5,80,,10,500,14.5-mm heavy MG KPVT,500,Turret front 7 mm,73
+BTR-80,BTR-80,APC (wheeled),Russia,2,13.6,260-hp Diesel,260,19.1,85,60,10,600,14.5-mm heavy MG KPVT,500,Turret front: against 12.7 mm,75
+BTR-80,BTR-80A,APC (wheeled),Russia,2,14.6,260-hp Diesel,260,17.8,90,,10,800,30-mm automatic gun 2A72,300,Turret front: can defeat 12.7 mm,76
+BTR-D,BTR-D,Airborne APC (tracked),Russia,1,6.7,240-hp Diesel,240,35.8,61,35,10,500,2 x 7.62-mm MG PKT (hatch),"2,000","""Antibullet"" (7.62 mm)",77
+M113,M113A1,APC (tracked),USA,2,11.20,215-hp Diesel,215,19.2,64,,5.8,483,.50 cal heavy MG M2HB,"2,000",No turret,78
+MT-LB,MT-LB,Light armoured multi-purpose vehicle (tracked),Russia,2,11.9,290-hp Diesel,290,24.4,61.5 (70 modernized),30 (45 modernized),5-6,500,7.62-mm MG PKT,"2,000",7-14 mm,79
+Pandur,Pandur,APC (wheeled),Austria,3,11.3,210-hp Diesel/265-hp in upgrade,210,18.6,105,,9/11 with amphibious version,650,.50 cal heavy MG M2HB,"1,000","12.7 mm on front 30 deg, 7.62 mm other",80
+V-150,V-150,APC (wheeled),USA,3,9.89,202-hp Diesel,202,20.4,89,,5,643,7.62-mm MG FN-MAG (example),"3,200",Against 7.62-mm ball,82
+VTT-323,VTT-323,APC (tracked),North Korea,3,13.5,260-hp Diesel,260,19.3,80,70-80,10,450,2 x 14.5-mm heavy MG KPVT,"1,000",24 mm,83
+WZ 551,WZ 551,APC (wheeled),China,3,15.3,256-hp Diesel,256,16.7,85,,8,600,25-mm automatic gun,400 (mix est),INA,84
+YW 531,YW 531A/531C,APC (tracked),China,4,12.60,260-hp Diesel/320-hp Diesel,260/320,,42/66,32/40,6.0,500,12.7-mm heavy MG Type 54,"1,120",14 mm front glacis,85
+YW 531H,YW 531H / Type 85,APC (tracked),China,2 / 4,13.6 / 13.8,320-hp Diesel,320,,65 / 60,46,6.0,500,12.7-mm heavy MG Type 54,"1,120",14 mm front glacis,86
+AMX-10P,AMX-10P,IFV (tracked),France,3,14.5,300-hp Diesel,300,20.7,65,,7,600,20-mm automatic cannon M693 F1,760,Against 12.7 mm frontal,87
+BMD-1,BMD-1,Airborne IFV (tracked),Russia,2,13.3 (as printed; see note),240-hp Diesel,240,18.0,65,40-45,7,600,73-mm smoothbore gun 2A28 Grom; AT-3 ATGM,40 gun + 4 ATGM,"23 mm or ""antibullet""",89
+BMD-3,BMD-3,Airborne IFV (tracked),Russia,3,12.9,450-hp Diesel,450,34.9,70,45,10,500,30-mm automatic gun 2A42; AT-4/AT-5 ATGM,860 gun + 6 ATGM (launcher),"""Antibullet"" (7.62 mm)",91
+BMP-1,BMP-1,IFV (tracked),Russia,3,13.3,Diesel (power not stated),,,65,40-45,7,600,73-mm smoothbore gun 2A28 Grom; AT-3 ATGM,40 gun + 5 ATGM,19-23 mm,93
+BMP-1,BMP-1P,IFV (tracked),Russia,3,13.3,300-hp Diesel,300,22.6,65,40-45,7,600,73-mm smoothbore gun 2A28 Grom; AT-4/AT-5 ATGM,40 gun + 4 ATGM,19-23 mm,95
+BMP-2,BMP-2,IFV (tracked),Russia,3,14.3,300-hp Diesel,300,21.0,65,45,7,600,30-mm automatic gun 2A42; AT-4/AT-5 ATGM,500 gun + 5 ATGM,23-33 mm,97
+BMP-3,BMP-3,IFV (tracked),Russia,3,18.70,500-hp Diesel,500,26.7,70,45,10,600,100-mm rifled gun 2A70; 30-mm automatic gun 2A72; AT-10 ATGM,40 x 100-mm + 8 ATGM; 500 x 30-mm,30-35 mm front glacis,99
+Marder 1,Marder 1,IFV (tracked),Germany,4 (3 + 1 squad member),29.2,590-600-hp Diesel,590-600,20.2-20.5,75,65,N/A,520,20-mm automatic cannon Rh202; Milan ATGM,"1,250 + 5 ATGM",Against 20 mm,101
+Marder 1,Marder 1A3,IFV (tracked),Germany,4 (3 + 1 squad member),35.0,590-600-hp Diesel,590-600,16.9-17.1,75,65,N/A,520,20-mm automatic cannon Rh202; Milan ATGM,"1,250 + 5 ATGM",Against 30 mm (1A3),101
+Warrior,Warrior,IFV (tracked),UK,3,24.00,550-hp Diesel,550,22.9,75,60,N/A,660,30-mm automatic cannon RARDEN L21A1,228,Against 14.5-mm,103
+AMX-10RC,AMX-10RC,Armoured recon vehicle (wheeled),France,4,15.8,260-hp Diesel,260,16.5,85,,4.5/7.2 with 2 hydrojets,"1,000",105-mm rifled gun CN-105-F2,38,INA,111
+BRDM-2,BRDM-2,Armoured scout car (wheeled),Russia,4,7.0,140-hp Gasoline,140,20.0,95,,10,750,14.5-mm MG KPVT,500,10 mm,113
+BRM-1K,BRM-1K,Armoured recon command vehicle (tracked),Russia,4 (with addition of a navigator),13.3,300-hp Diesel,300,22.6,65,40-45,7,600,73-mm smoothbore gun 2A28 Grom,20,19-23 mm,114
+BRM-3K,BRM-3K,Combat recon vehicle (tracked),Russia,6,19.6,500-hp Diesel,500,25.5,70,45,10,600,30-mm automatic gun 2A72,500,30-35 mm front glacis,116
+EE-9,EE-9,Armoured recon vehicle (wheeled),Brazil,3,13.4,212-hp Diesel,212,15.8,100,,N/A,880,90-mm gun Engesa EC-90,44,16 mm,117
+Fox,Fox,Armoured recon vehicle (wheeled),UK,3,6.12,190-hp Gasoline,190,31.0,104,,5.23,434,30-mm auto-cannon Rarden L21,99,Resistant to heavy MG (NFI),118
+Shorland S55,S55,"Armoured personnel carrier (wheeled, 4x4)",UK,3,3.6,114-hp Gasoline,114,31.7,105 (Mk 5),,N/A,514,7.62-mm GP MG L7A2,"1,500",11.0 mm; can defeat 7.62-mm ball at 26 m,119
+AMX-13,AMX-13,Light tank,France,3,15.0,250-hp Gasoline,250,16.7,60,,N/A,350,90-mm rifled gun CN-90-F3,34,25 mm at 45 deg impact angle,124
+M41,M41A3,Light tank,USA,4,23.5,500-hp Gasoline,500,21.3,72,48,N/A,161,76-mm rifled gun M32,65,38 mm,125
+M1985,M1985 / PT-85,Light tank,North Korea,3-4,19.0,320-hp Diesel,320,16.8,60,,10,500,85-mm rifled gun; AT-3-type ATGM,47 (est) + 4 ATGM,30 mm (est.),126
+Type 63A,Type 63A Modernized,Light tank (amphibious),China,3,INA,"1,000-hp Diesel (as printed; see note)",1000,,64,28,7,370,105-mm rifled gun,57,Against 35-mm AP round at 300 m,128
+PT-76,PT-76B,Amphibious light tank,Russia,3,14.0,240-hp Diesel,240,17.1,44,,10,260,76-mm rifled gun D-56B,40,20 mm,130
+Scorpion,Scorpion CVR(T),"Combat recon vehicle, tracked",UK,3,8.07,190-hp Gasoline,190,23.5,80,,4/6 with propeller,650,76-mm rifled gun L23A1,40,Against 14.5-mm projectiles,131
+AMX-30,AMX-30,Main battle tank,France,4,36.00,720-hp Diesel multi-fuel,720,20.0,65,,N/A,500-600,105-mm rifled gun CN-105-F1,47,Turret front 81 KE & CE (RHA) / 120 AMX-30B2,132
+Challenger 2,Challenger 2,Main battle tank,UK,4,62.5,"1,200-hp Diesel",1200,19.2,59,45 (est),N/A,450,120-mm rifled gun L30 CHARM,52,"Turret front 500 KE (RHA) at 2,000 m / 800 CE",134
+Chieftain,Chieftain Mk 5,Main battle tank,UK,4,55.00,750-hp Diesel,750,13.6,48,,N/A,400-500,120-mm rifled gun L11A5,64,Turret front 300 (RHA),136
+Leopard 1,Leopard 1A1,Main battle tank,Germany,4,40 (42.4 for 1A1A1 and after),830-hp Diesel multi-fuel,830,20.8,65,,N/A,600,105-mm rifled gun L7A3,60 (later 55),Turret front 250 RHA KE / 230 CE,138
+Leopard 2,Leopard 2,Main battle tank,Germany,4,55.15,"1,500-hp Diesel",1500,27.2,72,45,N/A,550,"120-mm smoothbore gun (printed as ""M256"")",42,"Turret front 700 KE / 1,000 against HEAT",140
+M60,M60A1/M60A3,Main battle tank,USA,4,52.5,750-hp Diesel,750,14.3,48,45,N/A,550,105-mm rifled gun M68,63,"Turret front 325 KE (RHA) at 2,000 m / 325 CE",142
+T-34,T-34/85,Medium tank,Russia,5,32,500-hp Diesel,500,15.6,56,35,N/A,300 (500 with extra tanks),85-mm rifled gun D-5T or ZIS-S-53,55,75-85 mm,144
+T-55,T-55AMV,Main battle tank,Russia,4,40.5,620-690 hp Diesel,620-690,15.3-17.0,50,35,N/A,390 (600 with extra tanks),100-mm rifled gun D-10T2S; AT-10 ATGM,43 (incl. 5 ATGM),"Turret front 200 (base T-55 armour); ERA entry reads ""1st Gen raises to KE/700-900""",146
+T-62,T-62M,Main battle tank,Russia,4,41.5,620-hp Diesel,620,14.9,45,,N/A,450 (650 with extra tanks),115-mm smoothbore gun 2A20; AT-10 ATGM,40 (incl. 5 ATGM),Turret front 230,148
+T-64,T-64B,Main battle tank,Russia,3,40.3,720-hp Diesel,720,17.9,60,,N/A,500 with extra tanks,125-mm smoothbore gun 2A46-2; AT-8 ATGM,37 (incl. 6 ATGM),"Turret front 450 KE (RHA) at 2,000 m / 900 CE; ERA standard on T-64BV",150
+T-72,T-72B,Main battle tank,Russia,3,44.5,840-hp Diesel,840,18.9,60,45,N/A,500 (900 with external tanks),125-mm smoothbore gun 2A46M / D-81TM; AT-11 ATGM,45 (incl. 6 ATGM),Turret front 520 / 950 against HEAT; Kontakt or Kontakt-5 ERA,152
+T-72,T-72M1,Main battle tank,Poland/Czechoslovakia,3,41.5 (without ERA),780-hp Diesel,780,18.8,60,45,N/A,460 (700 with extra tanks),125-mm smoothbore gun 2A46M / D-81TM,44,Turret front 500 / 560 against HEAT; 1st or 2nd gen ERA available,154
+T-80,T-80B,Main battle tank,Russia,3,44.5,"1,000-hp or 1,100-hp gas turbine (multifuel)",1000-1100,22.5-24.7,70,48,N/A,370 (500 with extra tanks),125-mm smoothbore gun 2A46-2; AT-8 ATGM,45 (incl. 6 ATGM),Turret front: defeat 120-mm rounds (triple layer); 1st gen ERA available (T-80BV),156
+T-80,T-80U,Main battle tank,Russia,3,46.0,"1,250-hp gas turbine (multi-fuel); diesel on T-80UD",1250,27.2,70,48,N/A,335 (600 with extra tanks),125-mm smoothbore gun 2A46M-1; AT-11 ATGM,45 (incl. 6 ATGM),Turret front: against 120-mm ammunition; Kontakt-5 ERA,158
+T-90,T-90,Main battle tank,Russia,3,46.5,"1,000-hp Diesel (original 840 hp; options 950, 1,000, 1,100 hp)",1000,21.5,60,,N/A,500 (650 with extra tanks),125-mm smoothbore gun 2A46M-1 or -4; AT-11 ATGM,43 (incl. 6 ATGM),"Turret front 780-810 KE, 1,020-1,220 CE; Kontakt-5 ERA; Shtora-1",160
+Type 59,Type 59-II,Main battle tank,China,4,36.5-37.0,520-hp Diesel,520,14.1-14.2,50,25,N/A,440 (600 with external tanks),105-mm rifled gun (L7-type),34,Turret front 203,162
+Type 85,Type 85-IIM,Main battle tank,China,3,41.0,730-hp Diesel,730,17.8,57,45,N/A,700 (900 with external tanks),125-mm smoothbore gun (printed as 2A46M / D-81TM),42,INA,164
+M36,M36,Self-propelled AT gun,USA,5,27.7,500-hp Gasoline,500,18.1,42,,N/A,177,90-mm rifled gun M3,47,Turret front 76,170
+M36,M36B1,Self-propelled AT gun,USA,5,30.8,500-hp Gasoline,500,16.2,42,,N/A,177,90-mm rifled gun M3,47,Turret front 76,170
+M36,M36B2,Self-propelled AT gun,USA,5,29.9,375-hp Diesel,375,12.5,40,,N/A,177,90-mm rifled gun M3,47,Turret front 76,170
+9P148,9P148 (BRDM-2 with AT-4/AT-5),ATGM launcher vehicle (wheeled),Russia,2,7.0,140-hp Gasoline,140,20.0,100,,10,750,AT-5/AT-4 ATGM launcher (9P135M),"15 AT-5, or 10 AT-4 + 10 AT-5 mixed",10 mm,174
+9P149,9P149 (MT-LB with AT-6/AT-9),ATGM launcher vehicle (tracked),Russia,2,12.3,290-hp Diesel,290,23.6,65,,3-4,500,AT-6/AT-9 ATGM launcher,12,7-14 mm,176
+AMX-10 HOT,AMX-10 HOT,ATGM launcher vehicle (tracked),France,4-5,14.1,300-hp Diesel,300,21.3,65,,7 (with optional water jets),600,HOT ATGM launcher,18,12.7-mm frontal (distance NFI),178
+M901,M901 ITOW,ATGM launcher vehicle (tracked),USA,4-5,11.79,212-hp Diesel,212,18.0,64,,5.8,483,TOW ATGM launcher,12,INA,180
+1V13,1V13,Artillery command and recon vehicle (tracked),Russia,6,15.7,"YaMZ-238, 240 hp diesel",240,15.3,60,26,4.5,500,12.7-mm MG DShK,500,20 mm,199
+1V14/1V15,1V14/1V15,Artillery command and recon vehicle (tracked),Russia,6 (1V14) / 7 (1V15),15.7,"YaMZ-238, 240 hp diesel",240,15.3,60,26,4.5,500,7.62-mm MG,"2,000",20 mm,200
+1V16,1V16,Artillery command and recon vehicle (tracked),Russia,7,15.7,"YaMZ-238, 240 hp diesel",240,15.3,60,26,4.5,500,12.7-mm MG DShK,500,20 mm,201
+1V18/1V19,1V18/1V19,"Artillery command and observation vehicle (wheeled, BTR-60 based)",Russia,6,10.1,2 x GAZ-49B 90 hp (180 hp total),180,17.8,80,60,10,500,,,INA,202
+1V110,1V110,Battery senior officer vehicle (truck),Russia,5,3.6,"ZMZ-66, 115 hp V-8 gasoline",115,31.9,87,35,,875,,,,203
+1V111,1V111,Artillery command vehicle (truck),Russia,7,6.7,"ZIL-131, 150 hp V-8 gasoline",150,22.4,80,35,,850,,,,204
+1V119,1V119,Artillery command and recon vehicle (BTR-D based),Russia,6,6.7,"Type 5D20, 240 hp V-6 diesel",240,35.8,61,35,10,500,,,INA,205
+PRP-3,PRP-3/PRP-4M,Artillery mobile recon vehicle (tracked),Russia,5,13.2,293-hp Diesel,293,22.2,60,35,7,600,7.62-mm MG PKT,"2,000","Turret 23 mm, hull 19 mm",207
+2S1,2S1,SP howitzer (tracked),Russia,4 (section of 6),15.7,"V-8, 300 hp, Diesel",300,19.1,60,30,4.5,500,"122-mm howitzer 2A31 (Frag-HE OF-81 to 15,300 m; RAP 21,900 m; HEAT-FS direct fire)",45,"Turret 20 mm, turret top 10 mm, hull 15 mm",225
+2S3,2S3M,SP gun-howitzer (tracked),Russia,4,27.5,520-hp V-59 V-12 multi-fuel diesel,520,18.9,60,25,N/A,450,"152-mm howitzer 2A33 (OF-32 to 17,400 m; OF-96 to 24,400 m)",46,"Turret 20 mm, turret top 15 mm",226
+2S5,2S5,SP gun (tracked),Russia,5 (section of 7),28.2,520-hp V-59 V-12 multi-fuel diesel,520,18.4,63,25,4.5 (as printed),500,"152-mm gun 2A37 (OF-39 to 28,400 m; OF-86 to 30,500 m)",30,"Turret top 15 mm, hull 15 mm",227
+2S19,2S19,SP howitzer (tracked),Russia,5 (section of 7),42,840-hp V84-A diesel,840,20.0,60,25,N/A,500,"152-mm howitzer 2A64 (OF-72 to 24,700 m; OF-91 base-bleed to 29,000 m)",50,"Turret 15 mm, turret top 15 mm, hull 15 mm",228
+Type 83,Type 83,SP gun-howitzer (tracked),China,5,30.0,"Type 12150L V-12, 520-hp diesel",520,17.3,55,35,N/A,450,"152-mm Type 66 gun-howitzer (17,230 m; Type 83 round 30,370 m)",30,INA,229
+G6,G6,SP howitzer (wheeled 6x6),South Africa,6,48,525-hp air-cooled diesel,525,10.9,85,30,N/A,700,"155-mm 45-cal howitzer (30,000 m; base-bleed 39,000 m)",45,See NOTES on sheet,231
+AU-F1,AU-F1,"SP howitzer (tracked, AMX-30 chassis)",France,4,42.0,"Hispano-Suiza HS110, 720-hp multi-fuel",720,17.1,60,40,N/A,450,"155-mm 40-cal howitzer (23,000 m; RAP 31,500 m)",42,See NOTES on sheet,233
+2S12,2S12-RT,SP mortar (GAZ-66 truck),Russia,5,3.64,"ZMZ-66, 115 hp V-8 gasoline",115,31.6,87,35,,600,120-mm mortar 2B11,INA,None,251
+2S23,2S23,SP combination gun (BTR-80 chassis),Russia,4,14.5,260 hp V-8 diesel,260,17.9,80,60,10,600,"120-mm gun-mortar 2A60 (8,850 m; RAP 13,000 m)",30,Against 12.7 mm,252
+BM-21,BM-21,Multiple rocket launcher (truck),Russia,5,13.7,"ZIL-375, 180 hp V-8 gasoline",180,13.1,75,35,N/A,450,"40 x 122-mm rockets (9M22U to 20,380 m)",40,,235
+M77,M77,Multiple rocket launcher (truck),Yugoslavia,5,22,"Model 2F/002A, 200 hp",200,9.1,80,35,N/A,600,"32 x 128-mm rockets (20,600 m)",32,,239
+9P140,9P140,Multiple rocket launcher (truck),Russia,4,20.0,2 x 177 hp gasoline engines,354,17.7,65,,N/A,500,"16 x 220-mm rockets (35,000 m)",16,,241
+Fadjr-3,Fadjr-3,Multiple rocket launcher (truck),Iran,5,15.0,280 hp V-8 diesel,280,18.7,60,25 (est),N/A,INA,"12 x 240-mm rockets (43,000 m)",12,,243
+ASTROS II,ASTROS II,Multiple rocket launcher (truck),Brazil,3,20.0,280 hp turbocharged diesel,280,14.0,70,40,N/A,INA,"127/180/300-mm rockets (SS-30 30,000 m; SS-40 35,000 m; SS-60 60,000 m; SS-80 90,000 m)","32 x 127, 16 x 180 or 4 x 300",,245
+WM-80,WM-80,Multiple rocket launcher (truck),China,5,34,525 hp air-cooled diesel,525,15.4,70,,N/A,400,"8 x 273-mm rockets (34,000-80,000 m)",8,None,247
+9A52-2,9A52-2,Multiple rocket launcher (truck),Russia,4 (7 with 9K58 complex),43.7,518 hp V-12 diesel,518,11.9,60,35,N/A,850,"12 x 300-mm rockets (9M55F/9M55K, 20,000-90,000 m)",12,,248
+TOS-1,TOS-1,Heavy flamethrower system (T-72 chassis),Russia,3 in vehicle,46.0,780-hp Diesel,780,17.0,60,,,550 without external fuel tanks,"220-mm thermobaric/incendiary rockets (3,500 m original / 6,000 m current launcher)",30 (original) / 24 (current),500/560 against HEAT,259
+Gepard,Gepard,SP AA gun (Leopard 1 chassis),Germany/Switzerland,3,46,830-hp Diesel,830,18.0,65,,,550,2 x 35-mm cannon KDA,680,40 mm,270
+ZSU-23-4,ZSU-23-4,SP AA gun (tracked),Russia,4,20.5,V6R-1 diesel (power not stated),,,50,,,450,4 x 23-mm AA gun 2A7/2A7M,"2,000",,271
+2S6M,2S6M,SP AA gun/missile system (tracked),Russia,4,34,V-12 turbo diesel (power not stated),,,65,,INA,500,2 x 30-mm twin-barrel cannon 2A38M; 8 SA-19 missiles,"1,904 + 8 missiles",,272
+ZSU-57-2,ZSU-57-2,SP AA gun (T-54 based chassis),Russia,6,28.0,520 hp,520,18.6,50,,,400,Twin 57-mm automatic cannon,300,13 mm front hull and turret,273
+SA-6,SA-6 TEL,SAM launcher (modified PT-76 chassis),Russia,3,14,V-6R 6-cyl diesel (power not stated),,,45,,N/A,250,3 missiles on launch rails,3,,282
+SA-8b,SA-8b TELAR,SAM launcher (BAZ-5937 6x6 amphibious),Russia,3,9,D20K300 diesel (power not stated),,,80,,8,500,6 missiles in canisters,6,,283
+SA-10b,SA-10b TEL,SAM launcher,Russia,6,,D12A-525 V-12 water cooled,,,60,,,650,SA-10b missiles,,,285
+SA-11,SA-11 TELAR,SAM launcher (GM-569 tracked),Russia,4,32.34,700-hp diesel,700,21.6,65 (30 with launchers ready),,,500,4 missiles on TELAR,4,,287
+SA-12,SA-12a/SA-12b,SAM launcher (tracked),Russia,4,48,525-hp Diesel,525,10.9,50,,,450,SA-12a/SA-12b missiles,,,288
+SA-13b,SA-13b TELAR,SAM launcher (MT-LB chassis),Russia,3,12.3,V-8 diesel (power not stated),,,61.5,,6,500,9M333 missiles,4 ready + 4 reload,"7 mm (MT-LB hull, per NOTES)",289
+SA-15b,SA-15b TLAR,SAM launcher (GM-355 tracked),Russia,3,34,V-12 diesel (power not stated),,,65,,,500,8 ready missiles,8,,290
+BMP-1KSh,BMP-1KSh,Command and staff vehicle (tracked),Russia,3,13.0,300-hp Diesel,300,23.1,65,40-45,7,550,Stowed 7.62-mm MG,"2,000",19-23 mm,378

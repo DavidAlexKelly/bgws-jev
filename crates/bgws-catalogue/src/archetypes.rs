@@ -1,4 +1,4 @@
-//! Archetypes (MULTI_DOMAIN_PLAN.md W2; ports `behaviour/archetypes.ts` and
+//! Archetypes (multi-domain-plan.md W2; ports `behaviour/archetypes.ts` and
 //! `model/archetypes.ts`): from what a platform is to the generic record it
 //! inherits from, and the behaviour template a unit uses when nothing else
 //! is assigned. The lists below are every archetype and force-list platform

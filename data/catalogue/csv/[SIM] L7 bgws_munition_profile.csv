@@ -1,34 +1,34 @@
 ﻿munition_id,weapon_id,name,kind,is_kinetic,is_shaped_charge,top_attack,defeats_era_ke,pen_mm_0m,pen_mm_1000m,pen_mm_2000m,pen_mm_3000m,lethal_radius_m,he_fill_kg,source_confidence,source_ref
-m_l27a1,gun_120_l30,L27A1 CHARM 3 APFSDS,apfsds,true,false,false,false,676.0,657.0,620.0,583.0,0.0,0.0,C,open estimates 600-650mm; DU long rod
+m_l27a1,gun_120_l30,L27A1 CHARM 3 APFSDS,apfsds,true,false,false,false,719.0,669.0,620.0,573.0,0.0,0.0,C,"open estimates 600-650mm; DU long rod; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_l31_hesh,gun_120_l30,L31 HESH,hesh,false,true,false,false,150.0,150.0,150.0,150.0,25.0,4.1,B,HESH ~150mm equivalent vs monolithic; ineffective vs spaced/composite
-m_dm73,gun_120_l55a1,DM73 APFSDS,apfsds,true,false,false,true,785.0,763.0,720.0,677.0,0.0,0.0,C,Rheinmetall: ~8% over DM63 (~700 @2km)
+m_dm73,gun_120_l55a1,DM73 APFSDS,apfsds,true,false,false,true,831.0,775.0,720.0,667.0,0.0,0.0,C,"Rheinmetall: ~8% over DM63 (~700 @2km); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_dm11,gun_120_l55a1,DM11 HE programmable,he,false,false,false,false,,,,,25.0,2.2,B,Rheinmetall datasheet
-m_m829a3,gun_120_l44,M829A3 APFSDS,apfsds,true,false,false,true,818.0,795.0,750.0,705.0,0.0,0.0,C,open estimates 700-800mm
-m_m829a4,gun_120_l44,M829A4 APFSDS,apfsds,true,false,false,true,872.0,848.0,800.0,752.0,0.0,0.0,C,estimate; classified
+m_m829a3,gun_120_l44,M829A3 APFSDS,apfsds,true,false,false,true,877.0,812.0,750.0,691.0,0.0,0.0,C,"open estimates 700-800mm; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_m829a4,gun_120_l44,M829A4 APFSDS,apfsds,true,false,false,true,928.0,863.0,800.0,740.0,0.0,0.0,C,"estimate; classified; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_m830a1,gun_120_l44,M830A1 HEAT-MP-T,heat,false,true,false,false,600.0,600.0,600.0,600.0,25.0,2.3,B,published ~600mm
 m_m1147,gun_120_l44,M1147 AMP HE,he,false,false,false,false,,,,,25.0,2.6,B,multipurpose programmable
-m_3bm42,gun_125_2a46,3BM42 Mango APFSDS,apfsds,true,false,false,false,545.0,530.0,500.0,470.0,0.0,0.0,B,published ~500mm @2km
-m_3bm46,gun_125_2a46,3BM46 Svinets APFSDS,apfsds,true,false,false,false,708.0,689.0,650.0,611.0,0.0,0.0,B,published ~650mm @2km (DU)
-m_3bm60,gun_125_2a46,3BM60 Svinets-2 APFSDS,apfsds,true,false,false,true,763.0,742.0,700.0,658.0,0.0,0.0,C,estimate 700-750mm; T-90M/T-72B3M
-m_3bm22,gun_125_2a46,3BM22 Zakolka APFSDS,apfsds,true,false,false,false,469.0,456.0,430.0,404.0,0.0,0.0,B,export/legacy stock
+m_3bm42,gun_125_2a46,3BM42 Mango APFSDS,apfsds,true,false,false,false,578.0,538.0,500.0,463.0,0.0,0.0,B,"published ~500mm @2km; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_3bm46,gun_125_2a46,3BM46 Svinets APFSDS,apfsds,true,false,false,false,747.0,698.0,650.0,604.0,0.0,0.0,B,"published ~650mm @2km (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_3bm60,gun_125_2a46,3BM60 Svinets-2 APFSDS,apfsds,true,false,false,true,812.0,755.0,700.0,648.0,0.0,0.0,C,"estimate 700-750mm; T-90M/T-72B3M; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_3bm22,gun_125_2a46,3BM22 Zakolka APFSDS,apfsds,true,false,false,false,498.0,463.0,430.0,398.0,0.0,0.0,B,"export/legacy stock; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_3bk29,gun_125_2a46,3BK29 tandem HEAT,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,20.0,1.6,B,published 750mm behind ERA
 m_3of26,gun_125_2a46,3OF26 HE-Frag,hefrag,false,false,false,false,,,,,25.0,3.4,B,fill 3.4kg
 m_9m119,at_kobra,9M119M Refleks-M tandem,heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,15.0,1.4,B,published 900mm behind ERA
-m_vacuum1,gun_125_2a82,3BM70 Vacuum-1 APFSDS,apfsds,true,false,false,true,981.0,954.0,900.0,846.0,0.0,0.0,D,speculative; 900mm claimed
-m_3bm6,gun_115_u5ts,3BM6 APFSDS,apfsds,true,false,false,false,309.0,300.0,282.0,264.0,0.0,0.0,B,published ~300mm @1km
-m_3bm28,gun_115_u5ts,3BM28 APFSDS,apfsds,true,false,false,false,412.0,400.0,376.0,352.0,0.0,0.0,B,published ~400mm @1km
+m_vacuum1,gun_125_2a82,3BM70 Vacuum-1 APFSDS,apfsds,true,false,false,true,1035.0,967.0,900.0,835.0,0.0,0.0,D,"speculative; 900mm claimed; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_3bm6,gun_115_u5ts,3BM6 APFSDS,apfsds,true,false,false,false,324.0,300.0,277.0,255.0,0.0,0.0,B,"published ~300mm @1km; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_3bm28,gun_115_u5ts,3BM28 APFSDS,apfsds,true,false,false,false,431.0,400.0,370.0,342.0,0.0,0.0,B,"published ~400mm @1km; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_3bk4,gun_115_u5ts,3BK4M HEAT,heat,false,true,false,false,440.0,440.0,440.0,440.0,18.0,1.5,B,published reference tables / manufacturer data (see README sources)
 m_3of18,gun_115_u5ts,3OF18 HE-Frag,hefrag,false,false,false,false,,,,,22.0,2.8,B,published reference tables / manufacturer data (see README sources)
-m_m900,gun_105_m35,M900 APFSDS,apfsds,true,false,false,false,567.0,551.0,520.0,489.0,0.0,0.0,C,estimates 500-550mm (DU)
-m_m833,gun_105_m68,M833 APFSDS,apfsds,true,false,false,false,458.0,445.0,420.0,395.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m900,gun_105_m35,M900 APFSDS,apfsds,true,false,false,false,617.0,567.0,520.0,476.0,0.0,0.0,C,"estimates 500-550mm (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_m833,gun_105_m68,M833 APFSDS,apfsds,true,false,false,false,495.0,456.0,420.0,385.0,0.0,0.0,B,"published reference tables / manufacturer data (see README sources); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_m456,gun_105_m68,M456A2 HEAT,heat,false,true,false,false,430.0,430.0,430.0,430.0,18.0,1.0,B,published reference tables / manufacturer data (see README sources)
 m_m393,gun_105_m68,M393A3 HEP/HESH,hesh,false,true,false,false,120.0,120.0,120.0,120.0,22.0,3.0,B,published reference tables / manufacturer data (see README sources)
 m_105_hesh,how_105_l118,L118 HESH (direct fire),hesh,false,true,false,false,100.0,100.0,100.0,100.0,20.0,2.5,B,published reference tables / manufacturer data (see README sources)
 m_105_he,how_105_l118,105mm HE L31 / M1,he,false,false,false,false,,,,,30.0,2.1,B,published reference tables / manufacturer data (see README sources)
-m_3bm25,gun_100_d10,3BM25 APFSDS,apfsds,true,false,false,false,288.0,280.0,263.0,246.0,0.0,0.0,B,D-10T; also 3BM8 APDS ~250
+m_3bm25,gun_100_d10,3BM25 APFSDS,apfsds,true,false,false,false,306.0,280.0,255.0,233.0,0.0,0.0,B,"D-10T; also 3BM8 APDS ~250; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_3bk17,gun_100_d10,3BK17M HEAT,heat,false,true,false,false,390.0,390.0,390.0,390.0,16.0,1.0,B,published reference tables / manufacturer data (see README sources)
 m_of412,gun_100_d10,OF-412 HE-Frag,hefrag,false,false,false,false,,,,,20.0,1.5,B,published reference tables / manufacturer data (see README sources)
-m_3bm24,gun_100_mt12,3BM24 APFSDS (MT-12),apfsds,true,false,false,false,258.0,250.0,235.0,220.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_3bm24,gun_100_mt12,3BM24 APFSDS (MT-12),apfsds,true,false,false,false,273.0,250.0,229.0,209.0,0.0,0.0,B,"published reference tables / manufacturer data (see README sources); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_3bk16,gun_100_mt12,3BK16 HEAT (MT-12),heat,false,true,false,false,400.0,400.0,400.0,400.0,16.0,1.0,B,published reference tables / manufacturer data (see README sources)
 m_9m117,at_kastet,9M117M Kastet tandem,heat_tandem,false,true,false,false,600.0,600.0,600.0,600.0,12.0,1.0,B,published reference tables / manufacturer data (see README sources)
 m_br412,gun_100_ks19,BR-412B AP,ap,true,false,false,false,183.0,170.0,144.0,119.0,5.0,0.05,B,published reference tables / manufacturer data (see README sources)
@@ -37,11 +37,11 @@ m_9m117b,at_bastion,9M117M1 Arkan tandem,heat_tandem,false,true,false,false,750.
 m_pg15v,gun_73_2a28,PG-15V HEAT,heat,false,true,false,false,300.0,300.0,300.0,300.0,10.0,0.6,B,PG-9 ~400
 m_og15v,gun_73_2a28,OG-15V HE-Frag,hefrag,false,false,false,false,,,,,12.0,0.7,B,published reference tables / manufacturer data (see README sources)
 m_90_heat,gun_90_ckm,Cockerill 90mm HEAT M620,heat,false,true,false,false,350.0,350.0,350.0,350.0,15.0,0.8,B,published reference tables / manufacturer data (see README sources)
-m_ct40_ap,ac_40_ct40,CT40 APFSDS-T,apfsds,true,false,false,false,148.0,144.0,136.0,127.0,0.0,0.0,A,KNDS/CTAI: 140mm RHA @1500m
+m_ct40_ap,ac_40_ct40,CT40 APFSDS-T,apfsds,true,false,false,false,172.0,150.0,130.0,113.0,0.0,0.0,A,"KNDS/CTAI: 140mm RHA @1500m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_ct40_gpr,ac_40_ct40,CT40 GPR-PD-T / A3B airburst,airburst,false,false,false,false,,,,,8.0,0.115,A,"KNDS: 15mm RHA @1000m, 210mm concrete"
 m_l14,ac_30_rarden,L14A2 APDS-T,apds,true,false,false,false,52.0,50.0,45.0,40.0,0.0,0.0,B,~40mm @1500m
 m_l13,ac_30_rarden,L13A1 HE-I,he,false,false,false,false,,,,,3.0,0.03,B,published reference tables / manufacturer data (see README sources)
-m_mk30_ap,ac_30_mk30,PMC308 APFSDS-T (30x173),apfsds,true,false,false,false,103.0,100.0,94.0,88.0,0.0,0.0,B,Rheinmetall: >100mm @1000m
+m_mk30_ap,ac_30_mk30,PMC287/PMC359 APFSDS-T (30x173),apfsds,true,false,false,false,124.0,106.0,90.0,75.0,0.0,0.0,B,"Rheinmetall D129e0721 / B305e0526: 1,405 m/s; 53 mm at 60 deg (NATO) at 1,000 m = 106 mm along the line of flight; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_mk30_abm,ac_30_mk30,KETF/ABM airburst,airburst,false,false,false,false,,,,,6.0,0.05,B,published reference tables / manufacturer data (see README sources)
 m_3ubr8,ac_30_2a42,3UBR8 APDS-T,apds,true,false,false,false,58.0,55.0,50.0,44.0,0.0,0.0,B,~25mm @1500m/60deg
 m_3ubr6,ac_30_2a42,3UBR6 API-T,api,true,false,false,false,22.0,20.0,11.0,5.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
@@ -50,7 +50,7 @@ m_2a72_apds,ac_30_2a72,3UBR8 APDS-T (2A72),apds,true,false,false,false,52.0,50.0
 m_2a72_he,ac_30_2a72,3UOF8 HE-I (2A72),he,false,false,false,false,,,,,3.0,0.05,B,published reference tables / manufacturer data (see README sources)
 m_2a38_api,ac_30_2a38,3UBR6 API-T (2A38),api,true,false,false,false,28.0,25.0,14.0,6.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
 m_2a38_he,ac_30_2a38,3UOF8 HE-I (2A38),he,false,false,false,false,,,,,3.0,0.05,B,published reference tables / manufacturer data (see README sources)
-m_m919,ac_25_m242,M919 APFSDS-T,apfsds,true,false,false,false,72.0,70.0,66.0,62.0,0.0,0.0,B,>60mm @1000m
+m_m919,ac_25_m242,M919 APFSDS-T,apfsds,true,false,false,false,83.0,70.0,58.0,48.0,0.0,0.0,B,">60mm @1000m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_m791,ac_25_m242,M791 APDS-T,apds,true,false,false,false,37.0,35.0,32.0,28.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
 m_m792,ac_25_m242,M792 HE-I-T,he,false,false,false,false,,,,,2.5,0.03,B,published reference tables / manufacturer data (see README sources)
 m_bzt23,ac_23_azp23,BZT 23mm API-T,api,true,false,false,false,25.0,19.0,8.0,6.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
@@ -149,7 +149,7 @@ m_35_apds,ac_35_kda,FAPDS-T 35mm,apds,true,false,false,false,84.0,80.0,72.0,64.0
 m_35_he,ac_35_kda,HEI-T 35mm,he,false,false,false,false,,,,,4.0,0.1,B,published reference tables / manufacturer data (see README sources)
 m_m789,ac_30_m230,M789 HEDP 30x113,heat,false,true,false,false,50.0,50.0,50.0,50.0,4.0,0.027,B,published reference tables / manufacturer data (see README sources)
 m_agm114,at_hellfire,AGM-114K/R tandem HEAT,heat_tandem,false,true,false,false,1000.0,1000.0,1000.0,1000.0,15.0,8.0,B,published reference tables / manufacturer data (see README sources)
-m_35_apfsds,ac_35_wotan,35mm PMC308 APFSDS-T,apfsds,true,false,false,true,164.0,159.0,150.0,141.0,0.0,0.0,B,Rheinmetall: ~140-160mm RHA @1000m
+m_35_apfsds,ac_35_wotan,35mm PMD343 APFSDS-T,apfsds,true,false,false,true,184.0,159.0,136.0,116.0,0.0,0.0,D,"Rheinmetall D251e0721: 1,400 m/s; Rheinmetall publishes no penetration, 159 mm at 1 km is an unsourced estimate; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
 m_35_abm,ac_35_wotan,35mm AHEAD/ABM,airburst,false,false,false,false,,,,,5.0,0.06,B,Rheinmetall AHEAD datasheet
 m_20_dm63,ac_20_rh202,20mm DM63 APDS-T,apds,true,false,false,false,47.0,45.0,40.0,36.0,0.0,0.0,B,Rh 202 published: ~45mm/30deg @1000m
 m_20_he_rh,ac_20_rh202,20mm DM51 HEI,he,false,false,false,false,,,,,2.0,0.02,B,Rheinmetall

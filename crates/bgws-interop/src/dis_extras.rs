@@ -1,4 +1,4 @@
-//! DIS for phase 4 (docs/design/INTEROP_PLAN.md §7): Transmitter, Signal,
+//! DIS for phase 4 (docs/design/interop-plan.md §7): Transmitter, Signal,
 //! Electromagnetic Emission, Aggregate State and Minefield State PDUs from
 //! [`crate::extras`], and Transmitter and Electromagnetic Emission PDUs in.
 //!

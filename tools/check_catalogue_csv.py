@@ -80,7 +80,7 @@ check((sc.pen_mm_0m == sc.pen_mm_2000m).all(), "shaped charges: penetration does
 print("Signs of blanket calculations")
 ke = M[M.kind == "apfsds"].dropna(subset=["pen_mm_0m", "pen_mm_2000m"])
 r2 = (ke.pen_mm_2000m / ke.pen_mm_0m).round(2)
-note(f"APFSDS 2 km / muzzle penetration ratios: {sorted(r2.unique().tolist())} over {len(ke)} rounds (one curve for 30 mm to 125 mm)")
+note(f"APFSDS 2 km / muzzle penetration ratios: {sorted(r2.unique().tolist())} over {len(ke)} rounds" + (" (one curve for every calibre: a blanket calculation)" if r2.nunique() == 1 else " (per round: tools/penetration_model.py)"))
 land = P[P.domain == "land"]
 shared = 0
 total = 0

@@ -1,4 +1,4 @@
-//! Comms, C2, EW, PNT and drones in real games (RUST_ENGINE.md §8.5, §8.7,
+//! Comms, C2, EW, PNT and drones in real games (rust-engine.md §8.5, §8.7,
 //! §8.12, §18 phases 4 and 5): the M3 battalion attack and the M4 drone
 //! line play; detect-to-strike [P2], FPV effectiveness [P9], precision
 //! under jamming [P15] and kill-zone depth [P8] are measured from games;

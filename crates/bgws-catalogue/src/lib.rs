@@ -1,4 +1,4 @@
-//! Platform records (RUST_ENGINE.md §5.1, §14.1, §19 "port and extend
+//! Platform records (rust-engine.md §5.1, §14.1, §19 "port and extend
 //! realtime/catalogue/"): movers, bodies, signatures, sensors, weapon mounts
 //! and munitions, radios, emitters, stores, carried loads and crew defaults;
 //! class defaults so a record can be written with a few numbers; loading

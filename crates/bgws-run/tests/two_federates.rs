@@ -1,5 +1,5 @@
 //! Two of our simulations as HLA federates through the Federate Protocol and
-//! the RPR FOM (docs/design/INTEROP_PLAN.md phase 3), on the mock RTI: one
+//! the RPR FOM (docs/design/interop-plan.md phase 3), on the mock RTI: one
 //! plays blue, the other red, each owning its side.
 //!
 //! - Time-managed: they fight in lock step; each judges damage to its own,

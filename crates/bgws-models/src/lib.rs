@@ -1,4 +1,4 @@
-//! Physical and human models for land combat (RUST_ENGINE.md §8.1 ground,
+//! Physical and human models for land combat (rust-engine.md §8.1 ground,
 //! §8.2 sensing, §8.3 signatures, §8.8 weapons and terminal effects, §8.9
 //! engineers, §8.10 people).
 //!

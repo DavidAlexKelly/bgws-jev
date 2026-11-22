@@ -1776,7 +1776,7 @@ pub(crate) fn fired_upon(s: &mut Sim, te: Entity, by: EntityId) {
     s.ctx.triggers.push(Trigger { entity: tid, point: if located { "D2" } else { "D3" }, about: Some(by) });
 }
 
-/// A detonation another simulation reports (docs/design/INTEROP_PLAN.md
+/// A detonation another simulation reports (docs/design/interop-plan.md
 /// §3.2): what it does to our entities is ours to judge, with our models.
 /// - An impact on one of ours: each round strikes it, through a random
 ///   aspect (front, side, rear; the roof for top attack), against its armour

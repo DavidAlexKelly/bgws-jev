@@ -1,4 +1,4 @@
-//! The rules decider (RUST_ENGINE.md §10.2: "the batch runner uses the rules
+//! The rules decider (rust-engine.md §10.2: "the batch runner uses the rules
 //! decider by default so overnight runs cost nothing") and the plain fallback
 //! decider. Both answer at once, deterministically, and cost nothing.
 

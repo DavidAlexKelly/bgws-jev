@@ -1,4 +1,4 @@
-//! Entities owned by another simulation (docs/design/INTEROP_PLAN.md §3.2):
+//! Entities owned by another simulation (docs/design/interop-plan.md §3.2):
 //! they join on their first state, stand on our ground, move only by dead
 //! reckoning from their owner's states, are fired at but never damaged,
 //! moved or decided for here, count in no side's strength, and go when

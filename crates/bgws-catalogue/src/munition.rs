@@ -1,4 +1,4 @@
-//! Munitions (RUST_ENGINE.md §8.8, §14.1): what a mount fires. Ported from
+//! Munitions (rust-engine.md §8.8, §14.1): what a mount fires. Ported from
 //! the TS `WeaponSpec` (the flight, guidance and kill half of it; the mount
 //! half lives on `Mount`) and extended with a penetration-versus-range table,
 //! a Carleton damage function for area effects, the seeker, warhead mass and

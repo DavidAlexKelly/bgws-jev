@@ -1,4 +1,4 @@
-//! Scenario version 4 (RUST_ENGINE.md §14.3): "the current scenario JSON
+//! Scenario version 4 (rust-engine.md §14.3): "the current scenario JSON
 //! (forces, scope, world setup, templates, victory, events) with additions
 //! for the new physics (emitter settings, weather source, theatre pack)".
 //!
@@ -687,7 +687,7 @@ pub struct ScenarioV4 {
 }
 
 /// A game's identity on a DIS exercise or HLA federation
-/// (docs/design/INTEROP_PLAN.md).
+/// (docs/design/interop-plan.md).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InteropSpec {

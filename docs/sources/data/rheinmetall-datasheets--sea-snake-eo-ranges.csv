@@ -1,0 +1,4 @@
+sensor,band,fov_narrow_deg,fov_wide_deg,detection_m,recognition_m,identification_m,conditions,source_file,page
+Sea Snake 30 daylight camera,350-1100 nm,1.35,32.81,18000,9000,5000,visibility 23 km (values are minima),raw/weapons/rheinmetall-2025-sea-snake-30-naval-rcws.pdf,4
+Sea Snake 30 cooled IR,MWIR 3.6-4.15 um,1.40,6.60,18000,9000,5500,STANAG 4347 sigma=0.2 (values are minima),raw/weapons/rheinmetall-2025-sea-snake-30-naval-rcws.pdf,4
+Sea Snake 30 laser rangefinder,1550 nm,,,6000,,,2.3 x 2.3 m target; standard day; CAVOK,raw/weapons/rheinmetall-2025-sea-snake-30-naval-rcws.pdf,4

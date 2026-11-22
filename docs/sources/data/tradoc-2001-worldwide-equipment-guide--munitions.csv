@@ -1,0 +1,123 @@
+weapon,round,type,muzzle_velocity_m_s,penetration_mm,penetration_range_m,penetration_basis,max_effective_range_m,pdf_page
+73-mm recoilless gun SPG-9,HEAT (name not given),HEAT,435,400,,"HEAT any range (sheet heading says ""@ 1,000 m"")",1000,47
+84-mm recoilless rifle Carl Gustaf M2,FFV 751,Tandem HEAT,,500+,,"HEAT, not range-dependent",500,48
+84-mm recoilless rifle Carl Gustaf M2,FFV 502,HEDP,230,150+,,"HEAT, not range-dependent",500 (stationary target),48
+84-mm recoilless rifle Carl Gustaf M2,FFV 551,HEAT,255,400,,"HEAT, not range-dependent",700,48
+90-mm recoilless rifle M67,M371E1,HEAT,213,350,,"HEAT, not range-dependent",420,49
+40-mm ATGL RPG-7V,PG-7V (85-mm),HEAT,,330,,"HEAT, not range-dependent",500,51
+40-mm ATGL RPG-7V,PG-7VM (70.5-mm),HEAT (type INA on sheet),140,330,,"HEAT, not range-dependent",500,51
+40-mm ATGL RPG-7V,PG-7VL (93-mm),HEAT (type INA on sheet),112,600,,"HEAT, not range-dependent",300,51
+40-mm ATGL RPG-7V,PG-7VR (105-mm),Tandem HEAT,,750+,,"HEAT; ""all armor including reactive armor""",200,52
+60-mm ATGL Panzerfaust-3,110-mm HEAT (name INA),HEAT,170,700+,,"HEAT, not range-dependent",500 stationary / 300 moving,53
+105-mm ATGL RPG-29,PG-29V,Tandem HEAT,,750+,,"HEAT, not range-dependent",500,54
+105-mm ATGL RPG-29,PG-29V,Tandem HEAT,,650,,"HEAT, behind ERA",500,54
+67-mm disposable ATGL Armbrust,HEAT (name INA),HEAT,210,300,,"HEAT, not range-dependent",300,55
+72-mm disposable ATGL RPG-22,HEAT (name INA),HEAT,133 initial / 300 max,390,,"HEAT, not range-dependent",250,56
+84-mm disposable AT weapon AT4,AT4 HEAT,HEAT,285,420,,"HEAT, not range-dependent",300,57
+84-mm disposable AT weapon AT4,LMAW,HEDP,235,150,,"HEAT, not range-dependent",300,57
+84-mm disposable AT weapon AT4,AT4 HP,HEAT,290,600,,"HEAT, not range-dependent",INA,57
+106-mm recoilless rifle M40,3/A-HEAT-T (Bofors upgrade),HEAT-T,570,700+,,"HEAT, not range-dependent",2000,60
+82-mm recoilless gun B-10,BK-881M,HEAT,322,240,,"HEAT, not range-dependent",400,61
+82-mm recoilless gun B-10,Type 65,HEAT,240,356,,"HEAT, not range-dependent",450,61
+82-mm recoilless gun M60 (Yugoslav),M60,HEAT,388,200,,"HEAT, not range-dependent",500,62
+82-mm recoilless gun M60 (Yugoslav),M72,Rocket-assisted HEAT,,220,,"HEAT, not range-dependent",1000,62
+107-mm recoilless gun B-11,BK-883,HEAT,400,381,,"HEAT, at 0 deg",450,63
+"7.62-mm MG (BOV-M, BTR-D, MT-LB)","API, API-T",API,,8,500,RHA,1000,69; 77; 79
+"14.5-mm MG KPVT (BTR-60PB, BTR-80, BRDM-2)",API-T,API-T,,30,500,not stated,2000,73; 75; 113
+"14.5-mm MG KPVT (BTR-60PB, BTR-80, BRDM-2)",API-T,API-T,,20,1000,not stated,2000,73; 75; 113
+14.5-mm MG KPVT (VTT-323),API-T,API-T,,38,0,not stated (at muzzle),1500,83
+12.7-mm MG Type 54 (YW 531 series),"API, Type 54",API,,21,500,RHA,800 (armoured vehicles),85; 86
+12.7-mm MG Type 54 (YW 531 series),"API, Type 54",API,,13,1000,RHA,800 (armoured vehicles),85; 86
+"30-mm automatic gun 2A42/2A72 (BMP-2, BMD-3, BMP-3, BTR-80A, BRM-3K, Kliver)",APDS,APDS,,25,1500,"RHA; errata (PDF 9) says 25 mm at 60 deg and 1,500 m",2000,98; 92; 100; 76; 116; 106
+"30-mm automatic gun 2A42/2A72 (BMP-2, BMD-3, BMP-3)",AP-T,AP-T,,18,1500,"RHA, 60 deg",1500,97; 92; 100
+20-mm cannon Rh202 (Marder 1),APDS-T DM43A1,APDS-T,,32,1000,not stated,2000,102
+30-mm Rarden L21 (Fox),APDS-T L14A2,APDS-T,,40,1500,"RHA, 45 deg",1000,118
+"73-mm gun 2A28 Grom (BMP-1, BMP-1P, BMD-1, BRM-1K)",PG-9,HEAT-FS,,335,,"RHA; HEAT, not range-dependent",800,94; 95; 90; 114
+"73-mm gun 2A28 Grom (BMP-1, BMP-1P, BMD-1, BRM-1K)",NFI (newer HEAT-FS),HEAT-FS,,>400,,"RHA; HEAT, not range-dependent",1000,94; 95; 90; 114
+100-mm rifled gun 2A70 (BMP-3),HE 3UOF17,HE,,25,,RHA (as printed),4000,100
+105-mm rifled gun CN-105-F2 (AMX-10RC),OFL 105 Mle F3 (Giat),APFSDS-T,,,1000,"""Single heavy tank target at 1,000 m"" (NATO target)",1500,111
+105-mm rifled gun CN-105-F2 (AMX-10RC),OCC 105 F3 (Giat),HEAT-T,,100,,at 70 deg,1250,111
+90-mm rifled gun CN-90-F3 (AMX-13),"HEAT, NFI",HEAT,,160,,"RHA, at 60 deg impact angle",1000,124
+76-mm rifled gun M32 (M41A3),AAI M464,APFSDS-T,,,1000,"""NATO triple heavy (57 deg) at 1000 m""",INA,125
+"85-mm rifled gun (M1985, T-34/85)",HVAP-T BR-365PK,HVAP-T,,130,1000,0 deg,1150,126; 144
+85-mm rifled gun (T-34/85),HVAP-T BR-365PK,HVAP-T,,167,0,0 deg (at muzzle),1150,144
+"85-mm rifled gun (M1985, T-34/85)",APC-T Type 367 / BR-367,APC-T,,120,1000,0 deg,1150,127; 145
+"85-mm rifled gun (M1985, T-34/85)",BK-2M type,HEAT-FS,,300-400,,"0 deg, all ranges (100 at 65 deg)",970 (direct fire range),127; 145
+"85-mm rifled gun (M1985, T-34/85)",AP-HE,AP-HE,,102,1000,0 deg,"950 (M1985) / 1,150 est (T-34/85)",127; 145
+"105-mm rifled gun (Type 63A, Type 59-II, M60A1/A3)",New Chinese (UI) APFSDS,APFSDS-T,,460,2000,not stated,2000-3000 (est),128; 163; 142
+"105-mm rifled gun (Type 63A, Type 59-II, M60A1/A3)",M456 (multinational),HEAT,,432,,"HEAT; ""NATO single heavy target""",1500-2500 (est),129; 163; 143
+"105-mm rifled gun (AMX-30, Leopard 1)",M456A2 (Belgian Mecar),HEAT-T,,432,,at 0 deg,INA,133; 139
+"105-mm rifled gun (AMX-30, Leopard 1)",OCC 105 F1 (Giat),HEAT-T,,360,,at 0 deg,2500,133; 139
+"105-mm rifled gun (AMX-30, Leopard 1)",OFL 105 F1 (Giat),APFSDS-T,,,5500,"""NATO triple heavy target; 5,500 m""",1800,133
+"105-mm rifled gun (AMX-30, Leopard 1)",M413 (IMI),APFSDS-T,,,6000,"""NATO triple heavy target, 6,000+ m""",2000,133; 139
+105-mm rifled gun L7A3 (Leopard 1),DM43 (Rheinmetall),APFSDS-T,,,5500,"""NATO triple heavy target, 5,500 m""",1400 / 2000 (Leo 1A1 and later),139
+105-mm rifled gun M68 (M60A1/A3),H6/62 (UK),APFSDS,,,5000,"""NATO single heavy target, 5,000 m""",2000,143
+105-mm rifled gun M68 (M60A1/A3),DM23 (GE),APFSDS,,150,2000,"""NATO single heavy target, 60 deg at 2,000 m""",2000,143
+76-mm rifled gun D-56B (PT-76B),BM-354P,HVAP-T,,127,0,not stated (at muzzle),650,130
+76-mm rifled gun D-56B (PT-76B),BM-354P,HVAP-T,,50,1000,not stated,650,130
+76-mm rifled gun D-56B (PT-76B),BK-350M,HEAT,,280,,"""to max range""",650,130
+120-mm smoothbore gun (Leopard 2),DM43,APFSDS-T,,450,2000,not stated,INA,141
+120-mm smoothbore gun (Leopard 2),Olin GD120,APFSDS-T,,520,2000,not stated,3000,141
+100-mm rifled gun D-10T2S (T-55AMV),BM-8,APDS-T,,200,1000,not stated,1500,147
+"100-mm rifled gun D-10T2S (T-55AMV), 100-mm MT-12",BM-412M (Romanian),APFSDS-T,,418,2000,not stated,2000+ (est),147; 172
+"100-mm rifled gun D-10T2S (T-55AMV), 100-mm MT-12",BM-412M (Romanian),APFSDS-T,,380,3000,not stated,2000+ (est),147; 172
+100-mm rifled gun D-10T2S (T-55AMV),M1000 (Belgian),APFSDS-T,,,4500,"""NATO triple heavy target, 4,500 m"" (MT-12 sheet: at 4,000 m)",2500 (est),147; 172
+"100-mm rifled gun D-10T2S (T-55AMV), 100-mm MT-12",BK-17,HEAT,,380,,"HEAT, not range-dependent",1000 (est),147; 172
+"100-mm gun-launched ATGM (T-55AMV, BMP-3, MT-12)","AT-10/BASTION (Basnya, Kastet)","ATGM, HEAT",,650,,"RHA; ATGM, not range-dependent","4000 (5,000 from MT-12)",147; 100; 172
+"100-mm gun-launched ATGM (T-55AMV, BMP-3, MT-12)",AT-10 Improved (AT-10b/Kan),"ATGM, tandem HEAT",,700,,"RHA, behind ERA","4000 (5,000 from MT-12)",147; 100; 172
+115-mm smoothbore gun 2A20 (T-62M),BD/36-2,APFSDS-T,,520,1000,"RHA, 71 deg angle (as printed)",2000+ (est),148
+115-mm smoothbore gun 2A20 (T-62M),BM-6,APFSDS-T,,237,1000,RHA,1500,148
+115-mm smoothbore gun 2A20 (T-62M),BK-4,HEAT,,495,,"RHA; HEAT, not range-dependent",1200,149
+115-mm gun-launched ATGM (T-62M),AT-10/Sheksna,"ATGM, HEAT",,650,,"ATGM, not range-dependent",4000 (day only),149
+115-mm gun-launched ATGM (T-62M),AT-10 Improved,"ATGM, tandem HEAT",,700,,behind ERA,4000 (day only),149
+"125-mm smoothbore gun 2A46 series (T-64B, T-72B, T-72M1, T-80B, T-80U, T-90, Type 85-IIM, 2A45M)",BM-42M,APFSDS-T,,590-630,2000,not stated,2000-3000,153; 151; 155; 156; 159; 161; 164; 173
+125-mm smoothbore gun 2A46 series (same sheets),BK-29M,HEAT-MP,,650-750,,"HEAT, not range-dependent","2000-3000 (T-64B, T-80B); INA on others",153; 151; 155; 157; 159; 161; 165; 173
+125-mm smoothbore gun 2A46 series (same sheets),BK-27,HEAT,,700-800,,"HEAT, not range-dependent","2000-3000 (T-64B, T-80B); INA on others",153; 151; 155; 157; 159; 161; 165; 173
+"125-mm gun-launched ATGM (T-64B, T-80B)",AT-8/SONGSTER,"ATGM, HEAT",,700,,"RHA, conventional armour",4000,151; 157
+"125-mm gun-launched ATGM (T-72B, T-80U, T-90, 2A45M)",AT-11/SVIR,"ATGM, HEAT",,800,,conventional armour,"4000 (T-72B); 5,000 (T-80U, T-90, 2A45M)",153; 159; 161; 173
+"125-mm gun-launched ATGM (T-72B, T-80U, T-90, 2A45M)",AT-11/SVIR,"ATGM, HEAT",,700,,behind ERA,"4000 (T-72B); 5,000 (T-80U, T-90, 2A45M)",153; 159; 161; 173
+"125-mm gun-launched ATGM (T-72B, T-80U, T-90, 2A45M)",AT-11B/INVAR,"ATGM, tandem HEAT",,870,,conventional armour,"4000 (T-72B); 5,000 (T-80U, T-90, 2A45M)",153; 159; 161; 173
+"125-mm gun-launched ATGM (T-72B, T-80U, T-90, 2A45M)",AT-11B/INVAR,"ATGM, tandem HEAT",,800,,behind ERA,"4000 (T-72B); 5,000 (T-80U, T-90, 2A45M)",153; 159; 161; 173
+76-mm towed AT gun ZIS-3,BR-354P,HVAP-T,,92,500,not stated,1000,168
+76-mm towed AT gun ZIS-3,BR-354P,HVAP-T,,58,1000,not stated,1000,168
+76-mm towed AT gun ZIS-3,BR-350B,APC-T,,61,1000,not stated,1000,168
+76-mm towed AT gun ZIS-3,BK-354M,HEAT,,120,,"RHA; HEAT, not range-dependent",500,168
+85-mm towed gun D-44,BR-365P/365PK,HVAP-T,,180,1000,RHA (as printed),1150,169
+85-mm towed gun D-44,BR-365P/365PK,HVAP-T,,113,500,"RHA, 30 deg",1150,169
+85-mm towed gun D-44,BK-2M,HEAT-FS,,300,,"HEAT, not range-dependent",1500,169
+85-mm towed gun D-44,AP-HE,AP-HE,,91,500,30 deg angle,950,169
+90-mm gun M3 (M36),"HVAP, INA",HVAP,,195,1000,not stated,1000,170
+90-mm gun M3 (M36),Yugoslav M74,HEAT-T,,150,1000,30 deg impact,1000,170
+ATGM launcher 9P111 (AT-3),"AT-3, -3a, -3b/SAGGER","ATGM, HEAT",,400,,"ATGM, not range-dependent; avg velocity 115 m/s (BMP-1/BMD-1 sheets give 410 RHA)",3000,182
+ATGM launcher 9P111 (AT-3),AT-3c/SAGGER,"ATGM, HEAT",,520,,avg velocity 115 m/s,3000,182
+ATGM launcher 9P111 (AT-3),Malyutka-2,"ATGM, tandem HEAT",,800,,avg velocity 130 m/s,3000,182
+"ATGM (BMP-1, BMD-1, M1985, VTT-323 sheets)",AT-3c Imp / Polk (Slovenian),"ATGM, HEAT",,580,,RHA,3000,94; 90; 127; 83
+"ATGM (BMP-1, M1985, VTT-323 sheets)",Red Arrow-73A (Chinese),"ATGM, HEAT",,500,,RHA,3000,94; 127; 83
+"ATGM (BMP-1, M1985, VTT-323 sheets)",Red Arrow-73B/C (Chinese),"ATGM, HEAT",,600,,RHA,3000,94; 127; 83
+ATGM launcher 9P135 series (AT-4/AT-5),AT-4/SPIGOT,"ATGM, HEAT",,480,,avg velocity 186 m/s,2000,183; 174; 96; 98
+ATGM launcher 9P135 series (AT-4/AT-5),AT-4B/Factoria,"ATGM, HEAT",,550,,avg velocity 180 m/s,2500,175; 96; 98
+ATGM launcher 9P135 series (AT-4/AT-5),AT-5/SPANDREL,"ATGM, HEAT",,650,,avg velocity 200 m/s,4000,183; 174; 92; 96; 98
+ATGM launcher 9P135 series (AT-4/AT-5),AT-5B/Konkurs-M,"ATGM, tandem HEAT",,925,,avg velocity 208 m/s,4000,183; 174; 92; 96; 98
+ATGM launcher vehicle 9P149,AT-6a/SPIRAL,"ATGM, HEAT",,750,,conventional; avg velocity 345 m/s,5000,176
+ATGM launcher vehicle 9P149,AT-6a/SPIRAL,"ATGM, HEAT",,600,,behind ERA,5000,176
+ATGM launcher vehicle 9P149,AT-9,"ATGM, tandem HEAT",,950,,conventional; avg velocity 400 m/s,"6000 (5,000 ground use)",176
+ATGM launcher vehicle 9P149,AT-9,"ATGM, tandem HEAT",,800,,behind ERA,"6000 (5,000 ground use)",176
+ATGM launcher 9P151 (AT-7/AT-13),AT-7/Saxhorn,"ATGM, HEAT",,460,,avg velocity 180 m/s,1000,184
+ATGM launcher 9P151 (AT-7/AT-13),AT-13,"ATGM, tandem HEAT",,1000,,conventional; avg velocity 287 m/s,1500,184
+ATGM launcher 9P151 (AT-7/AT-13),AT-13,"ATGM, tandem HEAT",,900,,behind ERA,1500,184
+ATGM launcher Kornet-E (9P163),Kornet-LR,"ATGM, tandem HEAT",,1200,,avg velocity 550 m/s,5500,186; 106
+ATGM launcher Kornet-E (9P163),Kornet-MR,"ATGM, tandem HEAT",,1000,,not stated,2500,186
+ATGM launcher Eryx,Eryx,"ATGM, tandem HEAT",,900,,avg velocity 162 m/s,600,185
+ATGM launcher MILAN 2/MILAN 3,MILAN,"ATGM, HEAT",,600,,RHA; avg velocity 160 m/s,2000,188; 102
+ATGM launcher MILAN 2/MILAN 3,MILAN 2,"ATGM, tandem HEAT",,800,,RHA,2000,188; 102
+ATGM launcher MILAN 2/MILAN 3,MILAN 3,"ATGM, tandem HEAT with precursor",,880,,RHA,1920,188; 102
+ATGM launcher Red Arrow-8,Red Arrow-8A,"ATGM, HEAT",,800,,avg velocity 220 m/s,3000,189
+ATGM launcher Red Arrow-8,Red Arrow-8E,"ATGM, tandem HEAT",,900,,avg velocity 210 m/s,4000,189
+ATGM launcher vehicle AMX-10 HOT,HOT,"ATGM, HEAT",,800,,avg velocity 233 m/s,4000,178
+ATGM launcher vehicle AMX-10 HOT,HOT 2,"ATGM, tandem HEAT",,900,,avg velocity 233 m/s,4000,178
+ATGM launcher vehicle AMX-10 HOT,HOT 2T,"ATGM, tandem HEAT",,1250,,not stated,4000,178
+ATGM launcher vehicle M901,TOW,"ATGM, HEAT",,600,,avg velocity 179 m/s,3750,180
+ATGM launcher vehicle M901,ITOW,"ATGM, tandem HEAT",,800,,avg velocity 179 m/s,3750,181
+122-mm howitzer D-30A / 2S1 (2A31),HEAT-FS (name not given),HEAT-FS,740,460,,"0 deg obliquity, any range",1000 (direct fire max range),217; 225
+57-mm twin AA gun (ZSU-57-2),APC-T,APC-T,1000,96,1000,not stated,INA,273
+37-mm towed AA gun M-1939,AP/HVAP family (rounds not separated on sheet),AP,,55,500,not stated,INA,263

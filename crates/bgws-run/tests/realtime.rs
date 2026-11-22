@@ -1,4 +1,4 @@
-//! Real-time play (docs/design/INTEROP_PLAN.md §3.4): decisions do not stop
+//! Real-time play (docs/design/interop-plan.md §3.4): decisions do not stop
 //! the clock, answers apply when they come back, and a real-time game
 //! replays exactly from its record; with a pace, the clock follows the wall.
 

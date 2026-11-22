@@ -1,0 +1,19 @@
+target,salience,display,cue_precision,cue_error_deg,detection_time_s,ratio_to_uncued,source_page,pdf_page,note
+soldier,high,HMD,perfect,0-7.5,2.2,0.34,3,4,read from Figure 3; about +/-0.3 s
+soldier,high,HMD,degraded,7.5-22.5,3.9,0.60,3,4,read from Figure 3
+soldier,high,HMD,poor,22.5-45,4.8,0.74,3,4,read from Figure 3
+soldier,high,HMD,uncued,,6.5,1.00,3,4,read from Figure 3
+soldier,high,hand-held,perfect,0-7.5,3.5,0.45,3,4,read from Figure 3; marker hidden under the mine (hand-held) marker so uncertain
+soldier,high,hand-held,degraded,7.5-22.5,2.9,0.38,3,4,read from Figure 3
+soldier,high,hand-held,poor,22.5-45,4.1,0.53,3,4,read from Figure 3
+soldier,high,hand-held,uncued,,7.7,1.00,3,4,read from Figure 3
+mine,low,HMD,perfect,0-7.5,2.7,0.26,3,4,read from Figure 3
+mine,low,HMD,degraded,7.5-22.5,8.1,0.79,3,4,read from Figure 3
+mine,low,HMD,poor,22.5-45,10.5,1.03,3,4,read from Figure 3
+mine,low,HMD,uncued,,10.2,1.00,3,4,read from Figure 3
+mine,low,hand-held,perfect,0-7.5,3.6,0.40,3,4,read from Figure 3
+mine,low,hand-held,degraded,7.5-22.5,6.4,0.72,3,4,read from Figure 3
+mine,low,hand-held,poor,22.5-45,10.2,1.15,3,4,read from Figure 3
+mine,low,hand-held,uncued,,8.9,1.00,3,4,read from Figure 3
+any,,hand-held,catastrophic (>90 deg off),>90,101.4,,3,4,stated in text; first trials after a cue failure
+any,,HMD,catastrophic (>90 deg off),>90,56.8,,3,4,stated in text

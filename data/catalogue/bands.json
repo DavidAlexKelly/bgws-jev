@@ -1,5 +1,5 @@
 {
-  "$comment": "The bands table (RUST_ENGINE.md §7.5, §14.1): every band id a sensor, radio, emitter, jammer or RCS entry may name. Radio/radar edges are the IEEE/ITU letter bands; optical edges are the usual atmospheric windows; 'none' is for wire, fibre-as-courier and couriers.",
+  "$comment": "The bands table (rust-engine.md §7.5, §14.1): every band id a sensor, radio, emitter, jammer or RCS entry may name. Radio/radar edges are the IEEE/ITU letter bands; optical edges are the usual atmospheric windows; 'none' is for wire, fibre-as-courier and couriers.",
   "bands": [
     { "id": "hf", "name": "HF", "kind": "radio", "fMinHz": 3e6, "fMaxHz": 3e7, "source": "ITU" },
     { "id": "vhf", "name": "VHF", "kind": "radio", "fMinHz": 3e7, "fMaxHz": 3e8, "source": "ITU; SINCGARS 30–88 MHz [P4]" },

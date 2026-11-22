@@ -1,0 +1,7 @@
+cannon,calibre,operation,rate_of_fire_rds_min,rate_note,mass_kg,length_mm,effective_range_m,muzzle_velocity_m_s,feed,platforms,source_file
+MK30-2/ABM,30x173,gas,650,200 controlled; 600 burst optional,210,3772,3000,1100-1405,dual belt,Puma; Boxer (Lance); Lynx KF41 (Lance),raw/weapons/rheinmetall-2026-mk30-2-abm-automatic-cannon.pdf
+MK35-E,35x228,electric,200,single fire to 200,,4260,3000,1050-1400,dual belt,CV9035,raw/weapons/rheinmetall-2026-mk35e-automatic-cannon.pdf
+Oerlikon KBA,25x137,gas,600,rapid single 175,112,2888,2500,1100-1400,dual belt,RWS land and naval,raw/weapons/rheinmetall-2025-oerlikon-kba-25x137-cannon.pdf
+KAE,20x128,,1000,min 1 rd/min; bursts 0.2-6 s,,,,1050-1150,,Sea Snake 20 (mount 460 kg),raw/weapons/rheinmetall-2021-sea-snake-20-naval-gun.pdf
+BK27 (M),27x145,revolver,1700,min 1 rd/min; bursts 0.2-6 s,,,,1100,,Sea Snake 27 (mount 449 kg),raw/weapons/rheinmetall-2021-sea-snake-27-ciws.pdf
+KCE-30,30x173,revolver,,,,,,,,Sea Snake 30,raw/weapons/rheinmetall-2025-sea-snake-30-naval-rcws.pdf
