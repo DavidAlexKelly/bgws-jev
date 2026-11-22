@@ -522,12 +522,20 @@ pub fn even_attack_generated() -> Option<ScenarioV4> {
     ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
 }
 
+/// The committed fixture pack the real-ground vignettes play on
+/// (`data/packs/kgd-fixture`: 20.35–20.53° E, 54.58–54.755° N, built by
+/// `bgws terrain` without Overture buildings), so CI and a local run play
+/// the same ground.
+pub const REAL_GROUND_PACK: &str = "kgd-fixture";
+
 /// The Kaliningrad company attack (`gen-kgd-company-attack`) at even odds,
 /// 1:1, for attack-halt-real-ground: at 3:1 it took its objective in 40 of
-/// 40 games and at 1.5:1 in 38, so it never halted.
+/// 40 games and at 1.5:1 in 38, so it never halted. Played on the fixture
+/// pack, where `kaliningrad-big` has its frame origin.
 pub fn even_attack_on_pack() -> Option<ScenarioV4> {
     let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
     spec.ratio = 1.0;
+    spec.ground = crate::scengen::GroundSpec::Pack { name: REAL_GROUND_PACK.into(), at: Some([54.7, 20.475]) };
     ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
 }
 
@@ -537,7 +545,7 @@ pub fn even_attack_on_pack() -> Option<ScenarioV4> {
 pub fn open_country_attack_on_pack() -> Option<ScenarioV4> {
     let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-kgd-company-attack")?;
     spec.ratio = 1.0;
-    spec.ground = crate::scengen::GroundSpec::Pack { name: "kaliningrad-big".into(), at: Some([54.6057, 20.3976]) };
+    spec.ground = crate::scengen::GroundSpec::Pack { name: REAL_GROUND_PACK.into(), at: Some([54.6057, 20.3976]) };
     ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
 }
 

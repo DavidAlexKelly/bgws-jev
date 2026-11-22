@@ -1,6 +1,7 @@
 target/
 # Theatre packs built by `bgws terrain`: large, and rebuilt from their box.
-packs/
+# (data/packs/ holds the small committed fixtures CI plays on.)
+/packs/
 node_modules/
 .DS_Store
 # The decision lab (bgws lab): moments, play-outs and labels are yours, not the repo's.

@@ -1,0 +1,731 @@
+{
+  "bbox": [
+    20.35,
+    54.58,
+    20.53,
+    54.755
+  ],
+  "key": [
+    {
+      "kind": "chokepoint",
+      "lat": 54.59696858753103,
+      "lon": 20.390343897175505,
+      "score": 1.0,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 11.4 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.603169629772225,
+      "lon": 20.39683545835428,
+      "score": 1.0,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 11.4 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.61476154972133,
+      "lon": 20.407503334026455,
+      "score": 1.0,
+      "classes": [
+        "tracked",
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 11.4 km² (tracked, wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.636864552917245,
+      "lon": 20.429322200495672,
+      "score": 0.5653231096797706,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 3.2 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.643871296087326,
+      "lon": 20.42653224616025,
+      "score": 0.5653231096797706,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 11.4 and 3.2 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.65842474339826,
+      "lon": 20.43117595587718,
+      "score": 0.5653231096797706,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 11.4 and 3.2 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.64143147241287,
+      "lon": 20.500413741815336,
+      "score": 0.5089306379662123,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 2.6 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.643582485134864,
+      "lon": 20.50971059135998,
+      "score": 0.5089306379662123,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 37.6 and 2.6 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.6376673849694,
+      "lon": 20.478571231824443,
+      "score": 0.5089306379662123,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 3.2 and 2.6 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.64629253397193,
+      "lon": 20.474861688916615,
+      "score": 0.5089306379662123,
+      "classes": [
+        "tracked"
+      ],
+      "note": "a gap 60 m wide between open areas of 3.2 and 2.6 km² (tracked)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.586192829710356,
+      "lon": 20.47759449850466,
+      "score": 0.4723421583552022,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 2.3 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.58080041257675,
+      "lon": 20.484549046608144,
+      "score": 0.4723421583552022,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 2.3 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.622309361348115,
+      "lon": 20.414928361787823,
+      "score": 0.3902454010218243,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 1.7 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.63039459030029,
+      "lon": 20.415852451863596,
+      "score": 0.3902454010218243,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 1.7 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.62632497923932,
+      "lon": 20.35547166214382,
+      "score": 0.3902454010218243,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 3.2 and 1.7 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.619866941189784,
+      "lon": 20.371275083317382,
+      "score": 0.3902454010218243,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 3.2 and 1.7 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.618793850325176,
+      "lon": 20.380564899480984,
+      "score": 0.3902454010218243,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 3.2 and 1.7 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.6268819011901,
+      "lon": 20.492960290611087,
+      "score": 0.3726335832329824,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 1.6 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.633350726134715,
+      "lon": 20.491110434267103,
+      "score": 0.3726335832329824,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 16.1 and 1.6 km² (wheeled)"
+    },
+    {
+      "kind": "chokepoint",
+      "lat": 54.610977132734874,
+      "lon": 20.501761542123155,
+      "score": 0.3726335832329824,
+      "classes": [
+        "wheeled"
+      ],
+      "note": "a gap 60 m wide between open areas of 2.3 and 1.6 km² (wheeled)"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.65839623553301,
+      "lon": 20.394900445111332,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.68765364112353,
+      "lon": 20.462599395403252,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.686931144599335,
+      "lon": 20.491620889822787,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.6982353249775,
+      "lon": 20.519451462825305,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.70590091226395,
+      "lon": 20.489400012590227,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.70960144314467,
+      "lon": 20.50833639176186,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.707810097809144,
+      "lon": 20.52336211124899,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.733442257357844,
+      "lon": 20.413531082675494,
+      "score": 0.85,
+      "classes": [],
+      "note": "primary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.63925524411963,
+      "lon": 20.356550255527644,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.63923971633468,
+      "lon": 20.3802073164673,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.64477571347206,
+      "lon": 20.38152696330695,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.65189793527159,
+      "lon": 20.386649975178095,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.676259654026794,
+      "lon": 20.518201566607672,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.669115850575,
+      "lon": 20.51837859255945,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.707562159579645,
+      "lon": 20.514623485312153,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.5 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72881461796029,
+      "lon": 20.439682603061325,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.73191525933801,
+      "lon": 20.46012638756903,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.74066763394111,
+      "lon": 20.464906075145056,
+      "score": 0.6,
+      "classes": [],
+      "note": "secondary bridge over water 2.0 m deep, too deep to ford"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.710540479351636,
+      "lon": 20.445712207314976,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.70761485948922,
+      "lon": 20.467588297664435,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.71357434642005,
+      "lon": 20.41931927957295,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.7154738810338,
+      "lon": 20.47717450634187,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72008135951242,
+      "lon": 20.485494710596623,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.738930312616155,
+      "lon": 20.473510594216098,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.73717434059941,
+      "lon": 20.480527247919763,
+      "score": 0.51,
+      "classes": [],
+      "note": "primary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.59503547131267,
+      "lon": 20.489759400120736,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.67200702527888,
+      "lon": 20.488123292205156,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.68482559532656,
+      "lon": 20.527342518978514,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.69397570694464,
+      "lon": 20.424109698843534,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.71237198154232,
+      "lon": 20.477356896016154,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.715935583662805,
+      "lon": 20.422457462949144,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.716837281240174,
+      "lon": 20.454338187318612,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72489896057967,
+      "lon": 20.352274853395155,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72451791219324,
+      "lon": 20.355911920658922,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72188144057405,
+      "lon": 20.361678658525808,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72190313002714,
+      "lon": 20.36837344771875,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.722999880668844,
+      "lon": 20.494120684892764,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.72206733356064,
+      "lon": 20.510283661276368,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.727340084647516,
+      "lon": 20.516656569242997,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "crossing",
+      "lat": 54.733154199276704,
+      "lon": 20.49725348921451,
+      "score": 0.36,
+      "classes": [],
+      "note": "secondary bridge over water 0.6 m deep, fordable by tracks"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.66029555502918,
+      "lon": 20.37771507434836,
+      "score": 1.0,
+      "classes": [],
+      "note": "sees 13.4 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.670547672184036,
+      "lon": 20.405598834408135,
+      "score": 0.8976830072543417,
+      "classes": [],
+      "note": "sees 12.0 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.6155726904666,
+      "lon": 20.46044014188918,
+      "score": 0.853150142888547,
+      "classes": [],
+      "note": "sees 11.4 km² within 4 km, 8 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.68671090634338,
+      "lon": 20.386978148730652,
+      "score": 0.8090305561661904,
+      "classes": [],
+      "note": "sees 10.8 km² within 4 km, 8 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.596709268800936,
+      "lon": 20.440008138117282,
+      "score": 0.7870081336557485,
+      "classes": [],
+      "note": "sees 10.5 km² within 4 km, 13 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.69208787797537,
+      "lon": 20.362778817876375,
+      "score": 0.715757309298747,
+      "classes": [],
+      "note": "sees 9.6 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.61179022604248,
+      "lon": 20.388004239715816,
+      "score": 0.6709166849857112,
+      "classes": [],
+      "note": "sees 9.0 km² within 4 km, 18 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.58484910619718,
+      "lon": 20.417735469474135,
+      "score": 0.581041987249945,
+      "classes": [],
+      "note": "sees 7.8 km² within 4 km, 7 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.622573917156856,
+      "lon": 20.4827369371793,
+      "score": 0.5644976918003958,
+      "classes": [],
+      "note": "sees 7.5 km² within 4 km, 12 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.60964520040707,
+      "lon": 20.433507995059692,
+      "score": 0.5258562321389316,
+      "classes": [],
+      "note": "sees 7.0 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.59668871641207,
+      "lon": 20.36945755103853,
+      "score": 0.467931413497472,
+      "classes": [],
+      "note": "sees 6.3 km² within 4 km, 8 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.624737114256796,
+      "lon": 20.43071878238957,
+      "score": 0.4564827434601012,
+      "classes": [],
+      "note": "sees 6.1 km² within 4 km, 16 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.62957692008911,
+      "lon": 20.387052495874258,
+      "score": 0.44027698395251713,
+      "classes": [],
+      "note": "sees 5.9 km² within 4 km, 9 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.64952719031928,
+      "lon": 20.40747559349183,
+      "score": 0.39067487359859315,
+      "classes": [],
+      "note": "sees 5.2 km² within 4 km, 9 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.58861381371996,
+      "lon": 20.490126261112668,
+      "score": 0.31761266212354367,
+      "classes": [],
+      "note": "sees 4.2 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.64414074231562,
+      "lon": 20.453948827447704,
+      "score": 0.2354715322048802,
+      "classes": [],
+      "note": "sees 3.1 km² within 4 km, 8 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.59401082230033,
+      "lon": 20.46878346114004,
+      "score": 0.2299934051439877,
+      "classes": [],
+      "note": "sees 3.1 km² within 4 km, 9 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.64628753141692,
+      "lon": 20.48926781308898,
+      "score": 0.22672675313255664,
+      "classes": [],
+      "note": "sees 3.0 km² within 4 km, 7 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.62310094818996,
+      "lon": 20.508746657250857,
+      "score": 0.22172345570455046,
+      "classes": [],
+      "note": "sees 3.0 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.70609995821259,
+      "lon": 20.359959828603433,
+      "score": 0.14735106616838867,
+      "classes": [],
+      "note": "sees 2.0 km² within 4 km, 26 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.65869453250181,
+      "lon": 20.442797283063243,
+      "score": 0.14114310837546715,
+      "classes": [],
+      "note": "sees 1.9 km² within 4 km, 9 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.58105301024754,
+      "lon": 20.51795521295394,
+      "score": 0.12908771158496374,
+      "classes": [],
+      "note": "sees 1.7 km² within 4 km, 6 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.597228779205025,
+      "lon": 20.508703040669,
+      "score": 0.12387777533523853,
+      "classes": [],
+      "note": "sees 1.7 km² within 4 km, 15 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.75085650818486,
+      "lon": 20.400871727838755,
+      "score": 0.10484062431303584,
+      "classes": [],
+      "note": "sees 1.4 km² within 4 km, 12 m above the ground round it"
+    },
+    {
+      "kind": "observation",
+      "lat": 54.74976306720383,
+      "lon": 20.367328162907764,
+      "score": 0.0979511980655089,
+      "classes": [],
+      "note": "sees 1.3 km² within 4 km, 18 m above the ground round it"
+    }
+  ]
+}
