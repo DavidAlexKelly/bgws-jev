@@ -244,6 +244,12 @@
       "fingerprint": "cfe17d9cc8f266f8",
       "replaced": "cfe17d9cc8f266f8",
       "verdict": "accepted"
+    },
+    {
+      "explanation": "Units now report losses when they happen and HQs read those reports first (they had waited for a 15-minute routine report, read last): attack halt on real ground 0.31 -> 0.25 (in band; now on the committed fixture pack kgd-fixture), on generated ground 0.385 -> 0.31; no other vignette moved",
+      "fingerprint": "cfe17d9cc8f266f8",
+      "replaced": "cfe17d9cc8f266f8",
+      "verdict": "accepted"
     }
   ]
 }

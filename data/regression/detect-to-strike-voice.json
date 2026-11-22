@@ -7,24 +7,24 @@
     "hi": 30.0,
     "statistic": "median"
   },
-  "estimate": 22.675,
+  "estimate": 22.65,
   "summary": {
-    "n": 20,
-    "missing": 180,
-    "mean": 23.407500000000002,
-    "sd": 1.6887871958842111,
-    "min": 21.45,
-    "p05": 21.560833333333335,
-    "p10": 21.851666666666667,
-    "p25": 22.258333333333333,
-    "p50": 22.675,
-    "p75": 24.2,
-    "p90": 26.345,
-    "p95": 26.491666666666667,
+    "n": 22,
+    "missing": 178,
+    "mean": 23.202272727272728,
+    "sd": 1.734579035389979,
+    "min": 20.883333333333333,
+    "p05": 21.454166666666666,
+    "p10": 21.53666666666667,
+    "p25": 22.008333333333333,
+    "p50": 22.65,
+    "p75": 24.041666666666668,
+    "p90": 26.188333333333336,
+    "p95": 26.444166666666664,
     "max": 27.283333333333335,
     "mean_ci": {
-      "lo": 22.617123262948716,
-      "hi": 24.19787673705129,
+      "lo": 22.433203467428065,
+      "hi": 23.97134198711739,
       "level": 0.95
     }
   },
@@ -42,16 +42,18 @@
     "22.666666666666668",
     "21.566666666666666",
     "24.25",
+    "23.183333333333334",
     "24.883333333333333",
+    "21.533333333333335",
     "22.433333333333334",
     "22.633333333333333",
     "26.45",
     "23.616666666666667",
-    "23.3",
+    "20.883333333333333",
     "21.883333333333333"
   ],
-  "missing": 180,
-  "fingerprint": "ce100eeb2c3d7aeb",
+  "missing": 178,
+  "fingerprint": "2c290273f7d91905",
   "history": [
     {
       "explanation": "Guided missiles now fail in flight 6% of the time (atgm-engagement 0.81 to 0.75); detect-to-strike measures the drone line without blue's tank and IFV, which attacking at will kill the drones' targets at 3 km first",
@@ -63,6 +65,12 @@
       "explanation": "Cue factors sourced from Yeh et al. 2001 (ADA447823): a friend's report now shortens search to 0.6 of uncued (0.25 before, unsourced), so drone-cued units take longer to find the targets they are told of; networked detect-to-strike 3.40 -> 4.19 min, inside its 2-5 min band",
       "fingerprint": "ce100eeb2c3d7aeb",
       "replaced": "dce659ccab6b768a",
+      "verdict": "pass"
+    },
+    {
+      "explanation": "Units now report losses when they happen and HQs read those reports first (they had waited for a 15-minute routine report, read last): attack halt on real ground 0.31 -> 0.25 (in band; now on the committed fixture pack kgd-fixture), on generated ground 0.385 -> 0.31; no other vignette moved",
+      "fingerprint": "2c290273f7d91905",
+      "replaced": "ce100eeb2c3d7aeb",
       "verdict": "pass"
     }
   ]
