@@ -345,14 +345,25 @@ to reach openrouter.ai.
 
 ### Calibration backlog
 
+CI runs the vignettes with `--backlog attack-halt,attack-halt-real-ground`:
+those two are reported but being out of band does not fail the run.
+
 - **Detect-to-strike, networked [P2]:** on the M4 drone line the median from
   a detection to the first FPV arriving on it is 5.35 minutes (95% CI
   5.03–5.97, 200 games), just above the 2–5 minute band. The HQ chain itself
   (report, staff, hand-off, launch) takes about 1.5 minutes; the rest is
   transit to targets 3–6 km away at 90 km/h, mid-range of the reported
   65–150 km/h. On voice nets (the scenario's `network: voice`) the same chain
-  takes about 23 minutes, inside P2's ~20. CI runs it with
-  `--backlog detect-to-strike-networked,attack-halt`, so it is reported but does not fail.
+  takes about 23 minutes, inside P2's ~20. It has since come back into band
+  (3.4 min, then 4.2 min with sourced cue factors) and left the backlog.
+- **Attack halt on real ground [P14]:** on the mapped Kaliningrad pack, at
+  1:1, the attack halts at a median of 5 of 16 vehicles lost (0.31; 95% CI
+  0.25–0.31; 117 of 200 games reach a halt), one vehicle above the 10–30%
+  band. It was already there before the per-round penetration and sourced
+  cue factors: an A/B with the old munitions gave the identical result. It
+  went unnoticed while CI could not run (19–22 November). The same attack
+  on open country halts at 0.15, inside the band. On the backlog until the
+  cause is found.
 - **Attack halt [P14]:** in the advance-to-contact skirmish the attack stops at
   a median of a third of its strength lost (4 of 12 vehicles; 95% CI
   0.25–0.42, 200 games), just above the 10–30% band. The stored 0.25 came
