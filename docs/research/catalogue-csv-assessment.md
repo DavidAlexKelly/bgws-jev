@@ -94,6 +94,40 @@ published figures, not a source in hand, so check them before changing:
 | T-80 (MBT) | 46 t | T-80B about 42.5 t |
 | BTR-82A | two rows, 13.6 t and 15.4 t | one vehicle, about 15.4 t |
 
+**Checked against sources (22 November 2026).** The sources in
+`docs/sources/` now settle several of these:
+
+| Asset | CSV | Source | Where |
+|---|---|---|---|
+| BMP-2 engine | 399.6 hp | 300 hp | WEG 2001, PDF p. 97 |
+| T-72B | 46 t, 839 hp (as "T-72 (Ural)" and "T-72B3") | 44.5 t, 840 hp | WEG p. 152 |
+| T-72M1 (export T-72A) | – | 41.5 t, 780 hp | WEG p. 154 |
+| T-80 | 46 t, 1,250 hp | T-80B/BV 44.5 t, 1,000–1,100 hp; 1,250 hp is the T-80U's | WEG pp. 156, 158 |
+| T-90 | 46.5 t, 1,250 hp (the T-80U's figure again) | 840–1,000 hp | WEG pp. 160–161 |
+| T-55 engine | 80.5 hp (looks like 60 kW mis-converted) | 620–690 hp (T-55AMV) | WEG p. 146 |
+| BTR-60 engine | 89.8 hp (one of its two engines) | 2 × 90 hp | WEG p. 73 |
+| SA-6 (2K12) | 25 t, 65 km/h | 14 t, 45 km/h | WEG p. 282 |
+| BTR-D | 8.2 t | 6.7 t | WEG p. 77 |
+| 30 mm "PMC308 APFSDS-T" (`m_mk30_ap`) | named after the airburst round | APFSDS-T is PMC287 / PMC359: 1,405 m/s, 53 mm at 60° at 1,000 m | Rheinmetall D129, B305 |
+| 35 mm "PMC308 APFSDS-T" (`m_35_apfsds`) | 164 mm at the muzzle | PMD343: 1,400 m/s; no penetration published | Rheinmetall D251 |
+
+The full comparison of 53 rows is in
+`docs/sources/notes/tradoc-2001-worldwide-equipment-guide.md`, with the
+uncertain matches listed separately. The 2001 guide predates the T-72B3,
+T-90M and T-80BVM, so it confirms that their figures are copied, not what
+they should be.
+
+**Penetration against range, measured.** The 25 mm KBA cannon sheet gives
+flight times to 2 km. Fitted, a sub-calibre round loses about 125 m/s per
+km. With the long-rod fits in Toksoy (2025) and the SwRI database
+(Anderson et al. 1992; 208 measured tungsten-rod shots), a 25–35 mm rod
+keeps about 80% of its muzzle penetration at 1 km and 62% at 2 km; the
+CSV gives 97% and 92%. For a tank rod (faster, slowing less) the same
+fits give a fall close to the CSV's curve. Details:
+`docs/sources/notes/rheinmetall-datasheets-medium-calibre.md`,
+`toksoy-2025-tungsten-long-rod-penetration-models.md`,
+`anderson-1992-penetration-mechanics-database.md`.
+
 **Gaps:**
 - **Smoke:** `has_smoke` is false on every platform, and
   `smoke_max_range_m` and `l6_asset_id` are empty. Most armoured vehicles

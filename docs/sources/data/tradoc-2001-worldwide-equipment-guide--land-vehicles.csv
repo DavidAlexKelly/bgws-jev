@@ -81,10 +81,10 @@ AU-F1,AU-F1,"SP howitzer (tracked, AMX-30 chassis)",France,4,42.0,"Hispano-Suiza
 BM-21,BM-21,Multiple rocket launcher (truck),Russia,5,13.7,"ZIL-375, 180 hp V-8 gasoline",180,13.1,75,35,N/A,450,"40 x 122-mm rockets (9M22U to 20,380 m)",40,,235
 M77,M77,Multiple rocket launcher (truck),Yugoslavia,5,22,"Model 2F/002A, 200 hp",200,9.1,80,35,N/A,600,"32 x 128-mm rockets (20,600 m)",32,,239
 9P140,9P140,Multiple rocket launcher (truck),Russia,4,20.0,2 x 177 hp gasoline engines,354,17.7,65,,N/A,500,"16 x 220-mm rockets (35,000 m)",16,,241
-Fadjr-3,Fadjr-3,Multiple rocket launcher (truck),Iran,5,15.0,280 hp V-8 diesel,280,18.7,60,25 (est),N/A,INA,12 x 240-mm rockets,12,,243
+Fadjr-3,Fadjr-3,Multiple rocket launcher (truck),Iran,5,15.0,280 hp V-8 diesel,280,18.7,60,25 (est),N/A,INA,"12 x 240-mm rockets (43,000 m)",12,,243
 ASTROS II,ASTROS II,Multiple rocket launcher (truck),Brazil,3,20.0,280 hp turbocharged diesel,280,14.0,70,40,N/A,INA,"127/180/300-mm rockets (SS-30 30,000 m; SS-40 35,000 m; SS-60 60,000 m; SS-80 90,000 m)","32 x 127, 16 x 180 or 4 x 300",,245
-WM-80,WM-80,Multiple rocket launcher (truck),China,5,34,525 hp air-cooled diesel,525,15.4,70,,N/A,400,8 x 273-mm rockets,8,None,247
-9A52-2,9A52-2,Multiple rocket launcher (truck),Russia,4 (7 with 9K58 complex),43.7,518 hp V-12 diesel,518,11.9,60,35,N/A,850,12 x 300-mm rockets,12,,248
+WM-80,WM-80,Multiple rocket launcher (truck),China,5,34,525 hp air-cooled diesel,525,15.4,70,,N/A,400,"8 x 273-mm rockets (34,000-80,000 m)",8,None,247
+9A52-2,9A52-2,Multiple rocket launcher (truck),Russia,4 (7 with 9K58 complex),43.7,518 hp V-12 diesel,518,11.9,60,35,N/A,850,"12 x 300-mm rockets (9M55F/9M55K, 20,000-90,000 m)",12,,248
 TOS-1,TOS-1,Heavy flamethrower system (T-72 chassis),Russia,3 in vehicle,46.0,780-hp Diesel,780,17.0,60,,,550 without external fuel tanks,"220-mm thermobaric/incendiary rockets (3,500 m original / 6,000 m current launcher)",30 (original) / 24 (current),500/560 against HEAT,259
 Gepard,Gepard,SP AA gun (Leopard 1 chassis),Germany/Switzerland,3,46,830-hp Diesel,830,18.0,65,,,550,2 x 35-mm cannon KDA,680,40 mm,270
 ZSU-23-4,ZSU-23-4,SP AA gun (tracked),Russia,4,20.5,V6R-1 diesel (power not stated),,,50,,,450,4 x 23-mm AA gun 2A7/2A7M,"2,000",,271
