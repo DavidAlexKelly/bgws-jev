@@ -1,0 +1,37 @@
+impact_velocity_nominal_km_s,obliquity_deg,scale,thickness_category,perforated,p_over_l,lr_over_l,lr_over_l_uncertainty,vr_over_v,vr_over_v_uncertainty,remarks,pdf_page
+1.5,0,1/12.60,NLT,,,,,,,no low-yaw result in the table,53
+1.5,0,1/6.30,NLT,no,0.63,,,,,,53
+1.5,0,1/3.15,NLT,no,0.71,,,,,,53
+1.5,0,1/12.60,IB,no,0.60,,,,,,53
+1.5,0,1/6.30,IB,no,0.62,,,,,,53
+1.5,0,1/3.15,IB,no,0.62,,,,,,53
+1.5,0,1/12.60,WB,no,0.59,0,,0,,,53
+1.5,0,1/6.30,WB,yes,,0.09,0.006,0.13,0.017,,53
+1.5,0,1/3.15,WB,yes,,0.12,0.003,0.58,0.017,,53
+1.5,60,1/12.60,NLT,no,0.56,,,,,,53
+1.5,60,1/6.30,NLT,no,0.64,,,,,,53
+1.5,60,1/3.15,NLT,no,0.69,,,,,,53
+1.5,60,1/12.60,IB,,,,,,,no low-yaw result in the table,53
+1.5,60,1/6.30,IB,no,0.74,,,,,,53
+1.5,60,1/3.15,IB,no,0.59,,,,,,53
+1.5,60,1/12.60,WB,yes,,0.14,0.012,0.47,0.017,,53
+1.5,60,1/6.30,WB,yes,,0.24,0.006,0.71,0.017,,53
+1.5,60,1/3.15,WB,yes,,0.24,0.003,0.82,0.017,,53
+2.2,0,1/12.60,NLT,no,1.21,,,,,,53
+2.2,0,1/6.30,NLT,no,1.12,,,,,,53
+2.2,0,1/3.15,NLT,no,1.26,,,,,,53
+2.2,0,1/12.60,IB,,,,,,,no low-yaw result in the table,53
+2.2,0,1/6.30,IB,no,1.17,,,,,,53
+2.2,0,1/3.15,IB,yes,,,,,,,53
+2.2,0,1/12.60,WB,yes,,0.20,0.012,0.90,0.011,,53
+2.2,0,1/6.30,WB,,,,,,,no low-yaw result in the table,53
+2.2,0,1/3.15,WB,yes,,,,,,no residual rod seen (spray),53
+2.2,60,1/12.60,NLT,,,,,,,no low-yaw result in the table,53
+2.2,60,1/6.30,NLT,no,1.26,,,,,,53
+2.2,60,1/3.15,NLT,no,1.21,,,,,,53
+2.2,60,1/12.60,IB,yes,,,,,,no residual rod seen (spray),53
+2.2,60,1/6.30,IB,,,,,,,no low-yaw result in the table,53
+2.2,60,1/3.15,IB,yes,,,,,,no residual rod seen (spray),53
+2.2,60,1/12.60,WB,,,,,,,no low-yaw result in the table,53
+2.2,60,1/6.30,WB,yes,,,,,,,53
+2.2,60,1/3.15,WB,yes,,,,,,,53
