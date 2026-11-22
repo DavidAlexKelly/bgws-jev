@@ -937,7 +937,7 @@ fn camera_p(s: &Sim, c4: &C4, f: &Flight, fid: u64, e: bevy_ecs::prelude::Entity
         if let Some(o) = o {
             ap.n50 = [o.n50.detect, o.n50.recognise, o.n50.identify];
         }
-        let r = acquire(&AcquireInput { critical_dim_m: crit, range_m: slant, cycles_per_mrad: res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: c, stage: Stage::Detect, search: Search { fov_deg: p.search_fov_deg, cued: false, observer_tau_mult: 1.0, clutter: crate::systems::clutter_at(&s.ctx.ground, tpos) } }, &ap);
+        let r = acquire(&AcquireInput { critical_dim_m: crit, range_m: slant, cycles_per_mrad: res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: c, stage: Stage::Detect, search: Search { fov_deg: p.search_fov_deg, cue: bgws_models::sensing::acquire::Cue::None, observer_tau_mult: 1.0, clutter: crate::systems::clutter_at(&s.ctx.ground, tpos) } }, &ap);
         if best.map(|b| r.p_inf * r.rate_per_s > b.2 * b.0).unwrap_or(true) {
             best = Some((r.rate_per_s, sk, r.p_inf));
         }

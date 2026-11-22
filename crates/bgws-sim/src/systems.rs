@@ -14,7 +14,7 @@ use bgws_env::{transmission, OpticalBand};
 use bgws_know::{ClassEvidence, Detection, Hypothesis, IdLevel, Measurement, MotionHint, SensorKind, TruthTag};
 use bgws_models::direct_fire::{self as df, ArmourZones, FireControl, Gun, PersonPosture, Protection, Shot, StrikeOutcome, VehicleDims, VehiclePosture, Warhead, Zone};
 use bgws_models::people::{IncomingFire, MoraleState, StressInputs, UnitQuality, WorkLoad};
-use bgws_models::sensing::acquire::{acquire, AcquireInput, Clutter, Contrast, Metric, Search, Stage};
+use bgws_models::sensing::acquire::{acquire, AcquireInput, Clutter, Contrast, Cue, Metric, Search, Stage};
 use bgws_models::sensing::observer::{tau_multiplier, ObserverState};
 use bevy_ecs::prelude::Entity;
 use nalgebra::Matrix3;
@@ -355,9 +355,22 @@ struct SenseEnt {
 }
 
 impl SenseEnt {
-    /// Is its search for `t` cued: seen it already, or told where to look.
-    fn cued_on(&self, t: &SenseEnt, seen: bool) -> bool {
-        seen || self.cues.iter().any(|(p, r)| p.sub(t.pos).horizontal() <= *r)
+    /// How its search for `t` is cued: precisely if it has seen it already;
+    /// roughly if friends have reported one there, which helps little for a
+    /// target that does not stand out (still, and on foot or well concealed).
+    fn cued_on(&self, t: &SenseEnt, seen: bool, hard_concealment: f64) -> Cue {
+        if seen {
+            Cue::Precise
+        } else if self.cues.iter().any(|(p, r)| p.sub(t.pos).horizontal() <= *r) {
+            let hard = !t.moving && (t.hypothesis == Hypothesis::Infantry || t.concealment >= hard_concealment);
+            if hard {
+                Cue::ReportedHard
+            } else {
+                Cue::Reported
+            }
+        } else {
+            Cue::None
+        }
     }
 }
 
@@ -625,7 +638,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
     let p = &s.ctx.p;
     let seed = s.ctx.seed;
     let world = &s.world;
-    let cued = |o: &SenseEnt, t: &SenseEnt| o.cued_on(t, world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
+    let cued = |o: &SenseEnt, t: &SenseEnt| o.cued_on(t, world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false), p.cue_hard_concealment);
     let smoke = s.world.get_resource::<crate::smoke::SmokeState>().filter(|sm| sm.any());
     // 1. The best sensor per pair and its first die (no terrain yet).
     let best: Vec<Option<Best>> = {
@@ -663,7 +676,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                         atmos_mtf: 1.0,
                         contrast,
                         stage: Stage::Detect,
-                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
+                        search: Search { fov_deg: p.search_fov_deg, cue: cued, observer_tau_mult: tau_mult, clutter },
                     };
                     let det = acquire(&input, &ap);
                     // The sensor that finds it soonest on average (P∞/τ).
@@ -749,7 +762,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let _first: f64 = rng.gen();
                 let mut ap = p.acquire.clone();
                 ap.n50 = b.n50;
-                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer), clutter: clutter_at(ground, t.pos) };
+                let search = Search { fov_deg: p.search_fov_deg, cue: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer), clutter: clutter_at(ground, t.pos) };
                 let input = |stage| AcquireInput { critical_dim_m: t.crit, range_m: range, cycles_per_mrad: b.res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: b.contrast, stage, search };
                 let rec = acquire(&input(Stage::Recognise), &ap).p_inf;
                 let idn = acquire(&input(Stage::Identify), &ap).p_inf;
@@ -843,7 +856,7 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
     let lux = bgws_env::illuminance_at(&s.ctx.start.at(now), lat, lon, w.cloud_cover, &p.light).total_lux;
     let night = lux < p.night_lux;
-    let cued = o.cued_on(t, s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false));
+    let cued = o.cued_on(t, s.world.get::<Aware>(o.e).map(|a| a.seen.contains_key(&t.id)).unwrap_or(false), p.cue_hard_concealment);
     let tau_mult = tau_multiplier(&o.observer, &p.observer);
     let smoke = s.world.get_resource::<crate::smoke::SmokeState>().filter(|sm| sm.any());
     let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
@@ -871,7 +884,7 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
             atmos_mtf: 1.0,
             contrast,
             stage: Stage::Detect,
-            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
+            search: Search { fov_deg: p.search_fov_deg, cue: cued, observer_tau_mult: tau_mult, clutter },
         };
         let det = acquire(&input, &ap);
         if in_range && det.p_inf * det.rate_per_s > best_p_inf * best_rate {
@@ -900,7 +913,7 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         // The share of light smoke between them lets through (1: none).
         "smoke": { "visual": smoke_visual, "thermal": smoke_thermal },
         "target_signature": { "criticalDimM": t.crit, "contrast": t.contrast, "deltaTK": t.delta_t, "concealment": t.concealment, "moving": t.moving },
-        "observerState": { "cued": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
+        "observerState": { "cued": cued.is_cued(), "cue": cued, "tauMultiplier": tau_mult, "eyeHeightM": o.eye_h + o.agl, "searchFovDeg": p.search_fov_deg, "maxSearchRangeM": p.sense_max_m },
         // pVisible is the chance a line like theirs is clear (any element seen); openWhereTheyStand is how
         // it fell for where they stand, which holds until one moves; the rest is the line between the two units' centres.
         "lineOfSight": { "pVisible": p_elements, "openWhereTheyStand": open, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
@@ -913,7 +926,7 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         "windowS": over_s,
         // While neither moves (0 if the line is blocked or it cannot pick the target out from here).
         "pDetectInWindow": p_window,
-        "alreadySeen": cued,
+        "alreadySeen": cued == Cue::Precise,
     }))
 }
 

@@ -1613,7 +1613,14 @@ references are in `docs/sources/notes/irhb-1993-v4-eo-systems-design-analysis-te
     P∞ ≥ 0.9.
   - A sector is searched one field of view at a time (`fov_ref_deg`, 10°),
     so it takes as many times longer as it holds fields of view.
-  - A cue and the observer's state scale it.
+  - A cue and the observer's state scale it. A cue is precise (the
+    observer has seen the target already: τ × 0.35) or a report from a
+    friend: τ × 0.6 for a target that stands out once looked at, × 1.0 for
+    one that does not (still, and on foot or concealed ≥ 50%). Yeh et al.
+    (2001, ADA447823) measured search time with a cue within 7.5° at
+    0.26–0.45 of uncued; with a 7.5°–45° cue at 0.38–0.74 for soldiers and
+    0.72–1.15 for small, hard targets. A cue never changes P∞: their
+    soldiers found 95% of targets with or without one.
 - **Clutter at the target sets how hard it is to find.** Fields and open
   ground are low clutter, so the detection N50 is half the medium value
   (Howe Table 2.5). Woods and towns are medium: what they hide is already
@@ -1628,7 +1635,6 @@ references are in `docs/sources/notes/irhb-1993-v4-eo-systems-design-analysis-te
   in three generated scenarios. TETAM measured 8–11 s for anti-tank
   missile crews (`docs/sources/notes/bryson-nd-tetam-antitank-missile-trials.md`).
 - **Not sourced yet:**
-  - the cue factor;
   - the observer multipliers;
   - the 10° reference field of view;
   - use of the model for the naked eye, which Howe excludes.

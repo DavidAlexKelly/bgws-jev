@@ -62,12 +62,38 @@ pub enum Contrast {
 pub struct Search {
     /// Field of view being searched, degrees.
     pub fov_deg: f64,
-    /// Told where to look (a cue shrinks the search area).
-    pub cued: bool,
+    /// Told where to look, and how exactly (a cue shrinks the search area).
+    pub cue: Cue,
     /// Observer multiplier on τ (≥ 1 slower) from `observer::tau_multiplier`.
     pub observer_tau_mult: f64,
     /// The clutter round the target, which sets the detection N₅₀ in search.
     pub clutter: Clutter,
+}
+
+/// A cue to where a target is (Yeh et al. 2001, ADA447823): it shortens the
+/// search but leaves whether the target can be found (P∞) alone. How much it
+/// shortens it depends on how exactly it points, and, for a rough cue, on
+/// how easy the target is to see once the eye is near it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Cue {
+    #[default]
+    None,
+    /// Points within a few degrees: the observer has seen the target already,
+    /// a laser spot or a sight's reticle marks it.
+    Precise,
+    /// A report or a plot of where it is (Yeh's 7.5°–45° cues), for a target
+    /// that stands out once looked at: a vehicle, a moving man.
+    Reported,
+    /// The same rough cue for a target that does not stand out (still men,
+    /// a concealed post): it barely helps.
+    ReportedHard,
+}
+
+impl Cue {
+    pub fn is_cued(self) -> bool {
+        self != Cue::None
+    }
 }
 
 /// Clutter round a target in search (Howe 1993, Table 2.5).
@@ -139,6 +165,8 @@ pub struct AcquireParams {
     pub fov_ref_deg: f64,
     pub fov_exponent: f64,
     pub cue_factor: f64,
+    pub cue_factor_reported: f64,
+    pub cue_factor_reported_hard: f64,
     pub p_inf_max: f64,
     pub irst_pfa: f64,
     pub irst_frame_s: f64,
@@ -162,6 +190,8 @@ impl AcquireParams {
             fov_ref_deg: f.get("sensing.acquire.fov_ref_deg"),
             fov_exponent: f.get("sensing.acquire.fov_exponent"),
             cue_factor: f.get("sensing.acquire.cue_factor"),
+            cue_factor_reported: f.get("sensing.acquire.cue_factor_reported"),
+            cue_factor_reported_hard: f.get("sensing.acquire.cue_factor_reported_hard"),
             p_inf_max: f.get("sensing.acquire.p_inf_max"),
             irst_pfa: f.get("sensing.irst.pfa"),
             irst_frame_s: f.get("sensing.irst.frame_s"),
@@ -201,7 +231,12 @@ pub fn contrast_factor(apparent: f64, threshold: f64, reference: f64) -> f64 {
 /// fields of view (eq. 2.40), a cue, and the observer's state.
 pub fn search_scale(s: &Search, p: &AcquireParams) -> f64 {
     let fov = (s.fov_deg.max(0.1) / p.fov_ref_deg).powf(p.fov_exponent).max(1.0);
-    let cue = if s.cued { p.cue_factor } else { 1.0 };
+    let cue = match s.cue {
+        Cue::None => 1.0,
+        Cue::Precise => p.cue_factor,
+        Cue::Reported => p.cue_factor_reported,
+        Cue::ReportedHard => p.cue_factor_reported_hard,
+    };
     fov * cue * s.observer_tau_mult.max(0.1)
 }
 
@@ -279,13 +314,15 @@ pub fn figures() -> Vec<Figure> {
         figure!("sensing.acquire.visual_contrast_ref", 0.5, "fraction", 0.1, 1.0, "default", Default, "contrast at which full resolution is reached"),
         figure!("sensing.acquire.thermal_dt_threshold_k", 0.05, "K", 0.01, 0.3, "default", Default, "MRTD floor (≈ NETD) of a modern imager"),
         figure!("sensing.acquire.thermal_dt_ref_k", 4.0, "K", 0.5, 20.0, "default", Default, "ΔT at which full resolution is reached"),
-        figure!("sensing.acquire.tfov_k_s", 3.4, "s", 2.0, 6.0, "Howe 1993 eq. 2.35/2.38", Medium, "mean time to find a target in one field of view is this / P∞ (P∞ < 0.9, low to medium clutter; NVESD search model, validated mainly with thermal imagers)"),
+        figure!("sensing.acquire.tfov_k_s", 3.4, "s", 2.0, 6.0, "Howe 1993 eq. 2.35/2.38; glimpse time 0.3 s also Poe 1974 (ADA017599) p. 10", Medium, "mean time to find a target in one field of view is this / P∞ (P∞ < 0.9, low to medium clutter; NVESD search model, validated mainly with thermal imagers)"),
         figure!("sensing.acquire.tfov_k_high_s", 6.8, "s", 4.0, 12.0, "Howe 1993 eq. 2.36/2.38", Medium, "for P∞ ≥ 0.9 the time in one field of view is this × N50/N"),
         figure!("sensing.acquire.clutter_low", 0.5, "×", 0.3, 1.0, "Howe 1993 Table 2.5", Medium, "search detection N50 in low clutter (a target in a field, on a road), relative to medium (0.5 vs 1.0 cycles)"),
         figure!("sensing.acquire.clutter_high", 2.0, "×", 1.0, 3.0, "Howe 1993 Table 2.5", Medium, "search detection N50 in high clutter (a vehicle among similar vehicles), relative to medium (2.0 vs 1.0 cycles)"),
         figure!("sensing.acquire.fov_ref_deg", 10.0, "deg", 3.0, 20.0, "default", Default, "the field of view a sector is searched with (a gunner's sight's wide field is about 10–15°); a sector of n of these takes n times as long"),
         figure!("sensing.acquire.fov_exponent", 1.0, "1", 0.5, 1.0, "Howe 1993 eq. 2.40", Medium, "search time grows as (sector / field of view)^k: n fields of view take n times as long (k = 1 for a band of fixed height)"),
-        figure!("sensing.acquire.cue_factor", 0.25, "fraction", 0.05, 1.0, "default", Default, "τ multiplier when cued"),
+        figure!("sensing.acquire.cue_factor", 0.35, "fraction", 0.25, 0.45, "Yeh et al. 2001 (ADA447823) Fig. 3, p. 3", Low, "τ multiplier for a precise cue (within about 7.5°: a target seen already, a laser spot): search time 0.26–0.45 of uncued (docs/sources/notes/yeh-2001-head-up-head-down-cue-effectiveness.md)"),
+        figure!("sensing.acquire.cue_factor_reported", 0.6, "fraction", 0.4, 0.75, "Yeh et al. 2001 (ADA447823) Fig. 3, p. 3", Low, "τ multiplier for a rough cue (a report or plot, 7.5°–45°) to a target that stands out: a vehicle, a moving man (search time 0.38–0.74 of uncued)"),
+        figure!("sensing.acquire.cue_factor_reported_hard", 1.0, "fraction", 0.7, 1.15, "Yeh et al. 2001 (ADA447823) Fig. 3, p. 3", Low, "τ multiplier for a rough cue to a target that does not stand out (still men, concealed posts): 0.72–1.15 of uncued, no gain at 22.5°–45°"),
         figure!("sensing.acquire.p_inf_max", 0.999, "fraction", 0.9, 0.999999, "default", Default, "cap on P∞ so λ stays finite"),
         figure!("sensing.irst.pfa", 1e-6, "fraction", 1e-9, 1e-2, "default", Default, "IRST per-frame per-pixel false alarm probability"),
         figure!("sensing.irst.frame_s", 1.0, "s", 0.01, 10.0, "default", Default, "IRST revisit of a given direction"),
@@ -308,7 +345,7 @@ mod tests {
             atmos_mtf: 0.8,
             contrast,
             stage,
-            search: Search { fov_deg: 10.0, cued: false, observer_tau_mult: 1.0, clutter: Clutter::Medium },
+            search: Search { fov_deg: 10.0, cue: Cue::None, observer_tau_mult: 1.0, clutter: Clutter::Medium },
         }
     }
 
@@ -337,8 +374,15 @@ mod tests {
         assert_relative_eq!(d.rate_per_s, 1.0 / d.tau_s, epsilon = 1e-12);
         // Cueing searches a small area: faster.
         let mut cued = tank_at(2000.0, c, 2.9, Stage::Detect);
-        cued.search.cued = true;
-        assert!(acquire(&cued, &p).rate_per_s > d.rate_per_s);
+        cued.search.cue = Cue::Precise;
+        let precise = acquire(&cued, &p).rate_per_s;
+        assert!(precise > d.rate_per_s);
+        // A report helps less than seeing it already; for a hard target, not at all.
+        cued.search.cue = Cue::Reported;
+        let reported = acquire(&cued, &p).rate_per_s;
+        assert!(reported > d.rate_per_s && reported < precise);
+        cued.search.cue = Cue::ReportedHard;
+        assert!(acquire(&cued, &p).rate_per_s <= reported);
     }
 
     /// Howe's worked example (p. 114): N = 2.56 cycles in medium clutter
@@ -354,7 +398,7 @@ mod tests {
         let (poor, _) = p_infinity(1.34, 1.0, &p);
         assert!((poor - 0.74).abs() < 0.01, "{poor}");
         assert!((tau_fov(poor, 1.34, 1.0, &p) - 4.52).abs() < 0.15, "{}", tau_fov(poor, 1.34, 1.0, &p));
-        let one = Search { fov_deg: p.fov_ref_deg, cued: false, observer_tau_mult: 1.0, clutter: Clutter::Medium };
+        let one = Search { fov_deg: p.fov_ref_deg, cue: Cue::None, observer_tau_mult: 1.0, clutter: Clutter::Medium };
         let five = Search { fov_deg: 5.0 * p.fov_ref_deg, ..one };
         assert_relative_eq!(search_scale(&five, &p), 5.0 * search_scale(&one, &p), epsilon = 1e-12);
     }
