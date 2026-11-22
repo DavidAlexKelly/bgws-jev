@@ -41,7 +41,7 @@ m_ct40_ap,ac_40_ct40,CT40 APFSDS-T,apfsds,true,false,false,false,172.0,150.0,130
 m_ct40_gpr,ac_40_ct40,CT40 GPR-PD-T / A3B airburst,airburst,false,false,false,false,,,,,8.0,0.115,A,"KNDS: 15mm RHA @1000m, 210mm concrete"
 m_l14,ac_30_rarden,L14A2 APDS-T,apds,true,false,false,false,52.0,50.0,45.0,40.0,0.0,0.0,B,~40mm @1500m
 m_l13,ac_30_rarden,L13A1 HE-I,he,false,false,false,false,,,,,3.0,0.03,B,published reference tables / manufacturer data (see README sources)
-m_mk30_ap,ac_30_mk30,PMC287/PMC359 APFSDS-T (30x173),apfsds,true,false,false,false,124.0,106.0,90.0,75.0,0.0,0.0,B,"Rheinmetall D129e0721 / B305e0526: 1,405 m/s; 53 mm at 60 deg (NATO) at 1,000 m = 106 mm along the line of flight; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point"
+m_mk30_ap,ac_30_mk30,PMC287/PMC359 APFSDS-T (30x173),apfsds,true,false,false,false,104.0,89.0,75.0,63.0,0.0,0.0,B,"Rheinmetall D129e0721 / B305e0526: 1,405 m/s; 53 mm at 60 deg (NATO) at 1,000 m; semi-infinite depth 89 mm (2 x 53 / 0.5^-0.255; Mullin et al. 1995: 1.6-2.0 x 53); range fall-off: tools/penetration_model.py"
 m_mk30_abm,ac_30_mk30,KETF/ABM airburst,airburst,false,false,false,false,,,,,6.0,0.05,B,published reference tables / manufacturer data (see README sources)
 m_3ubr8,ac_30_2a42,3UBR8 APDS-T,apds,true,false,false,false,58.0,55.0,50.0,44.0,0.0,0.0,B,~25mm @1500m/60deg
 m_3ubr6,ac_30_2a42,3UBR6 API-T,api,true,false,false,false,22.0,20.0,11.0,5.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)

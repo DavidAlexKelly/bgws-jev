@@ -1083,7 +1083,8 @@ fn volley_kill_odds(s: &Sim, e: Entity, fit: u32, cat_mount: &bgws_catalogue::Mo
         let z = armour_zones(&tplat);
         let chemical = matches!(warhead_of(mun), Warhead::ShapedCharge | Warhead::TandemShapedCharge);
         let front = if chemical { z.ce_mm[0] } else { z.ke_mm[0] };
-        if pen > front { 0.6 } else { 0.05 }
+        let limit = if chemical { pen } else { pen * p.ke_limit_ratio };
+        if limit > front { 0.6 } else { 0.05 }
     };
     let rounds = ((fit as f64 * s.ctx.p.rounds_per_volley).round().max(1.0)).min(rounds_left as f64);
     1.0 - (1.0 - ph * pk).powf(rounds)
