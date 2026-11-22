@@ -46,7 +46,7 @@ figure.
 
 | # | Area | Figure (value, range) | Moves | Why it matters |
 |---|---|---|---|---|
-| 1 | Search and detection | `sensing.acquire.cue_factor` (0.25, 0.05–1) | tank range 52%, attack halt 47%, ATGM 26% | How much faster a cued observer finds a target. Sets who sees whom first. |
+| 1 | Search and detection | `sensing.acquire.cue_factor` (now 0.35, 0.25–0.45, Yeh 2001; was 0.25 when ranked) | tank range 52%, attack halt 47%, ATGM 26% | How much faster a cued observer finds a target. Sets who sees whom first. |
 | 2 | | `sim.sense.search_fov_deg` (60°, 10–180) | tank range 21%, attack halt 55%, ATGM 17% | The sector a unit searches without a cue. |
 | 3 | | `sensing.acquire.fov_exponent` (0.5) and `fov_ref_deg` (10°) | tank range 59%, 27% | How search time grows with the sector. |
 | 4 | | `sensing.acquire.tau_base_s` (8 s, 1–60) | ATGM 31%, tank range 10% | Search time constant. |
@@ -253,14 +253,25 @@ missile crews took 8–11 s to engage after detecting. The lay time
 (`sim.fire.lay_min_s`, 6 s minimum) stands.
 
 **Still unsourced:**
-- `cue_factor`;
 - `fov_ref_deg`;
 - the observer multipliers;
 - the clutter mapping from land cover.
 
-ADA447823, the cueing report, could not be found. The file added as
-"cueing" is a 2024 laboratory study of contextual cueing (Su, Zhao & Ma,
-*Frontiers in Psychology*), not a field source. It is not used.
+ADA447823, the cueing report, has since been found: Yeh, Merlo, Wickens
+and Brandenburg (2001). Its measured times now set the cue factors, split
+by precision (`docs/sources/notes/yeh-2001-head-up-head-down-cue-effectiveness.md`):
+
+| Cue | Figure | Value (range) |
+|---|---|---|
+| Precise: seen already, a laser spot | `sensing.acquire.cue_factor` | 0.35 (0.25–0.45), was 0.25 unsourced |
+| A report, to a target that stands out | `sensing.acquire.cue_factor_reported` | 0.6 (0.4–0.75) |
+| A report, to a still man or a concealed post | `sensing.acquire.cue_factor_reported_hard` | 1.0 (0.7–1.15) |
+
+Which reported targets count as hard is set by
+`sim.sense.cue_hard_concealment` (0.5, unsourced). Poe (1974, ADA017599)
+measured a glimpse rate of about 3 a second, which supports Howe's
+0.3 s glimpse time behind `tfov_k_s`. The Su (2024) file is off-topic and
+not used.
 
 ## Why feature cover does not move the attack (21 November)
 

@@ -220,7 +220,11 @@ A blanket reference is grade D, whatever it says.
      spin-stabilised cores) are left out; the fit is for long rods.
    - **Result:** 2 km/muzzle ratios now run from about 0.70 (25 mm) to
      0.87 (older tank rounds), not 0.92 for all. For the 30 mm round:
-     124, 106, 90 and 75 mm at 0, 1, 2 and 3 km.
+     104, 89, 75 and 63 mm at 0, 1, 2 and 3 km. Its anchor is the
+     thick-block depth for "53 mm at 60°": 89 mm, not the 106 mm line of
+     flight (Mullin et al. 1995 put it at 1.6–2.0 times the plate figure).
+   - **Thin plates:** a kinetic rod perforates up to 1.05 times its
+     thick-block depth (`direct.ke_limit_ratio`, Mullin et al. 1995).
    - **Still to source:** most muzzle velocities are recalled reference
      figures, marked as such in `ke_rounds.csv`. So are the rods' L/D and
      the carbide-cored rounds' density. `--check` prints the model against

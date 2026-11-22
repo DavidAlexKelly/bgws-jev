@@ -968,9 +968,9 @@ mod tests {
         let f = crate::params::default_figures();
         let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
         let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
-        for k in 0..spec.len() {
+        for (k, cover) in t.land_cover.data.iter_mut().enumerate() {
             let (e, n) = spec.pos(spec.ij(k).0, spec.ij(k).1);
-            t.land_cover.data[k] = if e < -3_300.0 || n > 3_300.0 { LandCover::ForestLight } else { LandCover::Open };
+            *cover = if e < -3_300.0 || n > 3_300.0 { LandCover::ForestLight } else { LandCover::Open };
         }
         Ground::from_terrain(t, 1, &f)
     }
@@ -1310,10 +1310,10 @@ mod tests {
         let f = crate::params::default_figures();
         let spec = GridSpec::new(301, 301, 30.0, -4_500.0, -4_500.0);
         let mut t = Terrain::flat(Geodetic::new(54.7, 20.5, 0.0), spec, 0.0);
-        for k in 0..spec.len() {
+        for (k, h) in t.elevation.data.iter_mut().enumerate() {
             let (e, n) = spec.pos(spec.ij(k).0, spec.ij(k).1);
             if e.abs() < 3_000.0 {
-                t.elevation.data[k] = (40.0 * (1.0 - (n - 700.0).abs() / 300.0)).max(0.0) as f32;
+                *h = (40.0 * (1.0 - (n - 700.0).abs() / 300.0)).max(0.0) as f32;
             }
         }
         let g = Ground::from_terrain(t, 1, &f);

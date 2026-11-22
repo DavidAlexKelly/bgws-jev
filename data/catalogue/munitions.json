@@ -1323,19 +1323,19 @@
    "penetration": [
     {
      "rangeM": 0,
-     "mm": 124
+     "mm": 104
     },
     {
      "rangeM": 1000,
-     "mm": 106
+     "mm": 89
     },
     {
      "rangeM": 2000,
-     "mm": 90
+     "mm": 75
     },
     {
      "rangeM": 3000,
-     "mm": 75
+     "mm": 63
     }
    ],
    "topAttack": false,
@@ -1358,7 +1358,7 @@
     "air"
    ],
    "costUsd": 300,
-   "source": "synthetic; TS snapshots.ts cannon30 90 mm; Rheinmetall D129e0721: 53 mm at 60 deg (NATO) at 1000 m = 106 mm along the line of flight; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point",
+   "source": "Rheinmetall D129e0721: 53 mm at 60 deg (NATO) at 1000 m; semi-infinite depth 2 x 53 / 0.5^-0.255 = 89 mm (Lanz-Odermatt obliquity term; Mullin et al. 1995 put it at 1.6-2.0 x 53); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point",
    "dis": {
     "kind": 2,
     "domain": 2,

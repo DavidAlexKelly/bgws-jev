@@ -114,6 +114,8 @@ pub struct DirectFireParams {
     pub person_height_m: [f64; 3],
     pub ke_falloff_per_km: f64,
     pub pen_spread: f64,
+    /// A long rod goes through a plate this much thicker than the depth it reaches in a thick block.
+    pub ke_limit_ratio: f64,
     pub era_ke_reduction: f64,
     pub era_ce_reduction: f64,
     pub era_tandem_residual: f64,
@@ -172,6 +174,7 @@ impl DirectFireParams {
             person_height_m: ["standing", "kneeling", "prone"].map(|p| f.get(&format!("direct.person.height_m.{p}"))),
             ke_falloff_per_km: f.get("direct.ke_falloff_per_km"),
             pen_spread: f.get("direct.pen_spread"),
+            ke_limit_ratio: f.get("direct.ke_limit_ratio"),
             era_ke_reduction: f.get("direct.era.ke_reduction"),
             era_ce_reduction: f.get("direct.era.ce_reduction"),
             era_tandem_residual: f.get("direct.era.tandem_residual"),
@@ -559,6 +562,8 @@ pub fn strike_odds(warhead: Warhead, penetration_mm: f64, zone: Zone, armour: &A
     } else {
         penetration_mm
     };
+    // A rod perforates a plate a little thicker than it could penetrate in a thick block (the rear face gives way).
+    let pen = if warhead == Warhead::Kinetic { pen * p.ke_limit_ratio } else { pen };
     let p_intercept = if prot.aps && ce && attack_elevation_deg <= p.aps_max_elevation_deg { p.aps_p_intercept } else { 0.0 };
     let p_pen = if base <= 0.0 { 1.0 } else { logistic((pen - base) / (p.pen_spread * base)) };
     let over = if base <= 0.0 { 1.0 } else { ((pen / base - 1.0) / (p.overmatch_ratio - 1.0)).clamp(0.0, 1.0) };
@@ -656,6 +661,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("direct.person.height_m.prone", 0.35, "m", 0.2, 0.5, "default", Default, "prone presented height"),
         figure!("direct.ke_falloff_per_km", 0.06, "1/km", 0.02, 0.15, "default", Default, "KE penetration loss per km beyond the table"),
         figure!("direct.pen_spread", 0.12, "fraction", 0.03, 0.3, "default", Default, "softness of the penetration margin"),
+        figure!("direct.ke_limit_ratio", 1.05, "1", 1.0, 1.15, "Mullin et al. 1995 (ADA296435) pp. 42-43, 53", Low, "a kinetic rod perforates armour up to this multiple of its semi-infinite depth (the catalogue's penetration figures): the limit thickness lies between the depth and the depth plus about two rod diameters (docs/sources/notes/mullin-1995-scale-model-penetration-finite-steel-targets.md)"),
         figure!("direct.era.ke_reduction", 0.2, "fraction", 0.0, 0.5, "default", Default, "heavy ERA against long rods"),
         figure!("direct.era.ce_reduction", 0.6, "fraction", 0.2, 0.9, "default", Default, "ERA against single shaped charges"),
         figure!("direct.era.tandem_residual", 0.1, "fraction", 0.0, 0.5, "default", Default, "ERA effect left against a tandem warhead"),
