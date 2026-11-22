@@ -64,7 +64,8 @@ jobs:
       - name: Test the viewer's own logic (the imagery's lean)
         run: npm test
       - name: The committed build is the current one (bgws-server embeds it)
-        run: git diff --exit-code -- dist || (echo "frontend/viewer/dist is stale: run npm run build in frontend/viewer and commit it" && exit 1)
+        run: |
+          git diff --exit-code -- dist || (echo "frontend/viewer/dist is stale: run npm run build in frontend/viewer and commit it" && exit 1)
 
   duckdb:
     runs-on: ubuntu-latest
