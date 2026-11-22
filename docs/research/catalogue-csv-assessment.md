@@ -117,12 +117,29 @@ uncertain matches listed separately. The 2001 guide predates the T-72B3,
 T-90M and T-80BVM, so it confirms that their figures are copied, not what
 they should be.
 
+**Corrected (22 November 2026).** In the platform CSV:
+
+- **Source column:** a new `figure_source` column records where each
+  corrected figure came from.
+- **Corrected rows:** BMP-2 (and the BMP-2M's engine), T-72 (Ural),
+  T-80, T-90, T-55 engine, BTR-60, BTR-D and SA-6 now carry the WEG
+  values, and `hp_per_tonne` is recomputed.
+- **SA-6 engine:** blanked. Its 839 hp was copied from another row.
+- **Still unsourced:** the T-72B3, T-80BVM and T-90M keep their copied
+  figures, marked `UNSOURCED` in `figure_source` until a newer source is
+  found.
+
+In the munition CSV, `m_mk30_ap` is renamed PMC287/PMC359 and
+`m_35_apfsds` PMD343, with their sources stated. The 35 mm round's
+penetration is graded D because Rheinmetall publishes none.
+
 **Penetration against range, measured.** The 25 mm KBA cannon sheet gives
 flight times to 2 km. Fitted, a sub-calibre round loses about 125 m/s per
 km. With the long-rod fits in Toksoy (2025) and the SwRI database
 (Anderson et al. 1992; 208 measured tungsten-rod shots), a 25–35 mm rod
-keeps about 80% of its muzzle penetration at 1 km and 62% at 2 km; the
-CSV gives 97% and 92%. For a tank rod (faster, slowing less) the same
+keeps about 80–85% of its muzzle penetration at 1 km and 62–73% at 2 km
+(the range covers the two fits and 25 against 35 mm); the CSV gave 97%
+and 92%. For a tank rod (faster, slowing less) the same
 fits give a fall close to the CSV's curve. Details:
 `docs/sources/notes/rheinmetall-datasheets-medium-calibre.md`,
 `toksoy-2025-tungsten-long-rod-penetration-models.md`,
@@ -184,15 +201,30 @@ A blanket reference is grade D, whatever it says.
 
 ## How to improve the calculations
 
-1. **Long-rod penetration against range, per round.**
-   - **Velocity at range:** from the round's launch velocity and drag,
-     v(x) = v₀·exp(−x/L_d), where the decay length L_d comes from the
-     penetrator's mass and frontal area. For most rods this is about
-     50–70 m/s lost per km.
-   - **Penetration at that velocity:** the Lanz–Odermatt equation, from
-     the rod's length, diameter, density and the target's hardness.
-   - Calibrate each to its published muzzle or 2 km figure. That replaces
-     the single 97/92/86% curve, and the rounds diverge as they should.
+1. **Long-rod penetration against range, per round. Done:
+   `tools/penetration_model.py`, inputs in `data/catalogue/ke_rounds.csv`.**
+   - **Velocity at range:** v(x) = v₀·exp(−x/λ). λ is 11.2 km for 25 mm,
+     fitted to the KBA's flight times, and about 24.5 km for 120 mm, from
+     published losses of 62 m/s at 1 km and 123 m/s at 2 km (M829A1).
+     λ = 11.2 km·(calibre/25)^0.5 reproduces both, and is used between and
+     beyond them.
+   - **Penetration at that velocity:** the SwRI fit (Anderson et al. 1992,
+     eq. 7). It is within 1% on average of 194 measured shots with L/D
+     10–23; it over-predicts L/D 24–33 rods by 12%, which the anchoring
+     removes.
+   - **Anchoring:** each curve passes through the round's published
+     penetration at its published range, so only the shape comes from the
+     model.
+   - **Applied to:** the 19 APFSDS rows of the munition CSV and the 7
+     kinetic rounds in the sim's `munitions.json`. APDS rounds (short,
+     spin-stabilised cores) are left out; the fit is for long rods.
+   - **Result:** 2 km/muzzle ratios now run from about 0.70 (25 mm) to
+     0.87 (older tank rounds), not 0.92 for all. For the 30 mm round:
+     124, 106, 90 and 75 mm at 0, 1, 2 and 3 km.
+   - **Still to source:** most muzzle velocities are recalled reference
+     figures, marked as such in `ke_rounds.csv`. So are the rods' L/D and
+     the carbide-cored rounds' density. `--check` prints the model against
+     its sources.
 2. **Shaped charges.** Keep penetration constant with range (correct now).
    Record against plain armour and the effect of ERA separately (a tandem
    precursor defeats ERA; a single charge loses roughly 50–80% to it).
