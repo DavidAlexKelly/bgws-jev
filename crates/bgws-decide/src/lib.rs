@@ -65,7 +65,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("decide.heuristic.engineer_back", 1200.0, "m", 100.0, 10000.0, "default", Default, "Where engineers follow the lead, behind the objective."),
         figure!("decide.heuristic.post_back", 2500.0, "m", 200.0, 20000.0, "default", Default, "Where a command post follows the attack to."),
         figure!("decide.heuristic.post_follow_beyond", 4000.0, "m", 500.0, 50000.0, "default", Default, "A command post further than this from the objective follows the attack."),
-        figure!("decide.heuristic.fires_move_up", 0.7, "fraction", 0.1, 1.0, "default", Default, "Fire units beyond this share of their reach move up."),
+        figure!("decide.heuristic.fires_move_up", 1.0, "fraction", 0.1, 1.0, "default", Default, "Fire units beyond this share of their reach from the objective move up; at 1.0 only those that cannot reach it, so one that can stays in action (moving takes it out of action just when the attack meets the enemy: at 0.7 a company's mortars 6.6 km out with 7 km reach drove for 13 minutes and fired nothing at the first contact)."),
         figure!("decide.heuristic.fires_standoff", 0.5, "fraction", 0.1, 1.0, "default", Default, "Where fire units move up to, as a share of their reach from the objective."),
         figure!("decide.heuristic.enemy_close", 3000.0, "m", 200.0, 20000.0, "default", Default, "A lead unit with a known enemy this close bounds instead of moving tactically."),
         figure!("decide.heuristic.culmination_min_distance", 300.0, "m", 0.0, 5000.0, "default", Default, "An attack on its objective does not culminate; only one still short of it."),

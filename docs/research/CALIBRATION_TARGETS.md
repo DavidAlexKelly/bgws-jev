@@ -210,7 +210,399 @@ country shows the features in this outcome. Either units seldom stand on
 them, or a dug-in defence's cover outweighs them. Telling the two apart
 needs a trace of where units stand and what cover they get.
 
-## The search model: what could not yet be sourced
+## The search model: sourced and in (Howe 1993, TETAM)
+
+Volume 4 of the *IR/EO Systems Handbook* (Howe, pp. 110–114) and the TETAM
+paper (Bryson) were read in the original. The notes are in
+`docs/papers/notes/`.
+
+**What changed:**
+- Detection levels off at P∞, drawn once per pair and position
+  (eq. 2.33). The rate for an observer that will find the target is 1/τ.
+- τ for one field of view is 3.4/P∞, or 6.8·N50/N when P∞ ≥ 0.9
+  (eq. 2.38). Howe's worked example reproduces: 2.65 s and 4.52 s.
+- `fov_exponent` goes from 0.5 to 1.0: n fields of view take n times as
+  long (eq. 2.40).
+- The search detection N50 is scaled by clutter at the target: ×0.5 low,
+  ×2 high (Table 2.5).
+- `sensing.acquire.tau_base_s` (8 s, unsourced) is gone.
+
+**Vignettes, 60 games each, before → after:**
+
+| Vignette | Before | After |
+|---|---|---|
+| Attack halt (generated) | 25% | 33%, out of band (200 games, interval 25–33%) |
+| Attack halt (real ground) | 25% | 19% |
+| Attack halt (open country) | 19% | 25% |
+| ATGM engagement | 0.73 | 0.70 |
+| Spot report latency | 2.04 | 1.79 min |
+| Detect-to-strike (networked) | 3.42 | 3.20 min |
+
+Every other vignette is unchanged.
+
+**The generated attack-halt result needs explaining.** Its scenario has no
+HQ planner, so only units' own morale halts the attack. With slower,
+capped search, the defence finds the attackers later and the attack gets
+further before morale breaks. Giving that scenario a company HQ (as the
+generated `gen-*` attacks have) would test the HQ's halt there too.
+
+**TETAM check:** first sighting to first shot is a median 7 s (quartiles
+4.5–15 s) over 60 shots in `gen-company-attack`,
+`gen-meeting-engagement` and `gen-company-defence`. TETAM's anti-tank
+missile crews took 8–11 s to engage after detecting. The lay time
+(`sim.fire.lay_min_s`, 6 s minimum) stands.
+
+**Still unsourced:**
+- `cue_factor`;
+- `fov_ref_deg`;
+- the observer multipliers;
+- the clutter mapping from land cover.
+
+ADA447823, the cueing report, could not be found. The file added as
+"cueing" is a 2024 laboratory study of contextual cueing (Su, Zhao & Ma,
+*Frontiers in Psychology*), not a field source. It is not used.
+
+## Why feature cover does not move the attack (21 November)
+
+**1. The generated attack-halt test now has an HQ.** It plays
+`gen-company-attack` at 1:1 on generated ground, with its company HQ, as
+the two Kaliningrad tests do. It replaces the skirmish preset, which had
+none. Losses at the halt are a median of 38.5% over 100 games, still out
+of band (10–30%). The HQ's halt works; the losses come before it can act.
+In most seeds a single dug-in ATGM team destroys blue's four-tank platoon
+at 1.7–1.9 km, within one to two minutes of first contact, in about three
+two-missile volleys. Four tanks are 31% of the company, so it is past 20%
+before the HQ's 10-second check and its radio order to go firm.
+
+**2. A trace of where units stand and what cover they get** (6 games each,
+sampled every 30 s for units within 2.5 km of an enemy):
+
+| Ground | Attacker cover: class draw → final | Halted attackers masked | Defender cover: class → final |
+|---|---|---|---|
+| Open country (Kaliningrad) | 0.20 → 0.29 (folds 45%, trees 31%, rail 14%) | 16% | 0.35 → 0.36 |
+| Town (Kaliningrad) | 0.44 → 0.63 (walls 35%, trees 88%) | 43% | 0.48 → 0.55 |
+| Generated | 0.42 → 0.42 (folds only, shallow) | 0% | 0.20 → 0.21 |
+
+The features do reach the attackers. Defenders gain little: their land
+cover and digging in already give more.
+
+**3. Two reasons this did not move outcomes:**
+- **Vehicles ignored ground cover.** Direct fire at a vehicle used only
+  its posture: hull-down after settling, or in a firing position chosen
+  for it. A tank halted behind a railway bank or in a fold was fully
+  exposed. Now a halted vehicle counts as hull-down at once behind
+  features that mask its hull (`sim.cover.hull_mask`, 0.4 of cover from
+  walls, railway banks and folds). Trees and hedges don't count: they
+  hide a vehicle but do not stop rounds.
+- **Most losses happen on the move,** where no cover helps. Over 12
+  games each:
+
+  | Ground | Lost moving | Lost halted | Halted and masked or hull-down |
+  |---|---|---|---|
+  | Open country | 31 | 10 | 4 |
+  | Town | 20 | 13 | 13 |
+  | Generated | 65 | 4 | 0 |
+
+  Even with masking, switching feature cover off makes no detectable
+  difference to losses at the halt (open country p 0.28, town p 0.45,
+  generated p 0.97; 100 games each).
+
+**What decides these fights, and so what to look at next:**
+- how attackers cross ground the defence can see: bounding with
+  overwatch, smoke, and routes through dead ground;
+- how quickly a dug-in missile team kills a platoon that keeps coming:
+  its volley rate, and the tanks going to ground when fired on from
+  beyond their reach.
+
+## Crossing observed ground, and the missile team's kill rate (21 November)
+
+**One game, second by second** (`gen-company-attack` at 1:1, seed 1):
+- 418 s: the red anti-tank team launches two missiles at the tank
+  platoon, 1.8 km off. The tanks fire their smoke dischargers.
+- 429 s: both missiles hit. The platoon goes Steady → Shaken → Pinned →
+  Broken → Routed in four ticks (losing half its tanks at once is a burst
+  of stress that makes each next step near-certain). Its leader is hit, so
+  it can take no new orders for 120 s.
+- It then sits in the open, or runs in a straight line away. The team
+  finishes it 3½ minutes later, still at 1.9 km.
+
+**The missile team's rate is not the problem.** It is two firing posts
+(`generic/atgmTeam`, count 2), each firing one missile a volley, about 30 s
+apart: a launcher's reload plus about 10 s of flight. That is close to real
+practice. TETAM's crews took 8–11 s from detection to engagement.
+
+**What changed: a break-contact drill.**
+- **A vehicle that notices a missile launched at it** fires its smoke, as
+  before, and now also drives to the nearest ground the launcher cannot
+  see, within `sim.react.break_contact_m` (400 m). It searches 25 m rings,
+  straight back before the sides (`Ground::dead_ground`).
+- **A vehicle hit by a missile** from a launcher it cannot see does the
+  same; the hit shows where it came from.
+- **A broken or routed unit** runs to that dead ground instead of in a
+  straight line.
+- **A noticed launch counts as fire from the launcher,** so a unit that is
+  still steady calls smoke on it.
+- **It's a drill:** it needs no orders. Until the unit reaches the dead
+  ground, decisions and late answers don't send it back.
+- **The chance of noticing a launch** (`smoke.vehicle.warning_p`) is now
+  0.35, from TETAM Phase IIA: armour crews detected 18–47% of simulated
+  launches. It was 0.5, unsourced.
+
+**What it can and can't do:**
+- Retreating tanks make about 3–4 m/s.
+- On the generated farmland the nearest dead ground from 1.8 km is about
+  400 m away, too far to reach within a 10 s missile flight.
+- TETAM's 70 m median to break line of sight was on rolling hills
+  (Hunter Liggett).
+- So the drill saves tanks where there is ground to use, not on open
+  plains.
+
+**Effect, 100 games each, losses at the halt:**
+
+| Test | Drill off | Drill on | Halted (off → on) |
+|---|---|---|---|
+| Open country | 31% (out of band) | 23% (in band) | 40 → 56 |
+| Generated | 38.5% | 34% | 84 → 84 |
+| Kaliningrad town | 19% | 25% (p 0.02) | 55 → 66 |
+
+It helps in open country and costs a little in town, where vehicles
+pulling back are exposed in the streets.
+
+**Tried and switched off: approach routes that avoid the objective's
+view.** A route request can now carry the position its destination
+overlooks (`overlook`): ground the objective sees costs as exposure, its
+dead ground does not. At weight 0.6, attacks lost more before halting:
+
+| Test | Without | With |
+|---|---|---|
+| Real ground | 25% | 37.5% |
+| Open country | 23% | 31% |
+
+Both differences are significant (p 0.04 and 0.02). Routing round what the
+objective's centre sees takes longer detours, and the flank platoons still
+overlook them. It stays in the code at weight 0
+(`sim.route.overlook_weight`). A version that takes in what the whole
+defended front sees, or the HQ's own terrain appreciation, may do better.
+
+**Still open:**
+- **The morale cascade:** four states in four ticks after a lumped loss.
+  A minimum time in each state, or stress that builds over seconds, would
+  stop it.
+- **Bounding with overwatch at small odds:** at 1:1 the plan gives no unit
+  the support-by-fire task, so every unit moves at once.
+
+## Morale in steps, and covering fire at even odds (21 November)
+
+**Morale takes time to collapse.** A unit now stays in a morale state at
+least `people.morale.min_dwell_s` (20 s, unsourced) before it can get
+worse. Recovery is not held back.
+
+- **Before:** a tank platoon that lost two of four tanks to one volley went
+  Steady → Shaken → Pinned → Broken → Routed in four ticks. The loss is a
+  burst of stress that makes every next step near-certain.
+- **Now:** the same collapse takes 60–75 s, and in one seed of four the
+  platoon steadies once before breaking.
+- **Losses at the halt don't change** (100 games each, p 0.46–0.92). The
+  missiles destroy the tanks whatever their morale. This is a realism fix
+  for what units do in the meantime: firing back, taking orders, the HQ
+  pulling them out.
+
+**Covering fire with three platoons.** The planner used to hold one of a
+company's three platoons back as the reserve. That left two to lead,
+fewer than the three needed for one to give fire, so both went in with no
+one covering them. Now a reserve is held only if enough are left to lead
+with one giving fire. With three platoons, one supports by fire and two
+assault; with four or more, there is still a reserve. This reverses an
+earlier choice that three were "too few to split", in favour of the
+doctrinal company attack.
+
+Losses at the halt, 100 games each, against the run before (break-contact
+drill on, neither change):
+
+| Test | Before | After | Attacks halted |
+|---|---|---|---|
+| Open country | 23% | 15% | 56 → 67 |
+| Generated | 34% | 38.5% | 84 → 94 |
+| Kaliningrad town | 25% | 31% (out of band) | 66 → 45 |
+
+The effect is mixed, as the doctrine would expect. In town, more attacks
+now take the objective (55 of 100, from 34). In open country they halt
+sooner and at lower losses. On generated ground the covering platoon,
+standing off at 1.8 km, still meets the anti-tank team it can't
+out-range.
+
+**A mine strike can break a tank platoon out of contact.** In the breach
+test (seed 6), one tank in four lost to a mine, with no enemy near, takes
+the platoon from Steady to Routed (now over a minute). It stays Broken or
+Routed for 40 minutes and never uses the lane the engineers cleared. The
+test now excuses a platoon that broke, as it already excused one left
+immobilised.
+
+Whether a quarter of a platoon lost to one mine should break it is a
+calibration question. It turns on `people.stress.k_casualty` (3.0, tied
+to the 20% attack halt), and on slow recovery out of contact
+(`people.stress.recover_tau_s`, an hour).
+
+**What still decides the generated attack:** a dug-in missile team on
+open farmland with no dead ground near. The losses there come before
+morale, covering fire or the HQ's halt can act. Indirect fire on the
+launcher once it has fired (counter-fire from the company's mortars),
+not yet in the plan, is the next thing to try.
+
+## Mortar counter-fire on the launcher (21 November)
+
+**Why blue never fired on the missile team.** In every traced game, all
+the calls for fire were red's. There were three reasons:
+- **Only fully steady units called for fire.** After the first missile
+  hit, the tanks were Shaken. Now shaken and pinned units call too; only
+  broken and routed ones don't.
+- **A launcher had to be "seen" to be called on.** Now a noticed launch is
+  a target report in itself: the unit calls fire on where the missile came
+  from, with twice the usual aiming error, at priority 4 ("a missile
+  launched at us from there"). The sim records each launcher's last launch
+  position for this (`missiles_launched`).
+- **The company's mortars were driving.** They start 6.6 km from the
+  objective, within their 7 km range. The planner still sent them forward
+  ("move up into range", since they were beyond 70% of their range): 13
+  minutes on the road, out of action through the first contact at 7
+  minutes. Fire units now move up only if they cannot reach the objective
+  at all (`decide.heuristic.fires_move_up` 0.7 → 1.0).
+
+**What happens now.** In seed 1 the tanks call fire on the launcher one
+second after it launches (430 s). The battery's first round lands 95 s
+later, and it is smoke for an earlier screen request (missions go in
+turn). High explosive lands at 670 s, after the tank platoon was
+destroyed at 532 s, and knocks nothing out. An unplanned call takes
+minutes; a dug-in missile team kills a platoon in one or two. Counter-fire
+cannot save the platoon that draws the fire. At most it suppresses the
+team for the next one.
+
+**Losses at the halt, 100 games each:**
+
+| Test | Before | After |
+|---|---|---|
+| Kaliningrad town | 31% (out of band) | 25% (in band) |
+| Open country | 15% (in band) | 15% (in band) |
+| Generated | 38.5% (out of band) | 38.5% (out of band) |
+
+Keeping the mortars in action accounts for most of the town change
+(31% → 25%, with 65 attacks halted against 44), though that comparison is
+not significant on its own (Mann–Whitney p 0.33).
+
+**What would help next: planned fire on the objective.** Doctrine fires on
+the objective and its likely missile positions while the assault closes,
+not only on call. The heuristic plan gives its mortars only "answer calls
+for fire". A preparatory and covering fire plan would suppress the
+missile team before it can fire: rounds on the objective timed to the
+lead platoons crossing into missile range.
+
+## Planned covering fire on the objective (21 November)
+
+**What was added.** An attacking side's fire units fire on its objective
+while the assault closes, without waiting for a call (`covering_fire` in
+`domains/fires/indirect.rs`):
+- **When:** from when its lead manoeuvre unit is within
+  `sim.fires.cover_from_m` (3 km, about a missile team's reach) until it
+  is within `sim.fires.cover_lift_m` (400 m).
+- **How often:** a mission every `sim.fires.cover_every_s` (60 s), at
+  priority 2. Counter-fire on a seen launch, at priority 4, still comes
+  first.
+- **Where:** on each enemy the side believes is on the objective, in turn.
+  With none seen, on the fighting positions it was briefed on: where the
+  enemy's platoons and anti-tank teams started.
+- **Delivery:** the targets are planned and registered, so there is no
+  call delay, a quarter of the usual lay time (`sim.fires.cover_lay_frac`)
+  and the smaller bias of careful laying.
+- **Which side:** a side counts as attacking if it has its own objective,
+  or a plan with an "attack: take the objective" order. A defender whose
+  HQ plans a counter-attack fires its own.
+- **Off:** set `sim.fires.cover_from_m` to 0.
+
+**What it does, and why it does not change the outcome.** Losses at the
+halt, with and without, 100 games each:
+
+| Test | With | Without | Mann–Whitney p |
+|---|---|---|---|
+| Generated | 38.5% | 38.5% | 0.68 |
+| Town | 31% | 25% | 0.24 |
+| Open country | 15% | 15% | 0.21 |
+
+None of the differences can be told apart. Tracing the generated attack
+shows why:
+
+- **The missile team is not where it was briefed.** It moves about 200 m
+  forward from its starting hide to a firing position. The planned salvos
+  land on the briefed spot (within about 40 m of the aim), 170–190 m from
+  the team. That is outside the roughly 100 m at which a 120 mm burst is
+  felt (`sim.fires.suppress_radius_m` 150 m, scaled), so its suppression
+  stays at 0–0.15.
+- **Starting earlier backfires.** At 4 km the mortars fired from the first
+  minute and gave themselves away to red's counter-battery. They
+  displaced at 236 s and were out of action until 499 s, while the
+  missile team killed the tank platoon.
+
+This is realistic: fire on positions templated from the briefing misses
+defenders who have moved. What would hit the team is fire on where it
+actually is. That means an observer who sees it, or counter-fire on its
+launch, which now comes within a second of the first launch and lands
+about 90 s later. The plan is kept, as doctrine, and has no measurable
+effect against this defence.
+
+## The ranking refreshed (21 November, after all of the above)
+
+The same Morris screening over the land fight's figures (`--prefix land`,
+328 figures, 3 trajectories, 3 replicates), on the current model:
+
+| Vignette | Leading figures (μ*, as % of that vignette's top figure) |
+|---|---|
+| ATGM engagement | `direct.guided.ph` 100%, `sim.fire.missile_fail_p` 44%, `sensing.acquire.fov_exponent` 35% (now sourced), `sensing.observer.moving_factor` 33%, `sim.fire.rounds_per_volley` 33%, `sim.sense.search_fov_deg` 31%, `cue_factor` 25% |
+| Tank engagement range | `sim.sense.max_range_m` 100%, `cue_factor` 52%, `sim.fire.lay_min_s` 52%, `sensing.acquire.fov_ref_deg` 45%, `search_fov_deg` 35%, `moving_factor` 27%, `visual_contrast_threshold` 24% |
+| Attack halt, open country (Kaliningrad) | `decide.heuristic.fire_and_movement` 100%, `frontage` 94%, `fm_min_units` 93%, `missile_fail_p` 80%, `visual_contrast_threshold` 75%, `direct.guided.ph` 59%, `people.morale.min_dwell_s` 58%, `env.landcover.crops.conceal_mean` 53% |
+| Attack halt, town (Kaliningrad; noisy, few games halt) | `forest_dense.canopy_m`, `people.morale.hazard_width`, `moving_factor` (each 100%), `people.stress.k_casualty` 75%, `fov_exponent` 75%, `fm_min_units` 62%, `sim.fires.lay_mortar_s` 62% |
+
+**What changed since the first pass:**
+- **The search model is still the common thread.** Of its settings,
+  `fov_exponent` and the two τ constants are now sourced (Howe). Still
+  unsourced:
+  - the cue factor;
+  - the search sector (`search_fov_deg`);
+  - the reference field of view (`fov_ref_deg`);
+  - the moving observer's factor (`moving_factor`);
+  - the longest search range (`max_range_m`).
+- **On real ground the HQ planner's figures lead.** How an attack is put
+  together (fire and movement, frontage, how many units it needs) now
+  decides the open-country fight more than any physical figure. That
+  matches what the traces showed. These figures need a source in doctrine
+  (company attack frontages, support-by-fire practice) or in the
+  historical record.
+- **Morale moves the town fight:** `hazard_width`, `k_casualty` (sourced
+  to P14 but low confidence) and the new `min_dwell_s` (20 s, unsourced).
+- **Feature cover stays at the bottom:** `sim.cover.*` is at 8% or less
+  everywhere. So is the covering fire plan (`cover_from_m` 7%). The
+  traces explain both: losses come on the move, and the missile team is
+  not where it was briefed.
+
+**Next sources to find, in order:**
+1. The ATGM's chance of reaching its target, and its failure rate. These
+   were the top two in the first pass and still are.
+2. Search sector, cueing and the moving observer. The TETAM companion
+   paper on time to detect (not yet found), and the naked-eye leads in
+   `docs/papers/notes/naked-eye-leads.md`.
+3. Company attack frontage and fire-and-movement practice, from field
+   manuals (FM 3-90 / ATP 3-90.1, company attack).
+4. Morale hazard and dwell: historical breaking points of small units
+   under fire.
+
+## Naked-eye search
+
+Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau
+(2022), on Soviet trials: an unaided eye finds a tank against forest in
+3–7 s at 0.5–2.5 km. That is consistent with what the model does now.
+Each was seen only in search snippets, so none is used.
+
+## Superseded: the search model before the sources were read
+
+
 
 The primary sources are NVESD and ACQUIRE reports on DTIC, plus SPIE
 papers. Search snippets and recollection point to the following, none of

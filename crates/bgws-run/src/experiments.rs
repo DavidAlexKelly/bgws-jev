@@ -299,7 +299,7 @@ pub fn dismounted(f: &Figures, seed: Seed) -> Value {
     if water(a) || water(b) {
         return None;
     }
-    let req = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Foot, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 4.0, cross_kmh: 2.5, threats: &[], obstacles: &[], urgent: false };
+    let req = bgws_sim::routing::RouteRequest { from: a, to: b, class: bgws_env::VehicleClass::Foot, mode: bgws_sim::components::MoveModeS::Tactical, road_kmh: 4.0, cross_kmh: 2.5, threats: &[], obstacles: &[], urgent: false, overlook: None };
     let p = g.plan(&req, &g.route_params);
     (p.time_s > 0.0).then(|| (p.road_m + p.open_m) / 1000.0 / (p.time_s / 3600.0))
 }
@@ -511,6 +511,15 @@ pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value +
         let h = sim.world.get::<Health>(sim.ctx.entity(gun))?;
         Some(if h.start == h.fit { 1.0 } else { 0.0 })
     }
+}
+
+/// The generated company attack (`gen-company-attack`, generated ground) at
+/// even odds, 1:1, with its company HQ, for attack-halt: like the pack ones,
+/// so an HQ can call the attack off at its culmination losses.
+pub fn even_attack_generated() -> Option<ScenarioV4> {
+    let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-company-attack")?;
+    spec.ratio = 1.0;
+    ScenarioV4::from_json(&crate::scengen::build(&spec).ok()?.to_string()).ok()
 }
 
 /// The Kaliningrad company attack (`gen-kgd-company-attack`) at even odds,

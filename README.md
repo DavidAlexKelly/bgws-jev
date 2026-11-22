@@ -1546,6 +1546,93 @@ Ground sensing and drone cameras both work this way. *Can it see…?* shows
 `openWhereTheyStand`, and gives the chance of detection over the window on
 that line.
 
+### Breaking contact
+
+When a missile is launched at a vehicle and the crew notices, it fires its
+smoke dischargers and drives to the nearest ground the launcher cannot
+see. The chance of noticing is `smoke.vehicle.warning_p`, 0.35 (TETAM:
+armour crews spotted 18–47% of launches).
+
+- **Where it goes:** the search covers 25 m rings out to
+  `sim.react.break_contact_m` (400 m), straight back before the sides.
+  With no dead ground that near, it goes straight back.
+- **Hit from out of sight:** a vehicle hit by a missile from a launcher it
+  cannot see does the same.
+- **Broken units:** a broken or routed unit runs to that dead ground, not
+  in a straight line.
+- **Smoke:** a noticed launch counts as fire from the launcher, so a unit
+  still steady calls smoke on it.
+- **A drill:** until the unit reaches the dead ground, decisions and late
+  answers don't send it back. Each logs `unit.break_contact`.
+
+On open plains the nearest dead ground can be too far to reach within a
+missile's 10 s flight. Where there is a fold or a crest near, it saves the
+vehicle. Details are in `docs/research/CALIBRATION_TARGETS.md`.
+
+### Fire on missile teams, and planned covering fire
+
+- **Counter-fire on a launch:** a unit that notices a missile launched at
+  it calls fire on where it came from, priority 4, with twice the usual
+  aiming error. The sim keeps each launcher's last launch position for
+  this (`missiles_launched`).
+- **Who can call:** shaken and pinned units still call for fire; broken
+  and routed ones don't.
+- **Fire units stay in action:** they move up only if they cannot reach
+  the objective at all (`decide.heuristic.fires_move_up` 1.0). A company's
+  mortars in range no longer drive forward through the first contact.
+- **Covering fire plan:** while an attacking side's lead closes from 3 km
+  to 400 m of its objective (`sim.fires.cover_from_m`, `cover_lift_m`), its
+  fire units put a mission on the objective every 60 s. They fire on enemy
+  believed there, else on the fighting positions briefed at the start.
+  The targets count as registered: no call delay, a quarter of the lay
+  time, careful laying's bias. Logged as "the covering fire plan"; 0 for
+  `cover_from_m` turns it off.
+
+Against a dug-in missile team neither changes losses much. An unplanned
+call lands about 90 s after the launch, after the platoon that drew it is
+usually lost. The covering fire falls on the team's briefed hide, while
+the team fires from about 200 m away. Details are in
+`docs/research/CALIBRATION_TARGETS.md`.
+
+### Searching for a target: the NVESD search model
+
+Detection follows the US Army's NVESD search model, as Howe gives it in
+the *IR/EO Systems Handbook* (vol. 4, 1993, pp. 110–114). Notes with page
+references are in `docs/papers/notes/howe-1993-search.md`.
+
+- **Only some observers ever find a target.** The model gives
+  P(t) = P∞·[1 − exp(−t/τ)]. P∞ is the share of observers who ever find
+  the target, from the cycles they resolve across it (ACQUIRE).
+  - Whether this observer will is drawn once for the pair where they
+    stand, as for a sight line through trees. Moving draws it again.
+  - Before this change, the chance of detection kept rising towards 1
+    however hard the target was to pick out. Now a target this observer
+    cannot pick out stays unseen while neither moves.
+- **One that will find it does so in about τ.**
+  - Within one field of view, τ = 3.4/P∞ s, or 6.8·N50/N s when
+    P∞ ≥ 0.9.
+  - A sector is searched one field of view at a time (`fov_ref_deg`, 10°),
+    so it takes as many times longer as it holds fields of view.
+  - A cue and the observer's state scale it.
+- **Clutter at the target sets how hard it is to find.** Fields and open
+  ground are low clutter, so the detection N50 is half the medium value
+  (Howe Table 2.5). Woods and towns are medium: what they hide is already
+  the target's concealment and the canopy on the sight line. Rating them
+  high as well doubled the threshold and counted the wood twice.
+
+**What the change did:**
+- The vignettes stay in band, except attack halt on generated ground: its
+  median moved from 25% to 33% losses (200 games; band 10–30%). That
+  scenario has no HQ planner, so only morale halts the attack.
+- From first sighting to first shot takes a median of 7 s over 60 shots
+  in three generated scenarios. TETAM measured 8–11 s for anti-tank
+  missile crews (`docs/papers/notes/bryson-tetam.md`).
+- **Not sourced yet:**
+  - the cue factor;
+  - the observer multipliers;
+  - the 10° reference field of view;
+  - use of the model for the naked eye, which Howe excludes.
+
 ### Cover from the features on the ground
 
 A unit's cover (against direct fire, suppression and blast) and
@@ -1560,6 +1647,11 @@ the unit stands:
 | A tree line, hedgerow or garden trees | the share of the ground within 10 m under trees (full at 25%: a line through the point) | 0.3 | 0.7 |
 | A railway's bank and ballast | the railway cells, on or beside the line | 0.45 | 0.3 |
 | A fold, hollow or ditch | how far the point lies below the ground 25 m round it (at least a terrain cell) | 0.3 a metre, to 0.6 | 0.8 × cover |
+
+A vehicle halted behind features that mask its hull (walls, railway banks
+and folds that give 0.4 or more cover: `sim.cover.hull_mask`) counts as
+hull-down at once, without waiting to settle. Trees and hedges don't
+count: they hide a vehicle but do not stop rounds.
 
 The features join as `1 − Π(1 − each)`, capped at 0.95. The result is
 combined with the class's draw by taking the better of the two. The draw

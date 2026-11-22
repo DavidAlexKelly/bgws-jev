@@ -27,6 +27,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.cover.rail_conceal", 0.3, "fraction", 0.0, 1.0, "default", Low, "concealment at a railway's bank"),
         figure!("sim.cover.fold_per_m", 0.3, "fraction/m", 0.0, 1.0, "default", Low, "cover from direct fire per metre a point lies below the ground round it (a fold, hollow or ditch)"),
         figure!("sim.cover.fold_max", 0.6, "fraction", 0.0, 1.0, "default", Low, "most cover a fold of the ground gives"),
+        figure!("sim.cover.hull_mask", 0.4, "fraction", 0.1, 1.0, "default", Low, "a vehicle halted behind features that mask this much (a wall, a railway bank, a fold of the ground; not trees or hedges, which hide but do not stop rounds) counts as hull-down at once"),
         figure!("sim.cover.fold_radius_m", 25.0, "m", 5.0, 100.0, "default", Default, "how far round a point the ground is compared with it to find a fold (at least the terrain's cell)"),
     ]
 }
@@ -44,6 +45,7 @@ pub struct FeatureCoverParams {
     pub fold_per_m: f64,
     pub fold_max: f64,
     pub fold_radius_m: f64,
+    pub hull_mask: f64,
 }
 
 impl FeatureCoverParams {
@@ -60,6 +62,7 @@ impl FeatureCoverParams {
             fold_per_m: f.get("sim.cover.fold_per_m"),
             fold_max: f.get("sim.cover.fold_max"),
             fold_radius_m: f.get("sim.cover.fold_radius_m"),
+            hull_mask: f.get("sim.cover.hull_mask"),
         }
     }
 }
@@ -78,6 +81,9 @@ pub struct FeatureCover {
     /// Together: 1 − Π(1 − each).
     pub cover: f64,
     pub concealment: f64,
+    /// The part of the cover from features that mask a vehicle's hull (walls,
+    /// railway banks, folds): trees and hedges hide but do not stop rounds.
+    pub masking: f64,
 }
 
 /// The eight directions round a point.
@@ -90,6 +96,7 @@ pub fn feature_cover(g: &Ground, e: f64, n: f64) -> FeatureCover {
     let mut out = FeatureCover::default();
     let mut cover = Vec::with_capacity(4);
     let mut conceal = Vec::with_capacity(4);
+    let mut masks = Vec::with_capacity(3);
     // Buildings and trees, from the 5 m surface: the point and rings at 5 and 10 m.
     if let Some(s) = g.sight.as_ref() {
         let mut trees = 0usize;
@@ -117,6 +124,7 @@ pub fn feature_cover(g: &Ground, e: f64, n: f64) -> FeatureCover {
                 0.0
             };
             cover.push(p.wall * k);
+            masks.push(p.wall * k);
             conceal.push(p.wall_conceal * k);
         }
         if out.tree_share > 0.0 {
@@ -131,6 +139,7 @@ pub fn feature_cover(g: &Ground, e: f64, n: f64) -> FeatureCover {
         out.rail = g.rail_at(e, n) || RING.iter().step_by(2).any(|&(dx, dy)| g.rail_at(e + dx * r, n + dy * r));
         if out.rail {
             cover.push(p.rail_bank);
+            masks.push(p.rail_bank);
             conceal.push(p.rail_conceal);
         }
     }
@@ -142,12 +151,20 @@ pub fn feature_cover(g: &Ground, e: f64, n: f64) -> FeatureCover {
     if out.fold_m > 0.0 {
         let c = (out.fold_m * p.fold_per_m).min(p.fold_max);
         cover.push(c);
+        masks.push(c);
         conceal.push(c * 0.8);
     }
     let join = |v: &[f64]| (1.0 - v.iter().map(|c| 1.0 - c.clamp(0.0, 1.0)).product::<f64>()).min(0.95);
     out.cover = join(&cover);
     out.concealment = join(&conceal);
+    out.masking = join(&masks);
     out
+}
+
+/// Whether a vehicle halted here is hull-down behind what masks it (wall,
+/// railway bank, fold), whatever its settling time.
+pub fn masks_hull(g: &Ground, e: f64, n: f64) -> bool {
+    feature_cover(g, e, n).masking >= g.feature_cover.hull_mask
 }
 
 /// The class's draw with the features' cover: the better of the two.
@@ -199,6 +216,10 @@ mod tests {
         assert!(further.cover < by_wall.cover && further.cover > 0.0, "{further:?}");
         let in_line = feature_cover(&g, 0.0, 300.0);
         assert!((in_line.cover - p.trees).abs() < 1e-9 && in_line.concealment > 0.6, "{in_line:?}");
+        // Trees hide a vehicle but do not mask its hull; a wall does.
+        assert_eq!(in_line.masking, 0.0);
+        assert!(by_wall.masking >= p.hull_mask && masks_hull(&g, 95.0, 0.0));
+        assert!(!masks_hull(&g, 0.0, 300.0));
         let open = feature_cover(&g, 0.0, 200.0);
         assert_eq!(open.cover, 0.0);
         // A hollow: the ground round (−500, −500) raised 2 m.
@@ -215,5 +236,6 @@ mod tests {
         let (e, n) = t.spec.pos(c.0, c.1);
         let hollow = feature_cover(&g, e, n);
         assert!(hollow.fold_m > 1.5 && hollow.cover > 0.4, "{hollow:?}");
+        assert!(hollow.masking >= g.feature_cover.hull_mask, "a 2 m hollow masks a hull: {hollow:?}");
     }
 }

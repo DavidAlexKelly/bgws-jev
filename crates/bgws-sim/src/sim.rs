@@ -156,6 +156,9 @@ pub struct Ctx {
     pub route_obstacles: Vec<(crate::routing::KnownObstacle, std::collections::BTreeSet<Side>)>,
     /// Guided missile volleys in flight.
     pub missiles: Vec<crate::systems::InFlight>,
+    /// Each launcher's last missile launch: when, and where from (what a
+    /// crew that sees the launch knows of it).
+    pub missiles_launched: BTreeMap<EntityId, (SimTime, Enu)>,
     /// Entities another simulation owns, by their external key.
     pub remote: BTreeMap<crate::remote::ExternalKey, EntityId>,
     /// Detonations already judged: (the firing simulation's event, target,
@@ -287,6 +290,7 @@ impl Sim {
             seats: Side::PLAYERS.iter().map(|s| (*s, SeatKind::Planner)).collect(),
             route_obstacles: Vec::new(),
             missiles: Vec::new(),
+            missiles_launched: BTreeMap::new(),
             remote: BTreeMap::new(),
             detonations_seen: Default::default(),
             frozen: false,
@@ -950,6 +954,7 @@ pub(crate) fn spawn_force(world: &mut World, ctx: &mut Ctx, id: EntityId, f: &bg
                 fire_position: None,
                 bound: None,
                 guiding_until: None,
+                breaking_until: None,
             },
             Aware::default(),
             SigState { engine_on: domain != Domain::Land || platform.mover.kind != bgws_catalogue::MoverKind::Foot, ..Default::default() },

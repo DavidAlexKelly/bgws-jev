@@ -924,7 +924,7 @@ fn camera_p(s: &Sim, c4: &C4, f: &Flight, fid: u64, e: bevy_ecs::prelude::Entity
     let (crit, contrast, dt, conc, _) = signature(s, c4, e)?;
     let w = s.ctx.weather.sample(f.pos.e, f.pos.n, s.ctx.now);
     let p = &s.ctx.p;
-    let mut best: Option<(f64, SensorKind)> = None;
+    let mut best: Option<(f64, SensorKind, f64)> = None;
     for sen in f.platform.sensors.iter().filter(|x| x.kind.is_imaging_eo() && slant <= x.range_max_m) {
         let o = sen.optics.as_ref();
         let res = o.map(|o| o.resolution_cyc_per_mrad).unwrap_or(1.0);
@@ -937,12 +937,16 @@ fn camera_p(s: &Sim, c4: &C4, f: &Flight, fid: u64, e: bevy_ecs::prelude::Entity
         if let Some(o) = o {
             ap.n50 = [o.n50.detect, o.n50.recognise, o.n50.identify];
         }
-        let r = acquire(&AcquireInput { critical_dim_m: crit, range_m: slant, cycles_per_mrad: res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: c, stage: Stage::Detect, search: Search { fov_deg: p.search_fov_deg, cued: false, observer_tau_mult: 1.0 } }, &ap);
-        if best.map(|b| r.rate_per_s > b.0).unwrap_or(true) {
-            best = Some((r.rate_per_s, sk));
+        let r = acquire(&AcquireInput { critical_dim_m: crit, range_m: slant, cycles_per_mrad: res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: c, stage: Stage::Detect, search: Search { fov_deg: p.search_fov_deg, cued: false, observer_tau_mult: 1.0, clutter: crate::systems::clutter_at(&s.ctx.ground, tpos) } }, &ap);
+        if best.map(|b| r.p_inf * r.rate_per_s > b.2 * b.0).unwrap_or(true) {
+            best = Some((r.rate_per_s, sk, r.p_inf));
         }
     }
-    let (rate, sk) = best?;
+    let (rate, sk, p_inf) = best?;
+    // Only a camera operator who will ever pick it out from here does (P∞).
+    if !crate::systems::findable(s.ctx.seed, fid, tid.0 as u64, f.pos, tpos, s.ctx.p.sight_line_cell_m, p_inf) {
+        return None;
+    }
     Some((hazard_probability(rate, 1.0), sk, slant))
 }
 

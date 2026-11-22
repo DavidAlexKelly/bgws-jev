@@ -44,6 +44,10 @@ pub fn raise(s: &mut Sim) {
         if s.world.get::<Crew>(e).is_some_and(|c| c.leaderless_until.is_some()) && t.point != "D11" {
             continue;
         }
+        // Breaking contact: it carries on to the dead ground first (a drill).
+        if s.world.get::<Act>(e).is_some_and(|a| a.breaking_until.is_some_and(|t| t > s.ctx.now) && matches!(a.activity, Activity::Withdraw { .. })) && t.point != "D11" {
+            continue;
+        }
         // A broken unit runs itself.
         let morale = s.world.get::<Crew>(e).map(|c| c.morale.state).unwrap_or(MoraleState::Steady);
         if matches!(morale, MoraleState::Broken | MoraleState::Routed) && t.point != "D11" {
@@ -669,6 +673,13 @@ pub fn apply(s: &mut Sim, qid: QuestionId) {
         return;
     }
     let Some(opt) = p.q.options.iter().find(|o| o.id == a.choice).cloned() else { return };
+    // An answer asked for before it began breaking contact waits: the drill
+    // comes first (the unit is getting out of a missile's sight).
+    if s.world.get::<Act>(e).is_some_and(|a| a.breaking_until.is_some_and(|t| t > s.ctx.now) && matches!(a.activity, Activity::Withdraw { .. })) {
+        let text = format!("{}: {} (not now: breaking contact)", name(s, id), opt.summary);
+        s.ctx.log.push(s.ctx.now, "decide.apply").side(p.q.side).entity(id).text(text).data(serde_json::json!({ "question": qid.0, "option": opt.id, "deferred": "breakingContact" }));
+        return;
+    }
     let applied = crate::world::apply_action(s, e, id, &opt.action, &opt.params, p.about) || apply_land_action(s, e, id, &opt.action, p.about);
     { let __text = format!("{}: {}{}", name(s, id), opt.summary, if applied { "" } else { " (nothing to do)" }); s.ctx.log.push(s.ctx.now, "decide.apply").side(p.q.side).entity(id).text(__text).data(serde_json::json!({ "question": qid.0, "action": opt.action, "option": opt.id, "summary": opt.summary, "trigger": p.q.trigger, "title": p.q.title, "options": p.q.options.iter().map(|o| serde_json::json!({ "id": o.id, "summary": o.summary })).collect::<Vec<_>>(), "source": a.source, "probabilities": a.probabilities, "rationale": a.rationale })); }
 }
@@ -844,10 +855,13 @@ fn plan_route(s: &Sim, e: bevy_ecs::prelude::Entity, to: Enu, mode: MoveModeS, s
         _ => bgws_env::VehicleClass::Wheeled,
     };
     let threats = if seeks { Vec::new() } else { believed_threats(s, i.side) };
+    // A move that closes with the enemy keeps to ground its destination
+    // (where the enemy is expected) cannot see.
+    let overlook = (seeks && mode != MoveModeS::March).then_some((to.e, to.n));
     let m = &i.platform.mover;
     // Only the obstacles this side knows of: an unknown minefield is met, not avoided.
     let obstacles: Vec<crate::routing::KnownObstacle> = s.ctx.route_obstacles.iter().filter(|(_, known)| known.contains(&i.side)).map(|(o, _)| o.clone()).collect();
-    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats, obstacles: &obstacles, urgent };
+    let r = crate::routing::RouteRequest { from: k.pos, to, class, mode, road_kmh: m.road_kmh.max(m.cross_country_kmh).max(1.0), cross_kmh: m.cross_country_kmh.max(1.0), threats: &threats, obstacles: &obstacles, urgent, overlook };
     s.ctx.ground.plan(&r, &s.ctx.ground.route_params).waypoints
 }
 

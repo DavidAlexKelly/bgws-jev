@@ -64,6 +64,8 @@ pub struct RouteParams {
     pub obstacle_s: f64,
     /// The share of a believed threat's weight that applies where it cannot see (dead ground).
     pub masked: f64,
+    /// Weight of ground an approach's objective overlooks (`sim.route.overlook_weight`).
+    pub overlook_weight: f64,
     /// A threat's eye above the ground, m, and the cell its sight is worked out on.
     pub sight_agl_m: f64,
     pub sight_cell_m: f64,
@@ -118,6 +120,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("sim.route.ford_s", 90.0, "s", 0.0, 1_800.0, "default", Default, "time to ford a river shallow enough to cross (banks, entry and exit)"),
         figure!("sim.route.rail_kmh_tracked", 8.0, "km/h", 1.0, 40.0, "default", Default, "most a tracked vehicle makes across a railway away from a level crossing (bank, rails, ballast)"),
         figure!("sim.route.rail_kmh_wheeled", 3.0, "km/h", 0.5, 40.0, "default", Default, "most a wheeled vehicle makes across a railway away from a level crossing (bank, rails, ballast)"),
+        figure!("sim.route.overlook_weight", 0.0, "ratio", 0.0, 1.0, "default", Default, "on an approach to an objective, the weight of ground the objective (its centre) overlooks, as a share of a believed threat's; off by default: at 0.6 attacks lost more before halting (real ground 25% -> 37.5%, open country 23% -> 31%), the detours through ground hidden from the centre staying open to the flanks"),
         figure!("sim.route.masked", 0.5, "ratio", 0.0, 1.0, "default", Default, "share of a believed threat's weight on ground it cannot see (dead ground: hidden from direct fire and observation, not from drones or indirect fire)"),
         figure!("sim.route.sight_agl_m", 3.0, "m", 0.5, 30.0, "default", Default, "a believed threat's eye above the ground, for what it can see of a route"),
         figure!("sim.route.sight_cell_m", 60.0, "m", 10.0, 500.0, "default", Default, "cell a believed threat's sight is worked out on"),
@@ -161,6 +164,7 @@ impl RouteParams {
             long_m: g("long_m"),
             access_m: g("access_m"),
             masked: g("masked"),
+            overlook_weight: g("overlook_weight"),
             sight_agl_m: g("sight_agl_m"),
             sight_cell_m: g("sight_cell_m"),
             crater_cut: g("crater_cut").round().clamp(1.0, 255.0) as u8,
@@ -189,6 +193,11 @@ pub struct RouteRequest<'a> {
     /// Time-critical (orders "now", or getting a weapon into range): exposure
     /// counts only near a believed threat, not everywhere.
     pub urgent: bool,
+    /// Where the enemy a move closes with is expected (an attack's
+    /// objective): ground it can see costs as exposure, its dead ground does
+    /// not, so the approach keeps to covered ground. Unlike `threats`, it is
+    /// not steered round.
+    pub overlook: Option<(f64, f64)>,
 }
 
 /// An obstacle the moving side knows of (a minefield, ditch or dragon's
@@ -506,6 +515,8 @@ impl Ground {
                 }
             })
             .collect();
+        // What the objective overlooks, on an approach to it.
+        let overlook = r.overlook.and_then(|o| self.sight(o.0, o.1, reach).map(|v| (o, v)));
         let march = r.mode == MoveModeS::March;
         let r2 = p.threat_radius_m * p.threat_radius_m;
         let ford_limit = self.ford.depth_m[ci] as f32;
@@ -544,6 +555,14 @@ impl Ground {
                     }
                 })
                 .fold(0.0, f64::max);
+            // On the approach: ground the objective sees is open to its fire.
+            let near = match &overlook {
+                Some((o, v)) if v.sees(e, n) => {
+                    let d = (o.0 - e).hypot(o.1 - n);
+                    near.max((1.0 - d / p.threat_radius_m).max(0.0) * p.overlook_weight)
+                }
+                _ => near,
+            };
             // Exposure weight here, per second spent in the open.
             let base = if r.urgent { 0.0 } else { p.exposure_baseline[mi] };
             let exposure = p.exposure[mi] * (base + (1.0 - base) * near);
@@ -961,7 +980,7 @@ mod tests {
             VehicleClass::Wheeled => (90.0, 40.0),
             _ => (60.0, 40.0),
         };
-        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats, obstacles: &[], urgent: false };
+        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(to.0, to.1, 0.0), class, mode, road_kmh, cross_kmh, threats, obstacles: &[], urgent: false, overlook: None };
         g.plan(&r, &g.route_params)
     }
 
@@ -1221,7 +1240,7 @@ mod tests {
     }
 
     fn plan_past(g: &Ground, class: VehicleClass, obstacles: &[KnownObstacle]) -> Plan {
-        let r = RouteRequest { from: Enu::new(0.0, -3_000.0, 0.0), to: Enu::new(0.0, 3_000.0, 0.0), class, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles, urgent: false };
+        let r = RouteRequest { from: Enu::new(0.0, -3_000.0, 0.0), to: Enu::new(0.0, 3_000.0, 0.0), class, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles, urgent: false, overlook: None };
         g.plan(&r, &g.route_params)
     }
 
@@ -1305,7 +1324,7 @@ mod tests {
         assert!(n > 800.0, "goes behind the ridge: crosses at n = {n:.0}");
         let mut blind = g.route_params.clone();
         blind.masked = 1.0;
-        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(4_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &threat, obstacles: &[], urgent: false };
+        let r = RouteRequest { from: Enu::new(from.0, from.1, 0.0), to: Enu::new(4_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &threat, obstacles: &[], urgent: false, overlook: None };
         let n_blind = crossing_e(&g.plan(&r, &blind), from).expect("crosses");
         assert!(n_blind < 800.0, "without sight it has no reason to: {n_blind:.0}");
         let sight = g.sight(0.0, 0.0, 4_000.0).expect("a sight");
@@ -1329,7 +1348,7 @@ mod tests {
         assert_eq!(g.road_net.as_ref().map(|n| n.nodes.len()), Some(4));
         let mut p = g.route_params.clone();
         p.long_m = 3_000.0;
-        let r = RouteRequest { from: Enu::new(-4_100.0, -3_100.0, 0.0), to: Enu::new(-4_100.0, 3_100.0, 0.0), class: VehicleClass::Wheeled, mode: MoveModeS::March, road_kmh: 90.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false };
+        let r = RouteRequest { from: Enu::new(-4_100.0, -3_100.0, 0.0), to: Enu::new(-4_100.0, 3_100.0, 0.0), class: VehicleClass::Wheeled, mode: MoveModeS::March, road_kmh: 90.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false, overlook: None };
         let plan = g.plan(&r, &p);
         assert!(plan.road_m > 9_000.0, "{plan:?}");
         assert!(plan.waypoints.contains(&Enu::new(-2_200.0, 0.0, 0.0)), "along the edge's line: {:?}", plan.waypoints);
@@ -1391,7 +1410,7 @@ mod tests {
     #[test]
     fn ends_off_the_ground_go_straight() {
         let g = ground();
-        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false };
+        let r = RouteRequest { from: Enu::new(0.0, 0.0, 0.0), to: Enu::new(50_000.0, 0.0, 0.0), class: VehicleClass::Tracked, mode: MoveModeS::Tactical, road_kmh: 60.0, cross_kmh: 40.0, threats: &[], obstacles: &[], urgent: false, overlook: None };
         assert_eq!(g.plan(&r, &g.route_params).waypoints, vec![Enu::new(50_000.0, 0.0, 0.0)]);
     }
 }

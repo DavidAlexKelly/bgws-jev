@@ -14,7 +14,7 @@ use bgws_env::{transmission, OpticalBand};
 use bgws_know::{ClassEvidence, Detection, Hypothesis, IdLevel, Measurement, MotionHint, SensorKind, TruthTag};
 use bgws_models::direct_fire::{self as df, ArmourZones, FireControl, Gun, PersonPosture, Protection, Shot, StrikeOutcome, VehicleDims, VehiclePosture, Warhead, Zone};
 use bgws_models::people::{IncomingFire, MoraleState, StressInputs, UnitQuality, WorkLoad};
-use bgws_models::sensing::acquire::{acquire, AcquireInput, Contrast, Metric, Search, Stage};
+use bgws_models::sensing::acquire::{acquire, AcquireInput, Clutter, Contrast, Metric, Search, Stage};
 use bgws_models::sensing::observer::{tau_multiplier, ObserverState};
 use bevy_ecs::prelude::Entity;
 use nalgebra::Matrix3;
@@ -487,7 +487,10 @@ struct Sight {
 
 /// The best sensor of an observer against one target (highest detection rate).
 struct Best {
+    /// For an observer that will find the target: 1/τ.
     rate: f64,
+    /// The share of observers that ever find it (P∞).
+    p_inf: f64,
     sensor: SensorKind,
     contrast: Contrast,
     res: f64,
@@ -553,16 +556,47 @@ fn candidate_pairs(s: &Sim, ents: &[SenseEnt], max_r: f64) -> Vec<(usize, usize,
 /// while neither moves, and either moving a cell or so draws it afresh
 /// (other gaps in the leaves). It is the same both ways round.
 pub fn sight_line_open(seed: Seed, a: u64, b: u64, pa: Enu, pb: Enu, cell_m: f64, p_visible: f64) -> bool {
-    if p_visible >= 1.0 {
+    let ((a, pa), (b, pb)) = if a <= b { ((a, pa), (b, pb)) } else { ((b, pb), (a, pa)) };
+    keyed_at(seed, "sight-line", a, b, pa, pb, cell_m, p_visible)
+}
+
+/// Will this observer ever find this target, searching from where it is?
+/// The search model's P∞ is the share of observers that ever do (Howe 1993,
+/// eq. 2.33); which way it falls is drawn once for the pair where the two
+/// stand (`cell_m` cells), like a sight line through trees, so looking longer
+/// does not find a target this observer cannot pick out. Either moving
+/// draws it again. Unlike a sight line it is one way: observer, then target.
+pub fn findable(seed: Seed, observer: u64, target: u64, po: Enu, pt: Enu, cell_m: f64, p_inf: f64) -> bool {
+    keyed_at(seed, "findable", observer, target, po, pt, cell_m, p_inf)
+}
+
+/// A draw against `p`, the same for a pair while both stay in their cells.
+#[allow(clippy::too_many_arguments)]
+fn keyed_at(seed: Seed, purpose: &'static str, a: u64, b: u64, pa: Enu, pb: Enu, cell_m: f64, p: f64) -> bool {
+    if p >= 1.0 {
         return true;
     }
-    if p_visible <= 0.0 {
+    if p <= 0.0 {
         return false;
     }
-    let ((a, pa), (b, pb)) = if a <= b { ((a, pa), (b, pb)) } else { ((b, pb), (a, pa)) };
     let q = |v: f64| (v / cell_m.max(0.1)).floor() as i64 as u64;
     let cells = mix64(q(pa.e) ^ mix64(q(pa.n) ^ mix64(q(pb.e) ^ mix64(q(pb.n)))));
-    seed.uniform(StreamKey::new("sight-line", a, b, cells as i64)) < p_visible
+    seed.uniform(StreamKey::new(purpose, a, b, cells as i64)) < p
+}
+
+/// The clutter round a target in search, from the land cover where it is
+/// (Howe 1993 Table 2.5): low for a target in a field or on a road (open
+/// ground, crops, bare ground, water, wetland), medium elsewhere. Woods and
+/// towns are not high clutter: Howe's high is "a vehicle in an array of
+/// similar vehicles", and what woods and buildings hide is already the
+/// target's concealment and the canopy on the sight line (rating them high
+/// too doubled the detection threshold and counted the wood twice).
+pub fn clutter_at(g: &crate::ground::Ground, at: Enu) -> Clutter {
+    use bgws_env::LandCover::*;
+    match g.land_cover(at.e, at.n) {
+        Open | Crops | Bare | Water | Wetland => Clutter::Low,
+        Scrub | ForestLight | ForestDense | UrbanLight | UrbanDense => Clutter::Medium,
+    }
 }
 
 /// Sensing (§8.2): candidate pairs in range on the hash grid, the best
@@ -604,6 +638,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let w = s.ctx.weather.sample((o.pos.e + t.pos.e) / 2.0, (o.pos.n + t.pos.n) / 2.0, now);
                 let cued = cued(o, t);
                 let tau_mult = tau_multiplier(&o.observer, &p.observer);
+                let clutter = clutter_at(ground, t.pos);
                 // Smoke between them, by band (heights above the ground).
                 let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
                 let mut best: Option<Best> = None;
@@ -628,11 +663,12 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                         atmos_mtf: 1.0,
                         contrast,
                         stage: Stage::Detect,
-                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+                        search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
                     };
                     let det = acquire(&input, &ap);
-                    if best.as_ref().map(|b| det.rate_per_s > b.rate).unwrap_or(true) {
-                        best = Some(Best { rate: det.rate_per_s, sensor: sk, contrast, res, n50, u: 1.0 });
+                    // The sensor that finds it soonest on average (P∞/τ).
+                    if best.as_ref().map(|b| det.p_inf * det.rate_per_s > b.p_inf * b.rate).unwrap_or(true) {
+                        best = Some(Best { rate: det.rate_per_s, p_inf: det.p_inf, sensor: sk, contrast, res, n50, u: 1.0 });
                     }
                 }
                 // The pair's first die, drawn now from its keyed stream (the
@@ -640,6 +676,11 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 // lowers the chance, so a die that fails with a clear line
                 // fails anyway: those pairs need no terrain at all.
                 let b = best.filter(|b| b.rate > 0.0)?;
+                // Only an observer that will ever find it does (P∞, drawn
+                // for where the two are), at the rate 1/τ.
+                if !findable(seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, b.p_inf) {
+                    return None;
+                }
                 let mut rng = seed.stream(StreamKey::new("sense", o.id.0 as u64, t.id.0 as u64, now.0));
                 let u: f64 = rng.gen();
                 (u < hazard_probability(b.rate, dt)).then_some(Best { u, ..b })
@@ -708,7 +749,7 @@ pub fn sensing(s: &mut Sim, dt: f64) {
                 let _first: f64 = rng.gen();
                 let mut ap = p.acquire.clone();
                 ap.n50 = b.n50;
-                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer) };
+                let search = Search { fov_deg: p.search_fov_deg, cued: cued(o, t), observer_tau_mult: tau_multiplier(&o.observer, &p.observer), clutter: clutter_at(ground, t.pos) };
                 let input = |stage| AcquireInput { critical_dim_m: t.crit, range_m: range, cycles_per_mrad: b.res, metric: Metric::Johnson, atmos_mtf: 1.0, contrast: b.contrast, stage, search };
                 let rec = acquire(&input(Stage::Recognise), &ap).p_inf;
                 let idn = acquire(&input(Stage::Identify), &ap).p_inf;
@@ -808,7 +849,8 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     let through = |band| smoke.map_or(1.0, |sm| sm.transmission(band, Enu::new(o.pos.e, o.pos.n, o.eye_h + o.agl), Enu::new(t.pos.e, t.pos.n, 1.5 + t.agl), now));
     let (smoke_visual, smoke_thermal) = (through(bgws_models::signature::Band::Visual), through(bgws_models::signature::Band::FarIr));
     let mut sensors = Vec::new();
-    let mut best_rate = 0.0f64;
+    let (mut best_rate, mut best_p_inf) = (0.0f64, 0.0f64);
+    let clutter = clutter_at(&s.ctx.ground, t.pos);
     for &(kind, rmax, res0, n50) in &o.sensors {
         let in_range = range <= rmax && range <= p.sense_max_m;
         let (contrast, mut res) = match kind {
@@ -829,11 +871,11 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
             atmos_mtf: 1.0,
             contrast,
             stage: Stage::Detect,
-            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult },
+            search: Search { fov_deg: p.search_fov_deg, cued, observer_tau_mult: tau_mult, clutter },
         };
         let det = acquire(&input, &ap);
-        if in_range {
-            best_rate = best_rate.max(det.rate_per_s);
+        if in_range && det.p_inf * det.rate_per_s > best_p_inf * best_rate {
+            (best_rate, best_p_inf) = (det.rate_per_s, det.p_inf);
         }
         sensors.push(json!({ "sensor": format!("{kind:?}"), "maxRangeM": rmax, "inRange": in_range, "cyclesPerMrad": res, "nightDegraded": night_degraded, "contrast": contrast_json(&contrast), "acquire": det }));
     }
@@ -849,7 +891,9 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
     // Through trees the line is open or not for where the two stand now (the
     // keyed draw sensing makes; reading it changes nothing).
     let open = sight_line_open(s.ctx.seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, p_elements);
-    let p_window = if open { hazard_probability(best_rate, over_s) } else { 0.0 };
+    // Whether this observer will ever pick it out from here (P∞, drawn as sensing draws it).
+    let will_find = findable(s.ctx.seed, o.id.0 as u64, t.id.0 as u64, o.pos, t.pos, p.sight_line_cell_m, best_p_inf);
+    let p_window = if open && will_find { hazard_probability(best_rate, over_s) } else { 0.0 };
     Some(json!({
         "observer": name(s, observer), "target": name(s, target), "rangeM": range, "atS": now.secs(),
         "light": { "lux": lux, "night": night }, "visibilityM": w.visibility_m,
@@ -861,9 +905,13 @@ pub fn explain_detection(s: &Sim, observer: EntityId, target: EntityId, over_s: 
         // it fell for where they stand, which holds until one moves; the rest is the line between the two units' centres.
         "lineOfSight": { "pVisible": p_elements, "openWhereTheyStand": open, "linesChecked": lines.len(), "centreLine": { "terrainVisible": los.terrain_visible, "clearanceM": los.clearance_m, "pClearOfCanopy": los.p_clear, "pVisible": los.p_visible, "canopyPathM": los.canopy_path_m, "buildingBlocked": los.building_blocked } },
         "sensors": sensors,
+        // The search model (Howe 1993): P∞ of observers ever find it; one that will finds it at bestRatePerS (1/τ).
+        "clutter": clutter,
+        "pInfinity": best_p_inf,
+        "findableFromHere": will_find,
         "bestRatePerS": best_rate,
         "windowS": over_s,
-        // While neither moves.
+        // While neither moves (0 if the line is blocked or it cannot pick the target out from here).
         "pDetectInWindow": p_window,
         "alreadySeen": cued,
     }))
@@ -959,7 +1007,10 @@ fn aim(s: &Sim, e: Entity, cat_mount: &bgws_catalogue::Mount, mun: &bgws_catalog
     } else {
         let b = &tplat.body;
         let dims = VehicleDims { length_m: b.length_m.max(3.0), width_m: b.width_m.max(2.0), hull_height_m: (b.height_m * 0.6).max(1.0), turret_height_m: (b.height_m * 0.4).max(0.3) };
-        df::presented_vehicle(&dims, aspect, if tposture == Posture::HullDown { VehiclePosture::HullDown } else { VehiclePosture::Exposed }, p)
+        // Hull-down once settled into a position, or at once when halted
+        // behind a wall, a railway bank or a fold that masks the hull.
+        let masked = tposture != Posture::Moving && crate::cover::masks_hull(&s.ctx.ground, tk.pos.e, tk.pos.n);
+        df::presented_vehicle(&dims, aspect, if tposture == Posture::HullDown || masked { VehiclePosture::HullDown } else { VehiclePosture::Exposed }, p)
     };
     (pres, budget, soft, tplat)
 }
@@ -1100,7 +1151,26 @@ fn launch_missiles(s: &mut Sim, e: Entity, id: EntityId, side: Side, mount_i: us
     let text = format!("{} launches {} {} at {} ({:.0} m, {:.0} s to go)", name(s, id), rounds, mun.name, name(s, tid), range, flight);
     s.ctx.log.push(now, "fire.launch").side(side).entity(id).target(tid).text(text).data(serde_json::json!({ "munition": mun.id, "rounds": rounds, "rangeM": range, "flightS": flight, "guidedByGunner": operator }));
     let from = s.world.get::<Kin>(e).map(|k| k.pos).unwrap_or_default();
+    s.ctx.missiles_launched.insert(id, (now, from));
     crate::smoke::missile_warning(s, tid, id, from);
+    // A vehicle crew that sees it coming also drives out of the launcher's
+    // sight (the same draw as for its dischargers): a missile guided by its
+    // gunner then goes astray.
+    let te = s.ctx.entity(tid);
+    if !crate::remote::is_remote(s, te) && crate::smoke::notices_launch(s, tid, id) {
+        // A launch seen is fire from that launcher: the unit can call smoke on it.
+        if let Some(mut c) = s.world.get_mut::<Crew>(te) {
+            c.last_incoming = Some((now, id));
+        }
+        if is_vehicle(s, te) {
+            break_contact(s, te, from, "a missile launch seen");
+        }
+    }
+}
+
+/// A land vehicle (not troops on foot).
+fn is_vehicle(s: &Sim, e: Entity) -> bool {
+    s.world.get::<Ident>(e).is_some_and(|i| i.domain == bgws_catalogue::Domain::Land && !matches!(i.platform.body.vulnerability, Vulnerability::Personnel))
 }
 
 /// Missile volleys that arrive now: each lands (hits resolved as a volley
@@ -1139,6 +1209,15 @@ fn missiles(s: &mut Sim) {
         };
         let quality = s.world.get::<Ident>(e).map(|i| i.quality).unwrap_or(0);
         fire_volley(s, e, m.firer, m.side, m.fit, quality, m.mount, &mun, &cat_mount, m.target, range, Some(m.rounds));
+        // Hit by a missile from out of its reach: what is left of a vehicle
+        // platoon gets out of the launcher's sight (the hit gives it away).
+        // One that has the launcher in sight fights it instead.
+        let sees_it = s.world.get::<Aware>(te).and_then(|a| a.seen.get(&m.firer)).is_some_and(|v| (now - v.last).secs() < 10.0);
+        if alive(s, te) && is_vehicle(s, te) && !sees_it && !crate::remote::is_remote(s, te) {
+            if let Some(from) = s.world.get::<Kin>(e).map(|k| k.pos) {
+                break_contact(s, te, from, "hit by a missile");
+            }
+        }
     }
 }
 
@@ -1911,12 +1990,14 @@ pub fn people(s: &mut Sim, dt: f64) {
             { let __text = format!("{} is {:?} (was {:?})", name(s, id), ch.to, ch.from); s.ctx.log.push(now, "people.morale").side(side).entity(id).text(__text).data(serde_json::json!({ "stress": ch.stress, "casualties": ch.casualties })); }
             match ch.to {
                 MoraleState::Broken | MoraleState::Routed => {
-                    // Runs itself: falls back away from the threat.
+                    // Runs itself: falls back away from the threat, to the
+                    // nearest ground it cannot see if there is any near,
+                    // else straight back.
                     let away = threat_bearing(s, e).map(|b| b + std::f64::consts::PI).unwrap_or(match side {
                         Side::Blue => std::f64::consts::PI,
                         _ => 0.0,
                     });
-                    let to = pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m * 1.5));
+                    let to = nearest_threat(s, e).and_then(|t| dead_ground_from(s, pos, t)).unwrap_or_else(|| pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m * 1.5)));
                     let mut a = s.world.get_mut::<Act>(e).expect("act");
                     a.activity = Activity::Withdraw { route: vec![to], then: Some(Box::new(Activity::Quiet)) };
                     a.roe = RoeS::IfFiredUpon;
@@ -1961,6 +2042,51 @@ impl FriendGrid {
 }
 
 /// Bearing to the nearest thing that threatens a unit (seen enemy or suspect).
+/// The nearest ground within `sim.react.break_contact_m` that a threat at
+/// `threat` cannot see (its viewshed, over the ground and through what it
+/// knows of the roofs and woods), not towards it: where a unit breaks
+/// contact to. TETAM's tanks, fired on, broke line of sight in a median 70 m
+/// of evasive driving. `None` if there is none that near.
+pub(crate) fn dead_ground_from(s: &Sim, pos: Enu, threat: Enu) -> Option<Enu> {
+    s.ctx.ground.dead_ground(pos, threat, s.ctx.p.break_contact_m)
+}
+
+/// A unit breaks contact from a threat: off to the nearest dead ground from
+/// it (else straight back `sim.withdraw_m`), then holds there on overwatch.
+/// A drill: it needs no orders, so a unit whose leader is down does it too.
+pub(crate) fn break_contact(s: &mut Sim, e: Entity, threat: Enu, why: &str) {
+    // `sim.react.break_contact_m` 0: no drill.
+    if s.ctx.p.break_contact_m <= 0.0 {
+        return;
+    }
+    let Some(pos) = s.world.get::<Kin>(e).map(|k| k.pos) else { return };
+    if s.world.get::<Act>(e).is_some_and(|a| matches!(a.activity, Activity::Withdraw { .. })) {
+        return;
+    }
+    let to = dead_ground_from(s, pos, threat).unwrap_or_else(|| {
+        let away = pos.sub(threat).bearing();
+        pos.add(Enu::new(away.sin(), away.cos(), 0.0).scale(s.ctx.p.withdraw_m))
+    });
+    let id = s.world.get::<Ident>(e).map(|i| i.id);
+    let secs = to.sub(pos).horizontal() / 3.0 + 20.0;
+    if let Some(mut a) = s.world.get_mut::<Act>(e) {
+        a.activity = Activity::Withdraw { route: vec![to], then: Some(Box::new(Activity::Overwatch)) };
+        a.last_event = s.ctx.now;
+        a.breaking_until = Some(s.ctx.now + bgws_core::SimDuration::from_secs(secs));
+    }
+    if let Some(id) = id {
+        let side = s.world.get::<Ident>(e).map(|i| i.side).unwrap_or(Side::Neutral);
+        let text = format!("{} breaks contact ({why}): {:.0} m to ground the threat cannot see", name(s, id), to.sub(pos).horizontal());
+        s.ctx.log.push(s.ctx.now, "unit.break_contact").side(side).entity(id).text(text).data(serde_json::json!({ "why": why, "m": to.sub(pos).horizontal() }));
+    }
+}
+
+/// The nearest enemy a unit has seen, where it was.
+pub(crate) fn nearest_threat(s: &Sim, e: Entity) -> Option<Enu> {
+    let pos = s.world.get::<Kin>(e)?.pos;
+    s.world.get::<Aware>(e)?.seen.values().map(|v| v.at).min_by(|a, b| a.sub(pos).horizontal().total_cmp(&b.sub(pos).horizontal()))
+}
+
 pub(crate) fn threat_bearing(s: &Sim, e: Entity) -> Option<f64> {
     let pos = s.world.get::<Kin>(e)?.pos;
     let aw = s.world.get::<Aware>(e)?;

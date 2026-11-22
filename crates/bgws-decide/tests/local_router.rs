@@ -180,6 +180,7 @@ fn hq_situation() -> HqSituation {
             u("B1", UnitRole::Manoeuvre, 50.0, 10.0, None),
             u("B2", UnitRole::Manoeuvre, 50.0, 10.01, None),
             u("B3", UnitRole::Manoeuvre, 50.0, 10.02, None),
+            u("B4", UnitRole::Manoeuvre, 50.0, 10.03, None),
             u("ART", UnitRole::Fires, 49.8, 10.0, Some(15000.0)),
             u("CP", UnitRole::Post, 49.95, 10.0, None),
             u("ENG", UnitRole::Engineer, 50.0, 10.0, None),
@@ -193,21 +194,40 @@ fn hq_situation() -> HqSituation {
 fn the_heuristic_attacks_with_a_reserve_when_strong_enough() {
     let p = HeuristicParams::from_figures(&default_figures());
     let plan = heuristic_plan(&hq_situation(), &p);
-    assert_eq!(plan["reserve"], "B3");
+    // Four manoeuvre units: one held back, one gives fire, two assault.
+    assert_eq!(plan["reserve"], "B4");
     assert!(plan["plan"].as_str().unwrap().contains("take the objective"));
     let orders = plan["orders"].as_array().unwrap();
     let of = |id: &str| orders.iter().find(|o| o["unit"] == id).unwrap().clone();
-    assert_eq!(of("B1")["task"], "attack: take the objective");
-    // The two lead units 300 m apart across the objective.
+    assert_eq!(of("B4")["task"], "reserve");
+    let support: Vec<&Value> = orders.iter().filter(|o| o["task"] == "support by fire onto the objective").collect();
+    assert_eq!(support.len(), 1, "one lead unit gives fire");
+    let assault: Vec<Value> = ["B1", "B2", "B3"].iter().map(|id| of(id)).filter(|o| o["task"] != "support by fire onto the objective").collect();
+    assert_eq!(assault.len(), 2);
+    // The two assaulting units 300 m apart across the objective.
     let to = |o: &Value| Geodetic::new(o["phases"][0]["to"]["lat"].as_f64().unwrap(), o["phases"][0]["to"]["lon"].as_f64().unwrap(), 0.0);
-    approx::assert_relative_eq!(to(&of("B1")).surface_distance(to(&of("B2"))), 300.0, epsilon = 1.0);
-    assert_eq!(of("B3")["task"], "reserve");
+    approx::assert_relative_eq!(to(&assault[0]).surface_distance(to(&assault[1])), 300.0, epsilon = 1.0);
     // ART is 33 km out with 15 km reach: it moves up.
     assert_eq!(of("ART")["phases"][0]["do"], "move");
     assert_eq!(of("CP")["phases"][0]["label"], "follow the attack");
     assert_eq!(of("ENG")["phases"][0]["label"], "follow the lead, ready to breach");
     // Every order fits the schema the Claude planner is held to.
     assert!(bgws_decide::schema_check::check(&bgws_decide::hq::orders_plan_schema(), &plan).is_empty());
+}
+
+/// With three manoeuvre units (a company's three platoons) none is held
+/// back: one supports by fire while two assault, rather than two going in
+/// with no one covering them.
+#[test]
+fn with_three_units_one_covers_and_two_assault() {
+    let p = HeuristicParams::from_figures(&default_figures());
+    let mut s = hq_situation();
+    s.units.retain(|u| u.id != "B4");
+    let plan = heuristic_plan(&s, &p);
+    assert!(plan.get("reserve").is_none(), "{plan}");
+    let orders = plan["orders"].as_array().unwrap();
+    let tasks: Vec<&str> = ["B1", "B2", "B3"].iter().map(|id| orders.iter().find(|o| o["unit"] == *id).unwrap()["task"].as_str().unwrap()).collect();
+    assert_eq!(tasks.iter().filter(|t| **t == "support by fire onto the objective").count(), 1, "{tasks:?}");
 }
 
 #[test]
@@ -235,7 +255,7 @@ async fn hq_questions_go_to_the_sides_planner_heuristic_by_default() {
     q.situation = serde_json::to_string(&hq_situation()).unwrap();
     let a = Router::rules().answer(vec![q.clone()]).await.remove(0);
     assert_eq!(a.source, AnswerSource::Rules);
-    assert_eq!(a.plan.unwrap()["reserve"], "B3");
+    assert_eq!(a.plan.unwrap()["reserve"], "B4");
     let h = bgws_decide::HeuristicPlanner::default();
     assert_eq!(h.name(), "heuristic");
 }
