@@ -1,4 +1,4 @@
-//! Communications and networks (RUST_ENGINE.md §8.5; research R2).
+//! Communications and networks (rust-engine.md §8.5; research R2).
 //!
 //! - **Bearers** with real figures: SINCGARS-like VHF at 0.2–40 km by power
 //!   **[P4]**, UHF, HF NVIS **[P5]**, satcom GEO and LEO with latency **[P7]**,

@@ -1,5 +1,5 @@
 //! Which built-in template a unit uses when nothing else is assigned, by what
-//! it is (RUST_ENGINE.md §10.1; DECISION_FLOW_GRAPHS.md §4.2). A port of
+//! it is (rust-engine.md §10.1; decision-flow-graphs.md §4.2). A port of
 //! `behaviour/archetypes.ts`, shared by the engine and the store so both
 //! always agree on a unit's default.
 

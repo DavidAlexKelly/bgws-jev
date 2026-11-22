@@ -1,4 +1,4 @@
-//! Aggregated combat and level of detail (RUST_ENGINE.md §8.13, §6.4; research R8, P14).
+//! Aggregated combat and level of detail (rust-engine.md §8.13, §6.4; research R8, P14).
 //!
 //! - **Stochastic Lanchester attrition** between formations: each side's
 //!   losses in a step are Poisson with rate k·(enemy effective strength)

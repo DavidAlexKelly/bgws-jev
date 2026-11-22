@@ -1,5 +1,5 @@
 //! Knowledge: tracks, Kalman filters, association, classification, fusion and
-//! the side views (RUST_ENGINE.md §9, rule 1 of §2, the truth property of §17).
+//! the side views (rust-engine.md §9, rule 1 of §2, the truth property of §17).
 //!
 //! The pipeline a side runs:
 //!

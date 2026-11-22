@@ -8,7 +8,7 @@ A web search on 21 November 2026 found the leads below. Each was seen
 **only in search snippets**: the hosts holding the documents refused this
 environment (apps.dtic.mil, archive.org, media.defense.gov,
 benning.army.mil). **None of these numbers is used in the model.** To use
-one, download it in a browser and add it to `docs/papers/pdfs/`.
+one, download it in a browser and add it to `docs/sources/raw/`.
 
 | Lead | What the snippets say | Would mean |
 |---|---|---|

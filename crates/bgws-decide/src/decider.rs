@@ -1,4 +1,4 @@
-//! The decider interface the host calls (RUST_ENGINE.md §3.2, §3.3, §10).
+//! The decider interface the host calls (rust-engine.md §3.2, §3.3, §10).
 //! A decider sees only `Question`s, which the sim built from what each agent
 //! believes (rule 1), and returns `Answer`s; it never sees the world.
 

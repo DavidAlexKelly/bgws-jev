@@ -1,4 +1,4 @@
-//! Validate behaviour templates (RUST_ENGINE.md §10.1; DECISION_FLOW_GRAPHS.md
+//! Validate behaviour templates (rust-engine.md §10.1; decision-flow-graphs.md
 //! §5.2, §6). A port of `behaviour/schema.ts`. Run over every JSON file at
 //! load and in the tests, so a broken template fails CI, never a game.
 //!

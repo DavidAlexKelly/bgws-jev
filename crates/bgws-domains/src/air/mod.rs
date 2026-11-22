@@ -1,4 +1,4 @@
-//! Air movement (RUST_ENGINE.md §8.1 Air): the point-mass energy model for
+//! Air movement (rust-engine.md §8.1 Air): the point-mass energy model for
 //! aircraft ([`aircraft`]), flight-path steering ([`paths`]), multirotor and
 //! fixed-wing drones with the fibre tether ([`drone`], **[P8]**), and sortie
 //! generation ([`sortie`], **[P30]**). The standard atmosphere lives in

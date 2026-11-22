@@ -1,4 +1,4 @@
-//! Drones (RUST_ENGINE.md §8.7; research R5.1, R5.2, P8, P9).
+//! Drones (rust-engine.md §8.7; research R5.1, R5.2, P8, P9).
 //!
 //! - **Types:** FPV (RF or fibre), bomber and reconnaissance multirotors,
 //!   fixed-wing ISR, loitering munitions, Shahed-type one-way attack and

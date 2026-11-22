@@ -1,4 +1,4 @@
-//! A side's track store (§9.1; SIDE_PICTURE.md generalised): one record per
+//! A side's track store (§9.1; side-picture.md generalised): one record per
 //! side of what its sensors have reported, as Kalman-filtered tracks.
 //!
 //! Each scan (the detections that share a time) is gated and assigned by

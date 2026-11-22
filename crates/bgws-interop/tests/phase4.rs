@@ -1,4 +1,4 @@
-//! Phase 4 over DIS (docs/design/INTEROP_PLAN.md §7): a real game's radios,
+//! Phase 4 over DIS (docs/design/interop-plan.md §7): a real game's radios,
 //! messages, radars and jammers, aggregated formations and minefields go out
 //! as Transmitter, Signal, Electromagnetic Emission, Aggregate State and
 //! Minefield State PDUs, each one parsing; and another simulation's radar

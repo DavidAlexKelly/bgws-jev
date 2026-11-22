@@ -1,4 +1,4 @@
-//! People (RUST_ENGINE.md §8.10): suppression, stress and cohesion, morale
+//! People (rust-engine.md §8.10): suppression, stress and cohesion, morale
 //! states as hazards, fatigue and sleep debt, skill and experience, reaction
 //! times, and casualties by triage category.
 //!

@@ -1,4 +1,4 @@
-//! Replay without calling anyone (RUST_ENGINE.md §12: "model answers are
+//! Replay without calling anyone (rust-engine.md §12: "model answers are
 //! recorded in the game record, so a game with Jev and Claude replays
 //! exactly"). A question the record does not hold, or a recorded choice that
 //! is no longer on offer, is a replay divergence: it fails loudly.

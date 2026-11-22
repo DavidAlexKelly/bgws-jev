@@ -1,4 +1,4 @@
-//! The batch runner (RUST_ENGINE.md §1, §13, §15.3): N seeded replicates of
+//! The batch runner (rust-engine.md §1, §13, §15.3): N seeded replicates of
 //! an experiment, run in parallel with `rayon`, with replicate seeds derived
 //! deterministically from one base seed (`Seed::derive`), and results
 //! collected in replicate order whatever the thread scheduling (§12).

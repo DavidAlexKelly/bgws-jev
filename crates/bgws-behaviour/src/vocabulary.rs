@@ -1,4 +1,4 @@
-//! The closed vocabulary (RUST_ENGINE.md §10.1; DECISION_FLOW_GRAPHS.md §3.1):
+//! The closed vocabulary (rust-engine.md §10.1; decision-flow-graphs.md §3.1):
 //! every action and fact a template may name. A port of
 //! `behaviour/vocabulary.ts`: the land vocabulary (decision points D0–D12)
 //! plus the world vocabulary, in one list, so a template naming anything

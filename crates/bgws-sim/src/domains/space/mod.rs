@@ -1,4 +1,4 @@
-//! Space and cyber (RUST_ENGINE.md §8.1 Space, §8.2 SAR/EO satellites,
+//! Space and cyber (rust-engine.md §8.1 Space, §8.2 SAR/EO satellites,
 //! §8.12; research R5.3–R5.5, P21): enabling layers the other domains feel.
 //!
 //! - [`orbit`]: satellites from their scenario placement or the catalogue's

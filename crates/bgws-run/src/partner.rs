@@ -1,4 +1,4 @@
-//! Terrain from a partner's data (docs/design/INTEROP_PLAN.md §7): when a
+//! Terrain from a partner's data (docs/design/interop-plan.md §7): when a
 //! federation agrees a common terrain source, `bgws terrain` builds from it
 //! in place of our open sources where it is given, so every simulation
 //! starts from the same ground.

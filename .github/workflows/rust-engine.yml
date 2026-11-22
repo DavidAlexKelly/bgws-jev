@@ -1,5 +1,5 @@
 # The simulation (the Rust workspace at the root): build, tests, lint, and the
-# benchmark vignettes checked against their stored baselines (docs/design/RUST_ENGINE.md
+# benchmark vignettes checked against their stored baselines (docs/design/rust-engine.md
 # §15.8, §17); and the default frontend's committed build.
 name: rust-engine
 

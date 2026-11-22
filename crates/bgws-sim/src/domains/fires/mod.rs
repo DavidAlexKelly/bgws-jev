@@ -1,6 +1,6 @@
 //! Domain systems: indirect fire and counter-battery, engineers and
 //! obstacles, unit stores, the logistics network, maintenance, casualties and
-//! the medical chain (RUST_ENGINE.md §8.8 "Indirect fire", §8.9, §8.10
+//! the medical chain (rust-engine.md §8.8 "Indirect fire", §8.9, §8.10
 //! casualties, §8.11; roadmap §18 phases 3 and 7).
 //!
 //! - [`indirect`]: calls for fire from observers, the fires cell giving each

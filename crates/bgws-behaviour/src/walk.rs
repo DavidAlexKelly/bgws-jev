@@ -1,7 +1,7 @@
 //! Resolve a template against its parents, evaluate conditions, and walk the
 //! graph from a trigger to the decision a decider is asked (or the drill that
-//! runs). A port of `behaviour/walk.ts` (RUST_ENGINE.md §10.1;
-//! DECISION_FLOW_GRAPHS.md §3.3), with the §10.1 hard gates added in
+//! runs). A port of `behaviour/walk.ts` (rust-engine.md §10.1;
+//! decision-flow-graphs.md §3.3), with the §10.1 hard gates added in
 //! [`walk_gated`].
 //!
 //! Pure and deterministic: no randomness, no clock, no I/O. Facts come from

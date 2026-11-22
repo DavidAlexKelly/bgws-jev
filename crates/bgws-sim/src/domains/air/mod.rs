@@ -1,4 +1,4 @@
-//! Air, missiles and air defence (RUST_ENGINE.md §8.1 Air and Missiles,
+//! Air, missiles and air defence (rust-engine.md §8.1 Air and Missiles,
 //! §8.2 radar, §8.8 air defence, §18 phase 6), the sim's port of the TS
 //! `world/domains/air.ts`, `world/munitions.ts` and `world/airspace.ts`:
 //!

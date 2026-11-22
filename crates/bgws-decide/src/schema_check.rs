@@ -1,4 +1,4 @@
-//! A small JSON Schema checker for plans (RUST_ENGINE.md §10.3: "parsing is a
+//! A small JSON Schema checker for plans (rust-engine.md §10.3: "parsing is a
 //! validation step, not guesswork"). It covers what the plan schemas use:
 //! `type` (one or a list), `required`, `properties`, `additionalProperties:
 //! false`, `items`, `enum`, `minimum`/`maximum`, `minItems`/`maxItems`.

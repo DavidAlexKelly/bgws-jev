@@ -5,7 +5,7 @@ Prediction", chapter 2 of *The Infrared & Electro-Optical Systems
 Handbook*, vol. 4 (Electro-Optical Systems Design, Analysis, and Testing),
 ed. M. C. Dudzik. ERIM / SPIE, 1993. DTIC ADA364024.
 
-**File:** `docs/papers/pdfs/VOLUME 4 Electro-Optical Systems Design, Analysis, and Testing.pdf`
+**File:** `docs/sources/raw/sensing/irhb-1993-v4-eo-systems-design-analysis-testing.pdf`
 
 | Topic | Book page | PDF page |
 |---|---|---|

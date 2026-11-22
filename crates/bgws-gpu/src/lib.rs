@@ -1,4 +1,4 @@
-//! The kernel layer (RUST_ENGINE.md §11): batched line of sight, viewsheds,
+//! The kernel layer (rust-engine.md §11): batched line of sight, viewsheds,
 //! candidate pairs, path-loss and J/S fields, cost→flow fields and a Monte
 //! Carlo hit-distribution kernel. Every kernel has a deterministic,
 //! rayon-parallel CPU twin; behind the `gpu` feature, wgpu compute shaders

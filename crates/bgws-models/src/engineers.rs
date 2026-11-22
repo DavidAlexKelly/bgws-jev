@@ -1,4 +1,4 @@
-//! Engineers and obstacles (RUST_ENGINE.md §8.9) **[ref R4.5]**.
+//! Engineers and obstacles (rust-engine.md §8.9) **[ref R4.5]**.
 //!
 //! - **Minefields:** encounter probability per crossing from density and
 //!   path, P = 1 − exp(−ρ·w·L); belts about 500 m deep **[P13]**.

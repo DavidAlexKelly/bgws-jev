@@ -1,4 +1,4 @@
-//! Golden decision scenes (RUST_ENGINE.md §19: "the golden decision scenes
+//! Golden decision scenes (rust-engine.md §19: "the golden decision scenes
 //! become snapshot tests with outputs exported from TS").
 //!
 //! `tests/golden/*.json` were written by the original TypeScript walker over

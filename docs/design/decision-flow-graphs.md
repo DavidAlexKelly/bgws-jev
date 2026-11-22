@@ -1,6 +1,6 @@
 # Decision flow graphs: editable behaviour templates for every unit
 
-Part of the [multi-domain plan](MULTI_DOMAIN_PLAN.md). This is the detailed specification for workstream **W1**.
+Part of the [multi-domain plan](multi-domain-plan.md). This is the detailed specification for workstream **W1**.
 
 ## 1. What it is
 

@@ -1,4 +1,4 @@
-//! A local model behind the same `Decider` trait (RUST_ENGINE.md §10.5): an
+//! A local model behind the same `Decider` trait (rust-engine.md §10.5): an
 //! OpenAI-compatible server (llama.cpp or vLLM), `POST {base}/v1/chat/completions`
 //! with `response_format: json_schema` constraining the reply to
 //! `{"choice": <one of the option ids>}`. Probabilities and confidence come

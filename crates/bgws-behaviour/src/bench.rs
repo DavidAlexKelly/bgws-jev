@@ -1,4 +1,4 @@
-//! The test bench (DECISION_FLOW_GRAPHS.md §5.2, §7 step 8): put a template
+//! The test bench (decision-flow-graphs.md §5.2, §7 step 8): put a template
 //! in a scene and see what it does there: the path through the graph, every
 //! option it offers and why the others are missing (removed, condition,
 //! unsupported, or a hard gate), and what the rules would choose. Two

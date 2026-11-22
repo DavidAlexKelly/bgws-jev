@@ -1,5 +1,5 @@
 //! Domain systems: comms nets, HQs and C2, EW, PNT, drones and counter-drone
-//! (RUST_ENGINE.md §8.5, §8.7, §8.12, §9.2, §10.3–10.4).
+//! (rust-engine.md §8.5, §8.7, §8.12, §9.2, §10.3–10.4).
 //!
 //! - [`comms`]: the side's nets as a `bgws_ops::comms::CommsNetwork` built
 //!   from the units' radios, link SINR from `bgws_prop` terrain path loss

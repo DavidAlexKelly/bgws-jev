@@ -1,4 +1,4 @@
-//! The action library (RUST_ENGINE.md §10.1; DECISION_FLOW_GRAPHS.md §3.2):
+//! The action library (rust-engine.md §10.1; decision-flow-graphs.md §3.2):
 //! every action a template may name, with its label and description, and the
 //! traits the hard gates read (does it fire, radiate, transmit, move, close
 //! with the enemy, or step back from a fight?).

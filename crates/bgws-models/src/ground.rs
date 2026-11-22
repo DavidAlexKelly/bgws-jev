@@ -1,4 +1,4 @@
-//! Ground movement (RUST_ENGINE.md §8.1 "Ground").
+//! Ground movement (rust-engine.md §8.1 "Ground").
 //!
 //! - **Speed** = min(road speed, trafficability speed, formation speed, order
 //!   mode). Trafficability follows the NATO Reference Mobility Model's shape:

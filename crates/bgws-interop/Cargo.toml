@@ -1,6 +1,6 @@
 [package]
 name = "bgws-interop"
-description = "Interoperability with other simulations: DIS (IEEE 1278.1) and HLA 4 through the Federate Protocol (docs/design/INTEROP_PLAN.md)."
+description = "Interoperability with other simulations: DIS (IEEE 1278.1) and HLA 4 through the Federate Protocol (docs/design/interop-plan.md)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

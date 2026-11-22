@@ -1,4 +1,4 @@
-//! Jev at the decision points (RUST_ENGINE.md §10.2), a port of
+//! Jev at the decision points (rust-engine.md §10.2), a port of
 //! `data/jevClient.ts`, `data/jevCache.ts`, `rules/jev.ts` and the prompt
 //! shapes of `engine/jevDecider.ts` (`jevRealtimeDecider`, land units) and
 //! `world/jevWorldDecider.ts` (world entities).

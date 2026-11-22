@@ -1,4 +1,4 @@
-//! What a game publishes beyond entities and fire (docs/design/INTEROP_PLAN.md
+//! What a game publishes beyond entities and fire (docs/design/interop-plan.md
 //! phase 4), protocol-free: radios and the messages they carry, radars and
 //! jammers, minefields, and aggregated formations. Read from the sim's own
 //! state; only our entities' (a remote entity's owner publishes its own).

@@ -15,7 +15,7 @@
 //!
 //! Search follows the NVESD search model (Howe 1993, *IR/EO Systems
 //! Handbook* vol. 4 ch. 2, §2.6.3, pp. 110–114; notes in
-//! `docs/papers/notes/howe-1993-search.md`): P(t) = P∞·[1 − exp(−t/τ)]
+//! `docs/sources/notes/irhb-1993-v4-eo-systems-design-analysis-testing.md`): P(t) = P∞·[1 − exp(−t/τ)]
 //! (eq. 2.33). Only a share P∞ of observers ever find the target; those that
 //! do find it at the rate 1/τ. τ for one field of view is 3.4/P∞ s for
 //! P∞ < 0.9 and 6.8·N₅₀/N s above (eq. 2.38); searching a sector of n

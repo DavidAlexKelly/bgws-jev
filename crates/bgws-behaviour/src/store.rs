@@ -1,5 +1,5 @@
-//! The user's behaviour templates and which unit uses which (RUST_ENGINE.md
-//! §10.1; DECISION_FLOW_GRAPHS.md §4.4, §6). A port of `behaviour/store.ts`,
+//! The user's behaviour templates and which unit uses which (rust-engine.md
+//! §10.1; decision-flow-graphs.md §4.4, §6). A port of `behaviour/store.ts`,
 //! with the browser's localStorage replaced by a plain serialisable value the
 //! host keeps wherever it likes.
 //!

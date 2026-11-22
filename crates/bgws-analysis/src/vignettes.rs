@@ -1,4 +1,4 @@
-//! Vignettes as hypotheses (RUST_ENGINE.md §15.3, §17 "statistical"): a
+//! Vignettes as hypotheses (rust-engine.md §15.3, §17 "statistical"): a
 //! small scenario whose outcome the research gives as a figure, stated as a
 //! hypothesis with an acceptance band, and checked as a distribution over
 //! hundreds of seeds. The checker runs an [`Experiment`], measures it with a

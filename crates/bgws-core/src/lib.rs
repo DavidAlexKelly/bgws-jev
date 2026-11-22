@@ -1,4 +1,4 @@
-//! The bottom of the BGWS Rust engine (RUST_ENGINE.md §3.1): identifiers,
+//! The bottom of the BGWS Rust engine (rust-engine.md §3.1): identifiers,
 //! simulated time, units of measure, WGS84 geodesy, the figures registry,
 //! keyed random streams, the event log with its fingerprint, and the types
 //! that cross the sans-IO boundary between the simulation and its deciders.

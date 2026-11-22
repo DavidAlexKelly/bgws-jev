@@ -1,4 +1,4 @@
-//! Distribution comparison (RUST_ENGINE.md §15.8, §17 "statistical", §16
+//! Distribution comparison (rust-engine.md §15.8, §17 "statistical", §16
 //! "comparing two templates or two catalogues"): the two-sample
 //! Kolmogorov–Smirnov test (does a new run's distribution differ from the
 //! stored one?), the one-sample KS test against a fitted CDF (goodness of fit

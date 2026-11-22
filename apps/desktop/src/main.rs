@@ -1,4 +1,4 @@
-//! `bgws-desktop`: the desktop shell (RUST_ENGINE.md §16). The host and the
+//! `bgws-desktop`: the desktop shell (rust-engine.md §16). The host and the
 //! game run in this process, on their own thread, as `bgws-server` does; the
 //! window shows the same viewer, with the editor and the Behaviour Manager a
 //! link away. The page talks to the host over a WebSocket on a private

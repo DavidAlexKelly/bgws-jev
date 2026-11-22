@@ -1,4 +1,4 @@
-//! Reports (RUST_ENGINE.md §15, §16): Markdown and JSON summaries of
+//! Reports (rust-engine.md §15, §16): Markdown and JSON summaries of
 //! batches, vignettes, sensitivity and regression checks — what the analysis
 //! workbench shows and the CLI (`bgws-run batch | vignettes | sensitivity`)
 //! prints. The Markdown tables follow the TypeScript `sensitivityReport`.

@@ -1,4 +1,4 @@
-//! The RPR FOM's objects for phase 4 (docs/design/INTEROP_PLAN.md §7): the
+//! The RPR FOM's objects for phase 4 (docs/design/interop-plan.md §7): the
 //! same radios, messages, emitters, aggregates and minefields as the DIS
 //! side ([`crate::dis_extras`]), as RPR objects and an interaction.
 //!

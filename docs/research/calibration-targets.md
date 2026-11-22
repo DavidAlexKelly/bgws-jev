@@ -214,7 +214,7 @@ needs a trace of where units stand and what cover they get.
 
 Volume 4 of the *IR/EO Systems Handbook* (Howe, pp. 110–114) and the TETAM
 paper (Bryson) were read in the original. The notes are in
-`docs/papers/notes/`.
+`docs/sources/notes/`.
 
 **What changed:**
 - Detection levels off at P∞, drawn once per pair and position
@@ -587,7 +587,7 @@ The same Morris screening over the land fight's figures (`--prefix land`,
    were the top two in the first pass and still are.
 2. Search sector, cueing and the moving observer. The TETAM companion
    paper on time to detect (not yet found), and the naked-eye leads in
-   `docs/papers/notes/naked-eye-leads.md`.
+   `docs/sources/leads/naked-eye-search.md`.
 3. Company attack frontage and fire-and-movement practice, from field
    manuals (FM 3-90 / ATP 3-90.1, company attack).
 4. Morale hazard and dwell: historical breaking points of small units
@@ -595,7 +595,7 @@ The same Morris screening over the land fight's figures (`--prefix land`,
 
 ## Naked-eye search
 
-Leads are in `docs/papers/notes/naked-eye-leads.md`. The best is Grau
+Leads are in `docs/sources/leads/naked-eye-search.md`. The best is Grau
 (2022), on Soviet trials: an unaided eye finds a tank against forest in
 3–7 s at 0.5–2.5 km. That is consistent with what the model does now.
 Each was seen only in search snippets, so none is used.

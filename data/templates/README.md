@@ -6,7 +6,7 @@ must match its path: `core/tank.json` → `"id": "core/tank"`.
 
 Every file is checked on load and in CI (`../schema.ts`), so a broken template
 fails the build, never a game. Format: `../types.ts`. Design and rationale:
-`docs/plan/DECISION_FLOW_GRAPHS.md`.
+`docs/plan/decision-flow-graphs.md`.
 
 ```json
 {

@@ -1,4 +1,4 @@
-//! The platform record (RUST_ENGINE.md §5.1, §14.1; MULTI_DOMAIN_PLAN.md §4.1):
+//! The platform record (rust-engine.md §5.1, §14.1; multi-domain-plan.md §4.1):
 //! a platform is built AFSIM-style from parts — a mover, a body, signatures,
 //! sensors, weapon mounts, radios, emitters, stores, carried loads and crew
 //! defaults — each with more physics than the TypeScript `CatalogueRecord`

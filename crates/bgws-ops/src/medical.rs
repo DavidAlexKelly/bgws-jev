@@ -1,4 +1,4 @@
-//! Medical evacuation and care (RUST_ENGINE.md §8.11; research R7).
+//! Medical evacuation and care (rust-engine.md §8.11; research R7).
 //!
 //! The chain runs from the point of injury to a casualty collection point
 //! (CCP), an aid post (Role 1), a surgical team (Role 2) and a hospital

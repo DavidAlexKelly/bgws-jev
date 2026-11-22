@@ -4,7 +4,7 @@
 Developments Experimentation Command, Fort Ord), "Tactical Effectiveness
 Testing of Antitank Missiles". Symposium paper, pp. 13–20, DTIC ADP000598.
 
-**File:** `docs/papers/pdfs/TACTICAL EFFECTIVENESS TESTING OF ANTITANK MISSILES.pdf`
+**File:** `docs/sources/raw/missiles/bryson-nd-tetam-antitank-missile-trials.pdf`
 
 Read in the original on 20 November 2026. Page numbers are the paper's own.
 
@@ -34,7 +34,7 @@ Read in the original on 20 November 2026. Page numbers are the paper's own.
 
 - **8–11 s from detection to engagement** is a check on our lay time
   (`sim.fire.lay_min_s`, 6 s minimum) plus reaction. See
-  `docs/research/CALIBRATION_TARGETS.md`.
+  `docs/research/calibration-targets.md`.
 - **Hand-off, 51–68% success in 18–31 s,** is a check for cued detection
   (`sensing.acquire.cue_factor`). It isn't a direct source: a hand-off
   is a description passed by telephone, not a precise cue.

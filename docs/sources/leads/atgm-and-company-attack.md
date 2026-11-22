@@ -3,7 +3,7 @@
 From a web search on 21 November 2026. Every item was seen **only in
 search snippets**: dote.osd.mil, globalsecurity.org and archive.org refused
 this environment. **No value is changed on them.** Download the documents
-into `docs/papers/pdfs/` to have them read and applied.
+into `docs/sources/raw/` to have them read and applied.
 
 ## `direct.guided.ph` (now 0.8, range 0.3–0.99)
 

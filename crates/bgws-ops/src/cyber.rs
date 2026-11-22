@@ -1,4 +1,4 @@
-//! Cyber as processes, not packets (RUST_ENGINE.md §8.12; research R5.5, P21).
+//! Cyber as processes, not packets (rust-engine.md §8.12; research R5.5, P21).
 //!
 //! An **access campaign** against a target system builds access over months
 //! (Kyivstar took 6–8 months **[P21]**) with a daily hazard of being

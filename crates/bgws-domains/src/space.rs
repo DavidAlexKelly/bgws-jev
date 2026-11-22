@@ -1,4 +1,4 @@
-//! Space (RUST_ENGINE.md §8.1 Space, §8.12): satellites propagated with SGP4
+//! Space (rust-engine.md §8.1 Space, §8.12): satellites propagated with SGP4
 //! from orbital elements (AFSPC-compatible mode, matching the published
 //! verification vectors), converted TEME → ECEF through GMST; ground tracks;
 //! access windows to a ground point found by root-finding on elevation and

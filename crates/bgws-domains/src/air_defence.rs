@@ -1,4 +1,4 @@
-//! Air and missile defence (RUST_ENGINE.md §8.8 Air defence, §8.6): the kill
+//! Air and missile defence (rust-engine.md §8.8 Air defence, §8.6): the kill
 //! chain per threat as stages with time and probability, layered systems with
 //! magazines, weapon-target assignment as an optimisation, shoot-look-shoot,
 //! and cost-exchange accounting [R3, R4.4, R6.2, P10, P11, P20, P28, P29].

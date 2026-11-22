@@ -1,4 +1,4 @@
-//! The shape of a behaviour template (RUST_ENGINE.md §10.1; DECISION_FLOW_GRAPHS.md §3, §6):
+//! The shape of a behaviour template (rust-engine.md §10.1; decision-flow-graphs.md §3, §6):
 //! a unit type's decision graph, stored as a JSON file under `data/templates`.
 //! A port of `realtime/behaviour/types.ts`, with the same JSON.
 //!

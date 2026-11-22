@@ -1,5 +1,5 @@
 //! HLA 4 (IEEE 1516-2025) through the Federate Protocol, with the RPR FOM
-//! (docs/design/INTEROP_PLAN.md, phase 3).
+//! (docs/design/interop-plan.md, phase 3).
 //!
 //! - [`proto`]: the Federate Protocol's call and callback messages, generated
 //!   from the IEEE protos (`proto/README.md`).

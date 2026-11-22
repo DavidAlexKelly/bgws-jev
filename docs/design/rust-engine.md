@@ -28,7 +28,7 @@
 | §20 | Risks and open questions |
 | §21 | Where it stands: what is built |
 
-Evidence is cited as in the multi-domain plan: **[ref R4.3, P12]** points to `research/MODERN_WARFARE_REFERENCE.md`. **[default]** marks a value or method chosen without a source, awaiting one.
+Evidence is cited as in the multi-domain plan: **[ref R4.3, P12]** points to `research/modern-warfare-reference.md`. **[default]** marks a value or method chosen without a source, awaiting one.
 
 ---
 
@@ -66,7 +66,7 @@ So the engine is **physics-first where physics decides** (sensing, propagation, 
 1. **Truth and belief are separate types.** Nothing that decides (a unit, an HQ, Jev, Claude, a person) can read ground truth. The compiler enforces this: decision code takes a `SideView`, never `&World`.
 2. **Time-continuous where possible.** Detection, failures, morale breaks and similar are hazard rates: P = 1 − e^(−λΔt). Results don't depend on the step size **[ref R8]**.
 3. **Every number is a declared figure,** with a unit, range, source, confidence and sensitivity, in one registry. No literals in models. A test fails if a figure is unused, or used outside its range.
-4. **Models are components, behaviour is data.** Platforms are built from movers, sensors, weapons, radios, emitters and stores (AFSIM-style). Behaviour is editable templates (DECISION_FLOW_GRAPHS.md, same JSON).
+4. **Models are components, behaviour is data.** Platforms are built from movers, sensors, weapons, radios, emitters and stores (AFSIM-style). Behaviour is editable templates (decision-flow-graphs.md, same JSON).
 5. **Hard gates outside the models.** Rules of engagement, weapon release authority, EMCON and capability are never left to a model's judgement **[ref R8]**.
 6. **Multi-resolution by design.** Entity resolution near contact, aggregate resolution away from it. The aggregate models are fitted to entity-level runs, not hand-set (§8.13).
 7. **The core is pure.** The simulation never touches the network, the disk or a clock. It returns questions and takes answers (§3.2).
@@ -199,7 +199,7 @@ The clock does not wait in wall time. It stops in simulated time until the answe
 
 ### 5.1 Entities and components
 
-Every platform is an ECS entity built from components. The current TypeScript `Platform` (MULTI_DOMAIN_PLAN §4.1) maps one to one, with more physics in each part:
+Every platform is an ECS entity built from components. The current TypeScript `Platform` (multi-domain-plan §4.1) maps one to one, with more physics in each part:
 
 | Component | Holds | Notes |
 |---|---|---|
@@ -527,7 +527,7 @@ Every path loss feeds the same receiver budget: signal, noise, interference and 
 
 ### 9.1 Tracks
 
-- **Each side has a track store** (the side picture of SIDE_PICTURE.md, generalised). Each track has a state estimate (position and velocity in ENU) with a covariance from a Kalman filter: constant-velocity or constant-turn for movers, near-static for ground positions.
+- **Each side has a track store** (the side picture of side-picture.md, generalised). Each track has a state estimate (position and velocity in ENU) with a covariance from a Kalman filter: constant-velocity or constant-turn for movers, near-static for ground positions.
 - **Association:** new detections are gated by Mahalanobis distance and assigned by global nearest neighbour (Kuhn–Munkres). Ambiguous cases create a new track and may later merge or split. This is how false and duplicate tracks arise, realistically.
 - **Classification** is a Bayesian belief over hypotheses (MBT, IFV, truck, decoy; fighter, bomber, drone, missile), updated by each sensor's identification probability and confusion matrix. A decoy stays a "probable MBT" until a good enough look.
 - **Track age and quality:** covariance grows without updates, and the track is dropped when it is too uncertain to act on.
@@ -548,7 +548,7 @@ Decoys, emitter decoys, false transmissions and spoofed tracks inject plausible 
 
 ### 10.1 Templates, gates and options
 
-- **The same behaviour template format** as the TypeScript build (DECISION_FLOW_GRAPHS.md): triggers, branches, choose nodes, patches and inheritance, the fact vocabulary and the action library. Templates written in the current Behaviour Manager load unchanged where their actions exist.
+- **The same behaviour template format** as the TypeScript build (decision-flow-graphs.md): triggers, branches, choose nodes, patches and inheritance, the fact vocabulary and the action library. Templates written in the current Behaviour Manager load unchanged where their actions exist.
 - **Hard gates** (ROE, weapon release authority, EMCON, capability, cohesion state) are applied before options are offered. Jev never sees a removed option.
 - **Decision points only:** agents are asked when a trigger fires (contact, under fire, link lost, a call for fire, a CCIR), not every tick. That's how behaviour-tree-driven forces scale to thousands of entities **[ref R8]**.
 - **Reaction time:** an answer takes effect after a reaction time drawn from the agent's skill, fatigue and drill (§8.10), not instantly.
@@ -565,7 +565,7 @@ Decoys, emitter decoys, false transmissions and spoofed tracks inject plausible 
 
 ### 10.3 Claude planners
 
-- **The planner hierarchy** of MULTI_DOMAIN_PLAN §4.4 (overall, land, air, maritime, space and cyber, sustainment) plans from the HQ's fused picture, through the Anthropic Messages API called directly from the host (the TypeScript build goes through a Foundry AIP function), into structured orders that are validated before they're sent.
+- **The planner hierarchy** of multi-domain-plan §4.4 (overall, land, air, maritime, space and cyber, sustainment) plans from the HQ's fused picture, through the Anthropic Messages API called directly from the host (the TypeScript build goes through a Foundry AIP function), into structured orders that are validated before they're sent.
 - **Structured output:** plans are requested as JSON matching the orders schema (generated from the Rust types), so parsing is a validation step, not guesswork.
 - **Rate limits and cost:** planning requests are few (on CCIR triggers and the battle rhythm), queued per HQ, retried with backoff, and logged with their cost.
 - **The heuristic planner** is the fallback, and the default for batch runs.

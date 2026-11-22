@@ -1,4 +1,4 @@
-//! Who answers what (RUST_ENGINE.md §3.3, §10.2–10.5): per side and per
+//! Who answers what (rust-engine.md §3.3, §10.2–10.5): per side and per
 //! question kind, a decider (rules, Jev, Claude, a local model, a person or a
 //! record); per side, a planner for HQ questions. The router batches one
 //! side's questions for one decider into one call, runs every call
@@ -81,7 +81,7 @@ impl Router {
     }
 
     /// Answer every question. One option (a drill, or the only one left) is
-    /// taken at once without asking (DECISION_FLOW_GRAPHS.md §3.3). A task
+    /// taken at once without asking (decision-flow-graphs.md §3.3). A task
     /// that panics (a replay divergence) propagates its panic.
     pub async fn answer(&self, questions: Vec<Question>) -> Vec<Answer> {
         let mut set = tokio::task::JoinSet::new();

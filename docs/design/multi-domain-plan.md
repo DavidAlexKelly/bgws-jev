@@ -9,7 +9,7 @@ Every workstream W0–W15 is built, and each milestone has its preset scenario (
 | Milestone | Where | Tests |
 |---|---|---|
 | M0 Foundations | `scope.ts` (with the time dimension), `scenario.ts`, `headless.ts`, `engine/workerHost.ts`, `world/figures.ts`, the scheduler in `world/step.ts` | `scope.test.ts`, `headless.test.ts`, `world/foundation.test.ts` |
-| M1 Editable behaviour | `behaviour/` (DECISION_FLOW_GRAPHS.md, steps 1–11) | `behaviour/*.test.ts` |
+| M1 Editable behaviour | `behaviour/` (decision-flow-graphs.md, steps 1–11) | `behaviour/*.test.ts` |
 | M2 Combined-arms company | `world/domains/fires.ts`, `landExt.ts`, `support.ts`, `world/munitions.ts`; preset `M2` | `world/combinedArms.test.ts` |
 | M3 Battalion C2 | `world/net.ts`, `world/domains/c2.ts`, `world/command/` (seats, fusion, heuristic and Claude planners); preset `M3` | `world/c2.test.ts` |
 | M4 Transparent battlefield | `world/domains/drones.ts`, `ew.ts`, `world/jamming.ts`, `world/pnt.ts`; preset `M4` | `world/droneLine.test.ts` |
@@ -46,8 +46,8 @@ Every workstream W0–W15 is built, and each milestone has its preset scenario (
 
 Companion documents:
 
-- [DECISION_FLOW_GRAPHS.md](DECISION_FLOW_GRAPHS.md): the full specification of editable behaviour templates (workstream W1).
-- [MODERN_WARFARE_REFERENCE.md](../research/MODERN_WARFARE_REFERENCE.md): the research this plan is built on, with sources. Numbers below marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W0, W12) until a source replaces them.
+- [decision-flow-graphs.md](decision-flow-graphs.md): the full specification of editable behaviour templates (workstream W1).
+- [modern-warfare-reference.md](../research/modern-warfare-reference.md): the research this plan is built on, with sources. Numbers below marked **[declared]** are design defaults that have no source yet; they go in the declared-figures registry (W0, W12) until a source replaces them.
 
 **Citations.** A claim taken from the research is tagged with where to find it:
 
@@ -120,7 +120,7 @@ These are carried forward from the existing real-time documents and extended. Th
 
 ## 3. How modern war works: the reference model
 
-The [research reference](../research/MODERN_WARFARE_REFERENCE.md) has the detail and the sources. This section condenses it into the claims that shape the simulation.
+The [research reference](../research/modern-warfare-reference.md) has the detail and the sources. This section condenses it into the claims that shape the simulation.
 
 ### 3.1 Planning and command
 
@@ -616,7 +616,7 @@ Each workstream has the same parts:
 
 ### W1 — Decision flow graphs and the template editor
 
-**The full specification is in [DECISION_FLOW_GRAPHS.md](DECISION_FLOW_GRAPHS.md).** In brief:
+**The full specification is in [decision-flow-graphs.md](decision-flow-graphs.md).** In brief:
 
 - Every unit gets a **decision flow graph** from its archetype's core template, masked at run time by what it can actually do. "By default a tank may fire, hold or retreat when it spots an enemy."
 - **Templates** are derived by patches: remove an option, re-weight it, add a gate, change the fallback, add doctrine text. They are assigned per unit, per archetype per side, or per scenario. "My tank template never retreats."

@@ -1,5 +1,5 @@
 //! The Federate Protocol session layer against the mock RTI
-//! (docs/design/INTEROP_PLAN.md phase 3): heartbeats keep a quiet session
+//! (docs/design/interop-plan.md phase 3): heartbeats keep a quiet session
 //! alive, a dropped connection is resumed with nothing lost or repeated, and
 //! call responses go back to the calls that made them under load.
 

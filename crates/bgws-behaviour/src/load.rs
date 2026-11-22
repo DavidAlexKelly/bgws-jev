@@ -1,4 +1,4 @@
-//! Turn the JSON template files into a validated [`Registry`] (RUST_ENGINE.md
+//! Turn the JSON template files into a validated [`Registry`] (rust-engine.md
 //! §10.1, §14.3, §20). A port of `behaviour/load.ts`.
 //!
 //! Files live at `templates/<kind>/<name>.json` (kind = core | custom) and a

@@ -1,4 +1,4 @@
-//! Interoperability with other simulations (docs/design/INTEROP_PLAN.md).
+//! Interoperability with other simulations (docs/design/interop-plan.md).
 //!
 //! Phase 1: the DIS codes are in the catalogue; this crate publishes the
 //! sim's truth as DIS Entity State PDUs (IEEE 1278.1-2012, DIS v7) over

@@ -1,4 +1,4 @@
-//! Tick benchmarks (RUST_ENGINE.md §13, §17): the synthetic brigade of
+//! Tick benchmarks (rust-engine.md §13, §17): the synthetic brigade of
 //! 2,000 land entities, whole base ticks and the land systems one by one,
 //! plus a quiet stretch with and without quiet skipping.
 //!

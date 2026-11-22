@@ -1,5 +1,5 @@
 //! Level of detail, aggregated combat, quiet skipping and the world's victory
-//! conditions (RUST_ENGINE.md §6.3, §6.4, §8.13; research R8, P14).
+//! conditions (rust-engine.md §6.3, §6.4, §8.13; research R8, P14).
 //!
 //! - [`formation`]: land units are grouped into formations at setup (by
 //!   their scenario `parent`, else by side and proximity). A formation far

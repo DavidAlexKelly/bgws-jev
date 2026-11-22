@@ -1,4 +1,4 @@
-//! Templates shared across a team (DECISION_FLOW_GRAPHS.md §6, step 9). A
+//! Templates shared across a team (decision-flow-graphs.md §6, step 9). A
 //! port of `behaviour/shared.ts`: one shared object per template (id, name,
 //! version, parent and the parent's version, archetype, the JSON body and its
 //! author), with the transport handed in as a [`TemplateRemote`]. Nothing

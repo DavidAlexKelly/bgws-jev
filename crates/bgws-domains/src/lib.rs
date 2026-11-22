@@ -1,4 +1,4 @@
-//! Physical and process models for the joint domains (RUST_ENGINE.md §8.1
+//! Physical and process models for the joint domains (rust-engine.md §8.1
 //! Air / Missiles and munitions / Sea / Space, §8.6, §8.8 air defence and
 //! guided munitions, §8.12 space):
 //!
