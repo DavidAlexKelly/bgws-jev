@@ -10,7 +10,7 @@ use bgws_run::{default_figures, load_scenario, Host, HostOptions};
 use bgws_sim::components::{Act, Activity, Kin, RoeS};
 
 fn host() -> Host {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios/gen-kgd-company-attack.json");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios/gen-company-attack.json");
     let sc = load_scenario(&path).unwrap();
     Host::new(&sc, Seed(3), default_figures(), &HostOptions::default()).unwrap()
 }
