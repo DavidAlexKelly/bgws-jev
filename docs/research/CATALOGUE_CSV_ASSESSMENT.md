@@ -1,0 +1,193 @@
+# The asset catalogue CSVs: an assessment
+
+`data/catalogue/csv/`, added 22 November 2026. Six files:
+
+| File | Rows |
+|---|---|
+| Platforms | 579 (land 174, sea 236, air 169) |
+| Capabilities | 954 |
+| Munitions | 213 |
+| Support assets | 350 |
+| Sections | 20 |
+| Image index | 733 |
+
+`tools/check_catalogue_csv.py` reruns every check below.
+
+## Summary
+
+The files are **internally sound but thinly sourced**.
+
+**What holds:**
+- The links between files all resolve: capabilities to platforms,
+  support payloads to munitions, platform images to the image index (2
+  missing).
+- The stated calculations are applied correctly (power-to-weight).
+- The physical rules hold: penetration never rises with range; a shaped
+  charge's penetration does not change with range.
+
+**What is weak is where the numbers come from:**
+- Much of the data is a class default or a blanket formula, not a value
+  for the asset.
+- Most rows have no source a reader could check.
+- The variants copy their base model's figures.
+
+Nothing in the sim reads these files yet. The game's catalogue is
+`data/catalogue/*.json`: 105 platforms, in the sim's own schema. The CSVs
+are a larger, separate source in another schema (turns, protection bands,
+capability tags), to be mapped in rather than a correction to what is
+loaded.
+
+## What the checks found
+
+**Provenance (the main weakness):**
+- **Munitions:** 93 of 213 cite only "published reference tables /
+  manufacturer data (see README sources)". There is no README with the
+  CSVs, so these can't be traced.
+- **Platform mass:** `mass_source` is "curated_equipment_table" for all 579,
+  with no row-level source.
+- **Support assets:** 312 of 350 have class-typical or class-default
+  loadouts and timings ("MF identity; class-default loadout and timings";
+  "magazine/salvo sizes class-typical").
+- **Confidence grades are generous:**
+  - 185 of 213 munitions are rated B, including the 93 with no traceable
+    source;
+  - all 20 sections are B or C, though "published TO&E" is the only
+    reference given for 17;
+  - platform protection has no grade on 397 of 579 rows, and 56 are
+    rated D.
+
+**Blanket calculations:**
+- **APFSDS penetration against range:** every round, from a 30 mm cannon
+  to a 125 mm tank gun, keeps 97.2% at 1 km, 91.7% at 2 km and 86.2% at
+  3 km (19 rounds). That is one curve applied to all. In reality the loss
+  per km depends on the round:
+  - its launch velocity;
+  - its drag (sectional density, L/D);
+  - how penetration scales with velocity.
+
+  Small-calibre sub-calibre rounds lose much more per km than a 120 mm
+  rod. The curve also loses more in the second km (5.6%) than the first
+  (2.8%). Velocity falls roughly linearly with range, so penetration
+  should too.
+- **Variants:** all 33 land rows that share a base with another row have
+  the same mass and engine as a sibling. Up-armoured and re-engined
+  variants get their base model's figures, and so its power-to-weight.
+  Examples:
+  - T-72 (Ural) and T-72B3 obr. 2016: both 46 t and 839 hp. The B3 obr.
+    2016 has the 1,130 hp V-92S2F (recalled).
+  - T-80 and T-80BVM: both 46 t and 1,250 hp.
+  - Ajax and Ares; Boxer and Boxer (GMG fit); Warrior and Warrior TES(H).
+- **Support timings:** 125 of 183 fire-support rows share response 2,
+  loiter 12, 3 sorties a day. That covers every destroyer and frigate's
+  naval gunfire alike.
+
+**Values that look wrong.** These are checked against my own recall of
+published figures, not a source in hand, so check them before changing:
+
+| Asset | CSV | Published (recalled) |
+|---|---|---|
+| General Dynamics Ajax | 30 t | about 38 t, up to 42 t |
+| ARTEC Boxer | 25.6 t | about 33–38.5 t |
+| M3 Bradley | 22.66 t | about 30–33 t, as the M2 (36.66 t here) |
+| BMP-2 | 399.6 hp | UTD-20, 300 hp (the "Russian 2020s" row has 300) |
+| T-72 (Ural) | 46 t, 839 hp | about 41 t, V-46 780 hp |
+| T-80 (MBT) | 46 t | T-80B about 42.5 t |
+| BTR-82A | two rows, 13.6 t and 15.4 t | one vehicle, about 15.4 t |
+
+**Gaps:**
+- **Smoke:** `has_smoke` is false on every platform, and
+  `smoke_max_range_m` and `l6_asset_id` are empty. Most armoured vehicles
+  carry smoke dischargers. The sim uses them.
+- **Engines:** `engine_hp` is given for 141 rows (137 land, 4 air).
+- **Speeds:**
+  - 0 km/h for towed systems (L118, Rapier). Better marked as towed, with
+    the prime mover's speed.
+  - 120–145 km/h for some light vehicles (Jackal, LMV, ISV). These are
+    road maxima; cross-country speed is far lower and matters more.
+- **Tandem warheads** give penetration "behind ERA" (Kornet 1,200 mm,
+  TOW-2A 900 mm), while other rounds give it against plain armour (RHA).
+  If the sim models ERA separately, a "behind ERA" figure counts the ERA
+  twice. The two need separating, with a field for each.
+- **Combat strength index:** `bgws_cs_index` has no stated formula. It
+  presumably lives in the missing README.
+
+## How to improve the sources
+
+**Per row, not per file.** Add `source_url` (or document) and
+`source_locator` (page, table, section) to every row and every
+calculated column. Grade confidence by what is cited:
+
+| Grade | Meaning |
+|---|---|
+| A | Read in an official or manufacturer document |
+| B | Two independent open sources agree |
+| C | One open source, or a derivation from sourced values |
+| D | Estimate or class default |
+
+A blanket reference is grade D, whatever it says.
+
+**Better public sources, by family:**
+- **Land vehicles (mass, power, speed, armour, armament, crew):** the US
+  Army TRADOC *Worldwide Equipment Guide* (WEG). It is public, on ODIN,
+  covers most Russian, Chinese and other threat systems with sourced
+  tables, and its versions are dated.
+  - For NATO vehicles: national fact files (army.mod.uk, army.mil fact
+    files, Bundeswehr), manufacturer datasheets, and parliamentary or GAO
+    reports.
+  - For inventories: IISS *The Military Balance*.
+  - Jane's is the standard paid source.
+- **Ammunition (velocity, penetration):** manufacturer datasheets
+  (Rheinmetall, Nammo, General Dynamics OTS, Bazalt, KBP); NATO STANAG
+  4385 (test conditions); DOT&E annual reports (for US munitions:
+  reliability and test hit rates).
+- **Armour estimates:** keep them as ranges with their spread (low,
+  central, high), not single numbers. Cite the estimate's origin. The
+  open figures for composite armour are estimates; say so.
+- **Naval gunfire, air sorties and loiter:** doctrine publications
+  (sortie rates, response times) and the sim's own vignettes
+  (`sortie-surge`, `sortie-sustained`, `detect-to-strike`), which already
+  hold sourced bands to check against.
+
+## How to improve the calculations
+
+1. **Long-rod penetration against range, per round.**
+   - **Velocity at range:** from the round's launch velocity and drag,
+     v(x) = v₀·exp(−x/L_d), where the decay length L_d comes from the
+     penetrator's mass and frontal area. For most rods this is about
+     50–70 m/s lost per km.
+   - **Penetration at that velocity:** the Lanz–Odermatt equation, from
+     the rod's length, diameter, density and the target's hardness.
+   - Calibrate each to its published muzzle or 2 km figure. That replaces
+     the single 97/92/86% curve, and the rounds diverge as they should.
+2. **Shaped charges.** Keep penetration constant with range (correct now).
+   Record against plain armour and the effect of ERA separately (a tandem
+   precursor defeats ERA; a single charge loses roughly 50–80% to it).
+3. **Variants.** Inherit only the fields a variant does not change, and
+   flag inherited values (`mass_inherited: true`) so they are visible and
+   can be sourced in turn.
+4. **Power-to-weight.** Compute it from the variant's own mass and engine,
+   as now, once those are its own.
+5. **Speeds.** Separate road, cross-country and swimming speeds. The sim's
+   movement uses cross-country going.
+6. **Support timings.** Replace the class defaults with per-type values
+   where doctrine or exercise data gives them, and state the turn length
+   that converts turns to seconds.
+7. **Combat strength index.** Write down its formula and inputs, or drop
+   it if the sim does not need it. The sim computes effects from the
+   physical figures.
+
+## Mapping into the sim
+
+When the CSVs are imported into the JSON catalogue:
+- **Map fields to fields:**
+  - mass → `body.massT`;
+  - power and speeds → `mover`;
+  - armour by facing → `body.armour.ke` / `ce`;
+  - munitions → `munitions.json`, with penetration as a function of range.
+- **Keep the confidence and source with each value,** as the figures
+  registry already does: sources, and `[default]` for unsourced.
+- **Check against the existing hand-built entries first** (`land.json`,
+  `sourced.json`), then let the calibration vignettes judge the result.
+
+An importer with a test that rejects rows missing a source would keep the
+catalogue honest as it grows.
