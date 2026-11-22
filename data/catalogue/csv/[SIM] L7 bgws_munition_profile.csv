@@ -1,0 +1,214 @@
+﻿munition_id,weapon_id,name,kind,is_kinetic,is_shaped_charge,top_attack,defeats_era_ke,pen_mm_0m,pen_mm_1000m,pen_mm_2000m,pen_mm_3000m,lethal_radius_m,he_fill_kg,source_confidence,source_ref
+m_l27a1,gun_120_l30,L27A1 CHARM 3 APFSDS,apfsds,true,false,false,false,676.0,657.0,620.0,583.0,0.0,0.0,C,open estimates 600-650mm; DU long rod
+m_l31_hesh,gun_120_l30,L31 HESH,hesh,false,true,false,false,150.0,150.0,150.0,150.0,25.0,4.1,B,HESH ~150mm equivalent vs monolithic; ineffective vs spaced/composite
+m_dm73,gun_120_l55a1,DM73 APFSDS,apfsds,true,false,false,true,785.0,763.0,720.0,677.0,0.0,0.0,C,Rheinmetall: ~8% over DM63 (~700 @2km)
+m_dm11,gun_120_l55a1,DM11 HE programmable,he,false,false,false,false,,,,,25.0,2.2,B,Rheinmetall datasheet
+m_m829a3,gun_120_l44,M829A3 APFSDS,apfsds,true,false,false,true,818.0,795.0,750.0,705.0,0.0,0.0,C,open estimates 700-800mm
+m_m829a4,gun_120_l44,M829A4 APFSDS,apfsds,true,false,false,true,872.0,848.0,800.0,752.0,0.0,0.0,C,estimate; classified
+m_m830a1,gun_120_l44,M830A1 HEAT-MP-T,heat,false,true,false,false,600.0,600.0,600.0,600.0,25.0,2.3,B,published ~600mm
+m_m1147,gun_120_l44,M1147 AMP HE,he,false,false,false,false,,,,,25.0,2.6,B,multipurpose programmable
+m_3bm42,gun_125_2a46,3BM42 Mango APFSDS,apfsds,true,false,false,false,545.0,530.0,500.0,470.0,0.0,0.0,B,published ~500mm @2km
+m_3bm46,gun_125_2a46,3BM46 Svinets APFSDS,apfsds,true,false,false,false,708.0,689.0,650.0,611.0,0.0,0.0,B,published ~650mm @2km (DU)
+m_3bm60,gun_125_2a46,3BM60 Svinets-2 APFSDS,apfsds,true,false,false,true,763.0,742.0,700.0,658.0,0.0,0.0,C,estimate 700-750mm; T-90M/T-72B3M
+m_3bm22,gun_125_2a46,3BM22 Zakolka APFSDS,apfsds,true,false,false,false,469.0,456.0,430.0,404.0,0.0,0.0,B,export/legacy stock
+m_3bk29,gun_125_2a46,3BK29 tandem HEAT,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,20.0,1.6,B,published 750mm behind ERA
+m_3of26,gun_125_2a46,3OF26 HE-Frag,hefrag,false,false,false,false,,,,,25.0,3.4,B,fill 3.4kg
+m_9m119,at_kobra,9M119M Refleks-M tandem,heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,15.0,1.4,B,published 900mm behind ERA
+m_vacuum1,gun_125_2a82,3BM70 Vacuum-1 APFSDS,apfsds,true,false,false,true,981.0,954.0,900.0,846.0,0.0,0.0,D,speculative; 900mm claimed
+m_3bm6,gun_115_u5ts,3BM6 APFSDS,apfsds,true,false,false,false,309.0,300.0,282.0,264.0,0.0,0.0,B,published ~300mm @1km
+m_3bm28,gun_115_u5ts,3BM28 APFSDS,apfsds,true,false,false,false,412.0,400.0,376.0,352.0,0.0,0.0,B,published ~400mm @1km
+m_3bk4,gun_115_u5ts,3BK4M HEAT,heat,false,true,false,false,440.0,440.0,440.0,440.0,18.0,1.5,B,published reference tables / manufacturer data (see README sources)
+m_3of18,gun_115_u5ts,3OF18 HE-Frag,hefrag,false,false,false,false,,,,,22.0,2.8,B,published reference tables / manufacturer data (see README sources)
+m_m900,gun_105_m35,M900 APFSDS,apfsds,true,false,false,false,567.0,551.0,520.0,489.0,0.0,0.0,C,estimates 500-550mm (DU)
+m_m833,gun_105_m68,M833 APFSDS,apfsds,true,false,false,false,458.0,445.0,420.0,395.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m456,gun_105_m68,M456A2 HEAT,heat,false,true,false,false,430.0,430.0,430.0,430.0,18.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_m393,gun_105_m68,M393A3 HEP/HESH,hesh,false,true,false,false,120.0,120.0,120.0,120.0,22.0,3.0,B,published reference tables / manufacturer data (see README sources)
+m_105_hesh,how_105_l118,L118 HESH (direct fire),hesh,false,true,false,false,100.0,100.0,100.0,100.0,20.0,2.5,B,published reference tables / manufacturer data (see README sources)
+m_105_he,how_105_l118,105mm HE L31 / M1,he,false,false,false,false,,,,,30.0,2.1,B,published reference tables / manufacturer data (see README sources)
+m_3bm25,gun_100_d10,3BM25 APFSDS,apfsds,true,false,false,false,288.0,280.0,263.0,246.0,0.0,0.0,B,D-10T; also 3BM8 APDS ~250
+m_3bk17,gun_100_d10,3BK17M HEAT,heat,false,true,false,false,390.0,390.0,390.0,390.0,16.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_of412,gun_100_d10,OF-412 HE-Frag,hefrag,false,false,false,false,,,,,20.0,1.5,B,published reference tables / manufacturer data (see README sources)
+m_3bm24,gun_100_mt12,3BM24 APFSDS (MT-12),apfsds,true,false,false,false,258.0,250.0,235.0,220.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_3bk16,gun_100_mt12,3BK16 HEAT (MT-12),heat,false,true,false,false,400.0,400.0,400.0,400.0,16.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_9m117,at_kastet,9M117M Kastet tandem,heat_tandem,false,true,false,false,600.0,600.0,600.0,600.0,12.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_br412,gun_100_ks19,BR-412B AP,ap,true,false,false,false,183.0,170.0,144.0,119.0,5.0,0.05,B,published reference tables / manufacturer data (see README sources)
+m_3of32,gun_100_2a70,3OF32 HE-Frag (BMP-3),hefrag,false,false,false,false,,,,,20.0,1.7,B,published reference tables / manufacturer data (see README sources)
+m_9m117b,at_bastion,9M117M1 Arkan tandem,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,12.0,1.0,B,earlier 9M117 Bastion ~550 single
+m_pg15v,gun_73_2a28,PG-15V HEAT,heat,false,true,false,false,300.0,300.0,300.0,300.0,10.0,0.6,B,PG-9 ~400
+m_og15v,gun_73_2a28,OG-15V HE-Frag,hefrag,false,false,false,false,,,,,12.0,0.7,B,published reference tables / manufacturer data (see README sources)
+m_90_heat,gun_90_ckm,Cockerill 90mm HEAT M620,heat,false,true,false,false,350.0,350.0,350.0,350.0,15.0,0.8,B,published reference tables / manufacturer data (see README sources)
+m_ct40_ap,ac_40_ct40,CT40 APFSDS-T,apfsds,true,false,false,false,148.0,144.0,136.0,127.0,0.0,0.0,A,KNDS/CTAI: 140mm RHA @1500m
+m_ct40_gpr,ac_40_ct40,CT40 GPR-PD-T / A3B airburst,airburst,false,false,false,false,,,,,8.0,0.115,A,"KNDS: 15mm RHA @1000m, 210mm concrete"
+m_l14,ac_30_rarden,L14A2 APDS-T,apds,true,false,false,false,52.0,50.0,45.0,40.0,0.0,0.0,B,~40mm @1500m
+m_l13,ac_30_rarden,L13A1 HE-I,he,false,false,false,false,,,,,3.0,0.03,B,published reference tables / manufacturer data (see README sources)
+m_mk30_ap,ac_30_mk30,PMC308 APFSDS-T (30x173),apfsds,true,false,false,false,103.0,100.0,94.0,88.0,0.0,0.0,B,Rheinmetall: >100mm @1000m
+m_mk30_abm,ac_30_mk30,KETF/ABM airburst,airburst,false,false,false,false,,,,,6.0,0.05,B,published reference tables / manufacturer data (see README sources)
+m_3ubr8,ac_30_2a42,3UBR8 APDS-T,apds,true,false,false,false,58.0,55.0,50.0,44.0,0.0,0.0,B,~25mm @1500m/60deg
+m_3ubr6,ac_30_2a42,3UBR6 API-T,api,true,false,false,false,22.0,20.0,11.0,5.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_3uof8,ac_30_2a42,3UOF8 HE-I,he,false,false,false,false,,,,,3.0,0.05,B,published reference tables / manufacturer data (see README sources)
+m_2a72_apds,ac_30_2a72,3UBR8 APDS-T (2A72),apds,true,false,false,false,52.0,50.0,45.0,40.0,0.0,0.0,B,slightly lower MV than 2A42
+m_2a72_he,ac_30_2a72,3UOF8 HE-I (2A72),he,false,false,false,false,,,,,3.0,0.05,B,published reference tables / manufacturer data (see README sources)
+m_2a38_api,ac_30_2a38,3UBR6 API-T (2A38),api,true,false,false,false,28.0,25.0,14.0,6.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_2a38_he,ac_30_2a38,3UOF8 HE-I (2A38),he,false,false,false,false,,,,,3.0,0.05,B,published reference tables / manufacturer data (see README sources)
+m_m919,ac_25_m242,M919 APFSDS-T,apfsds,true,false,false,false,72.0,70.0,66.0,62.0,0.0,0.0,B,>60mm @1000m
+m_m791,ac_25_m242,M791 APDS-T,apds,true,false,false,false,37.0,35.0,32.0,28.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m792,ac_25_m242,M792 HE-I-T,he,false,false,false,false,,,,,2.5,0.03,B,published reference tables / manufacturer data (see README sources)
+m_bzt23,ac_23_azp23,BZT 23mm API-T,api,true,false,false,false,25.0,19.0,8.0,6.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_ofz23,ac_23_azp23,OFZT 23mm HE-I,he,false,false,false,false,,,,,2.0,0.02,B,published reference tables / manufacturer data (see README sources)
+m_20_apds,ac_20_m139,20mm APDS-T,apds,true,false,false,false,32.0,30.0,27.0,24.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_762_ball,mg_762_gpmg,7.62 NATO ball/AP mix,api,true,false,false,false,7.0,5.0,2.0,2.0,0.0,0.0,B,AP ~8mm @100m
+m_762_pkt,mg_762_pkt,7.62x54R B-32 API,api,true,false,false,false,8.0,6.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_556_ball,mg_556_lmg,5.56 NATO ball/M855A1,api,true,false,false,false,5.0,4.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_545_ball,mg_545_rpk,5.45x39 7N22 AP,api,true,false,false,false,5.0,4.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m8_api,hmg_127_m2,.50 M8 API / M903 SLAP,api,true,false,false,false,20.0,16.0,6.0,5.0,0.0,0.0,B,M8 ~19mm @500m; SLAP ~34mm @500m
+m_b32_127,hmg_127_kord,12.7x108 B-32 API,api,true,false,false,false,20.0,16.0,6.0,5.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_b32_145,hmg_145_kpvt,14.5x114 B-32 API,api,true,false,false,false,32.0,25.0,10.0,8.0,0.0,0.0,B,"32mm @500m, 20mm @1000m"
+m_gau19,hmg_127_gau19,.50 M8 API (GAU-19),api,true,false,false,false,20.0,16.0,6.0,5.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m134,mg_762_m134,7.62 ball (M134),api,true,false,false,false,7.0,5.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_l94,mg_762_l94,7.62 NATO (L94A1),api,true,false,false,false,7.0,5.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m240,mg_762_m240,7.62 NATO (M240),api,true,false,false,false,7.0,5.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_pkm,mg_762_pkm,7.62x54R (PKM/PKP),api,true,false,false,false,8.0,6.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_m430,agl_40_mk19,M430A1 HEDP 40x53,heat,false,true,false,false,60.0,60.0,60.0,60.0,5.0,0.032,B,published 50-75mm
+m_vog17,agl_30_ags17,VOG-17M / VOG-30 HE-frag,hefrag,false,false,false,false,,,,,6.0,0.036,B,published reference tables / manufacturer data (see README sources)
+m_m433,ugl_40_m320,M433 HEDP 40x46,heat,false,true,false,false,50.0,50.0,50.0,50.0,5.0,0.035,B,published reference tables / manufacturer data (see README sources)
+m_vog25,ugl_40_gp25,VOG-25 HE-frag,hefrag,false,false,false,false,,,,,6.0,0.048,B,published reference tables / manufacturer data (see README sources)
+m_556_rifle,rifle_556_l85,5.56 ball,api,true,false,false,false,4.0,3.0,1.0,1.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_556_m4,rifle_556_m4,5.56 M855A1,api,true,false,false,false,5.0,4.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_545_rifle,rifle_545_ak74,5.45 7N10,api,true,false,false,false,4.0,3.0,1.0,1.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_762_dmr,dmr_762_l129,7.62 match/AP,api,true,false,false,false,7.0,5.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_762_svd,dmr_762_svd,7.62x54R 7N14 AP,api,true,false,false,false,8.0,6.0,2.0,2.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_javelin,at_javelin,Javelin tandem HEAT (top attack),heat_tandem,false,true,true,false,750.0,750.0,750.0,750.0,8.0,0.5,B,top-attack; pen figure nominal
+m_javelin_f,at_javelin_f,Javelin F-model,heat_tandem,false,true,true,false,750.0,750.0,750.0,750.0,10.0,0.6,B,multipurpose warhead
+m_nlaw,at_nlaw,NLAW OTA,heat,false,true,true,false,500.0,500.0,500.0,500.0,5.0,0.3,B,overfly top attack; direct mode also
+m_at4,at_at4,AT4 HEAT,heat,false,true,false,false,420.0,420.0,420.0,420.0,8.0,0.44,A,Saab: 420mm
+m_at4_ast,at_at4,AT4CS AST anti-structure,he,false,false,false,false,,,,,12.0,1.5,A,published reference tables / manufacturer data (see README sources)
+m_cg_751,at_cg_m3,Carl-Gustaf HEAT 751 tandem,heat_tandem,false,true,false,false,500.0,500.0,500.0,500.0,8.0,0.6,A,Saab: >500mm behind ERA
+m_cg_441,at_cg_m3,Carl-Gustaf HE 441,he,false,false,false,false,,,,,15.0,0.9,A,published reference tables / manufacturer data (see README sources)
+m_m72,at_law_m72,M72A7 HEAT,heat,false,true,false,false,300.0,300.0,300.0,300.0,5.0,0.3,B,published reference tables / manufacturer data (see README sources)
+m_tow2a,at_tow2,TOW-2A tandem,heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,10.0,0.8,B,published reference tables / manufacturer data (see README sources)
+m_tow2b,at_tow2,TOW-2B Aero (top attack EFP),efp,false,true,true,false,150.0,150.0,150.0,150.0,8.0,0.5,B,twin EFP vs roof
+m_pg7vl,at_rpg7,PG-7VL HEAT,heat,false,true,false,false,500.0,500.0,500.0,500.0,8.0,0.7,B,published reference tables / manufacturer data (see README sources)
+m_pg7vr,at_rpg7,PG-7VR tandem,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,8.0,0.7,B,published reference tables / manufacturer data (see README sources)
+m_og7v,at_rpg7,OG-7V frag,hefrag,false,false,false,false,,,,,10.0,0.4,B,published reference tables / manufacturer data (see README sources)
+m_tbg7v,at_rpg7,TBG-7V thermobaric,thermobaric,false,false,false,false,,,,,15.0,1.8,B,published reference tables / manufacturer data (see README sources)
+m_pg26,at_rpg26,PG-26 HEAT,heat,false,true,false,false,440.0,440.0,440.0,440.0,5.0,0.4,B,published reference tables / manufacturer data (see README sources)
+m_pg27,at_rpg27,PG-27 tandem,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,6.0,0.6,B,published reference tables / manufacturer data (see README sources)
+m_pg29v,at_rpg29,PG-29V tandem,heat_tandem,false,true,false,false,750.0,750.0,750.0,750.0,8.0,0.8,B,published reference tables / manufacturer data (see README sources)
+m_pg32v,at_rpg32,PG-32V tandem,heat_tandem,false,true,false,false,650.0,650.0,650.0,650.0,8.0,0.8,B,published reference tables / manufacturer data (see README sources)
+m_9m113,at_konkurs,9M113 Konkurs HEAT,heat,false,true,false,false,600.0,600.0,600.0,600.0,8.0,0.6,B,published reference tables / manufacturer data (see README sources)
+m_9m113m,at_konkurs,9M113M Konkurs-M tandem,heat_tandem,false,true,false,false,800.0,800.0,800.0,800.0,8.0,0.6,B,published reference tables / manufacturer data (see README sources)
+m_9m111,at_fagot,9M111M Fagot HEAT,heat,false,true,false,false,460.0,460.0,460.0,460.0,6.0,0.5,B,published reference tables / manufacturer data (see README sources)
+m_9m131,at_metis_m,9M131 Metis-M tandem,heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,8.0,0.6,B,published reference tables / manufacturer data (see README sources)
+m_9m131f,at_metis_m,9M131F thermobaric,thermobaric,false,false,false,false,,,,,20.0,4.9,B,published reference tables / manufacturer data (see README sources)
+m_9m133,at_kornet,9M133 Kornet tandem,heat_tandem,false,true,false,false,1200.0,1200.0,1200.0,1200.0,10.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_9m133m2,at_kornet,9M133M-2 Kornet-EM tandem,heat_tandem,false,true,false,false,1300.0,1300.0,1300.0,1300.0,10.0,1.0,B,published reference tables / manufacturer data (see README sources)
+m_9m133f,at_kornet,9M133F thermobaric,thermobaric,false,false,false,false,,,,,25.0,7.0,B,published reference tables / manufacturer data (see README sources)
+m_9m120,at_ataka,9M120 Ataka tandem,heat_tandem,false,true,false,false,800.0,800.0,800.0,800.0,10.0,0.8,B,published reference tables / manufacturer data (see README sources)
+m_9m14,at_sagger,9M14M Malyutka HEAT,heat,false,true,false,false,400.0,400.0,400.0,400.0,6.0,0.5,B,published reference tables / manufacturer data (see README sources)
+m_81_he,mor_81_l16,81mm HE L41 / M821,he,false,false,false,false,,,,,20.0,0.7,B,published reference tables / manufacturer data (see README sources)
+m_60_he,mor_60_m224,60mm HE M720,he,false,false,false,false,,,,,15.0,0.36,B,published reference tables / manufacturer data (see README sources)
+m_82_he,mor_82_2b14,82mm O-832DU HE,he,false,false,false,false,,,,,18.0,0.4,B,published reference tables / manufacturer data (see README sources)
+m_120_of49,mor_120_2a60,3OF49 120mm HE-Frag,he,false,false,false,false,,,,,35.0,3.8,B,published reference tables / manufacturer data (see README sources)
+m_3bk19,mor_120_2a60,3BK19 120mm HEAT (Nona),heat,false,true,false,false,600.0,600.0,600.0,600.0,15.0,1.0,B,published ~600mm
+m_240_f864,mor_240_2b8,3F5 / F-864 240mm HE,he,false,false,false,false,,,,,60.0,32.0,B,130kg bomb; Smelchak laser-guided variant
+m_155_m795,how_155_m284,M795 / L15 155mm HE,he,false,false,false,false,,,,,50.0,10.8,B,published reference tables / manufacturer data (see README sources)
+m_155_m107,how_155_m776,M107 155mm HE,he,false,false,false,false,,,,,45.0,6.6,B,published reference tables / manufacturer data (see README sources)
+m_155_l15,how_155_l31,L15A2 155mm HE,he,false,false,false,false,,,,,50.0,11.3,B,published reference tables / manufacturer data (see README sources)
+m_excalibur,how_155_m284,M982 Excalibur (GPS),he,false,false,true,false,,,,,50.0,10.8,B,precision; CEP 4m
+m_bonus,how_155_l31,BONUS / SMArt 155 sensor-fuzed,efp,false,true,true,false,150.0,150.0,150.0,150.0,10.0,0.5,B,"top attack, 2 submunitions"
+m_of540,how_152_2a33,OF-540 152mm HE-Frag,he,false,false,false,false,,,,,45.0,5.9,B,published reference tables / manufacturer data (see README sources)
+m_bp540,how_152_2a33,BP-540 152mm HEAT,heat,false,true,false,false,250.0,250.0,250.0,250.0,20.0,2.0,B,published reference tables / manufacturer data (see README sources)
+m_3of45,how_152_2a64,3OF45 152mm HE-Frag,he,false,false,false,false,,,,,48.0,7.6,B,published reference tables / manufacturer data (see README sources)
+m_krasnopol,how_152_2a64,2K25 Krasnopol laser-guided,he,false,false,true,false,,,,,45.0,6.4,B,precision; needs designator
+m_3of45_2a88,how_152_2a88,3OF45 (2S35),he,false,false,false,false,,,,,48.0,7.6,B,published reference tables / manufacturer data (see README sources)
+m_of29,gun_152_2a36,OF-29 152mm HE-Frag (Giatsint),he,false,false,false,false,,,,,45.0,6.7,B,published reference tables / manufacturer data (see README sources)
+m_of462,how_122_2a18,OF-462 122mm HE-Frag,he,false,false,false,false,,,,,30.0,3.5,B,published reference tables / manufacturer data (see README sources)
+m_bk13,how_122_2a18,BK-13 122mm HEAT,heat,false,true,false,false,460.0,460.0,460.0,460.0,15.0,1.5,B,direct-fire AT role
+m_of43,gun_203_2a44,3OF43 203mm HE,he,false,false,false,false,,,,,60.0,17.8,B,published reference tables / manufacturer data (see README sources)
+m_m26,mlrs_227_m270,M26 DPICM (644 M77),dpicm,false,false,true,false,,,,,200.0,12.0,B,"footprint ~200m radius per rocket; withdrawn US, stock elsewhere"
+m_m31,mlrs_227_m270,M31 GMLRS unitary,he,false,false,true,false,,,,,100.0,90.0,B,GPS; CEP <5m
+m_9m22u,mlrs_122_grad,9M22U 122mm HE-Frag,he,false,false,false,false,,,,,30.0,6.4,B,published reference tables / manufacturer data (see README sources)
+m_9m27f,mlrs_220_uragan,9M27F 220mm HE-Frag,he,false,false,false,false,,,,,60.0,51.0,B,published reference tables / manufacturer data (see README sources)
+m_9m27k,mlrs_220_uragan,9M27K 220mm cluster (30 x 9N210),dpicm,false,false,true,false,,,,,150.0,30.0,B,published reference tables / manufacturer data (see README sources)
+m_9m55f,mlrs_300_smerch,9M55F 300mm HE,he,false,false,false,false,,,,,80.0,92.0,B,published reference tables / manufacturer data (see README sources)
+m_9m55k,mlrs_300_smerch,9M55K 300mm cluster (72 x 9N235),dpicm,false,false,true,false,,,,,250.0,72.0,B,published reference tables / manufacturer data (see README sources)
+m_tos_tb,mlrs_220_tos1,MO.1.01.04M thermobaric,thermobaric,false,false,false,false,,,,,200.0,45.0,B,salvo footprint ~200x300m
+m_tochka,bm_tochka,9M79 HE 482kg,he,false,false,false,false,,,,,200.0,482.0,B,published reference tables / manufacturer data (see README sources)
+m_tochka_k,bm_tochka,9M79K cluster (50 x 9N24),dpicm,false,false,true,false,,,,,300.0,50.0,B,published reference tables / manufacturer data (see README sources)
+m_iskander,bm_iskander,9M723 HE/cluster 480-700kg,he,false,false,false,false,,,,,250.0,700.0,B,published reference tables / manufacturer data (see README sources)
+m_luna,bm_luna,9M21F HE 450kg,he,false,false,false,false,,,,,200.0,450.0,B,CEP 500-700m
+m_icbm,bm_icbm,Nuclear warhead (excluded),nuclear,false,false,false,false,,,,,0.0,0.0,A,Not for tactical sim
+m_sam_none,sam_short,Short-range SAM (Tor/Osa/Strela-10/Pantsir/Rapier),sam,false,false,false,false,,,,,0.0,0.0,C,class envelope: Tor-M2 16 km/10 km; Rapier FSC 8 km; Strela-10 5 km
+m_sam_none2,sam_medium,"Medium SAM (Buk-M2/M3, Kub, NASAMS)",sam,false,false,false,false,,,,,0.0,0.0,C,class envelope: Buk-M3 70 km; NASAMS 3 40 km w/ AMRAAM-ER
+m_sam_none3,sam_long,"Long-range SAM (Patriot PAC-3, S-300/400)",sam,false,false,false,false,,,,,0.0,0.0,C,class envelope; low-altitude helo engagement limited by radar horizon
+m_starstreak,sam_starstreak,Starstreak HVM (3 darts),sam,false,false,false,false,,,,,0.0,0.0,B,"Thales: 7 km, Mach 3+; laser beam-riding, immune to IR flares"
+m_stinger,sam_stinger,FIM-92 Stinger Block I RMP,sam,false,false,false,false,,,,,0.0,0.0,B,Raytheon; RAND MANPADS Pk 0.4-0.7 vs helo
+m_igla,sam_igla,9M39 Igla / 9M342 Igla-S / Verba,sam,false,false,false,false,,,,,0.0,0.0,B,"KBM: Igla-S 6 km, 3.5 km alt; Verba adds 3-channel seeker"
+m_ur77,eng_ur77,UZP-77 line charge (700kg explosive),he,false,false,false,false,,,,,90.0,700.0,B,demolition use vs buildings/trenches
+m_35_apds,ac_35_kda,FAPDS-T 35mm,apds,true,false,false,false,84.0,80.0,72.0,64.0,0.0,0.0,B,published reference tables / manufacturer data (see README sources)
+m_35_he,ac_35_kda,HEI-T 35mm,he,false,false,false,false,,,,,4.0,0.1,B,published reference tables / manufacturer data (see README sources)
+m_m789,ac_30_m230,M789 HEDP 30x113,heat,false,true,false,false,50.0,50.0,50.0,50.0,4.0,0.027,B,published reference tables / manufacturer data (see README sources)
+m_agm114,at_hellfire,AGM-114K/R tandem HEAT,heat_tandem,false,true,false,false,1000.0,1000.0,1000.0,1000.0,15.0,8.0,B,published reference tables / manufacturer data (see README sources)
+m_35_apfsds,ac_35_wotan,35mm PMC308 APFSDS-T,apfsds,true,false,false,true,164.0,159.0,150.0,141.0,0.0,0.0,B,Rheinmetall: ~140-160mm RHA @1000m
+m_35_abm,ac_35_wotan,35mm AHEAD/ABM,airburst,false,false,false,false,,,,,5.0,0.06,B,Rheinmetall AHEAD datasheet
+m_20_dm63,ac_20_rh202,20mm DM63 APDS-T,apds,true,false,false,false,47.0,45.0,40.0,36.0,0.0,0.0,B,Rh 202 published: ~45mm/30deg @1000m
+m_20_he_rh,ac_20_rh202,20mm DM51 HEI,he,false,false,false,false,,,,,2.0,0.02,B,Rheinmetall
+m_9m123,at_khrizantema,9M123 tandem HEAT,heat_tandem,false,true,false,false,1100.0,1100.0,1100.0,1100.0,0.0,0.0,B,"KBP: 1,100-1,250mm behind ERA"
+m_9m123f,at_khrizantema,9M123F thermobaric,thermobaric,false,false,false,false,,,,,25.0,6.0,B,KBP
+m_pg9v,at_spg9,PG-9V HEAT,heat,false,true,false,false,400.0,400.0,400.0,400.0,0.0,0.0,B,open literature 300-400mm; PG-9VS 400
+m_og9v,at_spg9,OG-9V frag,hefrag,false,false,false,false,,,,,12.0,0.7,B,open literature
+m_rpo_a,at_rpo_a,RPO-A thermobaric,thermobaric,false,false,false,false,,,,,12.0,2.1,B,KBP; ~80 m3 blast volume
+m_pg22,at_rpg22,PG-22 HEAT,heat,false,true,false,false,400.0,400.0,400.0,400.0,0.0,0.0,B,open literature 390-400mm
+m_pg28,at_rpg28,PG-28 tandem HEAT,heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,0.0,0.0,B,Bazalt: 900mm behind ERA
+m_pg30,at_rpg30,PG-30 tandem HEAT (precursor decoy defeats APS),heat_tandem,false,true,false,false,650.0,650.0,650.0,650.0,0.0,0.0,B,Bazalt: 650mm behind ERA; precursor round vs hard-kill APS
+m_matador,at_matador,MATADOR HEAT/HESH dual-mode,heat,false,true,false,false,500.0,500.0,500.0,500.0,10.0,0.9,B,DND/Rafael datasheet ~500mm
+m_m141,at_m141_bdm,M141 BDM HEDP,heat,false,true,false,false,200.0,200.0,200.0,200.0,10.0,1.0,B,Nammo Talley; primarily anti-structure
+m_vog40,agl_40_ags40,40mm 7P39 HE (caseless),he,false,false,false,false,,,,,7.0,0.09,C,Tecmash; 7P39
+m_82_o832_auto,mor_82_2b9,82mm O-832DU HE (Vasilek clip),he,false,false,false,false,,,,,18.0,0.4,B,same round as 2B14
+m_120_of843,mor_120_2b11,120mm OF-843B / M933 HE,he,false,false,false,false,,,,,35.0,3.9,B,"120mm mortar HE, ~3.9 kg fill"
+m_107_m329,mor_107_m30,107mm M329A2 HE,he,false,false,false,false,,,,,30.0,3.2,B,US TM
+m_127_dshk_api,mg_127_dshk,12.7x108 B-32 API,api,true,false,false,false,23.0,20.0,14.0,8.0,0.0,0.0,B,same round as Kord/NSVT; ~20mm @500m
+m_fpv_rpg,fpv_generic,FPV with PG-7VL warhead,heat,false,true,true,false,450.0,450.0,450.0,450.0,5.0,0.5,C,field-fitted PG-7 series warhead; ~85% of PG-7VL nominal after fuze mod
+m_fpv_tandem,fpv_generic,FPV with PG-7VR tandem warhead,heat_tandem,false,true,true,false,650.0,650.0,650.0,650.0,5.0,0.6,C,field-fitted tandem warhead; Oryx/UA reporting 2024-25
+m_fpv_frag,fpv_generic,FPV with fragmentation charge,hefrag,false,false,false,false,,,,,10.0,1.0,C,typical 0.8-1.5 kg improvised frag
+m_mam_l,at_hellfire,Roketsan MAM-L,heat_tandem,false,true,true,false,600.0,600.0,600.0,600.0,20.0,8.0,B,"Roketsan; 22 kg, tandem + HE variants"
+m_strela2,sam_strela2,9M32M Strela-2M / 9M36 Strela-3,sam,false,false,false,false,,,,,0.0,0.0,B,tail-chase IR; RAND Pk 0.2-0.3
+m_gbu12,bomb_gp_west,GBU-12 / Paveway IV 500 lb LGB,he,false,false,false,false,,,,,90.0,87.0,B,Mk 82 body: 87 kg Tritonal fill; lethal radius vs soft ~90 m
+m_gbu38,bomb_gp_west,GBU-38 JDAM 500 lb,he,false,false,false,false,,,,,90.0,87.0,B,Mk 82 body
+m_mk84,bomb_gp_west,Mk 84 / GBU-31 2000 lb,he,false,false,false,false,,,,,180.0,430.0,B,Mk 84: 429 kg Tritonal
+m_fab500,bomb_gp_ru,FAB-500 M-62 (UMPK),he,false,false,false,false,,,,,150.0,300.0,B,300 kg TNT fill; UMPK glide kit 2023
+m_fab250,bomb_gp_ru,FAB-250 M-62,he,false,false,false,false,,,,,90.0,100.0,B,~100 kg fill
+m_kab500,bomb_gp_ru,KAB-500L / KAB-500S,he,false,false,false,false,,,,,120.0,195.0,B,laser/GLONASS guided; 195 kg fill
+m_ls6,bomb_gp_cn,LS-6 500 kg glide bomb,he,false,false,false,false,,,,,140.0,250.0,B,CN 500 kg class
+m_brimstone,msl_brimstone,Brimstone 2 tandem HEAT,heat_tandem,false,true,true,false,900.0,900.0,900.0,900.0,8.0,6.2,B,MBDA: tandem shaped charge; mmW fire-and-forget
+m_agm65,msl_agm65,AGM-65D/G Maverick,heat,false,true,true,false,1000.0,1000.0,1000.0,1000.0,25.0,57.0,B,AGM-65D 57 kg shaped charge; G: 136 kg penetrator
+m_kh29,msl_kh29,Kh-29T/L,he,false,false,false,false,,,,,140.0,320.0,B,317 kg penetrating HE
+m_kh38,msl_kh29,Kh-38ML,he,false,false,false,false,,,,,120.0,250.0,B,250 kg class modular warhead
+m_hydra_he,rkt_hydra,Hydra 70 M151 HE / APKWS,hefrag,false,false,false,false,,,,,10.0,1.0,B,M151 10 lb warhead; APKWS adds laser guidance
+m_s8_he,rkt_s8,S-8KOM HEAT-frag,heat,false,true,false,false,400.0,400.0,400.0,400.0,10.0,0.9,B,"S-8KOM: 400 mm RHA, 3.6 kg warhead"
+m_gau8_api,gun_gau8,30mm PGU-14/B API (DU),api,true,false,false,false,69.0,59.0,38.0,17.0,0.0,0.0,B,"PGU-14: ~69 mm @500 m, 30°"
+m_gsh30_api,gun_gsh301,30mm BR/OFZ (GSh-30),api,true,false,false,false,46.0,40.0,28.0,16.0,0.0,0.0,B,Soviet 30x165 BR
+m_20_hei,gun_m61,20mm/23mm/27mm HEI aircraft,he,false,false,false,false,,,,,1.5,0.01,B,PGU-28 / BK27 / GSh-23
+m_105_ac130,gun_ac130_105,105mm M1 HE (AC-130),he,false,false,false,false,,,,,30.0,2.1,B,same as M102 round
+m_30_ac130,gun_ac130_30,30mm PGU-46/B HEI (GAU-23),he,false,false,false,false,,,,,3.0,0.03,B,Mk44 Bushmaster II round
+m_ngs_57,gun_naval_57,57mm HE (Mk 295 / AK-725),he,false,false,false,false,,,,,12.0,0.4,B,Mk 295: 2.4 kg projectile
+m_ngs_76,gun_naval_76,76mm HE (OTO / AK-176),he,false,false,false,false,,,,,18.0,0.75,B,"6.3 kg projectile, 0.75 kg fill"
+m_ngs_100,gun_naval_100,100mm HE (A-190 / AK-100),he,false,false,false,false,,,,,25.0,1.6,B,15.6 kg projectile
+m_ngs_114,gun_naval_114,4.5in Mk 8 HE,he,false,false,false,false,,,,,40.0,3.0,B,21 kg projectile
+m_ngs_127,gun_naval_127,5in Mk 80 HE-PD,he,false,false,false,false,,,,,45.0,3.6,B,31.8 kg projectile; Mk 45 Mod 4
+m_ngs_130,gun_naval_130,130mm HE (AK-130 / A-192 / H/PJ-38),he,false,false,false,false,,,,,45.0,3.5,B,33 kg projectile
+m_ngs_155,gun_naval_155,155mm LRLAP (inactive),he,false,false,false,false,,,,,50.0,11.0,B,LRLAP cancelled 2016; guns inert
+m_tomahawk,msl_tomahawk,Tomahawk Block IV/V 1000 lb,he,false,false,false,false,,,,,180.0,450.0,B,WDU-36/B 450 kg
+m_kalibr,msl_kalibr,3M14 Kalibr 450 kg,he,false,false,false,false,,,,,180.0,450.0,B,450 kg HE; 2022-25 employment
+m_cj10,msl_cj10,CJ-10 / YJ-18 land-attack 500 kg,he,false,false,false,false,,,,,190.0,500.0,B,CN sources; 500 kg class
+m_zircon,msl_zircon,3M22 Zircon 300-400 kg,he,false,false,false,false,,,,,160.0,350.0,B,RU claim
+m_hj8_air,msl_hj8_air,HJ-8 / HJ-10 tandem HEAT,heat_tandem,false,true,true,false,1000.0,1000.0,1000.0,1000.0,0.0,0.0,B,Norinco: >1000 mm behind ERA (HJ-10)
+m_tow_air,msl_tow_air,TOW-2A (helicopter),heat_tandem,false,true,false,false,900.0,900.0,900.0,900.0,0.0,0.0,B,as ground TOW-2A
+m_nsam_short,nsam_short,Naval short-range SAM (class envelope),sam,false,false,false,false,,,,,0.0,0.0,C,RAM Block 2 / Sea Ceptor / HHQ-10 class figures
+m_nsam_medium,nsam_medium,Naval medium-range SAM (class envelope),sam,false,false,false,false,,,,,0.0,0.0,C,ESSM / Aster 15 / HQ-16 / Shtil-1 class figures
+m_nsam_long,nsam_long,Naval long-range SAM (class envelope),sam,false,false,false,false,,,,,0.0,0.0,C,SM-2/SM-6 / Aster 30 / HHQ-9 / S-300F class figures
+m_ciws,ciws_20_phalanx,CIWS engagement (class envelope),sam,false,false,false,false,,,,,0.0,0.0,C,Phalanx / AK-630 / Type 730 class; last-ditch only
+m_aam_short,aam_short,Short-range AAM (class),sam,false,false,false,false,,,,,0.0,0.0,C,AIM-9X / R-73 class
+m_aam_medium,aam_medium,Medium-range AAM (class),sam,false,false,false,false,,,,,0.0,0.0,C,AIM-120 / R-77 / PL-15 class
+m_aam_long,aam_long,Very-long-range AAM (class),sam,false,false,false,false,,,,,0.0,0.0,C,R-37M / PL-17 class
+m_spike_lr,at_spike_lr,Spike-LR2 tandem HEAT,heat_tandem,false,true,true,false,1000.0,1000.0,1000.0,1000.0,0.0,0.0,B,"Rafael: >1,000 mm RHA behind ERA; lofted top-attack profile"

@@ -1,0 +1,955 @@
+﻿asset_id,bgws_capability,bgws_max_range_m,min_range_m,best_pen_mm_1000m,best_pen_mm_0m,best_pen_mm_2000m,has_top_attack,weapons,best_calibre_mm,muzzle_velocity_ms,mv_confidence,rof_cyclic,rof_sustained,short_range_m
+plat_a1051,apers,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a1051,atk,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a1052,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a1052,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a1176,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a1176,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a1329,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a1330,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a15,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_a150,apers,15000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23)]",500.0,0.0,B,1,1,7500.0
+plat_a150,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), S-8 / S-13 rocket pod, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a150,atm,6000,400,800.0,800.0,800.0,false,"[9M120 Ataka (AT-9), 9M120 Ataka (AT-9)]",130.0,400.0,B,1,1,3000.0
+plat_a150,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_a1636,apers,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_a1636,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_a19,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a19,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a19,atm,20000,0,1000.0,1000.0,1000.0,true,"[AGM-65 Maverick, AGM-65 Maverick, AGM-65 Maverick]",305.0,0.0,B,1,1,10000.0
+plat_a191,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a191,atk,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a194,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a194,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm, Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23)]",500.0,860.0,B,1500,600,7500.0
+plat_a194,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm, Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), S-8 / S-13 rocket pod, S-8 / S-13 rocket pod, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a194,atm,30000,0,,,,false,"[Kh-29 / Kh-38 / Kh-25, Kh-29 / Kh-38 / Kh-25, Kh-29 / Kh-38 / Kh-25, Kh-29 / Kh-38 / Kh-25]",380.0,0.0,B,1,1,15000.0
+plat_a195,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a195,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a196,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a196,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a196,atk,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a20,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a20,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a20,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a21,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a21,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a21,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a21,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a212,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a212,apers,15000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a212,atk,15000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a212,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a22,apers,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a22,atk,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a23,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a23,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a23,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a23,atm,20000,0,900.0,900.0,900.0,true,[Brimstone 2 / SPEAR],178.0,0.0,B,1,1,10000.0
+plat_a2308,apers,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a2308,atk,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a25,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a25,apers,15000,0,59.0,69.0,38.0,false,"[GAU-8/A 30mm (A-10), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,1010.0,B,3900,1000,7500.0
+plat_a25,atk,15000,0,59.0,69.0,38.0,false,"[GAU-8/A 30mm (A-10), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), Hydra 70 / CRV7 2.75in rocket pod]",500.0,1010.0,B,3900,1000,7500.0
+plat_a25,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a26,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",30.0,1000.0,C,650,200,1500.0
+plat_a26,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",30.0,1000.0,C,650,200,1500.0
+plat_a26,idf,10000,0,,,,false,"[AC-130 105mm M102 howitzer, AC-130 105mm M102 howitzer]",105.0,494.0,B,6,3,5000.0
+plat_a27,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a27,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a27,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a286,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a286,apers,15000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 2A42 / 23mm NR-23 / GSh-23 helicopter cannon, GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a286,atk,15000,0,400.0,400.0,400.0,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 2A42 / 23mm NR-23 / GSh-23 helicopter cannon, GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), S-8 / S-13 rocket pod, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a286,atm,20000,0,1000.0,1000.0,1000.0,true,"[9M120 Ataka (AT-9), AGM-65 Maverick]",305.0,0.0,B,1,1,10000.0
+plat_a289,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a289,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a289,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a30,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a30,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a30,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a385,apers,1500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23)]",23.0,700.0,C,3000,800,750.0
+plat_a385,atk,4000,0,,,,false,"[Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod]",70.0,0.0,B,19,19,2000.0
+plat_a385,atm,3750,0,900.0,900.0,900.0,false,[BGM-71 TOW (helicopter)],152.0,0.0,B,1,1,1875.0
+plat_a39,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a39,apers,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a39,atk,1500,0,,,,false,[M61 / M39 / BK27 / GSh-23 aircraft cannon],20.0,1050.0,B,4000,1000,750.0
+plat_a403,apers,0,0,,,,false,[Depth charge / ASW bomb],0.0,0.0,C,1,1,0.0
+plat_a403,atk,0,0,,,,false,[Depth charge / ASW bomb],0.0,0.0,C,1,1,0.0
+plat_a404,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_a404,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_a41,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_a42,apers,15000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a42,atk,15000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, Hydra 70 / CRV7 2.75in rocket pod, M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a42,atm,20000,0,1000.0,1000.0,1000.0,true,"[AGM-65 Maverick, AGM-65 Maverick, AGM-65 Maverick, BGM-71 TOW (helicopter)]",305.0,0.0,B,1,1,10000.0
+plat_a46,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_a468,atm,8000,500,1000.0,1000.0,1000.0,false,[AGM-114 Hellfire],178.0,475.0,B,1,1,4000.0
+plat_a509,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a509,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a55,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a55,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a55,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a55,atm,20000,0,900.0,900.0,900.0,true,[Brimstone 2 / SPEAR],178.0,0.0,B,1,1,10000.0
+plat_a56,apers,1000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",7.62,870.0,C,3000,600,500.0
+plat_a599,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon]",500.0,0.0,B,1,1,7500.0
+plat_a599,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), M61 / M39 / BK27 / GSh-23 aircraft cannon, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a599,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a6,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a6,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a6,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a65,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T), Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a65,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a65,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a697,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a697,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a697,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm, S-8 / S-13 rocket pod, S-8 / S-13 rocket pod, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a697,atm,30000,0,1000.0,1000.0,1000.0,true,"[AGM-65 Maverick, AGM-65 Maverick, Kh-29 / Kh-38 / Kh-25, Kh-29 / Kh-38 / Kh-25, Kh-29 / Kh-38 / Kh-25]",380.0,0.0,B,1,1,15000.0
+plat_a698,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a698,atk,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a71,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a71,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a769,apers,2000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm]",30.0,860.0,B,1500,600,1000.0
+plat_a769,atk,2000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm]",30.0,860.0,B,1500,600,1000.0
+plat_a782,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a782,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a782,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a784,apers,1500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",20.0,1050.0,B,4000,1000,750.0
+plat_a784,atk,4000,0,400.0,400.0,400.0,false,"[Hydra 70 / CRV7 2.75in rocket pod, M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon, S-8 / S-13 rocket pod]",80.0,0.0,B,20,20,2000.0
+plat_a784,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+plat_a785,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_a785,apers,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a785,atk,15000,0,,,,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV)]",500.0,0.0,B,1,1,7500.0
+plat_a785,atm,8000,500,1000.0,1000.0,1000.0,false,[AGM-114 Hellfire],178.0,475.0,B,1,1,4000.0
+plat_a866,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a875,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a88,apers,15000,0,40.0,46.0,28.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm]",500.0,860.0,B,1500,600,7500.0
+plat_a88,atk,15000,0,400.0,400.0,400.0,false,"[GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GP bomb / LGB (Mk 82/84, GBU-12/38/54, Paveway IV), GSh-30-1 / GSh-30-2 30mm, S-8 / S-13 rocket pod, S-8 / S-13 rocket pod]",500.0,0.0,B,20,20,7500.0
+plat_a882,apers,2000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm]",30.0,860.0,B,1500,600,1000.0
+plat_a882,atk,2000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, GSh-30-1 / GSh-30-2 30mm]",30.0,860.0,B,1500,600,1000.0
+plat_a898,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_a930,apers,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a930,atk,2000,0,40.0,46.0,28.0,false,[GSh-30-1 / GSh-30-2 30mm],30.0,860.0,B,1500,600,1000.0
+plat_a991,aa,20000,500,,,,false,"[Short-range AAM (AIM-9X, ASRAAM, R-73/74, PL-8/10, IRIS-T)]",127.0,0.0,C,1,1,10000.0
+plat_a991,apers,1500,0,,,,false,"[Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23)]",23.0,700.0,C,3000,800,750.0
+plat_a991,atk,4000,0,400.0,400.0,400.0,false,"[Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), Gun pod (12.7/20/23mm, GSh-23 UPK, SUU-23), S-8 / S-13 rocket pod]",80.0,0.0,B,20,20,2000.0
+plat_a991,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_sAdmiral_Chabanenko_DD_650,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Chabanenko_DD_650,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Chabanenko_DD_650,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Chabanenko_DD_650,idf,23000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,11500.0
+plat_sAdmiral_Essen_751,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Essen_751,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Essen_751,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Essen_751,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sAdmiral_Grigorovich_745,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Grigorovich_745,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Grigorovich_745,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Grigorovich_745,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sAdmiral_Kasatonov_431,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Kasatonov_431,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Kasatonov_431,idf,27000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, 4.5in Mk 8 Mod 1 naval gun]",130.0,850.0,B,40,20,13500.0
+plat_sAdmiral_Kuznetsov_CV_Project_1143_5_6,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Kuznetsov_CV_Project_1143_5_6,apers,4000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Kuznetsov_CV_Project_1143_5_6,atk,4000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Levchenko_605,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Levchenko_605,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Levchenko_605,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sAdmiral_Levchenko_605,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sAdmiral_Makarov_799,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Makarov_799,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Makarov_799,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sAdmiral_Makarov_799,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sAdmiral_Panteleyev_548,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Panteleyev_548,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sAdmiral_Panteleyev_548,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sAdmiral_Panteleyev_548,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sAdmiral_Tributs_564,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sAdmiral_Tributs_564,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sAdmiral_Tributs_564,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sAdmiral_Tributs_564,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sBoikiy_532,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sBoikiy_532,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sBoikiy_532,idf,27000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), 4.5in Mk 8 Mod 1 naval gun]",114.0,870.0,B,24,16,13500.0
+plat_sCCG_Willow_WLB_202,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sCNS_Anhui_33,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Anhui_33,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Anhui_33,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Baotou_133,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Baotou_133,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Baotou_133,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Baotou_133,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Bayannur_551,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Bayannur_551,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Bayannur_551,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Bengbu_582_Type_056,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Bengbu_582_Type_056,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Bengbu_582_Type_056,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Bengbu_582_Type_056,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Changchun_150,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Changchun_150,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Changchun_150,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Changsha_173,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Changsha_173,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Changsha_173,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Changsha_173,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Chaohu_Lake_890,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Chaohu_Lake_890,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Chaozhou_595,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Chaozhou_595,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Chaozhou_595,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Chaozhou_595,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Dalian_105,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Dalian_105,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Dalian_105,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Enshi_627,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Enshi_627,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Enshi_627,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Enshi_627,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Fujian_Type_003,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Fujian_Type_003,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Haikou_171,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Haikou_171,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Haikou_171,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Hainan_31,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Hainan_31,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Hainan_31,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Hanzhong_520_648,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Hanzhong_520_648,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Hanzhong_520_648,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Hanzhong_520_648,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Harbin_112,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Harbin_112,apers,4000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), AK-630 / AK-630M 30mm CIWS]",30.0,1000.0,C,650,200,2000.0
+plat_sCNS_Harbin_112,atk,4000,0,400.0,400.0,400.0,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), AK-630 / AK-630M 30mm CIWS, S-8 / S-13 rocket pod]",80.0,0.0,B,20,20,2000.0
+plat_sCNS_Harbin_112,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), 100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sCNS_Hefei_174_Type_052D,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Hefei_174_Type_052D,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Hefei_174_Type_052D,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Hefei_174_Type_052D,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Hohhot_161,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Hohhot_161,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Hohhot_161,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Hohhot_161,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Huainan_123,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Huainan_123,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huainan_123,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huainan_123,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Huanggang_577,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huanggang_577,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huanggang_577,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Huangshan_570,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huangshan_570,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Huangshan_570,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Huangshi_502_655,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Huangshi_502_655,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Huangshi_502_655,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Huangshi_502_655,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Jiaozuo_163,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Jiaozuo_163,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Jiaozuo_163,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Jiaozuo_163,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Jinan_152,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Jinan_152,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Jinan_152,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Lanzhou_170,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Lanzhou_170,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Lanzhou_170,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Liaoning_16,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Liaoning_16,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Liaoning_16,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Linyi_547,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Linyi_547,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Linyi_547,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Liupanshui_514,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Liupanshui_514,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Liupanshui_514,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Liupanshui_514,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Luoyang_527,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Luoyang_527,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Luoyang_527,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Luoyang_527,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Nanchang_101,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Nanchang_101,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Nanchang_101,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Nanchang_101,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Nanjing_155,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Nanjing_155,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Nanjing_155,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Nanjing_155,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Nanning_162,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Nanning_162,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Nanning_162,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Nanning_162,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Ningbo_139,apers,3000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, Goalkeeper / Kashtan 30mm CIWS]",30.0,860.0,B,1500,600,1500.0
+plat_sCNS_Ningbo_139,atk,3000,0,40.0,46.0,28.0,false,"[GSh-30-1 / GSh-30-2 30mm, Goalkeeper / Kashtan 30mm CIWS]",30.0,860.0,B,1500,600,1500.0
+plat_sCNS_Ningbo_139,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_sCNS_Ningbo_139,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Renhuai_732_847,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Renhuai_732_847,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Rizhao_598,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Rizhao_598,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Rizhao_598,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Sanya_574,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Sanya_574,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Sanya_574,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Shandong_17_Type_001A,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Shandong_17_Type_001A,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Shandong_17_Type_001A,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Shangrao_583,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Shangrao_583,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Shangrao_583,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Shangrao_583,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Sichuan_51,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Sichuan_51,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Sichuan_51,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Suining_551,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Suining_551,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Suining_551,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Suining_551,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Suzhou_132,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Suzhou_132,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Suzhou_132,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Suzhou_132,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Tongling_629,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Tongling_629,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Tongling_629,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Tongling_629,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Type_053H3_Jiangwei_II,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Type_053H3_Jiangwei_II,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Type_053H3_Jiangwei_II,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Type_053H3_Jiangwei_II,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sCNS_Type_054A_Jiangkai_II,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Type_054A_Jiangkai_II,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Type_054A_Jiangkai_II,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Type_054B,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Type_054B,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Type_054B,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Type_054B,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Type_055_Renhai_class,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Type_055_Renhai_class,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Type_055_Renhai_class,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Type_055_Renhai_class,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Type_056_Type_056A_Jiangdao,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Type_056_Type_056A_Jiangdao,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Type_056_Type_056A_Jiangdao,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Type_056_Type_056A_Jiangdao,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Type_075_class,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Type_075_class,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Type_075_class,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Weifang_550,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Weifang_550,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Weifang_550,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Weishan_Lake_887,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Weishan_Lake_887,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Wuhu_539,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Wuhu_539,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Wuhu_539,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Wuhu_539,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Wuxi_104,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Wuxi_104,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Wuxi_104,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Wuxi_104,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Wuyi_Shan_974,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Wuyi_Shan_974,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Wuzhou_626,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Wuzhou_626,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Wuzhou_626,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Wuzhou_626,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Xiamen_154,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Xiamen_154,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Xiamen_154,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Xiamen_154,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Xianyang_108,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Xianyang_108,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Xianyang_108,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Xianyang_108,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Xinji_606,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Xinji_606,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Xinji_606,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Xinji_606,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Xinyang_501,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Xinyang_501,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Xinyang_501,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Xinyang_501,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Yanan_106,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Yanan_106,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yanan_106,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yanan_106,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Yangzhou_578,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yangzhou_578,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yangzhou_578,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Yantai_538,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yantai_538,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yantai_538,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Yichang_564,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Yichang_564,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Yichang_564,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCNS_Yichang_564,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sCNS_Yinchuan_175,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Yinchuan_175,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Yinchuan_175,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Type 730 / Type 1130 / H/PJ-11 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Yinchuan_175,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCNS_Yiyang_548,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yiyang_548,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yiyang_548,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Yueyang_575,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yueyang_575,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yueyang_575,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Yulin_569,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yulin_569,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Yulin_569,idf,16000,0,,,,false,"[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8000.0
+plat_sCNS_Zhangjiakou_605,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Zhangjiakou_605,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Zhangjiakou_605,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sCNS_Zhangjiakou_605,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Zhengzhou_151,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Zhengzhou_151,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Zhengzhou_151,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_sCNS_Zhuzhou_594_639,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Zhuzhou_594_639,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Zhuzhou_594_639,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sCNS_Zhuzhou_594_639,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sCNS_Zibo_156,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sCNS_Zibo_156,apers,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Zibo_156,atk,3500,0,,,,false,[Type 730 / Type 1130 / H/PJ-11 30mm CIWS],30.0,1000.0,C,5800,1500,1750.0
+plat_sCNS_Zibo_156,idf,23000,0,,,,false,[130mm AK-130 / A-192 / H/PJ-38 naval gun],130.0,850.0,B,40,20,11500.0
+plat_sCombat_Boat_90_CB90_Stridsbat_90H,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCombat_Boat_90_CB90_Stridsbat_90H,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sCombat_Boat_90_CB90_Stridsbat_90H,atm,8000,500,1000.0,1000.0,1000.0,false,[AGM-114 Hellfire],178.0,475.0,B,1,1,4000.0
+plat_sCombat_Boat_90_CB90_Stridsbat_90H,idf,5650,100,,,,false,[L16 / M252 81mm mortar],81.0,226.0,B,15,8,2825.0
+plat_sDmitri_Donskoi_TK_208,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sDmitry_Rogachev_375_Project_22160,idf,27000,0,,,,false,"[4.5in Mk 8 Mod 1 naval gun, 76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)]",114.0,870.0,B,24,16,13500.0
+plat_sF470_Zodiac,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sGremyashchiy_Project_20385,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sGremyashchiy_Project_20385,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sGremyashchiy_Project_20385,idf,27000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), 4.5in Mk 8 Mod 1 naval gun]",114.0,870.0,B,24,16,13500.0
+plat_sGromkiy_335_Project_20381,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sGromkiy_335_Project_20381,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sGromkiy_335_Project_20381,idf,27000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, 4.5in Mk 8 Mod 1 naval gun]",130.0,850.0,B,40,20,13500.0
+plat_sHMS_Daring_D32,apers,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_sHMS_Daring_D32,atk,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_sHMS_Daring_D32,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Dauntless_D33,apers,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_sHMS_Dauntless_D33,atk,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_sHMS_Dauntless_D33,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Defender_D36,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Defender_D36,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Phalanx 20mm CIWS]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Defender_D36,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Iron_Duke_F234,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sHMS_Iron_Duke_F234,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Iron_Duke_F234,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Iron_Duke_F234,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Monmouth_F235,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sHMS_Monmouth_F235,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Monmouth_F235,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Monmouth_F235,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Montrose_F236,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sHMS_Montrose_F236,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Montrose_F236,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Montrose_F236,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Prince_of_Wales_R09,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Phalanx 20mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sHMS_Prince_of_Wales_R09,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Phalanx 20mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sHMS_Queen_Elizabeth_R08,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Phalanx 20mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sHMS_Queen_Elizabeth_R08,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Phalanx 20mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sHMS_Richmond_F239,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sHMS_Richmond_F239,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Richmond_F239,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Richmond_F239,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sHMS_Trent_P224,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sHMS_Trent_P224,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sHoubei_class_Type_22,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sHoubei_class_Type_22,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sHoubei_class_Type_22,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sKilo_class_Project_877_Paltus,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sLCAC_Landing_Craft_Air_Cushion,apers,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sLCAC_Landing_Craft_Air_Cushion,atk,2500,0,,,,false,[2A42 / 23mm NR-23 / GSh-23 helicopter cannon],30.0,970.0,C,550,250,1250.0
+plat_sLadny_801,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sLadny_801,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sMarshal_Shaposhnikov_543,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sMarshal_Shaposhnikov_543,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sMarshal_Shaposhnikov_543,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sMarshal_Shaposhnikov_543,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sMarshal_Ustinov_Project_1164_Atlant,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sMarshal_Ustinov_Project_1164_Atlant,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sMarshal_Ustinov_Project_1164_Atlant,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sMarshal_Ustinov_Project_1164_Atlant,idf,23000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,11500.0
+plat_sNakhimov_889_Project_21980,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sNakhimov_889_Project_21980,idf,27000,0,,,,false,[4.5in Mk 8 Mod 1 naval gun],114.0,870.0,B,24,16,13500.0
+plat_sNanuchka_class_Project_1234_Ovod,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sNanuchka_class_Project_1234_Ovod,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sNanuchka_class_Project_1234_Ovod,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sNanuchka_class_Project_1234_Ovod,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sNeustrashimyy_class_Project_11540_Yastre,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sNeustrashimyy_class_Project_11540_Yastre,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sNeustrashimyy_class_Project_11540_Yastre,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sParchim_class_Project_1331M,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sParchim_class_Project_1331M,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sParchim_class_Project_1331M,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Depth charge / ASW bomb]",30.0,1000.0,C,650,200,1500.0
+plat_sParchim_class_Project_1331M,idf,17000,0,,,,false,"[57mm naval gun (Mk 110 / AK-725 / H/PJ-17), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,8500.0
+plat_sPatrol_Boat_Light_PBL,apers,1000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",7.62,870.0,C,3000,600,500.0
+plat_sPatrol_Boat_Mark_V_Special_Operations_Cr,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sPatrol_Boat_Mark_V_Special_Operations_Cr,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sPatrol_Boat_Mark_V_Special_Operations_Cr,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sProject_23900_UDC,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sPyotr_Velikiy_Yuri_Andropov,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sPyotr_Velikiy_Yuri_Andropov,apers,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sPyotr_Velikiy_Yuri_Andropov,atk,3000,0,,,,false,[Goalkeeper / Kashtan 30mm CIWS],30.0,1000.0,C,4200,1000,1500.0
+plat_sPyotr_Velikiy_Yuri_Andropov,idf,23000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,11500.0
+plat_sRiverine_Command_Boat_RCB,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sRiverine_Command_Boat_RCB,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sRopucha_class_Project_775,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sRopucha_class_Project_775,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sRopucha_class_Project_775,atk,4000,0,400.0,400.0,400.0,false,"[AK-630 / AK-630M 30mm CIWS, S-8 / S-13 rocket pod]",80.0,0.0,B,20,20,2000.0
+plat_sRopucha_class_Project_775,idf,17000,0,,,,false,"[57mm naval gun (Mk 110 / AK-725 / H/PJ-17), 76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)]",76.0,925.0,B,85,40,8500.0
+plat_sSergey_Kotov_Project_22160,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sSergey_Kotov_Project_22160,idf,27000,0,,,,false,"[4.5in Mk 8 Mod 1 naval gun, 76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)]",114.0,870.0,B,24,16,13500.0
+plat_sSeverodvinsk_Yasen_class_Project_885_885,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sSeveromorsk_619_Project_619,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sSeveromorsk_619_Project_619,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sSeveromorsk_619_Project_619,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,1000.0,C,4200,1000,2000.0
+plat_sSeveromorsk_619_Project_619,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sShmel_class_Project_1204,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sShmel_class_Project_1204,atk,4000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Hydra 70 / CRV7 2.75in rocket pod, Mk 38 25mm chain gun (naval)]",70.0,0.0,B,19,19,2000.0
+plat_sShmel_class_Project_1204,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sShuoshi_II_class,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sSoobrazitelnyy_531,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sSoobrazitelnyy_531,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sSoobrazitelnyy_531,idf,27000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), 4.5in Mk 8 Mod 1 naval gun]",114.0,870.0,B,24,16,13500.0
+plat_sSovremennyy_class_Project_956_Sarych,apers,4000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, AK-630 / AK-630M 30mm CIWS]",30.0,970.0,C,550,250,2000.0
+plat_sSovremennyy_class_Project_956_Sarych,atk,4000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, AK-630 / AK-630M 30mm CIWS]",30.0,970.0,C,550,250,2000.0
+plat_sSovremennyy_class_Project_956_Sarych,idf,6000,0,,,,false,"[ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,3000.0
+plat_sTarantul_Project_1241_12411_1242_class,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sTarantul_Project_1241_12411_1242_class,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sTarantul_Project_1241_12411_1242_class,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sTrump_class_Series,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sTrump_class_Series,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sType_071_Yuzhao_class,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sType_071_Yuzhao_class,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sType_071_Yuzhao_class,idf,27000,0,,,,false,"[4.5in Mk 8 Mod 1 naval gun, 76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)]",114.0,870.0,B,24,16,13500.0
+plat_sType_072A_Landing_Ship_Tank_LST,apers,3000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sType_072A_Landing_Ship_Tank_LST,atk,3000,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sType_726,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sType_726,idf,27000,0,,,,false,[4.5in Mk 8 Mod 1 naval gun],114.0,870.0,B,24,16,13500.0
+plat_sTyphoon_class,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSAV_GEN_Frank_S_Besson_Jr_LSV_1,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSAV_GEN_Frank_S_Besson_Jr_LSV_1,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSCGC_Eagle_WIX_327,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSCGC_Eagle_WIX_327,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSNS_Lewis_B_Puller_ESB_3,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sUSNS_Rainier_T_AOE_7_USS_Rainer_AOE_7,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSNS_Rainier_T_AOE_7_USS_Rainer_AOE_7,atk,2000,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSNS_Robert_E_Peary_T_AKE_5,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sUSS_Abraham_Lincoln_CVN_72,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Abraham_Lincoln_CVN_72,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Abraham_Lincoln_CVN_72,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_America_LHA_6,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_America_LHA_6,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_America_LHA_6,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Avenger_MCM_1,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Avenger_MCM_1,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Barry_DDG_52,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Barry_DDG_52,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Barry_DDG_52,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Benfold_DDG_65,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Benfold_DDG_65,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Benfold_DDG_65,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Blue_Ridge_LCC_19,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1050.0,B,4000,1000,1000.0
+plat_sUSS_Blue_Ridge_LCC_19,atk,2000,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1050.0,B,4000,1000,1000.0
+plat_sUSS_Bonhomme_Richard_LHD_6,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Bonhomme_Richard_LHD_6,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Bonhomme_Richard_LHD_6,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Carl_Vinson_CVN_70,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Carl_Vinson_CVN_70,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Carl_Vinson_CVN_70,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Cole_DDG_67,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Cole_DDG_67,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Cole_DDG_67,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Constellation_FFG_62,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Constellation_FFG_62,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sUSS_Constellation_FFG_62,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Cyclone_PC_1,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Cyclone_PC_1,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Cyclone_PC_1,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Decatur_DDG_73,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Decatur_DDG_73,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Decatur_DDG_73,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Dewey_DDG_105,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1050.0,B,4000,1000,1000.0
+plat_sUSS_Dewey_DDG_105,atk,2000,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1050.0,B,4000,1000,1000.0
+plat_sUSS_Dwight_D_Eisenhower_CVN_69,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Dwight_D_Eisenhower_CVN_69,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Firebolt_PC_10,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Firebolt_PC_10,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Firebolt_PC_10,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Fitzgerald_DDG_62,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Fitzgerald_DDG_62,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Fitzgerald_DDG_62,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Fort_Worth_LCS_3,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Fort_Worth_LCS_3,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sUSS_Fort_Worth_LCS_3,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Freedom_LCS_1,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Freedom_LCS_1,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Freedom_LCS_1,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Freedom_LCS_1,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Gabrielle_Giffords_LCS_10,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AK-630 / AK-630M 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sUSS_Gabrielle_Giffords_LCS_10,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sUSS_Gabrielle_Giffords_LCS_10,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_George_H_W_Bush_CVN_77,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_George_H_W_Bush_CVN_77,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_George_Washington_CVN_73,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_George_Washington_CVN_73,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_George_Washington_CVN_73,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Gerald_R_Ford_CVN_78,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Gerald_R_Ford_CVN_78,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Gerald_R_Ford_CVN_78,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Gridley_DDG_101,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Gridley_DDG_101,atk,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Harry_S_Truman_CVN_75,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Harry_S_Truman_CVN_75,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Harry_S_Truman_CVN_75,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Independence_LCS_2,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm, AK-630 / AK-630M 30mm CIWS]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Independence_LCS_2,atk,4000,0,,,,false,"[AC-130 GAU-23/A 30mm, AK-630 / AK-630M 30mm CIWS]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Independence_LCS_2,atm,20000,0,1000.0,1000.0,1000.0,true,[AGM-65 Maverick],305.0,0.0,B,1,1,10000.0
+plat_sUSS_Independence_LCS_2,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Iwo_Jima_LHD_7,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Iwo_Jima_LHD_7,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Iwo_Jima_LHD_7,atk,2000,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_John_C_Stennis_CVN_74,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_John_C_Stennis_CVN_74,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_John_C_Stennis_CVN_74,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_John_Paul_Jones_DDG_53,apers,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_John_Paul_Jones_DDG_53,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_John_Paul_Jones_DDG_53,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_John_S_McCain_DDG_56,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_John_S_McCain_DDG_56,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_John_S_McCain_DDG_56,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Kauffman_FFG_59,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Kauffman_FFG_59,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Kauffman_FFG_59,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_sUSS_Kearsarge_LHD_3,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Kearsarge_LHD_3,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Kearsarge_LHD_3,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Mason_DDG_87,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Mason_DDG_87,atk,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Michael_Monsoor_DDG_1001,idf,6000,0,,,,false,"[ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,3000.0
+plat_sUSS_Mount_Whitney_LCC_20,apers,2000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Mount_Whitney_LCC_20,atk,2000,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Phalanx 20mm CIWS]",20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_New_York_LPD_21,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_New_York_LPD_21,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_New_York_LPD_21,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Nimitz_CVN_68,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Osprey_MHC_51,apers,1000,0,,,,false,[7.62mm minigun / GPMG (naval mount)],7.62,870.0,C,3000,600,500.0
+plat_sUSS_Ponce_AFSB_1,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Ponce_AFSB_1,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Port_Royal_CG_73,apers,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Port_Royal_CG_73,atk,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Ramage_DDG_61,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Ramage_DDG_61,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Ramage_DDG_61,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Ronald_Reagan_CVN_76,apers,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Ronald_Reagan_CVN_76,atk,2000,0,,,,false,[Phalanx 20mm CIWS],20.0,1100.0,C,4500,1000,1000.0
+plat_sUSS_Roosevelt_DDG_80,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Roosevelt_DDG_80,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Roosevelt_DDG_80,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_San_Antonio_LPD_17,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_San_Antonio_LPD_17,apers,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_San_Antonio_LPD_17,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Scout_MCM_8,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Scout_MCM_8,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Sioux_City_LCS_11,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Sioux_City_LCS_11,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Sioux_City_LCS_11,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Sioux_City_LCS_11,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Spruance_DDG_111,apers,1500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",20.0,1050.0,B,4000,1000,750.0
+plat_sUSS_Spruance_DDG_111,atk,1500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, M61 / M39 / BK27 / GSh-23 aircraft cannon]",20.0,1050.0,B,4000,1000,750.0
+plat_sUSS_Squall_PC_7,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Squall_PC_7,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Squall_PC_7,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_St_Louis_LCS_19,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_St_Louis_LCS_19,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_St_Louis_LCS_19,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_St_Louis_LCS_19,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_Stethem_DDG_63,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Stethem_DDG_63,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Stethem_DDG_63,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_sUSS_Theodore_Roosevelt_CVN_71,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Theodore_Roosevelt_CVN_71,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Theodore_Roosevelt_CVN_71,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_sUSS_Thomas_Hudner_DDG_116,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Thomas_Hudner_DDG_116,atk,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Wasp_LHD_1,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Wasp_LHD_1,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Wasp_LHD_1,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Wichita_LCS_13,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sUSS_Wichita_LCS_13,apers,4000,0,,,,false,"[7.62mm minigun / GPMG (naval mount), AC-130 GAU-23/A 30mm]",30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Wichita_LCS_13,atk,4000,0,,,,false,[AC-130 GAU-23/A 30mm],30.0,1080.0,B,200,100,2000.0
+plat_sUSS_Wichita_LCS_13,idf,17000,0,,,,false,[57mm naval gun (Mk 110 / AK-725 / H/PJ-17)],57.0,1035.0,B,220,60,8500.0
+plat_sUSS_William_P_Lawrence_DDG_110,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_William_P_Lawrence_DDG_110,atk,2500,0,,,,false,"[M61 / M39 / BK27 / GSh-23 aircraft cannon, Mk 38 25mm chain gun (naval)]",25.0,1100.0,C,180,100,1250.0
+plat_sUSS_Zumwalt_DDG_1000,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sUSS_Zumwalt_DDG_1000,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sVaryag_011,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sVaryag_011,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, AK-630 / AK-630M 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sVaryag_011,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, AK-630 / AK-630M 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_sVaryag_011,idf,6000,0,,,,false,"[ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,3000.0
+plat_sVasily_Bykov_368_Project_22160,idf,27000,0,,,,false,"[4.5in Mk 8 Mod 1 naval gun, 76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)]",114.0,870.0,B,24,16,13500.0
+plat_sVice_Admiral_Kulakov_626,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sVice_Admiral_Kulakov_626,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sVice_Admiral_Kulakov_626,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sVice_Admiral_Kulakov_626,idf,21000,0,,,,false,"[100mm naval gun (A-190 / AK-100 / H/PJ-87), ASW rocket launcher (RBU-6000/-1000, ASROC, Type 87)]",213.0,0.0,C,12,12,10500.0
+plat_sZubr_LCAC_Pomornik_Project_1232_2,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sZubr_LCAC_Pomornik_Project_1232_2,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sZubr_LCAC_Pomornik_Project_1232_2,atk,4000,0,400.0,400.0,400.0,false,"[AK-630 / AK-630M 30mm CIWS, S-8 / S-13 rocket pod]",80.0,0.0,B,20,20,2000.0
+plat_sadmiral_gorshkov_417_guided_missile_frig,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sadmiral_gorshkov_417_guided_missile_frig,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sadmiral_gorshkov_417_guided_missile_frig,idf,27000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, 4.5in Mk 8 Mod 1 naval gun]",130.0,850.0,B,40,20,13500.0
+plat_sbuyan_class_corvette_warship_russian_nav,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf), Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_sbuyan_class_corvette_warship_russian_nav,apers,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sbuyan_class_corvette_warship_russian_nav,atk,4000,0,,,,false,[AK-630 / AK-630M 30mm CIWS],30.0,900.0,C,5000,1000,2000.0
+plat_sbuyan_class_corvette_warship_russian_nav,idf,21000,0,,,,false,[100mm naval gun (A-190 / AK-100 / H/PJ-87)],100.0,880.0,B,80,30,10500.0
+plat_ssteregushchiy_530_corvette_warship_russi,apers,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_ssteregushchiy_530_corvette_warship_russi,atk,4000,0,,,,false,"[AK-630 / AK-630M 30mm CIWS, Goalkeeper / Kashtan 30mm CIWS]",30.0,900.0,C,5000,1000,2000.0
+plat_ssteregushchiy_530_corvette_warship_russi,idf,27000,0,,,,false,"[130mm AK-130 / A-192 / H/PJ-38 naval gun, 4.5in Mk 8 Mod 1 naval gun]",130.0,850.0,B,40,20,13500.0
+plat_stype_26_guided_missile_frigate_uk,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_stype_26_guided_missile_frigate_uk,apers,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, 7.62mm minigun / GPMG (naval mount), 7.62mm minigun / GPMG (naval mount), Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_stype_26_guided_missile_frigate_uk,atk,2500,0,,,,false,"[2A42 / 23mm NR-23 / GSh-23 helicopter cannon, Phalanx 20mm CIWS]",30.0,970.0,C,550,250,1250.0
+plat_stype_26_guided_missile_frigate_uk,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+plat_stype_31_inspiraton_class_guided_missile_,aa,10000,500,,,,false,"[Naval short-range SAM (RAM, Sea Ceptor, FL-3000N, HHQ-10, Osa-M, Kinzhal, Sea Wolf)]",150.0,0.0,C,1,1,5000.0
+plat_stype_31_inspiraton_class_guided_missile_,apers,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped), 7.62mm minigun / GPMG (naval mount)]",30.0,1000.0,C,650,200,1500.0
+plat_stype_31_inspiraton_class_guided_missile_,atk,3000,0,,,,false,"[30mm naval autocannon (DS30M, AK-306, H/PJ-17, MTPU 14.5 grouped)]",30.0,1000.0,C,650,200,1500.0
+plat_stype_31_inspiraton_class_guided_missile_,idf,16000,0,,,,false,[76mm naval gun (OTO 76/62 / AK-176 / H/PJ-26)],76.0,925.0,B,85,40,8000.0
+plat_suss_arleigh_burke_ddg51_guided_missile_d,apers,2500,0,,,,false,"[7.62mm minigun / GPMG (naval mount), Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_suss_arleigh_burke_ddg51_guided_missile_d,atk,2500,0,,,,false,"[Mk 38 25mm chain gun (naval), Phalanx 20mm CIWS]",25.0,1100.0,C,180,100,1250.0
+plat_suss_arleigh_burke_ddg51_guided_missile_d,idf,24000,0,,,,false,[5in/62 Mk 45 Mod 4 naval gun],127.0,830.0,B,20,10,12000.0
+var_1013_1,apers,1700,50,,,,false,[AGS-17/AGS-30 30mm AGL],30.0,185.0,B,400,100,850.0
+var_1013_default,apers,2000,0,25.0,32.0,10.0,false,"[AGS-17/AGS-30 30mm AGL, KPVT 14.5mm]",30.0,1000.0,B,600,100,1000.0
+var_1015_default,apers,1800,0,16.0,20.0,6.0,false,"[M240 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_1017_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_1073_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_1073_default,idf,30000,3000,,,,false,[2A88 152mm (2S35)],152.0,950.0,B,16,4,15000.0
+var_1080_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_10_1,apers,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_10_1,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_10_2,atm,3750,65,900.0,900.0,900.0,false,[BGM-71 TOW-2A/2B],152.0,300.0,B,1,1,1875.0
+var_10_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_1104_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_1120_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_1134_default,apers,2500,0,50.0,52.0,45.0,false,"[2A72 30mm, PKT/PKTM 7.62mm]",30.0,960.0,B,330,200,1250.0
+var_1134_default,atk,2500,0,50.0,52.0,45.0,false,[2A72 30mm],30.0,960.0,B,330,200,1250.0
+var_1134_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_1135_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_1139_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_115_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_1186_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_118_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_11_default,apers,1800,0,5.0,7.0,2.0,false,"[L7A2 GPMG / FN MAG 7.62mm, L94A1 EX-34 7.62mm chain gun]",7.62,840.0,B,520,200,900.0
+var_11_default,atk,4000,0,657.0,676.0,620.0,false,[L30A1 120mm rifled gun],120.0,1530.0,B,8,6,2000.0
+var_1211_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_1222_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_1246_default,apers,1800,0,16.0,20.0,6.0,false,"[L7A2 GPMG / FN MAG 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_1246_default,atk,4500,0,763.0,785.0,720.0,false,[L55A1 120mm smoothbore],120.0,1750.0,B,8,6,2250.0
+var_125_default,apers,2500,0,70.0,72.0,66.0,false,"[M240 7.62mm, M242 Bushmaster 25mm]",25.0,1345.0,B,200,100,1250.0
+var_125_default,atk,2500,0,70.0,72.0,66.0,false,[M242 Bushmaster 25mm],25.0,1345.0,B,200,100,1250.0
+var_125_default,atm,3750,65,900.0,900.0,900.0,false,[BGM-71 TOW-2A/2B],152.0,300.0,B,1,1,1875.0
+var_1266_default,idf,9650,800,,,,false,[2B8 / M-240 240mm mortar],240.0,362.0,B,1,1,4825.0
+var_1281_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_1281_default,atm,5500,100,1300.0,1300.0,1300.0,false,[9K135 Kornet / Kornet-EM (AT-14)],152.0,300.0,B,1,1,2750.0
+var_1290_default,apers,1800,0,16.0,20.0,6.0,false,"[M240 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_1290_default,atk,4000,0,551.0,567.0,520.0,false,[M35 105mm (M68 derivative)],105.0,1500.0,B,8,6,2000.0
+var_1291_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_12_default,apers,2500,0,50.0,52.0,45.0,false,"[2A72 30mm, PKT/PKTM 7.62mm]",30.0,960.0,B,330,200,1250.0
+var_12_default,atk,2500,0,50.0,52.0,45.0,false,[2A72 30mm],30.0,960.0,B,330,200,1250.0
+var_12_default,atm,4000,100,750.0,750.0,750.0,false,"[9M117 Bastion (gun-launched, 100mm)]",100.0,420.0,B,1,1,2000.0
+var_12_default,idf,4000,0,,,,false,[2A70 100mm rifled gun-launcher],100.0,250.0,B,10,6,2000.0
+var_137_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_147_default,apers,2000,0,25.0,32.0,10.0,false,"[KPVT 14.5mm, PKT/PKTM 7.62mm]",14.5,1000.0,B,600,100,1000.0
+var_14_default,apers,2500,0,19.0,25.0,8.0,false,[AZP-23 23mm quad (Shilka)],23.0,970.0,B,3400,1500,1250.0
+var_14_default,atk,2500,0,19.0,25.0,8.0,false,[AZP-23 23mm quad (Shilka)],23.0,970.0,B,3400,1500,1250.0
+var_15_default,atm,4000,75,800.0,800.0,800.0,false,[9K113 Konkurs (AT-5)],135.0,208.0,B,1,1,2000.0
+var_160_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_160_default,idf,24700,3000,150.0,150.0,150.0,true,[AS-90 155mm L31 (39 cal)],155.0,827.0,B,6,2,12350.0
+var_161_1,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_161_1,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_161_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_161_default,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_162_default,idf,24700,3000,,,,false,[M777 155mm (M776)],155.0,827.0,B,5,2,12350.0
+var_165_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_16_default,apers,2000,0,25.0,32.0,10.0,false,"[KPVT 14.5mm, PKT/PKTM 7.62mm]",14.5,1000.0,B,600,100,1000.0
+var_17_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_18_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_18_default,apers,4000,0,25.0,28.0,14.0,false,[2A38M 30mm twin (Tunguska/Pantsir)],30.0,960.0,B,2500,1000,2000.0
+var_18_default,atk,4000,0,25.0,28.0,14.0,false,[2A38M 30mm twin (Tunguska/Pantsir)],30.0,960.0,B,2500,1000,2000.0
+var_1_1,apers,1800,0,16.0,20.0,6.0,false,"[M240 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_1_1,atk,4000,0,445.0,458.0,420.0,false,[M68A1 105mm rifled],105.0,1490.0,B,8,6,2000.0
+var_1_default,apers,1800,0,16.0,20.0,6.0,false,"[M240 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_1_default,atk,4000,0,848.0,872.0,800.0,false,[L/44 120mm smoothbore (M256/Rh120)],120.0,1670.0,B,8,6,2000.0
+var_20_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_20_default,atk,3000,0,390.0,390.0,390.0,false,[D-10T 100mm rifled],100.0,1415.0,B,4,4,1500.0
+var_213_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_213_default,atk,3000,0,440.0,440.0,440.0,false,[U-5TS / D-68 115mm smoothbore],115.0,1615.0,B,4,4,1500.0
+var_218_1,apers,2200,75,60.0,60.0,60.0,false,[Mk 19 / HK GMG 40mm AGL],40.0,241.0,B,350,60,1100.0
+var_218_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_21_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_21_default,atk,3000,0,440.0,440.0,440.0,false,[U-5TS / D-68 115mm smoothbore],115.0,1615.0,B,4,4,1500.0
+var_22_1,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_22_1,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_22_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_22_default,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_23_1,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_23_1,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_23_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_23_default,atk,4000,0,750.0,750.0,750.0,false,[2A46M 125mm smoothbore],125.0,1700.0,B,7,6,2000.0
+var_27_1,apers,2000,0,50.0,52.0,45.0,false,"[L21A1 RARDEN 30mm, L94A1 EX-34 7.62mm chain gun]",30.0,1070.0,B,90,60,1000.0
+var_27_1,atk,2000,0,50.0,52.0,45.0,false,[L21A1 RARDEN 30mm],30.0,1070.0,B,90,60,1000.0
+var_27_default,apers,2000,0,50.0,52.0,45.0,false,"[L21A1 RARDEN 30mm, L94A1 EX-34 7.62mm chain gun]",30.0,1070.0,B,90,60,1000.0
+var_27_default,atk,2000,0,50.0,52.0,45.0,false,[L21A1 RARDEN 30mm],30.0,1070.0,B,90,60,1000.0
+var_291_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_299_default,apers,1800,0,16.0,20.0,6.0,false,"[L7A2 GPMG / FN MAG 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_300_default,idf,17200,2500,100.0,100.0,100.0,false,[L118 / M119 105mm light gun],105.0,709.0,B,6,3,8600.0
+var_315_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_320_1,apers,2200,75,60.0,60.0,60.0,false,[Mk 19 / HK GMG 40mm AGL],40.0,241.0,B,350,60,1100.0
+var_320_default,apers,1800,0,5.0,7.0,2.0,false,[M240 7.62mm],7.62,905.0,B,850,200,900.0
+var_395_1,apers,2500,0,50.0,52.0,45.0,false,"[2A72 30mm, PKT/PKTM 7.62mm]",30.0,960.0,B,330,200,1250.0
+var_395_1,atk,2500,0,50.0,52.0,45.0,false,[2A72 30mm],30.0,960.0,B,330,200,1250.0
+var_395_default,apers,2000,0,25.0,32.0,10.0,false,"[KPVT 14.5mm, PKT/PKTM 7.62mm]",14.5,1000.0,B,600,100,1000.0
+var_42_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_42_default,idf,18500,3000,250.0,250.0,250.0,false,[2A33 152mm (2S3)],152.0,655.0,B,4,1,9250.0
+var_434_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_434_default,idf,9650,800,,,,false,[2B8 / M-240 240mm mortar],240.0,362.0,B,1,1,4825.0
+var_444_default,atk,3000,0,170.0,183.0,144.0,false,[KS-19 100mm AA gun],100.0,900.0,B,15,10,1500.0
+var_44_1,aa,7000,300,,,,false,[Starstreak HVM],130.0,1250.0,B,1,1,3500.0
+var_44_1,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_44_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_49_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_49_default,atk,1300,0,300.0,300.0,300.0,false,[2A28 Grom 73mm smoothbore],73.0,400.0,B,8,6,650.0
+var_49_default,atm,3000,500,400.0,400.0,400.0,false,[9M14 Malyutka (AT-3 Sagger)],125.0,120.0,B,1,1,1500.0
+var_50_1,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, AGS-17/AGS-30 30mm AGL, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_50_1,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_50_1,atm,5500,100,1300.0,1300.0,1300.0,false,[9K135 Kornet / Kornet-EM (AT-14)],152.0,300.0,B,1,1,2750.0
+var_50_default,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_50_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_50_default,atm,4000,75,800.0,800.0,800.0,false,[9K113 Konkurs (AT-5)],135.0,208.0,B,1,1,2000.0
+var_517_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_517_default,idf,24700,3000,,,,false,[2A64 / 2A65 152mm (2S19 / MSTA-B)],152.0,810.0,B,8,2,12350.0
+var_51_default,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_51_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_51_default,atm,4000,75,800.0,800.0,800.0,false,[9K113 Konkurs (AT-5)],135.0,208.0,B,1,1,2000.0
+var_52_default,apers,2000,0,25.0,32.0,10.0,false,"[KPVT 14.5mm, PKT/PKTM 7.62mm]",14.5,1000.0,B,600,100,1000.0
+var_56_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_5_default,apers,2500,0,70.0,72.0,66.0,false,"[M240 7.62mm, M242 Bushmaster 25mm]",25.0,1345.0,B,200,100,1250.0
+var_5_default,atk,2500,0,70.0,72.0,66.0,false,[M242 Bushmaster 25mm],25.0,1345.0,B,200,100,1250.0
+var_5_default,atm,3750,65,900.0,900.0,900.0,false,[BGM-71 TOW-2A/2B],152.0,300.0,B,1,1,1875.0
+var_607_default,apers,2200,0,60.0,60.0,60.0,false,"[M2HB / M3M 12.7mm, Mk 19 / HK GMG 40mm AGL]",40.0,241.0,B,350,60,1100.0
+var_60_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_631_default,aa,15000,500,,,,false,[Short-range SAM (Rapier/Tor/Osa/Strela-10/Pantsir 57E6)],0.0,0.0,B,1,1,7500.0
+var_631_default,apers,4000,0,25.0,28.0,14.0,false,[2A38M 30mm twin (Tunguska/Pantsir)],30.0,960.0,B,2500,1000,2000.0
+var_631_default,atk,4000,0,25.0,28.0,14.0,false,[2A38M 30mm twin (Tunguska/Pantsir)],30.0,960.0,B,2500,1000,2000.0
+var_643_1,apers,2200,75,60.0,60.0,60.0,false,[Mk 19 / HK GMG 40mm AGL],40.0,241.0,B,350,60,1100.0
+var_643_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_672_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_693_default,idf,28500,4000,,,,false,[2A36 / 2A37 Giatsint 152mm gun],152.0,945.0,B,6,2,14250.0
+var_694_default,idf,24700,3000,,,,false,[2A64 / 2A65 152mm (2S19 / MSTA-B)],152.0,810.0,B,8,2,12350.0
+var_696_default,idf,8800,400,600.0,600.0,600.0,false,[2A60 / 2A80 120mm gun-mortar],120.0,367.0,B,8,6,4400.0
+var_6_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_704_default,idf,28500,4000,,,,false,[2A36 / 2A37 Giatsint 152mm gun],152.0,945.0,B,6,2,14250.0
+var_727_default,apers,1500,0,6.0,8.0,2.0,false,[PKM/PKP 7.62mm],7.62,823.0,B,700,250,750.0
+var_753_1,apers,1800,0,5.0,7.0,2.0,false,[M240 7.62mm],7.62,905.0,B,850,200,900.0
+var_753_1,atk,2000,0,350.0,350.0,350.0,false,[Cockerill Mk3 90mm],90.0,1000.0,B,8,6,1000.0
+var_753_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_783_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_783_default,idf,8800,400,600.0,600.0,600.0,false,[2A60 / 2A80 120mm gun-mortar],120.0,367.0,B,8,6,4400.0
+var_79_default,aa,4800,200,,,,false,[FIM-92 Stinger],70.0,750.0,B,1,1,2400.0
+var_79_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_7_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_7_default,idf,24000,3000,,,,false,[M284 155mm (M109A6)],155.0,827.0,B,4,1,12000.0
+var_82_default,apers,2200,0,60.0,60.0,60.0,false,"[M240 7.62mm, M2HB / M3M 12.7mm, Mk 19 / HK GMG 40mm AGL]",40.0,241.0,B,350,60,1100.0
+var_833_default,idf,6000,600,,,,false,[TOS-1A 220mm thermobaric],220.0,0.0,B,24,24,3000.0
+var_838_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_839_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_840_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_843_1,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_843_default,apers,2500,0,144.0,148.0,136.0,false,"[CT40 40mm cased-telescoped cannon, L7A2 GPMG / FN MAG 7.62mm, M2HB / M3M 12.7mm]",40.0,1500.0,B,200,100,1250.0
+var_843_default,atk,2500,0,144.0,148.0,136.0,false,[CT40 40mm cased-telescoped cannon],40.0,1500.0,B,200,100,1250.0
+var_873_default,apers,2000,0,25.0,32.0,10.0,false,[KPVT 14.5mm],14.5,1000.0,B,600,100,1000.0
+var_874_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_877_default,apers,1500,0,6.0,8.0,2.0,false,[PKM/PKP 7.62mm],7.62,823.0,B,700,250,750.0
+var_879_default,atk,3000,0,400.0,400.0,400.0,false,[MT-12 Rapira 100mm AT gun],100.0,1575.0,B,10,6,1500.0
+var_879_default,atm,4000,100,600.0,600.0,600.0,false,[9M117 Kastet (MT-12 gun-launched)],100.0,420.0,B,1,1,2000.0
+var_88_default,idf,15300,2000,460.0,460.0,460.0,false,[D-30 / 2A18 122mm],122.0,690.0,B,8,4,7650.0
+var_894_default,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, AGS-17/AGS-30 30mm AGL, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_894_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_894_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_89_default,idf,15300,2000,460.0,460.0,460.0,false,[D-30 / 2A18 122mm],122.0,690.0,B,8,4,7650.0
+var_8_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_905_default,apers,2000,0,16.0,20.0,6.0,false,"[Kord / NSVT 12.7mm, PKT/PKTM 7.62mm]",12.7,860.0,B,700,100,1000.0
+var_905_default,atk,5000,0,954.0,981.0,900.0,false,[2A82-1M 125mm smoothbore],125.0,1980.0,B,10,8,2500.0
+var_913_default,apers,3000,0,100.0,103.0,94.0,false,"[L7A2 GPMG / FN MAG 7.62mm, Mauser MK30-2/ABM 30mm]",30.0,1385.0,B,700,200,1500.0
+var_913_default,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_950_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_974_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_986_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_98_default,idf,17200,2500,100.0,100.0,100.0,false,[L118 / M119 105mm light gun],105.0,709.0,B,6,3,8600.0
+var_9_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_x90001_default,apers,1800,0,5.0,7.0,2.0,false,"[L7A2 GPMG / FN MAG 7.62mm, L7A2 GPMG / FN MAG 7.62mm]",7.62,840.0,B,750,200,900.0
+var_x90001_default,atk,4500,0,763.0,785.0,720.0,false,[L55A1 120mm smoothbore],120.0,1750.0,B,8,6,2250.0
+var_x90002_default,apers,1800,0,16.0,20.0,6.0,false,"[L7A2 GPMG / FN MAG 7.62mm, M2HB / M3M 12.7mm]",12.7,890.0,B,550,100,900.0
+var_x90002_default,atk,4500,0,763.0,785.0,720.0,false,[L55A1 120mm smoothbore],120.0,1750.0,B,8,6,2250.0
+var_x90003_default,apers,3000,0,100.0,103.0,94.0,false,"[L7A2 GPMG / FN MAG 7.62mm, Mauser MK30-2/ABM 30mm]",30.0,1385.0,B,700,200,1500.0
+var_x90003_default,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_x90004_default,apers,3000,0,100.0,103.0,94.0,false,"[L7A2 GPMG / FN MAG 7.62mm, Mauser MK30-2/ABM 30mm]",30.0,1385.0,B,700,200,1500.0
+var_x90004_default,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_x90005_default,apers,1800,0,5.0,7.0,2.0,false,[L7A2 GPMG / FN MAG 7.62mm],7.62,840.0,B,750,200,900.0
+var_x90005_default,idf,24700,3000,150.0,150.0,150.0,true,[AS-90 155mm L31 (39 cal)],155.0,827.0,B,6,2,12350.0
+var_x90006_default,idf,24700,3000,150.0,150.0,150.0,true,[AS-90 155mm L31 (39 cal)],155.0,827.0,B,6,2,12350.0
+var_x90007_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_x90007_default,idf,24700,3000,150.0,150.0,150.0,true,[AS-90 155mm L31 (39 cal)],155.0,827.0,B,6,2,12350.0
+var_x90008_default,idf,24700,3000,150.0,150.0,150.0,true,[AS-90 155mm L31 (39 cal)],155.0,827.0,B,6,2,12350.0
+var_x90009_default,apers,3500,0,80.0,84.0,72.0,false,[Oerlikon KDA 35mm twin (Gepard)],35.0,1175.0,B,1100,400,1750.0
+var_x90009_default,atk,3500,0,80.0,84.0,72.0,false,[Oerlikon KDA 35mm twin (Gepard)],35.0,1175.0,B,1100,400,1750.0
+var_x90010_default,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, AGS-17/AGS-30 30mm AGL, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_x90010_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90010_default,atm,5500,100,1300.0,1300.0,1300.0,false,[9K135 Kornet / Kornet-EM (AT-14)],152.0,300.0,B,1,1,2750.0
+var_x90011_default,apers,2500,0,50.0,52.0,45.0,false,"[2A72 30mm, PKT/PKTM 7.62mm]",30.0,960.0,B,330,200,1250.0
+var_x90011_default,atk,2500,0,50.0,52.0,45.0,false,[2A72 30mm],30.0,960.0,B,330,200,1250.0
+var_x90012_default,apers,2000,0,16.0,20.0,6.0,false,[Kord / NSVT 12.7mm],12.7,860.0,B,700,100,1000.0
+var_x90012_default,idf,24700,3000,,,,false,[2A64 / 2A65 152mm (2S19 / MSTA-B)],152.0,810.0,B,8,2,12350.0
+var_x90013_default,apers,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90013_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90013_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_x90014_default,apers,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90014_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90014_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_x90015_default,apers,2500,0,,,,false,[GSh-30K twin 30mm (Mi-24P)],30.0,940.0,B,2500,300,1250.0
+var_x90015_default,atk,2500,0,,,,false,[GSh-30K twin 30mm (Mi-24P)],30.0,940.0,B,2500,300,1250.0
+var_x90015_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_x90016_default,apers,3000,0,50.0,50.0,50.0,false,[M230 30mm chain gun (Apache)],30.0,805.0,B,625,300,1500.0
+var_x90016_default,atk,3000,0,50.0,50.0,50.0,false,[M230 30mm chain gun (Apache)],30.0,805.0,B,625,300,1500.0
+var_x90016_default,atm,8000,500,1000.0,1000.0,1000.0,false,[AGM-114 Hellfire],178.0,475.0,B,1,1,4000.0
+var_x90020_1,apers,3000,0,100.0,103.0,94.0,false,"[Mauser MK30-2/ABM 30mm, Minimi / M249 / L110 5.56mm]",30.0,1385.0,B,700,200,1500.0
+var_x90020_1,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_x90020_1,atm,5500,200,1000.0,1000.0,1000.0,true,[Spike-LR / LR2 (MELLS)],130.0,130.0,B,1,1,2750.0
+var_x90020_default,apers,3000,0,100.0,103.0,94.0,false,"[Mauser MK30-2/ABM 30mm, Minimi / M249 / L110 5.56mm]",30.0,1385.0,B,700,200,1500.0
+var_x90020_default,atk,3000,0,100.0,103.0,94.0,false,[Mauser MK30-2/ABM 30mm],30.0,1385.0,B,700,200,1500.0
+var_x90020_default,atm,5500,200,1000.0,1000.0,1000.0,true,[Spike-LR / LR2 (MELLS)],130.0,130.0,B,1,1,2750.0
+var_x90021_default,apers,2000,0,45.0,47.0,40.0,false,"[L7A2 GPMG / FN MAG 7.62mm, Rheinmetall Rh 202 20mm]",20.0,1050.0,B,900,300,1000.0
+var_x90021_default,atk,2000,0,45.0,47.0,40.0,false,[Rheinmetall Rh 202 20mm],20.0,1050.0,B,900,300,1000.0
+var_x90022_default,apers,2000,0,45.0,47.0,40.0,false,[Rheinmetall Rh 202 20mm],20.0,1050.0,B,900,300,1000.0
+var_x90022_default,atk,2000,0,45.0,47.0,40.0,false,[Rheinmetall Rh 202 20mm],20.0,1050.0,B,900,300,1000.0
+var_x90023_default,apers,3500,0,159.0,164.0,150.0,false,"[L7A2 GPMG / FN MAG 7.62mm, Rheinmetall Wotan 35 (Lance 2.0)]",35.0,1400.0,C,200,100,1750.0
+var_x90023_default,atk,3500,0,159.0,164.0,150.0,false,[Rheinmetall Wotan 35 (Lance 2.0)],35.0,1400.0,C,200,100,1750.0
+var_x90023_default,atm,5500,200,1000.0,1000.0,1000.0,true,[Spike-LR / LR2 (MELLS)],130.0,130.0,B,1,1,2750.0
+var_x90024_default,apers,2500,0,55.0,58.0,50.0,false,"[2A42 30mm, PKT/PKTM 7.62mm]",30.0,970.0,B,550,250,1250.0
+var_x90024_default,atk,2500,0,55.0,58.0,50.0,false,[2A42 30mm],30.0,970.0,B,550,250,1250.0
+var_x90024_default,atm,4000,75,800.0,800.0,800.0,false,[9K113 Konkurs (AT-5)],135.0,208.0,B,1,1,2000.0
+var_x90025_default,apers,2500,0,50.0,52.0,45.0,false,"[2A72 30mm, PKT/PKTM 7.62mm]",30.0,960.0,B,330,200,1250.0
+var_x90025_default,atk,2500,0,50.0,52.0,45.0,false,[2A72 30mm],30.0,960.0,B,330,200,1250.0
+var_x90025_default,atm,4000,100,750.0,750.0,750.0,false,"[9M117 Bastion (gun-launched, 100mm)]",100.0,420.0,B,1,1,2000.0
+var_x90025_default,idf,4000,0,,,,false,[2A70 100mm rifled gun-launcher],100.0,250.0,B,10,6,2000.0
+var_x90026_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_x90026_default,atk,4000,0,,,,false,[2A75 125mm smoothbore (Sprut-SD)],125.0,1700.0,B,7,6,2000.0
+var_x90027_default,atm,6000,400,1100.0,1100.0,1100.0,false,[9M123 Khrizantema (AT-15)],152.0,400.0,B,1,1,3000.0
+var_x90028_default,atm,6000,400,800.0,800.0,800.0,false,[9M120 Ataka (AT-9)],130.0,400.0,B,1,1,3000.0
+var_x90029_default,atm,5500,100,1300.0,1300.0,1300.0,false,[9K135 Kornet / Kornet-EM (AT-14)],152.0,300.0,B,1,1,2750.0
+var_x90030_default,apers,1500,0,6.0,8.0,2.0,false,[PKT/PKTM 7.62mm],7.62,825.0,B,700,250,750.0
+var_x90030_default,atk,1300,0,300.0,300.0,300.0,false,[2A28 Grom 73mm smoothbore],73.0,400.0,B,8,6,650.0
+var_x90031_default,apers,1800,0,16.0,20.0,6.0,false,[M2HB / M3M 12.7mm],12.7,890.0,B,550,100,900.0
+var_x90032_default,atm,8000,500,1000.0,1000.0,1000.0,false,[AGM-114 Hellfire],178.0,475.0,B,1,1,4000.0
+var_x90033_default,atk,15000,0,650.0,650.0,650.0,true,[FPV strike drone warhead carrier],0.0,30.0,C,1,1,7500.0
+var_x90034_default,atk,15000,0,650.0,650.0,650.0,true,[FPV strike drone warhead carrier],0.0,30.0,C,1,1,7500.0
