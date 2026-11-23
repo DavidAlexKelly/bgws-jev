@@ -97,6 +97,19 @@
 >     - That ground favours blue: the reference duel leaves blue 90% and red 54%.
 >     - On another generated ground the armour duel's result reverses. The ground matters
 >       more than the vehicles here.
+> - **Not imported, and why** (checked 23 November):
+>   - **Sea (236 rows) and air (169 rows) platforms:** no row has a row-level source.
+>     - `figure_source` is empty on every one.
+>     - `mass_source` is the table-wide "curated_equipment_table".
+>     - Protection is ungraded, apart from 8 air rows.
+>
+>     Under the importer's rule that a figure goes in only with a source for its row, only
+>     names would come across.
+>   - **Support assets (350):** all are class-default loadouts and timings, or "MF identity".
+>   - **Sections (20):** 17 cite only "published TO&E". 11 are already in `sourced.json` from
+>     the L6 import.
+>
+>   Each needs per-row sources first (see "How to improve the sources" below).
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the
