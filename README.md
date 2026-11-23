@@ -345,10 +345,16 @@ to reach openrouter.ai.
 
 ### Calibration backlog
 
-CI runs the vignettes with `--backlog attack-halt`: it is reported but
-being out of band does not fail the run. The real-ground vignettes play on
+CI runs the vignettes with `--backlog attack-halt,naked-eye-detection`:
+they are reported, but being out of band does not fail the run. The real-ground vignettes play on
 the committed fixture pack `data/packs/kgd-fixture`, so CI runs them too.
 
+- **Naked-eye detection [Caviness 1972]:** a soldier moving across a 30°
+  sector at 100–300 m in the open is found in a mean 1.19 s (200 games) by the game's
+  search model, against 2.1 s measured (band 1.5–3.0 s). It finds him
+  (P∞ ≈ 1), so the time is τ = 6.8 s·N₅₀/N for one field of view, times the
+  sector over `sensing.acquire.fov_ref_deg`. That reference field (10°) is
+  unsourced and is the likely lever; nothing is tuned to fit.
 - **Detect-to-strike, networked [P2]:** on the M4 drone line the median from
   a detection to the first FPV arriving on it is 5.35 minutes (95% CI
   5.03–5.97, 200 games), just above the 2–5 minute band. The HQ chain itself
