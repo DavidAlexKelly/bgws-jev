@@ -275,8 +275,14 @@ fn imported_csv_records_load() {
     // ERA kits: heavy ERA is ERA, a slat cage is not.
     let t90m = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "T-90M Proryv").unwrap();
     assert!(t90m.body.era);
+    assert_eq!(t90m.body.era_kind, EraKind::Heavy);
     let stryker = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "General Dynamics Stryker").unwrap();
     assert!(!stryker.body.era);
+    // Light ERA (Kontakt-1, ROMOR-A) works against shaped charges only.
+    let cr2 = c.platform("l7/var_11_default").unwrap();
+    assert!(cr2.body.era && cr2.body.era_kind == EraKind::Light);
+    assert_eq!(c.platform("var_11_default").unwrap().body.era_kind, EraKind::Light);
+    assert_eq!(c.platform("var_22_1").unwrap().body.era_kind, EraKind::Heavy);
     // A row for a vehicle the catalogue already has is parented on that record.
     let cr2 = c.platform("l7/var_11_default").unwrap();
     assert_eq!(cr2.parent.as_deref(), Some("var_11_default"));
@@ -332,4 +338,26 @@ fn a_fit_overlays_a_record_and_null_removes_from_the_parent() {
     assert!(p.stores.ammo.contains_key("heat120"));
     let bad = r#"{ "fits": { "t/nobody": { "mounts": [] } } }"#;
     assert!(Catalogue::from_sources(&sources_plus(bad)).is_err());
+}
+
+/// Rounds say what their penetration figure allows for against ERA, so the
+/// engine neither takes ERA off a behind-ERA figure again nor lets heavy ERA
+/// degrade a rod made against it.
+#[test]
+fn rounds_carry_their_era_basis() {
+    let c = builtin();
+    let spike = c.munition("l7/m_spike_lr").unwrap();
+    assert_eq!(spike.pen_basis, PenBasis::BehindEra);
+    assert!(spike.tandem);
+    let m829a3 = c.munition("l7/m_m829a3").unwrap();
+    assert!(m829a3.defeats_era && m829a3.pen_basis == PenBasis::Rha);
+    // Every behind-ERA engine round comes from a row that says so.
+    for m in c.munitions().filter(|m| m.pen_basis == PenBasis::BehindEra) {
+        assert_eq!(c.imported_munition(&m.id).and_then(|r| r.pen_basis), Some(PenBasis::BehindEra), "{}", m.id);
+    }
+    // Hand-built rounds are unchanged: read as RHA, not made against ERA.
+    for id in ["kornet", "javelin", "apfsds125", "m829"] {
+        let m = c.munition(id).unwrap();
+        assert!(m.pen_basis == PenBasis::Rha && !m.defeats_era, "{id}");
+    }
 }

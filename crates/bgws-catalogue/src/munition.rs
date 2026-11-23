@@ -6,6 +6,25 @@
 
 use serde::{Deserialize, Serialize};
 
+/// What a round's penetration figure was measured against.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PenBasis {
+    /// Plain rolled homogeneous armour.
+    #[default]
+    Rha,
+    /// Behind explosive reactive armour (a tandem warhead's figure).
+    BehindEra,
+    /// Not stated: read as RHA.
+    Unstated,
+}
+
+impl PenBasis {
+    pub fn is_rha(&self) -> bool {
+        *self == PenBasis::Rha
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MunitionKind {
@@ -188,6 +207,15 @@ pub struct Munition {
     /// Tandem shaped charge: defeats ERA.
     #[serde(default)]
     pub tandem: bool,
+    /// What the penetration figure is measured against: a tandem warhead's
+    /// published figure is often behind ERA, and the engine then does not take
+    /// ERA off it again.
+    #[serde(default, skip_serializing_if = "PenBasis::is_rha")]
+    pub pen_basis: PenBasis,
+    /// A long rod made to defeat heavy ERA (M829A3, 3BM60, DM73): heavy ERA
+    /// does not degrade it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub defeats_era: bool,
     pub targets: Vec<TargetDomain>,
     pub cost_usd: f64,
     /// Standard 200 kg-warhead hits one round is worth against ships and structures.
@@ -287,6 +315,8 @@ mod tests {
             penetration: vec![PenPoint { range_m: 0.0, mm: 700.0 }, PenPoint { range_m: 2000.0, mm: 600.0 }],
             top_attack: false,
             tandem: false,
+            pen_basis: PenBasis::Rha,
+            defeats_era: false,
             targets: vec![TargetDomain::Land],
             cost_usd: 8000.0,
             structural_hits: 0.03,

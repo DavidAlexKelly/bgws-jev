@@ -398,7 +398,11 @@ def make_munition(m, cls, guidance, row, engine, mun_csv):
     if m.get("penetration"):
         out["penetration"] = m["penetration"]
     out["topAttack"] = bool(m.get("topAttack"))
-    out["tandem"] = bool(m.get("tandem"))
+    out["tandem"] = bool(m.get("tandem")) or m.get("eraEffect") == "precursor_defeats_era"
+    if m.get("penBasis") == "behind_era" and m.get("penetration"):
+        out["penBasis"] = "behind_era"
+    if m.get("eraEffect") == "defeats_era" and kind == "ke":
+        out["defeatsEra"] = True
     out["targets"] = t["targets"]
     out["costUsd"] = t["costUsd"]
     out["structuralHits"] = t.get("structuralHits", 0)
@@ -409,7 +413,9 @@ def make_munition(m, cls, guidance, row, engine, mun_csv):
     out["source"] = (
         f"L7 munition row {mid} (weapon {m['family']}, grade {m['grade']}): {m['source']}. "
         f"Engine fields from `{tpl}` [default]; from the capability row: {taken}."
-        + (f" Penetration basis: {basis}." if basis and basis != "rha" else "")
+        + (" Penetration measured behind ERA: the engine does not take ERA off it again." if basis == "behind_era" else "")
+        + (" Penetration basis not stated: read as RHA." if basis == "unstated" else "")
+        + (" Made against heavy ERA: heavy ERA does not degrade it." if m.get("eraEffect") == "defeats_era" and kind == "ke" else "")
     )
     return out
 

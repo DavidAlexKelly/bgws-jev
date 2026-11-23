@@ -53,7 +53,29 @@
 >   - thermobaric, HE-frag tank and other rounds whose kind has no engine counterpart;
 >   - sensor-fuzed artillery (BONUS);
 >   - the 93 munition rows the importer rejected for their blanket source;
->   - `behind_era` penetration figures, which are used as they are (step 3).
+>   - (`behind_era` figures: done, below.)
+> - **ERA, settled.**
+>   - **Rounds:** a round carries `penBasis` and `defeatsEra`, from the CSV's `pen_basis` and
+>     `era_effect`.
+>     - A figure measured behind ERA (3BK29, Spike-LR2, 9M123) is not cut by ERA again.
+>       Before, the engine took 6% off (`direct.era.ce_reduction` × `tandem_residual`).
+>     - A long rod made against heavy ERA (M829A3, 3BM60, DM73) is not degraded by heavy ERA.
+>       Before, it lost `direct.era.ke_reduction`, 20%.
+>     - `precursor_defeats_era` sets `tandem`.
+>     - `unstated` is read as RHA.
+>   - **Vehicles:** a vehicle carries `eraKind`. Kontakt-5, Relikt and Malachit are heavy, so
+>     they work against long rods too. Kontakt-1, the Rafael kit and ROMOR-A are light: they
+>     work against shaped charges only, and take `direct.era.light_ke_reduction` (0,
+>     [default]) off a long rod.
+>     - `heavy` is the default, so a record with only `era: true` behaves as before.
+>     - The hand-built T-72B3 and T-80BVM are marked heavy. The Challenger 2
+>       (`var_11_default`) is marked light, from the L7 row's ROMOR-A. That is the one change
+>       to an existing scenario's vehicle.
+>   - **Not changed:** the hand-built `kornet`, `javelin` and `atgmTow`. Their CSV rows
+>     (`m_9m133`, `m_javelin`, `m_tow2a`) state no basis, and most are grade D. The "1,200 mm
+>     behind ERA" for Kornet in the gaps list below is not what the row says.
+>   - **To check:** the CSV marks the 35 mm PMD343 APFSDS `defeats_era`. That is unusual for
+>     a 35 mm round.
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the

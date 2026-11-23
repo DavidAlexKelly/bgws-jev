@@ -36,18 +36,20 @@ use std::collections::BTreeMap;
 
 /// An ERA or armour kit named by the CSV's `era_fit`: whether it is explosive
 /// reactive armour (what the engine's `body.era` means), and why.
-pub const ERA_FITS: &[(&str, bool, &str)] = &[
-    ("kontakt1", true, "Kontakt-1 ERA"),
-    ("kontakt5", true, "Kontakt-5 heavy ERA"),
-    ("relikt", true, "Relikt heavy ERA"),
-    ("malachit", true, "Malachit ERA"),
-    ("rafael_era", true, "Rafael ERA kit"),
-    ("romor_lfp", true, "ROMOR-A ERA on the lower front plate"),
-    ("brat_optional", false, "BRAT ERA is an optional kit: off unless a scenario fits it"),
-    ("slat", false, "slat armour: a cage, not ERA (not modelled)"),
-    ("bar_cage", false, "bar armour: a cage, not ERA (not modelled)"),
-    ("appliqué", false, "passive appliqué armour, not ERA"),
-    ("epsom", false, "Epsom: Challenger 3's passive modular armour, not ERA"),
+/// `Some("heavy")` (against long rods too: `eraKind` heavy), `Some("light")`
+/// (against shaped charges only) or `None` (not ERA).
+pub const ERA_FITS: &[(&str, Option<&str>, &str)] = &[
+    ("kontakt1", Some("light"), "Kontakt-1: light ERA, against shaped charges"),
+    ("kontakt5", Some("heavy"), "Kontakt-5: heavy ERA, against long rods too"),
+    ("relikt", Some("heavy"), "Relikt: heavy ERA, against long rods too"),
+    ("malachit", Some("heavy"), "Malachit: heavy ERA, against long rods too"),
+    ("rafael_era", Some("light"), "Rafael ERA kit: light, against shaped charges"),
+    ("romor_lfp", Some("light"), "ROMOR-A on the lower front plate: light ERA, against shaped charges"),
+    ("brat_optional", None, "BRAT ERA is an optional kit: off unless a scenario fits it"),
+    ("slat", None, "slat armour: a cage, not ERA (not modelled)"),
+    ("bar_cage", None, "bar armour: a cage, not ERA (not modelled)"),
+    ("appliqué", None, "passive appliqué armour, not ERA"),
+    ("epsom", None, "Epsom: Challenger 3's passive modular armour, not ERA"),
 ];
 
 /// An active protection system named by the CSV's `aps_fit`: the kind it
@@ -93,8 +95,11 @@ pub fn adapt_platform(v: &mut Value) -> Result<(), String> {
         }
         if let Some(fit) = body.remove("eraFit") {
             let name = fit.as_str().ok_or("`eraFit` must be a string")?;
-            let (_, era, why) = ERA_FITS.iter().find(|(n, _, _)| *n == name).ok_or_else(|| format!("unknown ERA fit `{name}`: add it to imported::ERA_FITS"))?;
-            body.insert("era".into(), json!(era));
+            let (_, kind, why) = ERA_FITS.iter().find(|(n, _, _)| *n == name).ok_or_else(|| format!("unknown ERA fit `{name}`: add it to imported::ERA_FITS"))?;
+            body.insert("era".into(), json!(kind.is_some()));
+            if let Some(k) = kind {
+                body.insert("eraKind".into(), json!(k));
+            }
             let e = notes.entry("body.era".into()).or_default();
             *e = if e.is_empty() { format!("{name}: {why}") } else { format!("{name}: {why}; {e}") };
         }
@@ -160,17 +165,7 @@ pub fn reparent(platforms: &mut BTreeMap<String, Value>) {
     }
 }
 
-/// What a round's penetration figure was measured against.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PenBasis {
-    /// Plain rolled homogeneous armour.
-    Rha,
-    /// Behind explosive reactive armour (a tandem warhead's figure): the
-    /// engine applies ERA itself, so this must not be used as RHA.
-    BehindEra,
-    Unstated,
-}
+pub use crate::munition::PenBasis;
 
 /// What ERA does to the round.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -232,6 +227,7 @@ mod tests {
         assert_eq!(a["zones"]["turret"]["ke"]["front"], 450);
         assert_eq!(a["zones"]["turret"]["ce"]["front"], 700);
         assert_eq!(v["body"]["era"], true);
+        assert_eq!(v["body"]["eraKind"], "heavy");
         assert!(v["body"]["aps"].is_null() && v["body"].get("apsFit").is_none());
         assert!(v.get("figures").is_none());
         assert_eq!(v["sources"]["body.armour"]["ref"], "a document (grade C)");

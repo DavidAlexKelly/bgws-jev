@@ -82,6 +82,7 @@
    ],
    "topAttack": false,
    "tandem": false,
+   "defeatsEra": true,
    "targets": [
     "land"
    ],
@@ -92,7 +93,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m829a3 (weapon gun_120_l44, grade C): open estimates 700-800mm; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_m829a3 (weapon gun_120_l44, grade C): open estimates 700-800mm; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_m830a1",
@@ -138,7 +139,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m830a1 (weapon gun_120_l44, grade B): published ~600mm. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis: unstated."
+   "source": "L7 munition row m_m830a1 (weapon gun_120_l44, grade B): published ~600mm. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_mk30_ap",
@@ -464,7 +465,7 @@
     "domain": 2,
     "category": 1
    },
-   "source": "L7 munition row m_9m117b (weapon at_bastion, grade B): earlier 9M117 Bastion ~550 single. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration basis: unstated."
+   "source": "L7 munition row m_9m117b (weapon at_bastion, grade B): earlier 9M117 Bastion ~550 single. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_dm73",
@@ -500,6 +501,7 @@
    ],
    "topAttack": false,
    "tandem": false,
+   "defeatsEra": true,
    "targets": [
     "land"
    ],
@@ -510,7 +512,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_dm73 (weapon gun_120_l55a1, grade C): Rheinmetall: ~8% over DM63 (~700 @2km); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_dm73 (weapon gun_120_l55a1, grade C): Rheinmetall: ~8% over DM63 (~700 @2km); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_m919",
@@ -685,6 +687,7 @@
    ],
    "topAttack": false,
    "tandem": true,
+   "penBasis": "behind_era",
    "targets": [
     "land"
    ],
@@ -695,7 +698,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bk29 (weapon gun_125_2a46, grade B): published 750mm behind ERA. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis: behind_era."
+   "source": "L7 munition row m_3bk29 (weapon gun_125_2a46, grade B): published 750mm behind ERA. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration measured behind ERA: the engine does not take ERA off it again."
   },
   {
    "id": "l7/m_3bm25",
@@ -834,7 +837,7 @@
     "domain": 9,
     "category": 2
    },
-   "source": "L7 munition row m_m430 (weapon agl_40_mk19, grade B): published 50-75mm. Engine fields from `he30` [default]; from the capability row: speed, maximum range. Penetration basis: unstated."
+   "source": "L7 munition row m_m430 (weapon agl_40_mk19, grade B): published 50-75mm. Engine fields from `he30` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_l14",
@@ -956,7 +959,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_pg15v (weapon gun_73_2a28, grade B): PG-9 ~400. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis: unstated."
+   "source": "L7 munition row m_pg15v (weapon gun_73_2a28, grade B): PG-9 ~400. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_3ubr8",
@@ -1171,6 +1174,7 @@
    ],
    "topAttack": false,
    "tandem": false,
+   "defeatsEra": true,
    "targets": [
     "land"
    ],
@@ -1181,7 +1185,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bm60 (weapon gun_125_2a46, grade C): estimate 700-750mm; T-90M/T-72B3M; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_3bm60 (weapon gun_125_2a46, grade C): estimate 700-750mm; T-90M/T-72B3M; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_spike_lr",
@@ -1217,6 +1221,7 @@
    ],
    "topAttack": true,
    "tandem": true,
+   "penBasis": "behind_era",
    "targets": [
     "land"
    ],
@@ -1227,7 +1232,7 @@
     "domain": 2,
     "category": 1
    },
-   "source": "L7 munition row m_spike_lr (weapon at_spike_lr, grade B): Rafael: >1,000 mm RHA behind ERA; lofted top-attack profile. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration basis: behind_era."
+   "source": "L7 munition row m_spike_lr (weapon at_spike_lr, grade B): Rafael: >1,000 mm RHA behind ERA; lofted top-attack profile. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration measured behind ERA: the engine does not take ERA off it again."
   },
   {
    "id": "l7/m_20_dm63",
@@ -1339,6 +1344,7 @@
    ],
    "topAttack": false,
    "tandem": false,
+   "defeatsEra": true,
    "targets": [
     "land",
     "air"
@@ -1350,7 +1356,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_35_apfsds (weapon ac_35_wotan, grade D): Rheinmetall D251e0721: 1,400 m/s; Rheinmetall publishes no penetration, 159 mm at 1 km is an unsourced estimate; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_35_apfsds (weapon ac_35_wotan, grade D): Rheinmetall D251e0721: 1,400 m/s; Rheinmetall publishes no penetration, 159 mm at 1 km is an unsourced estimate; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_35_abm",
@@ -1415,6 +1421,7 @@
    ],
    "topAttack": false,
    "tandem": true,
+   "penBasis": "behind_era",
    "targets": [
     "land"
    ],
@@ -1425,7 +1432,7 @@
     "domain": 2,
     "category": 1
    },
-   "source": "L7 munition row m_9m123 (weapon at_khrizantema, grade B): KBP: 1,100-1,250mm behind ERA. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration basis: behind_era."
+   "source": "L7 munition row m_9m123 (weapon at_khrizantema, grade B): KBP: 1,100-1,250mm behind ERA. Engine fields from `kornet` [default]; from the capability row: speed, maximum range. Penetration measured behind ERA: the engine does not take ERA off it again."
   }
  ],
  "fits": {
