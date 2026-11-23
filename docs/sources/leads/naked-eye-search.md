@@ -1,5 +1,21 @@
 # Naked-eye and binocular search: leads, not yet read in the original
 
+> **Status, 23 November 2026.**
+>
+> - **Read:** Maxey & Caviness (1972) and the full report, Caviness, Maxey & McPherson (1972)
+>   (`notes/caviness-1972-target-detection-and-range-estimation.md`). Camouflaged men on foot at
+>   100–300 m were found in 2–7 s on average. Only 54% were found in thick cover, and none at
+>   300 m there. The land engine is 3–5 times faster and has no ceiling, so this is now a
+>   calibration target.
+> - **Still to get:**
+>   - Grau (2022);
+>   - Louis (1964, AD0445050);
+>   - Richardson (1968);
+>   - ARI TR-79-A13 (ADA077862);
+>   - the TETAM Phase IB companion paper.
+>
+>   The Grau tables and ARI TR-79-A13 would give P∞ for tanks.
+
 Howe (1993) says the NVESD search model "is not applicable to search with
 the unaided eye, or even with optically aided eyes (using binoculars)".
 Most infantry search that way.

@@ -1,0 +1,674 @@
+table,id,field,reason
+platform,var_843_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_843_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_843_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_843_1,body.massT,copied from the base vehicle
+platform,var_843_1,mover.engineHp,copied from the base vehicle
+platform,var_843_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_44_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_44_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_44_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_44_1,body.massT,copied from the base vehicle
+platform,var_44_1,mover.engineHp,copied from the base vehicle
+platform,var_44_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1015_default,armour,no armour figures
+platform,var_1015_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1015_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1015_default,*,nothing sourced: no record written
+platform,var_986_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_986_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_986_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_913_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_913_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_299_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_299_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_299_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_165_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_165_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_165_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1120_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1120_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1120_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_160_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_160_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_160_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1246_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1246_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_220_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_220_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_220_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1135_default,armour,protection graded D
+platform,var_1135_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1135_default,*,nothing sourced: no record written
+platform,var_950_default,armour,protection graded D
+platform,var_950_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_950_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_950_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_950_default,*,nothing sourced: no record written
+platform,var_56_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_56_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_56_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_218_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_218_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_218_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_218_1,body.massT,copied from the base vehicle
+platform,var_218_1,mover.engineHp,copied from the base vehicle
+platform,var_218_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_974_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_974_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_974_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1080_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1080_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_291_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_291_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_291_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_27_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_27_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_27_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_27_1,body.massT,copied from the base vehicle
+platform,var_27_1,mover.engineHp,copied from the base vehicle
+platform,var_27_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_118_default,armour,no armour figures
+platform,var_118_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_118_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_118_default,*,nothing sourced: no record written
+platform,var_11_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_11_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_11_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_300_default,armour,protection graded D
+platform,var_300_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_300_default,*,nothing sourced: no record written
+platform,var_137_default,armour,protection graded D
+platform,var_137_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_137_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_137_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_137_default,*,nothing sourced: no record written
+platform,var_672_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_672_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_25_default,armour,protection graded D
+platform,var_25_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_25_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_25_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_25_default,*,nothing sourced: no record written
+platform,var_1294_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1294_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1294_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1291_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1291_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_753_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_753_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_753_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_753_1,body.massT,copied from the base vehicle
+platform,var_753_1,mover.engineHp,copied from the base vehicle
+platform,var_753_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1217_default,armour,no armour figures
+platform,var_1217_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1217_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1217_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1217_default,*,nothing sourced: no record written
+platform,var_162_default,armour,protection graded D
+platform,var_162_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_162_default,*,nothing sourced: no record written
+platform,var_78_default,armour,protection graded D
+platform,var_78_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_78_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_78_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_78_default,*,nothing sourced: no record written
+platform,var_9_default,armour,no armour figures
+platform,var_9_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_9_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_9_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_9_default,*,nothing sourced: no record written
+platform,var_8_default,armour,protection graded D
+platform,var_8_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_8_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_8_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_8_default,*,nothing sourced: no record written
+platform,var_839_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_839_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_839_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1290_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1290_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_115_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_115_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_115_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_183_default,armour,protection graded D
+platform,var_183_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_183_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_183_default,*,nothing sourced: no record written
+platform,var_1104_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1104_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1104_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_837_default,armour,protection graded D
+platform,var_837_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_837_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_837_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_837_default,*,nothing sourced: no record written
+platform,var_838_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_838_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_838_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_82_default,armour,no armour figures
+platform,var_82_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_82_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_82_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_82_default,*,nothing sourced: no record written
+platform,var_734_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_734_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_734_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_77_default,armour,protection graded D
+platform,var_77_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_77_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_77_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_77_default,*,nothing sourced: no record written
+platform,var_125_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_125_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_125_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_320_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_320_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_320_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_320_1,body.massT,copied from the base vehicle
+platform,var_320_1,mover.engineHp,copied from the base vehicle
+platform,var_320_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_673_default,armour,protection graded D
+platform,var_673_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_673_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_673_default,*,nothing sourced: no record written
+platform,var_98_default,armour,protection graded D
+platform,var_98_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_98_default,*,nothing sourced: no record written
+platform,var_6_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_6_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_6_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_10_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_10_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_10_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_10_1,body.massT,copied from the base vehicle
+platform,var_10_1,mover.engineHp,copied from the base vehicle
+platform,var_10_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_10_2,body.massT,copied from the base vehicle
+platform,var_10_2,mover.engineHp,copied from the base vehicle
+platform,var_10_2,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_518_default,armour,protection graded D
+platform,var_518_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_518_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_518_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_518_default,*,nothing sourced: no record written
+platform,var_1285_default,armour,protection graded D
+platform,var_1285_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1285_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1285_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1285_default,*,nothing sourced: no record written
+platform,var_643_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_643_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_643_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_643_1,body.massT,copied from the base vehicle
+platform,var_643_1,mover.engineHp,copied from the base vehicle
+platform,var_643_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_607_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_607_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_607_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_840_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_840_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_840_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_79_default,armour,protection graded D
+platform,var_79_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_79_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_79_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_79_default,*,nothing sourced: no record written
+platform,var_5_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_5_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_5_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1_1,body.massT,copied from the base vehicle
+platform,var_1_1,mover.engineHp,copied from the base vehicle
+platform,var_1_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_996_default,armour,protection graded D
+platform,var_996_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_996_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_996_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_996_default,*,nothing sourced: no record written
+platform,var_7_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_7_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_7_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1073_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1073_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1073_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1013_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1013_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1013_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1013_1,body.massT,copied from the base vehicle
+platform,var_1013_1,mover.engineHp,copied from the base vehicle
+platform,var_1013_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_20_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_20_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1017_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1017_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_842_default,armour,protection graded D
+platform,var_842_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_842_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_842_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_842_default,*,nothing sourced: no record written
+platform,var_52_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_52_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_52_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_695_default,armour,protection graded D
+platform,var_695_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_695_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_695_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_695_default,*,nothing sourced: no record written
+platform,var_49_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_49_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_49_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_17_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_17_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_17_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1134_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1134_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_395_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_395_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_395_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_395_1,body.massT,copied from the base vehicle
+platform,var_395_1,mover.engineHp,copied from the base vehicle
+platform,var_395_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1281_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1281_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1222_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1222_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1222_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1101_default,armour,protection graded D
+platform,var_1101_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1101_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1101_default,*,nothing sourced: no record written
+platform,var_909_default,armour,protection graded D
+platform,var_909_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_909_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_909_default,*,nothing sourced: no record written
+platform,var_631_default,armour,protection graded D
+platform,var_631_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_631_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_631_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_631_default,*,nothing sourced: no record written
+platform,var_1237_default,armour,protection graded D
+platform,var_1237_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1237_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1237_default,*,nothing sourced: no record written
+platform,var_1238_default,armour,protection graded D
+platform,var_1238_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1238_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1238_default,*,nothing sourced: no record written
+platform,var_693_default,armour,protection graded D
+platform,var_693_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_693_default,*,nothing sourced: no record written
+platform,var_151_default,armour,protection graded D
+platform,var_536_default,armour,protection graded D
+platform,var_536_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_536_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_536_default,*,nothing sourced: no record written
+platform,var_874_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_874_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_874_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1186_default,armour,protection graded D
+platform,var_1186_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1186_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1186_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1186_default,*,nothing sourced: no record written
+platform,var_1233_default,armour,protection graded D
+platform,var_1233_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1233_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1233_default,*,nothing sourced: no record written
+platform,var_1139_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1139_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_783_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_783_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_783_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_51_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_51_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_51_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_42_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_42_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_42_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1098_default,armour,protection graded D
+platform,var_1098_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1098_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1098_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1098_default,*,nothing sourced: no record written
+platform,var_15_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_15_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_15_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1211_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1211_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1211_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_16_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_694_default,armour,protection graded D
+platform,var_694_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_694_default,*,nothing sourced: no record written
+platform,var_877_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_877_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_877_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1266_default,armour,protection graded D
+platform,var_1266_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1266_default,*,nothing sourced: no record written
+platform,var_315_default,armour,protection graded D
+platform,var_315_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_315_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_315_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_315_default,*,nothing sourced: no record written
+platform,var_791_default,armour,protection graded D
+platform,var_791_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_791_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_791_default,*,nothing sourced: no record written
+platform,var_833_default,armour,protection graded D
+platform,var_833_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_833_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_833_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_833_default,*,nothing sourced: no record written
+platform,var_14_default,armour,protection graded D
+platform,var_14_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_14_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_14_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_14_default,*,nothing sourced: no record written
+platform,var_23_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_23_1,body.massT,row note says unsourced
+platform,var_23_1,mover.engineHp,row note says unsourced
+platform,var_23_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_60_default,armour,protection graded D
+platform,var_60_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_60_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_60_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_60_default,*,nothing sourced: no record written
+platform,var_1227_default,armour,protection graded D
+platform,var_1227_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1227_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1227_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1227_default,*,nothing sourced: no record written
+platform,var_1219_default,armour,protection graded D
+platform,var_1219_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1219_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1219_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1219_default,*,nothing sourced: no record written
+platform,var_453_default,armour,protection graded D
+platform,var_453_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_453_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_453_default,*,nothing sourced: no record written
+platform,var_434_default,armour,protection graded D
+platform,var_434_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_434_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_434_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_434_default,*,nothing sourced: no record written
+platform,var_1161_default,armour,protection graded D
+platform,var_1161_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1161_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1161_default,*,nothing sourced: no record written
+platform,var_876_default,armour,protection graded D
+platform,var_876_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_876_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_876_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_876_default,*,nothing sourced: no record written
+platform,var_905_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_905_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_905_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_696_default,armour,protection graded D
+platform,var_696_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_696_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_696_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_696_default,*,nothing sourced: no record written
+platform,var_143_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_143_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_143_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_727_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_727_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_727_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_444_default,armour,protection graded D
+platform,var_444_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_444_default,*,nothing sourced: no record written
+platform,var_454_default,armour,protection graded D
+platform,var_454_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_454_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_454_default,*,nothing sourced: no record written
+platform,var_1228_default,armour,protection graded D
+platform,var_1228_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1228_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_1228_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1228_default,*,nothing sourced: no record written
+platform,var_213_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_213_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_213_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_879_default,armour,protection graded D
+platform,var_879_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_879_default,*,nothing sourced: no record written
+platform,var_22_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_22_1,body.massT,row note says unsourced
+platform,var_22_1,mover.engineHp,row note says unsourced
+platform,var_22_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_18_default,armour,protection graded D
+platform,var_18_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_18_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_18_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_18_default,*,nothing sourced: no record written
+platform,var_873_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_873_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_873_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_88_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_88_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_88_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_398_default,armour,protection graded D
+platform,var_398_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_398_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_398_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_398_default,*,nothing sourced: no record written
+platform,var_147_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_147_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_147_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1234_default,armour,protection graded D
+platform,var_1234_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1234_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1234_default,*,nothing sourced: no record written
+platform,var_894_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_894_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_894_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_89_default,armour,protection graded D
+platform,var_89_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_89_default,*,nothing sourced: no record written
+platform,var_1208_default,armour,protection graded D
+platform,var_1208_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1208_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1208_default,*,nothing sourced: no record written
+platform,var_704_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_704_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_704_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_150_default,armour,protection graded D
+platform,var_150_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_150_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_150_default,*,nothing sourced: no record written
+platform,var_50_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_50_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_12_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_12_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_12_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1100_default,armour,protection graded D
+platform,var_1100_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_1100_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_1100_default,*,nothing sourced: no record written
+platform,var_161_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_161_1,body.massT,copied from the base vehicle
+platform,var_161_1,mover.engineHp,row note says unsourced
+platform,var_161_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_517_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_517_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_517_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_21_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_21_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_21_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90001_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90001_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90001_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90002_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90002_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90002_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90003_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90003_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90003_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90004_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90004_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90004_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90005_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90005_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90005_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90006_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90006_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90006_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90007_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90007_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90007_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90008_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90008_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90008_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90009_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90009_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90009_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90010_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90010_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90010_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90011_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90011_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90011_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90012_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90012_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90012_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90017_default,armour,protection graded D
+platform,var_x90017_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90017_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90017_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90017_default,*,nothing sourced: no record written
+platform,var_x90020_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90020_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90020_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90020_1,body.massT,copied from the base vehicle
+platform,var_x90020_1,mover.engineHp,copied from the base vehicle
+platform,var_x90020_1,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90021_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90021_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90021_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90022_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90022_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90022_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90023_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90023_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90023_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90024_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90024_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90024_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90025_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90025_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90025_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90026_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90026_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90026_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90027_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90027_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90027_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90028_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90028_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90028_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90029_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90029_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90029_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90030_default,body.massT,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90030_default,mover.engineHp,no row-level source (mass_source and the speed are table-wide)
+platform,var_x90030_default,mover.maxKmh,no row-level source (mass_source and the speed are table-wide)
+munition,m_3bk4,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3of18,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m833,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m456,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m393,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_105_hesh,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_105_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3bk17,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_of412,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3bm24,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3bk16,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m117,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_br412,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3of32,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_og15v,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_90_heat,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_l13,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_mk30_abm,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3ubr6,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3uof8,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_2a72_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_2a38_api,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_2a38_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m791,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m792,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_bzt23,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_ofz23,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_20_apds,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_762_pkt,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_556_ball,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_545_ball,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_b32_127,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_gau19,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m134,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_l94,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m240,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pkm,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_vog17,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m433,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_vog25,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_556_rifle,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_556_m4,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_545_rifle,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_762_dmr,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_762_svd,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_at4_ast,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_cg_441,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m72,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_tow2a,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg7vl,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg7vr,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_og7v,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_tbg7v,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg26,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg27,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg29v,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_pg32v,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m113,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m113m,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m111,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m131,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m131f,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m133,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m133m2,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m133f,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m120,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m14,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_81_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_60_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_82_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_120_of49,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_155_m795,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_155_m107,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_155_l15,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_of540,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_bp540,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3of45,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_3of45_2a88,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_of29,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_of462,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_of43,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m22u,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m27f,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m27k,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m55f,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_9m55k,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_tochka,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_tochka_k,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_iskander,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_icbm,*,"kind ""nuclear"" not imported"
+munition,m_35_apds,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_35_he,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_m789,*,"blanket source_ref (cites the table's README, not a source for this row)"
+munition,m_agm114,*,"blanket source_ref (cites the table's README, not a source for this row)"

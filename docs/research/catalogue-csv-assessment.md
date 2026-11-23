@@ -1,5 +1,32 @@
 # The asset catalogue CSVs: an assessment
 
+> **Status, 23 November 2026.** Done since this was written:
+>
+> - **Importer.** `npm run catalogue:import` (`src/scripts/catalogue-import.ts`,
+>   logic in `src/apps/bgws/realtime/catalogue/csvImport.ts`) writes
+>   `data/catalogue/imported.json`: land platforms as overlay records in the shape of
+>   `sourced.json` and munitions in the shape of `munitions.json`. A figure goes in only with a
+>   row-level source, and `figures` on each record says which. Everything left out is in
+>   `data/catalogue/imported-rejections.csv` with the reason. First run: 114 platforms and
+>   119 munitions imported, 673 figures or rows rejected (93 munitions on the blanket README
+>   reference; most mass, engine and speed figures for want of a row-level source). The test
+>   (`csvImport.test.ts`) fails if a figure is imported without a source, or if the committed
+>   files are out of date. No engine reads `imported.json` yet: it is staged for the Rust loader.
+> - **Quality columns**, from what the tables already say, no new source:
+>   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
+>     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the
+>     base vehicle's figure).
+>   - Munitions gain `pen_basis` (`rha`, `behind_era` or `unstated`) and `era_effect`
+>     (`precursor_defeats_era`, `era_degrades`, `defeats_era`).
+>   - The 93 munitions that cite only the README are regraded to D. Their old grade is kept in
+>     `source_confidence_original`.
+>
+>   The import adds these columns and is idempotent.
+>
+> Still open from the list below: per-row sources for the 93 munitions, a newer source for the
+> T-72B3, T-80BVM and T-90M, `has_smoke`, cross-country speeds, the `bgws_cs_index` formula, and the
+> support-asset timings.
+
 `data/catalogue/csv/`, added 22 November 2026. Six files:
 
 | File | Rows |

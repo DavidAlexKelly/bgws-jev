@@ -1,0 +1,13 @@
+group,reason,percent
+maneuver_by_enemy,"envelopment, encirclement, penetration",33
+maneuver_by_enemy,adjacent friendly unit withdrew,13
+maneuver_by_enemy,enemy occupied key terrain,6
+maneuver_by_enemy,enemy achieved surprise,8
+maneuver_by_enemy,enemy reinforced,4
+firepower_by_enemy,casualty or equipment losses,10
+firepower_by_enemy,heavy artillery or air attacks by enemy,2
+other,no reserves left,12
+other,supply shortage,2
+other,truce or surrender,6
+other,change in weather,2
+other,orders to withdraw,2

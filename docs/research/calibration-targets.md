@@ -611,6 +611,21 @@ Leads are in `docs/sources/leads/naked-eye-search.md`. The best is Grau
 3–7 s at 0.5–2.5 km. That is consistent with what the model does now.
 Each was seen only in search snippets, so none is used.
 
+## New targets from the sources read on 23 November
+
+These come from the sources added on 23 November (`docs/sources/notes/`). Each is a **check**
+the model does not yet pass, or has not yet been run against. No figure was tuned to meet them.
+
+| Target | Source | What the model does | Gap |
+|---|---|---|---|
+| A camouflaged man moving at 100–300 m is found in 2.1 s (open) to 4.1 s (thick cover) on average. 96% are found in the open, 54% in thick cover, and 0% at 300 m in thick cover. | Caviness et al. 1972, Table 3 | The TypeScript land engine (`engine/detection.ts`): 0.4 s at 200 m in the open, 1.5 s in cover. 95% are found within 10 s at 300 m in cover. | 3–5× too fast, and **no ceiling on detection** for concealed targets. Fixing either changes every dismounted scenario. |
+| A defender breaks near 40% losses and an attacker halts near 20%, with wide spread: Clark's battalions broke at 1–100%. | FM 105-5 via Dupuy Institute; Clark 1954 | Break tests at 20% / 40% (`timing.*_BREAK_AT`), now sourced | In band. |
+| Only 10% of forced posture changes are due to casualties; 64% follow enemy manoeuvre (envelopment, penetration, a neighbour withdrawing). Most forces quit below 10% losses. | McQuie 1987 via Dupuy Institute | Breaks on losses only | A break test on being outflanked or a neighbour withdrawing is missing. |
+| Attackers win 55–62% at 1.0–1.5:1, 80–83% at 2.0–3.0:1, 88–100% above 6:1 (division level, 1904–1991). | Dupuy Institute, 672/570 cases | Not yet run | A batch over force ratios. Mind the scale: these are divisions. |
+| Daily losses at division scale: attacker 2.8%, defender 1.5% (QJM standard rates; up to 13.4% / 5.8%). | QJM via Dupuy Institute | Not yet run | Only for long, large runs. |
+| An anti-tank guided missile hits 0.91 in test (Javelin, 20/22). | DOT&E FY2017 | `fire.GUIDED.hit` = 0.9 | In band (test conditions). |
+| Two or three interceptors per ballistic missile. | DOT&E FY2017, FY2024 | 2 (`world/domains/air.SALVO_VS_BALLISTIC`) | In band. |
+
 ## Superseded: the search model before the sources were read
 
 

@@ -1,0 +1,11 @@
+factor,level,observations,detections,percent_detected,mean_detection_time_s,sd_s,pdf_page,printed_page
+overall,all,810,641,79.1,3.8,4.4,24,14
+terrain_complexity,low,270,258,95.6,2.1,1.7,24,14
+terrain_complexity,medium,270,237,87.8,5.4,6.0,24,14
+terrain_complexity,high,270,146,54.1,4.1,3.5,24,14
+range_m,100,270,244,90.4,2.3,1.8,24,14
+range_m,200,270,252,93.3,3.5,3.8,24,14
+range_m,300,270,145,53.7,6.6,6.5,24,14
+target_speed,walk_1.5_m_s,270,216,80.0,5.4,6.4,24,14
+target_speed,slow_run_2.7_m_s,270,219,81.1,3.5,2.9,24,14
+target_speed,fast_run_7.5_m_s,270,206,76.3,2.4,1.9,24,14

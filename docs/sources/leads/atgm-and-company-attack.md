@@ -1,5 +1,19 @@
 # ATGM hit chance and reliability, and company attack doctrine: leads, not yet read
 
+> **Status, 23 November 2026.**
+>
+> - **Read:** the DOT&E FY2017 report (`notes/dote-2018-fy2017-annual-report.md`). It confirms
+>   the Javelin figures below: 20 of 22 hits, 18 of 18 on vehicles, and 2 precursor-warhead
+>   failures, then 14 of 14. `fire.GUIDED.hit` (0.9) now cites it.
+> - **Read:** FM 3-90 (2023) and ATP 3-90.1 (2023). They have **no** frontage, interval or
+>   support-by-fire standoff, and the "two platoons may suppress" sentence is not in the 2023
+>   FM 3-90.
+> - **Still to get:**
+>   - the DOT&E FY1998 Javelin report (51 of 54);
+>   - the FY2001 TOW report;
+>   - the older manuals with the numbers: FM 71-1, FM 3-21.8 (the 300 m), FM 17-15 (the 100 m),
+>     FM 17-12, and the pre-2023 FM 3-90 / FM 3-90-1.
+
 From a web search on 21 November 2026. Every item was seen **only in
 search snippets**: dote.osd.mil, globalsecurity.org and archive.org refused
 this environment. **No value is changed on them.** Download the documents

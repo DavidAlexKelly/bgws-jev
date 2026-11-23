@@ -19,7 +19,7 @@ it. Code and docs cite the note or the table, not the PDF.
 Topic folders: `sensing` (detection, optics, sensors), `missiles`,
 `ballistics` (penetration and armour mechanics), `ammunition` (datasheets
 for rounds), `weapons` (guns, mounts and weapon systems), `equipment`
-(platform reference guides), `test-reports` (trials and test results), `simulation` (other simulations, data links and interoperability),
+(platform reference guides), `test-reports` (trials and test results), `doctrine` (field manuals and techniques publications), `simulation` (other simulations, data links and interoperability, combat-modelling commentary),
 `other` (kept but off-topic).
 
 ## File names

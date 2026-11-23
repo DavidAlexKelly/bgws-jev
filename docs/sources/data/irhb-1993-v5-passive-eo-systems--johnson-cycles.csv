@@ -1,0 +1,41 @@
+task,probability,cycles,cycles_pessimistic,cycles_optimistic,viewing,table,printed_page,pdf_page
+detection,1.00,3.0,,,army vehicles,1.6,29,41
+detection,0.95,2.0,,,army vehicles,1.6,29,41
+detection,0.80,1.5,,,army vehicles,1.6,29,41
+detection,0.50,1.0,,,army vehicles,1.6,29,41
+detection,0.30,0.75,,,army vehicles,1.6,29,41
+detection,0.10,0.50,,,army vehicles,1.6,29,41
+detection,0.02,0.25,,,army vehicles,1.6,29,41
+detection,0.00,0,,,army vehicles,1.6,29,41
+recognition,1.00,10.5,12,9,army vehicles,1.7,29,41
+recognition,0.95,7.0,8,6,army vehicles,1.7,29,41
+recognition,0.80,5.25,6,4.5,army vehicles,1.7,29,41
+recognition,0.50,3.5,4,3,army vehicles,1.7,29,41
+recognition,0.30,2.63,3,2.25,army vehicles,1.7,29,41
+recognition,0.10,1.75,2,1.5,army vehicles,1.7,29,41
+recognition,0.02,0.88,1,0.75,army vehicles,1.7,29,41
+recognition,0.00,0,0,0,army vehicles,1.7,29,41
+identification,1.00,18,,,film on a light table,1.8A,29,41
+identification,0.95,12,,,film on a light table,1.8A,29,41
+identification,0.80,9,,,film on a light table,1.8A,29,41
+identification,0.50,6,,,film on a light table,1.8A,29,41
+identification,0.30,4.5,,,film on a light table,1.8A,29,41
+identification,0.10,3,,,film on a light table,1.8A,29,41
+identification,0.02,1.5,,,film on a light table,1.8A,29,41
+identification,0.00,0,,,film on a light table,1.8A,29,41
+identification,1.00,24,,,CRT monitor,1.8B,30,42
+identification,0.95,16,,,CRT monitor,1.8B,30,42
+identification,0.80,12,,,CRT monitor,1.8B,30,42
+identification,0.50,8,,,CRT monitor,1.8B,30,42
+identification,0.30,6,,,CRT monitor,1.8B,30,42
+identification,0.10,4,,,CRT monitor,1.8B,30,42
+identification,0.02,2,,,CRT monitor,1.8B,30,42
+identification,0.00,0,,,CRT monitor,1.8B,30,42
+detection_open_ocean,1.00,1.5,,,ships,1.9,30,42
+detection_open_ocean,0.95,1.0,,,ships,1.9,30,42
+detection_open_ocean,0.80,0.75,,,ships,1.9,30,42
+detection_open_ocean,0.50,0.50,,,ships,1.9,30,42
+detection_open_ocean,0.30,0.375,,,ships,1.9,30,42
+detection_open_ocean,0.10,0.25,,,ships,1.9,30,42
+detection_open_ocean,0.02,0.125,,,ships,1.9,30,42
+detection_open_ocean,0.00,0,,,ships,1.9,30,42
