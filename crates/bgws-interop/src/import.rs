@@ -73,10 +73,16 @@ fn stand_in(kind: u16, domain: u16) -> Option<&'static str> {
 
 impl Importer {
     pub fn new(sim: &Sim, spec: InteropSpec) -> Importer {
-        let mut platforms: Vec<(bool, String, [u16; 7])> = sim.ctx.catalogue.platforms().filter_map(|p| Some((p.parent.is_some(), p.id.clone(), p.dis?.with_country(0)))).collect();
+        // A DIS type names the first record that has it: a base record before
+        // its variants, and a hand-built one before an imported copy (which
+        // inherits its parent's type).
+        let cat = &sim.ctx.catalogue;
+        let mut platforms: Vec<(bool, bool, String, [u16; 7])> = cat.platforms().filter_map(|p| Some((p.parent.is_some(), p.provenance == bgws_catalogue::Provenance::Imported, p.id.clone(), p.dis?.with_country(0)))).collect();
         platforms.sort();
-        let munitions = sim.ctx.catalogue.munitions().filter_map(|m| Some((m.id.clone(), m.dis?.with_country(0)))).collect();
-        Importer { spec, platforms: platforms.into_iter().map(|(_, id, t)| (id, t)).collect(), munitions, reported: BTreeSet::new(), acks: Vec::new(), notes: Vec::new(), ee_slots: Default::default() }
+        let mut munitions: Vec<(bool, String, [u16; 7])> = cat.munitions().filter_map(|m| Some((cat.imported_munition(&m.id).is_some(), m.id.clone(), m.dis?.with_country(0)))).collect();
+        munitions.sort();
+        let munitions = munitions.into_iter().map(|(_, id, t)| (id, t)).collect();
+        Importer { spec, platforms: platforms.into_iter().map(|(_, _, id, t)| (id, t)).collect(), munitions, reported: BTreeSet::new(), acks: Vec::new(), notes: Vec::new(), ee_slots: Default::default() }
     }
 
     fn lookup(list: &[(String, [u16; 7])], t: [u16; 7]) -> Option<(String, bool)> {

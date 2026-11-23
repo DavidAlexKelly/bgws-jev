@@ -11,6 +11,11 @@
 //! The importer's output (a file with a `summary` section) is adapted on the
 //! way in (`imported.rs`): its platforms to the engine's schema, its
 //! munitions kept apart as [`ImportedMunition`]s.
+//! A `fits` section (id → partial record) is laid over a platform defined in
+//! another file, after every file is read: objects merge, anything else
+//! replaces, and `null` stays (so it removes what a parent has). The weapon
+//! fits of the imported platforms (`weapon-fits.json`, from
+//! `tools/weapon_fits.py`) use it.
 //!
 //! **Resolution**, for each platform:
 //! 1. its class's defaults, with the class's own `$extends` chain under them
@@ -49,6 +54,7 @@ pub const BUILTIN_FILES: &[(&str, &str)] = &[
     ("sea.json", include_str!("../../../data/catalogue/sea.json")),
     ("sourced.json", include_str!("../../../data/catalogue/sourced.json")),
     ("space.json", include_str!("../../../data/catalogue/space.json")),
+    ("weapon-fits.json", include_str!("../../../data/catalogue/weapon-fits.json")),
 ];
 
 /// The resolved catalogue.
@@ -72,6 +78,8 @@ struct Raw {
     platforms: BTreeMap<String, Value>,
     /// The importer's munition rows (not engine munitions).
     imported_munitions: Vec<(String, Value)>,
+    /// Overlays on platforms defined elsewhere (`fits` sections).
+    fits: BTreeMap<String, (String, Value)>,
 }
 
 const ELEMENT_LISTS: [(&str, &str); 4] = [("sensors", "kind"), ("emitters", "kind"), ("radios", "bearer"), ("mounts", "kind")];
@@ -81,6 +89,7 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
     let mut sorted: Vec<&(String, String)> = files.iter().collect();
     sorted.sort_by(|a, b| a.0.cmp(&b.0));
     let mut munition_ids = BTreeSet::new();
+    let mut imported_munition_ids = BTreeSet::new();
     let mut band_ids = BTreeSet::new();
     for (file, text) in sorted {
         let v: Value = match serde_json::from_str(text) {
@@ -113,6 +122,7 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         let what = &section[..section.len() - 1];
                         let fresh = match section.as_str() {
                             "bands" => band_ids.insert(id.to_owned()),
+                            "munitions" if import => imported_munition_ids.insert(id.to_owned()),
                             "munitions" => munition_ids.insert(id.to_owned()),
                             _ => !raw.platforms.contains_key(id),
                         };
@@ -153,6 +163,22 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         }
                     }
                 }
+                "fits" => {
+                    let Some(m) = body.as_object() else {
+                        errors.push(CatalogueError::Layout { file: file.clone(), message: "`fits` must be an object".into() });
+                        continue;
+                    };
+                    for (id, fit) in m {
+                        if id.starts_with('$') {
+                            continue;
+                        }
+                        if !fit.is_object() {
+                            errors.push(CatalogueError::Layout { file: file.clone(), message: format!("the fit for `{id}` must be an object") });
+                        } else if raw.fits.insert(id.clone(), (file.clone(), fit.clone())).is_some() {
+                            errors.push(CatalogueError::Duplicate { what: "fit".into(), id: id.clone() });
+                        }
+                    }
+                }
                 "kindDefaults" => {
                     let Some(m) = body.as_object() else {
                         errors.push(CatalogueError::Layout { file: file.clone(), message: "`kindDefaults` must be an object".into() });
@@ -178,8 +204,36 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
             }
         }
     }
+    for (id, (file, fit)) in &raw.fits {
+        match raw.platforms.get_mut(id) {
+            Some(rec) => overlay(rec, fit),
+            None => errors.push(CatalogueError::Layout { file: file.clone(), message: format!("a fit for `{id}`, which no file defines") }),
+        }
+    }
     imported::reparent(&mut raw.platforms);
     raw
+}
+
+/// Lay `fit` over `rec`: objects merge, anything else replaces, and `null`
+/// is kept (so that it removes the key from the parent when the record is
+/// merged down its parent chain).
+fn overlay(rec: &mut Value, fit: &Value) {
+    match (rec, fit) {
+        (Value::Object(r), Value::Object(f)) => {
+            for (k, v) in f {
+                if k.starts_with('$') {
+                    continue;
+                }
+                match r.get_mut(k) {
+                    Some(existing) if existing.is_object() && v.is_object() => overlay(existing, v),
+                    _ => {
+                        r.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+        }
+        (r, f) => *r = f.clone(),
+    }
 }
 
 /// A class's own numbers as figures: `catalogue.class.<class>.<path>`.

@@ -22,11 +22,38 @@
 >   - a row the catalogue already has from the L6 import (`l7/var_11_default` →
 >     `var_11_default`) uses that record as its parent, so it keeps that record's weapons.
 >
->   The other platforms still take their weapons from their generic parent: the weapon fits
->   are in the capability CSV, which is not imported yet. The 119 munitions are kept as typed
->   rows (`Catalogue::imported_munitions`), not engine munitions. Their `kind` is too coarse
->   (`he` covers mortar bombs, glide bombs and cruise missiles), and they have no flight,
->   guidance or range. The test `imported_csv_records_load` checks all of this.
+>   The 119 munitions are kept as typed rows (`Catalogue::imported_munitions`), not engine
+>   munitions. Their `kind` is too coarse (`he` covers mortar bombs, glide bombs and cruise
+>   missiles), and they have no flight, guidance or range. The test
+>   `imported_csv_records_load` checks all of this.
+> - **Weapon fits.** `tools/weapon_fits.py` writes `data/catalogue/weapon-fits.json` from the
+>   capability CSV. 109 of the 114 imported platforms now carry their own weapons, not
+>   their generic parent's. The other 5 have no capability rows.
+>   - A T-90M fires 125 mm rounds, a HMMWV has only its .50 cal, and an Uran-9 is armed.
+>   - Each weapon name is matched to the munition CSV's weapon id through a table. An unknown
+>     name is an error.
+>   - Each sourced munition row of the weapon becomes an engine munition (33 so far). The row
+>     gives the name, penetration against range, tandem and top-attack flags, warhead and
+>     lethal radius. An engine template for the weapon class and round type gives guidance,
+>     flight, pk, CEP, targets, cost, family and DIS type ([default]). Speed and maximum range
+>     come from the capability row when it names that one weapon.
+>   - A gun's KE round is the one nearest the vehicle's `best_pen_mm_1000m`. The munition CSV
+>     lists every round of a calibre, not what each vehicle carries, so an older T-72 does
+>     not get 3BM60.
+>   - A weapon with no sourced round fires the engine's own round for its class (for example
+>     `ball762` for the Kord and PKT, `atgmTandem` for Konkurs and Ataka, `he155` for 152 mm
+>     guns). The source note says so.
+>   - Mount figures and rounds carried are [default] per weapon class (`CLASSES` in the tool).
+>   - It is loaded through a new `fits` catalogue section, which overlays a platform defined in
+>     another file. `null` removes a parent's rounds.
+>   - `python3 tools/weapon_fits.py --check` fails if the file is stale. The test
+>     `imported_platforms_have_their_own_weapon_fits` checks the result.
+>
+>   Not yet in the fits:
+>   - thermobaric, HE-frag tank and other rounds whose kind has no engine counterpart;
+>   - sensor-fuzed artillery (BONUS);
+>   - the 93 munition rows the importer rejected for their blanket source;
+>   - `behind_era` penetration figures, which are used as they are (step 3).
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the
