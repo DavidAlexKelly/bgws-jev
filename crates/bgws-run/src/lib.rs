@@ -62,13 +62,20 @@ pub fn packs_dir() -> std::path::PathBuf {
     std::env::var_os("BGWS_PACKS").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../packs"))
 }
 
-/// A scenario's `theatre.pack`: a path, or a folder name under `packs_dir()`.
+/// A scenario's `theatre.pack`: a path, or a folder name under `packs_dir()`,
+/// else one of the small fixture packs committed under `data/packs/` (which
+/// CI, with no built packs, plays the real-ground vignettes on).
 pub fn resolve_pack(name: &str) -> std::path::PathBuf {
     let p = std::path::PathBuf::from(name);
     if p.is_absolute() || p.exists() {
-        p
+        return p;
+    }
+    let built = packs_dir().join(name);
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/packs").join(name);
+    if !built.exists() && fixture.exists() {
+        fixture
     } else {
-        packs_dir().join(name)
+        built
     }
 }
 

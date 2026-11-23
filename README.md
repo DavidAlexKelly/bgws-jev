@@ -345,8 +345,9 @@ to reach openrouter.ai.
 
 ### Calibration backlog
 
-CI runs the vignettes with `--backlog attack-halt,attack-halt-real-ground`:
-those two are reported but being out of band does not fail the run.
+CI runs the vignettes with `--backlog attack-halt`: it is reported but
+being out of band does not fail the run. The real-ground vignettes play on
+the committed fixture pack `data/packs/kgd-fixture`, so CI runs them too.
 
 - **Detect-to-strike, networked [P2]:** on the M4 drone line the median from
   a detection to the first FPV arriving on it is 5.35 minutes (95% CI
@@ -356,14 +357,17 @@ those two are reported but being out of band does not fail the run.
   65–150 km/h. On voice nets (the scenario's `network: voice`) the same chain
   takes about 23 minutes, inside P2's ~20. It has since come back into band
   (3.4 min, then 4.2 min with sourced cue factors) and left the backlog.
-- **Attack halt on real ground [P14]:** on the mapped Kaliningrad pack, at
-  1:1, the attack halts at a median of 5 of 16 vehicles lost (0.31; 95% CI
-  0.25–0.31; 117 of 200 games reach a halt), one vehicle above the 10–30%
-  band. It was already there before the per-round penetration and sourced
-  cue factors: an A/B with the old munitions gave the identical result. It
-  went unnoticed while CI could not run (19–22 November). The same attack
-  on open country halts at 0.15, inside the band. On the backlog until the
-  cause is found.
+- **Attack halt on real ground [P14]: off the backlog.** It halted at 0.31
+  (5 of 16 vehicles), one vehicle over the band. The cause: units told their
+  HQ their strength only in a routine report every 15 minutes, read last by
+  its staff, so the HQ heard of the losses long after its attack had passed
+  20%. Units now report a loss when it happens and the HQ reads it first;
+  the attack halts at 0.25 (on the fixture pack), inside the band.
+- **Attack halt, generated ground [P14]:** with the same change it falls
+  from 0.385 to 0.31 (4 of 13 vehicles), still one vehicle over. What is
+  left is granularity: the HQ counts its 11 manoeuvre vehicles, so its 20%
+  rule can only fire at the third loss (27%), and a little more is lost
+  while the company stops.
 - **Attack halt [P14]:** in the advance-to-contact skirmish the attack stops at
   a median of a third of its strength lost (4 of 12 vehicles; 95% CI
   0.25–0.42, 200 games), just above the 10–30% band. The stored 0.25 came

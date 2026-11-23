@@ -1,0 +1,410 @@
+{
+  "name": "kgd-fixture",
+  "version": 1,
+  "frame_origin": {
+    "lat": 54.667500000000004,
+    "lon": 20.44,
+    "h": 0.0
+  },
+  "cell": 30.0,
+  "tile_intervals": 128,
+  "spec": {
+    "width": 389,
+    "height": 651,
+    "cell": 30.0,
+    "origin_e": -5819.473997345802,
+    "origin_n": -9740.197392499012
+  },
+  "tiles": [
+    {
+      "ix": 0,
+      "iy": 0,
+      "file": "tiles/t_0_0.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": -9740.197392499012
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 0,
+      "file": "tiles/t_1_0.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": -9740.197392499012
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 0,
+      "file": "tiles/t_2_0.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": -9740.197392499012
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 0,
+      "file": "tiles/t_3_0.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": -9740.197392499012
+      }
+    },
+    {
+      "ix": 0,
+      "iy": 1,
+      "file": "tiles/t_0_1.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": -5900.1973924990125
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 1,
+      "file": "tiles/t_1_1.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": -5900.1973924990125
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 1,
+      "file": "tiles/t_2_1.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": -5900.1973924990125
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 1,
+      "file": "tiles/t_3_1.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": -5900.1973924990125
+      }
+    },
+    {
+      "ix": 0,
+      "iy": 2,
+      "file": "tiles/t_0_2.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": -2060.1973924990125
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 2,
+      "file": "tiles/t_1_2.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": -2060.1973924990125
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 2,
+      "file": "tiles/t_2_2.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": -2060.1973924990125
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 2,
+      "file": "tiles/t_3_2.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": -2060.1973924990125
+      }
+    },
+    {
+      "ix": 0,
+      "iy": 3,
+      "file": "tiles/t_0_3.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": 1779.8026075009875
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 3,
+      "file": "tiles/t_1_3.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": 1779.8026075009875
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 3,
+      "file": "tiles/t_2_3.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": 1779.8026075009875
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 3,
+      "file": "tiles/t_3_3.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": 1779.8026075009875
+      }
+    },
+    {
+      "ix": 0,
+      "iy": 4,
+      "file": "tiles/t_0_4.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": 5619.8026075009875
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 4,
+      "file": "tiles/t_1_4.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": 5619.8026075009875
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 4,
+      "file": "tiles/t_2_4.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": 5619.8026075009875
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 4,
+      "file": "tiles/t_3_4.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 129,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": 5619.8026075009875
+      }
+    },
+    {
+      "ix": 0,
+      "iy": 5,
+      "file": "tiles/t_0_5.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 11,
+        "cell": 30.0,
+        "origin_e": -5819.473997345802,
+        "origin_n": 9459.802607500988
+      }
+    },
+    {
+      "ix": 1,
+      "iy": 5,
+      "file": "tiles/t_1_5.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 11,
+        "cell": 30.0,
+        "origin_e": -1979.4739973458018,
+        "origin_n": 9459.802607500988
+      }
+    },
+    {
+      "ix": 2,
+      "iy": 5,
+      "file": "tiles/t_2_5.bgwt",
+      "spec": {
+        "width": 129,
+        "height": 11,
+        "cell": 30.0,
+        "origin_e": 1860.5260026541982,
+        "origin_n": 9459.802607500988
+      }
+    },
+    {
+      "ix": 3,
+      "iy": 5,
+      "file": "tiles/t_3_5.bgwt",
+      "spec": {
+        "width": 5,
+        "height": 11,
+        "cell": 30.0,
+        "origin_e": 5700.526002654198,
+        "origin_n": 9459.802607500988
+      }
+    }
+  ],
+  "roads": null,
+  "rivers": "rivers.json",
+  "power_lines": "power_lines.json",
+  "railways": "railways.json",
+  "tree_cover": {
+    "file": "treecover.png",
+    "west": 20.346833333333333,
+    "north": 54.75683333333333,
+    "step": 0.00008333333333333333,
+    "width": 2236,
+    "height": 2144
+  },
+  "towns": "towns.json",
+  "road_graph": "roads",
+  "basemap": "basemap.pmtiles",
+  "dem": "dem.pmtiles",
+  "surface": "surface.bin",
+  "analysis": "analysis.bin",
+  "bbox": [
+    20.35,
+    54.58,
+    20.53,
+    54.755
+  ],
+  "sources": {
+    "builtWith": "bgws-geodata 0.1.0",
+    "osm": {
+      "archive": "https://build.protomaps.com/20261122.pmtiles",
+      "zoom": 14,
+      "attribution": "© OpenStreetMap contributors, ODbL; Protomaps basemap build"
+    },
+    "elevation": {
+      "archive": "https://download.mapterhorn.com/planet.pmtiles",
+      "zoom": 12,
+      "attribution": "© Mapterhorn (Copernicus GLO-30 and national elevation models)",
+      "groundFilterM": 150.0
+    },
+    "cellM": 30.0,
+    "ground": {
+      "grid": [
+        389,
+        651
+      ],
+      "cellM": 30.0,
+      "elevationM": [
+        -3.5547940731048584,
+        43.88955307006836
+      ],
+      "landCover": {
+        "open": 0.3230860965333144,
+        "crops": 0.08979264647230482,
+        "scrub": 0.005860076844403903,
+        "forest_light": 0.12489387495606917,
+        "forest_dense": 0.08357322529310256,
+        "urban_light": 0.21914476048317993,
+        "urban_dense": 0.03149988745809295,
+        "water": 0.07917816765979964,
+        "wetland": 0.04293967358898116,
+        "bare": 0.00003159071075150352
+      },
+      "denseUrbanCells": 7977,
+      "rivers": 323,
+      "towns": 21,
+      "roadParts": 16180,
+      "basemapTiles": 17,
+      "elevationZoom": 12,
+      "vectorZoom": 14,
+      "surfaceCellM": 5.0,
+      "buildingFootprints": 26020,
+      "overture": {
+        "used": false
+      },
+      "treeCover": {
+        "used": true,
+        "treeShare": 0.3021393062638507,
+        "simulation": true,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)",
+        "lightWoodCells": 31628,
+        "surfaceCells": 1934087
+      }
+    },
+    "roads": {
+      "linePartsKept": 8733,
+      "tJunctions": 2823,
+      "tJunctionsBlockedByAccess": 0,
+      "snapsBlockedByAccess": 0,
+      "nodes": 13411,
+      "edges": 16077,
+      "km": 1536.4778084660534,
+      "kmByClass": {
+        "motorway": -0.0,
+        "primary": 164.19400615336755,
+        "secondary": 777.5602884814767,
+        "track": 594.7235138312009
+      },
+      "bridges": 148,
+      "tunnels": 48,
+      "components": 175,
+      "largestComponentNodes": 12497,
+      "snapM": 3.0
+    }
+  }
+}
