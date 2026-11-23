@@ -99,11 +99,35 @@ pub fn atgm_engagement(f: &Figures, seed: Seed) -> Value {
 /// Two tank platoons meet on open ground (the meeting engagement's tanks,
 /// flat ground): the range of the first volley either fires, m.
 pub fn tank_engagement_range(f: &Figures, seed: Seed) -> Value {
+    tank_engagement_range_with(f, seed, None)
+}
+
+/// The imported vehicles (`data/catalogue/imported.json` with its weapon
+/// fits) in the same meeting: M1 Abrams against T-90M, each with its own gun
+/// and rounds from the CSVs.
+pub const IMPORTED_TANKS: (&str, &str) = ("l7/var_1_default", "l7/var_161_1");
+
+/// [`tank_engagement_range`] on the imported tanks.
+pub fn tank_engagement_range_imported(f: &Figures, seed: Seed) -> Value {
+    tank_engagement_range_with(f, seed, Some(IMPORTED_TANKS))
+}
+
+/// The meeting with the tanks' platforms replaced (blue, red), if given.
+fn tank_engagement_range_with(f: &Figures, seed: Seed, platforms: Option<(&str, &str)>) -> Value {
     let mut spec = crate::scengen::standard().into_iter().find(|s| s.name == "gen-meeting-engagement")?;
     spec.ground = crate::scengen::GroundSpec::Flat;
     let mut v = crate::scengen::build(&spec).ok()?;
     let keep = ["b-1", "b-hq", "r-1", "r-hq"];
     v["forces"].as_array_mut()?.retain(|x| x["id"].as_str().is_some_and(|i| keep.contains(&i)));
+    if let Some((blue, red)) = platforms {
+        for x in v["forces"].as_array_mut()? {
+            match x["id"].as_str() {
+                Some("b-1") => x["platform"] = serde_json::json!(blue),
+                Some("r-1") => x["platform"] = serde_json::json!(red),
+                _ => {}
+            }
+        }
+    }
     for h in v["command"]["hqs"].as_array_mut()? {
         let sub = if h["side"] == "blue" { "b-1" } else { "r-1" };
         h["subordinates"] = serde_json::json!([sub]);
@@ -605,6 +629,7 @@ pub fn run_vignettes(figures: &Figures, seed: Seed, options: &CheckOptions, only
             "mbt-engagement" => check(&mbt_engagement),
             "atgm-engagement" => check(&atgm_engagement),
             "tank-engagement-range" => check(&tank_engagement_range),
+            "tank-engagement-range-imported" => check(&tank_engagement_range_imported),
             "suppression-recovery" => check(&suppression_recovery),
             "spot-report-latency" => check(&spot_report_latency),
             "fpv-effectiveness" => check(&fpv),
@@ -709,6 +734,7 @@ pub fn sensitivity(id: &str, replicates: usize, prefix: Option<&str>, seed: Seed
         "mbt-engagement" => Box::new(mbt_engagement),
         "atgm-engagement" => Box::new(atgm_engagement),
         "tank-engagement-range" => Box::new(tank_engagement_range),
+        "tank-engagement-range-imported" => Box::new(tank_engagement_range_imported),
         "suppression-recovery" => Box::new(suppression_recovery),
         "spot-report-latency" => Box::new(spot_report_latency),
         "fpv-effectiveness" => Box::new(fpv),

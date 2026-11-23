@@ -76,6 +76,27 @@
 >     behind ERA" for Kornet in the gaps list below is not what the row says.
 >   - **To check:** the CSV marks the 35 mm PMD343 APFSDS `defeats_era`. That is unusual for
 >     a 35 mm round.
+> - **In play, checked.**
+>   - **Gun ranges:** guns (tank guns, low-pressure guns, cannons) engage at the shorter of
+>     the capability CSV's `bgws_max_range_m` and their engine template's effective range.
+>     - The CSV gives a tank gun's maximum range, 4 km. As the engine's engagement range,
+>       that made imported tanks open fire at 3.9 km, outside the 2–3 km band.
+>     - Tank guns now engage at 3 km ([P27] "effective range 2–3 km"). Shorter CSV ranges
+>       are kept, such as the BMP-1's 2A28 at 1.3 km.
+>     - Missiles, artillery and mortars keep the CSV's range, which is their envelope.
+>   - **New vignette:** `tank-engagement-range-imported` plays the sourced tank-engagement
+>     benchmark on imported M1 Abrams against T-90M. Mean 2,896 m, in band. Its baseline is
+>     in `data/regression`.
+>   - **Smoke test:** `crates/bgws-run/tests/imported_vehicles.rs` puts all 109 fitted vehicles
+>     in one meeting engagement. It checks that they play, fire their own rounds (19 of the 33
+>     in 20 minutes) and knock things out.
+>   - **Shipped scenarios:** `skirmish-l7-armour-v1` (M1 Abrams against T-90M),
+>     `skirmish-l7-mech-v1` (Bradley and Abrams against BMP-2 and T-72B3) and
+>     `skirmish-l7-ifv-v1` (Puma and Lynx against BMP-3 and BMP-2M). They are on the same
+>     generated ground as `skirmish-catalogue-armour-v1`, so they compare with that duel.
+>     - That ground favours blue: the reference duel leaves blue 90% and red 54%.
+>     - On another generated ground the armour duel's result reverses. The ground matters
+>       more than the vehicles here.
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the

@@ -310,6 +310,9 @@ def build():
     return out, problems
 
 
+# Direct-fire guns: they engage at the shorter of the CSV's maximum and the template's effective range (see make_munition).
+GUN_CLASSES = ("tankGun", "lowPressure", "autocannon")
+
 KIND_ORDER = ["ke", "atgm", "heat", "smallArms", "shell", "mortar", "he", "sam"]
 
 
@@ -383,7 +386,18 @@ def make_munition(m, cls, guidance, row, engine, mun_csv):
         if mv and mv > 0 and cls not in ("howitzer", "mortar"):
             speed = mv
             notes.append("speed")
-        if rng and rng > 0:
+        # The engine's maxRangeM is the range a weapon engages at. For a gun the
+        # CSV gives the maximum (a tank gun 4 km), not the effective range, so a
+        # gun engages at the shorter of the two: the CSV's when it is shorter (the
+        # BMP-1's 2A28, 1.3 km), else its template's (tank guns 3 km, [P27]
+        # "effective range 2-3 km"; the tank-engagement-range-imported vignette
+        # checks it). For missiles, artillery and mortars the CSV's range is the
+        # envelope they engage in.
+        if rng and rng > 0 and cls in GUN_CLASSES:
+            if rng < max_range:
+                max_range = rng
+                notes.append("maximum range (shorter than the template's effective range)")
+        elif rng and rng > 0:
             max_range = rng
             notes.append("maximum range")
     out["speedMs"] = clean(speed)

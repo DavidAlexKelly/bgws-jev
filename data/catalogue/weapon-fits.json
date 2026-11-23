@@ -57,7 +57,7 @@
    "flight": "none",
    "speedMs": 1670,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -93,7 +93,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m829a3 (weapon gun_120_l44, grade C): open estimates 700-800mm; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
+   "source": "L7 munition row m_m829a3 (weapon gun_120_l44, grade C): open estimates 700-800mm; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_m830a1",
@@ -104,7 +104,7 @@
    "flight": "none",
    "speedMs": 1670,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.5,
    "cepM": 0,
    "warheadKg": 2.3,
@@ -139,7 +139,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m830a1 (weapon gun_120_l44, grade B): published ~600mm. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
+   "source": "L7 munition row m_m830a1 (weapon gun_120_l44, grade B): published ~600mm. Engine fields from `heat120` [default]; from the capability row: speed. Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_mk30_ap",
@@ -150,7 +150,7 @@
    "flight": "none",
    "speedMs": 1385,
    "minRangeM": 0,
-   "maxRangeM": 3000,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -186,7 +186,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_mk30_ap (weapon ac_30_mk30, grade B): Rheinmetall D129e0721 / B305e0526: 1,405 m/s; 53 mm at 60 deg (NATO) at 1,000 m; semi-infinite depth 89 mm (2 x 53 / 0.5^-0.255; Mullin et al. 1995: 1.6-2.0 x 53); range fall-off: tools/penetration_model.py. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_mk30_ap (weapon ac_30_mk30, grade B): Rheinmetall D129e0721 / B305e0526: 1,405 m/s; 53 mm at 60 deg (NATO) at 1,000 m; semi-infinite depth 89 mm (2 x 53 / 0.5^-0.255; Mullin et al. 1995: 1.6-2.0 x 53); range fall-off: tools/penetration_model.py. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_b32_145",
@@ -244,7 +244,7 @@
    "flight": "none",
    "speedMs": 1530,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -279,7 +279,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_l27a1 (weapon gun_120_l30, grade C): open estimates 600-650mm; DU long rod; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_l27a1 (weapon gun_120_l30, grade C): open estimates 600-650mm; DU long rod; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_l31_hesh",
@@ -290,7 +290,7 @@
    "flight": "none",
    "speedMs": 1530,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.5,
    "cepM": 0,
    "warheadKg": 4.1,
@@ -325,7 +325,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_l31_hesh (weapon gun_120_l30, grade B): HESH ~150mm equivalent vs monolithic; ineffective vs spaced/composite. Engine fields from `heat120` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_l31_hesh (weapon gun_120_l30, grade B): HESH ~150mm equivalent vs monolithic; ineffective vs spaced/composite. Engine fields from `heat120` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_762_ball",
@@ -383,7 +383,7 @@
    "flight": "none",
    "speedMs": 960,
    "minRangeM": 0,
-   "maxRangeM": 2500,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -419,7 +419,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_2a72_apds (weapon ac_30_2a72, grade B): slightly lower MV than 2A42. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_2a72_apds (weapon ac_30_2a72, grade B): slightly lower MV than 2A42. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_9m117b",
@@ -476,7 +476,7 @@
    "flight": "none",
    "speedMs": 1750,
    "minRangeM": 0,
-   "maxRangeM": 4500,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -512,7 +512,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_dm73 (weapon gun_120_l55a1, grade C): Rheinmetall: ~8% over DM63 (~700 @2km); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
+   "source": "L7 munition row m_dm73 (weapon gun_120_l55a1, grade C): Rheinmetall: ~8% over DM63 (~700 @2km); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_m919",
@@ -523,7 +523,7 @@
    "flight": "none",
    "speedMs": 1345,
    "minRangeM": 0,
-   "maxRangeM": 2500,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -559,7 +559,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m919 (weapon ac_25_m242, grade B): >60mm @1000m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_m919 (weapon ac_25_m242, grade B): >60mm @1000m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_m900",
@@ -570,7 +570,7 @@
    "flight": "none",
    "speedMs": 1500,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -605,7 +605,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_m900 (weapon gun_105_m35, grade C): estimates 500-550mm (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_m900 (weapon gun_105_m35, grade C): estimates 500-550mm (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_3bm46",
@@ -616,7 +616,7 @@
    "flight": "none",
    "speedMs": 1700,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -651,7 +651,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bm46 (weapon gun_125_2a46, grade B): published ~650mm @2km (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_3bm46 (weapon gun_125_2a46, grade B): published ~650mm @2km (DU); range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_3bk29",
@@ -662,7 +662,7 @@
    "flight": "none",
    "speedMs": 1700,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.5,
    "cepM": 0,
    "warheadKg": 1.6,
@@ -698,7 +698,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bk29 (weapon gun_125_2a46, grade B): published 750mm behind ERA. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration measured behind ERA: the engine does not take ERA off it again."
+   "source": "L7 munition row m_3bk29 (weapon gun_125_2a46, grade B): published 750mm behind ERA. Engine fields from `heat120` [default]; from the capability row: speed. Penetration measured behind ERA: the engine does not take ERA off it again."
   },
   {
    "id": "l7/m_3bm25",
@@ -744,7 +744,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bm25 (weapon gun_100_d10, grade B): D-10T; also 3BM8 APDS ~250; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_3bm25 (weapon gun_100_d10, grade B): D-10T; also 3BM8 APDS ~250; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_3bm28",
@@ -790,7 +790,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bm28 (weapon gun_115_u5ts, grade B): published ~400mm @1km; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_3bm28 (weapon gun_115_u5ts, grade B): published ~400mm @1km; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_m430",
@@ -884,7 +884,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_l14 (weapon ac_30_rarden, grade B): ~40mm @1500m. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_l14 (weapon ac_30_rarden, grade B): ~40mm @1500m. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_starstreak",
@@ -959,7 +959,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_pg15v (weapon gun_73_2a28, grade B): PG-9 ~400. Engine fields from `heat120` [default]; from the capability row: speed, maximum range. Penetration basis not stated: read as RHA."
+   "source": "L7 munition row m_pg15v (weapon gun_73_2a28, grade B): PG-9 ~400. Engine fields from `heat120` [default]; from the capability row: speed, maximum range (shorter than the template's effective range). Penetration basis not stated: read as RHA."
   },
   {
    "id": "l7/m_3ubr8",
@@ -970,7 +970,7 @@
    "flight": "none",
    "speedMs": 970,
    "minRangeM": 0,
-   "maxRangeM": 2500,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -1006,7 +1006,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3ubr8 (weapon ac_30_2a42, grade B): ~25mm @1500m/60deg. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_3ubr8 (weapon ac_30_2a42, grade B): ~25mm @1500m/60deg. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_krasnopol",
@@ -1073,7 +1073,7 @@
    "flight": "none",
    "speedMs": 1500,
    "minRangeM": 0,
-   "maxRangeM": 2500,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -1109,7 +1109,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_ct40_ap (weapon ac_40_ct40, grade A): KNDS/CTAI: 140mm RHA @1500m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_ct40_ap (weapon ac_40_ct40, grade A): KNDS/CTAI: 140mm RHA @1500m; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_ct40_gpr",
@@ -1138,7 +1138,7 @@
     "domain": 9,
     "category": 2
    },
-   "source": "L7 munition row m_ct40_gpr (weapon ac_40_ct40, grade A): KNDS: 15mm RHA @1000m, 210mm concrete. Engine fields from `he30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_ct40_gpr (weapon ac_40_ct40, grade A): KNDS: 15mm RHA @1000m, 210mm concrete. Engine fields from `he30` [default]; from the capability row: speed, maximum range (shorter than the template's effective range)."
   },
   {
    "id": "l7/m_3bm60",
@@ -1149,7 +1149,7 @@
    "flight": "none",
    "speedMs": 1700,
    "minRangeM": 0,
-   "maxRangeM": 4000,
+   "maxRangeM": 3000,
    "pk": 0.6,
    "cepM": 0,
    "warheadKg": 0,
@@ -1185,7 +1185,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_3bm60 (weapon gun_125_2a46, grade C): estimate 700-750mm; T-90M/T-72B3M; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
+   "source": "L7 munition row m_3bm60 (weapon gun_125_2a46, grade C): estimate 700-750mm; T-90M/T-72B3M; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds125` [default]; from the capability row: speed. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_spike_lr",
@@ -1279,7 +1279,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_20_dm63 (weapon ac_20_rh202, grade B): Rh 202 published: ~45mm/30deg @1000m. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_20_dm63 (weapon ac_20_rh202, grade B): Rh 202 published: ~45mm/30deg @1000m. Engine fields from `apfsds30` [default]; from the capability row: speed."
   },
   {
    "id": "l7/m_20_he_rh",
@@ -1308,7 +1308,7 @@
     "domain": 9,
     "category": 2
    },
-   "source": "L7 munition row m_20_he_rh (weapon ac_20_rh202, grade B): Rheinmetall. Engine fields from `he30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_20_he_rh (weapon ac_20_rh202, grade B): Rheinmetall. Engine fields from `he30` [default]; from the capability row: speed, maximum range (shorter than the template's effective range)."
   },
   {
    "id": "l7/m_35_apfsds",
@@ -1319,7 +1319,7 @@
    "flight": "none",
    "speedMs": 1400,
    "minRangeM": 0,
-   "maxRangeM": 3500,
+   "maxRangeM": 2000,
    "pk": 0.3,
    "cepM": 0,
    "warheadKg": 0,
@@ -1356,7 +1356,7 @@
     "domain": 2,
     "category": 2
    },
-   "source": "L7 munition row m_35_apfsds (weapon ac_35_wotan, grade D): Rheinmetall D251e0721: 1,400 m/s; Rheinmetall publishes no penetration, 159 mm at 1 km is an unsourced estimate; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed, maximum range. Made against heavy ERA: heavy ERA does not degrade it."
+   "source": "L7 munition row m_35_apfsds (weapon ac_35_wotan, grade D): Rheinmetall D251e0721: 1,400 m/s; Rheinmetall publishes no penetration, 159 mm at 1 km is an unsourced estimate; range fall-off: tools/penetration_model.py (v = v0 exp(-x/lam), lam = 11.2 km (cal/25)^0.5; P/L by Anderson et al. 1992 eq. 7), anchored at the published point. Engine fields from `apfsds30` [default]; from the capability row: speed. Made against heavy ERA: heavy ERA does not degrade it."
   },
   {
    "id": "l7/m_35_abm",
@@ -1385,7 +1385,7 @@
     "domain": 9,
     "category": 2
    },
-   "source": "L7 munition row m_35_abm (weapon ac_35_wotan, grade B): Rheinmetall AHEAD datasheet. Engine fields from `he30` [default]; from the capability row: speed, maximum range."
+   "source": "L7 munition row m_35_abm (weapon ac_35_wotan, grade B): Rheinmetall AHEAD datasheet. Engine fields from `he30` [default]; from the capability row: speed, maximum range (shorter than the template's effective range)."
   },
   {
    "id": "l7/m_9m123",
