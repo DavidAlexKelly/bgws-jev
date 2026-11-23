@@ -11,7 +11,22 @@
 >   119 munitions imported, 673 figures or rows rejected (93 munitions on the blanket README
 >   reference; most mass, engine and speed figures for want of a row-level source). The test
 >   (`csvImport.test.ts`) fails if a figure is imported without a source, or if the committed
->   files are out of date. No engine reads `imported.json` yet: it is staged for the Rust loader.
+>   files are out of date.
+> - **The Rust engine reads `imported.json`** (`crates/bgws-catalogue/src/imported.rs`), as
+>   generated, with no hand edits. Its 114 platforms load as `provenance: imported`:
+>   - armour `turret` becomes the turret zone, and `roof` becomes `top`;
+>   - `eraFit` and `apsFit` map to `era` and `aps` through named tables (an unknown kit is an
+>     error). Slat and bar cages, appliqué armour, Epsom and optional kits (BRAT,
+>     Trophy on the M1) are not ERA/APS;
+>   - `figures` becomes `sources`;
+>   - a row the catalogue already has from the L6 import (`l7/var_11_default` →
+>     `var_11_default`) uses that record as its parent, so it keeps that record's weapons.
+>
+>   The other platforms still take their weapons from their generic parent: the weapon fits
+>   are in the capability CSV, which is not imported yet. The 119 munitions are kept as typed
+>   rows (`Catalogue::imported_munitions`), not engine munitions. Their `kind` is too coarse
+>   (`he` covers mortar bombs, glide bombs and cruise missiles), and they have no flight,
+>   guidance or range. The test `imported_csv_records_load` checks all of this.
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the

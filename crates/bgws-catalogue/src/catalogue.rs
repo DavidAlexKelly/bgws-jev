@@ -8,6 +8,9 @@
 //! `mounts`: kind → partial element), `munitions` (list) and `platforms`
 //! (list of partial records). Keys starting with `$` are comments and
 //! sources. Files are read in name order, so loading is deterministic.
+//! The importer's output (a file with a `summary` section) is adapted on the
+//! way in (`imported.rs`): its platforms to the engine's schema, its
+//! munitions kept apart as [`ImportedMunition`]s.
 //!
 //! **Resolution**, for each platform:
 //! 1. its class's defaults, with the class's own `$extends` chain under them
@@ -21,6 +24,7 @@
 //! 6. typed deserialisation into `Platform`.
 
 use crate::derive::{derive, DeriveParams};
+use crate::imported::{self, ImportedMunition};
 use crate::json::{deep_merge, get_str, strip_meta, walk_numbers};
 use crate::munition::Munition;
 use crate::types::{Band, Domain, Mount, Platform};
@@ -38,6 +42,7 @@ pub const BUILTIN_FILES: &[(&str, &str)] = &[
     ("classes.json", include_str!("../../../data/catalogue/classes.json")),
     ("command.json", include_str!("../../../data/catalogue/command.json")),
     ("drones.json", include_str!("../../../data/catalogue/drones.json")),
+    ("imported.json", include_str!("../../../data/catalogue/imported.json")),
     ("land.json", include_str!("../../../data/catalogue/land.json")),
     ("munitions.json", include_str!("../../../data/catalogue/munitions.json")),
     ("nodes.json", include_str!("../../../data/catalogue/nodes.json")),
@@ -54,6 +59,7 @@ pub struct Catalogue {
     munitions: BTreeMap<String, Munition>,
     bands: BTreeMap<String, Band>,
     classes: BTreeMap<String, Value>,
+    imported_munitions: BTreeMap<String, ImportedMunition>,
 }
 
 /// The raw sections gathered from every file.
@@ -64,6 +70,8 @@ struct Raw {
     kind_defaults: BTreeMap<String, BTreeMap<String, Value>>,
     munitions: Vec<(String, Value)>,
     platforms: BTreeMap<String, Value>,
+    /// The importer's munition rows (not engine munitions).
+    imported_munitions: Vec<(String, Value)>,
 }
 
 const ELEMENT_LISTS: [(&str, &str); 4] = [("sensors", "kind"), ("emitters", "kind"), ("radios", "bearer"), ("mounts", "kind")];
@@ -86,8 +94,9 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
             errors.push(CatalogueError::Layout { file: file.clone(), message: "a catalogue file must be a JSON object".into() });
             continue;
         };
+        let import = imported::is_import_file(obj);
         for (section, body) in obj {
-            if section.starts_with('$') {
+            if section.starts_with('$') || (import && section == "summary") {
                 continue;
             }
             match section.as_str() {
@@ -113,7 +122,17 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         }
                         match section.as_str() {
                             "bands" => raw.bands.push((id.to_owned(), item.clone())),
+                            "munitions" if import => raw.imported_munitions.push((id.to_owned(), item.clone())),
                             "munitions" => raw.munitions.push((id.to_owned(), item.clone())),
+                            _ if import => {
+                                let mut item = item.clone();
+                                match imported::adapt_platform(&mut item) {
+                                    Ok(()) => {
+                                        raw.platforms.insert(id.to_owned(), item);
+                                    }
+                                    Err(message) => errors.push(CatalogueError::Shape { what: "imported platform".into(), id: id.into(), message }),
+                                }
+                            }
                             _ => {
                                 raw.platforms.insert(id.to_owned(), item.clone());
                             }
@@ -159,6 +178,7 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
             }
         }
     }
+    imported::reparent(&mut raw.platforms);
     raw
 }
 
@@ -378,6 +398,14 @@ impl Catalogue {
                 Err(e) => errors.push(CatalogueError::Shape { what: "munition".into(), id: id.clone(), message: e.to_string() }),
             }
         }
+        for (id, v) in &raw.imported_munitions {
+            match serde_json::from_value::<ImportedMunition>(strip_meta(v)) {
+                Ok(m) => {
+                    cat.imported_munitions.insert(id.clone(), m);
+                }
+                Err(e) => errors.push(CatalogueError::Shape { what: "imported munition".into(), id: id.clone(), message: e.to_string() }),
+            }
+        }
         for id in raw.classes.keys() {
             match resolve_class(id, &raw.classes, figures, &mut Vec::new()) {
                 Ok(v) => {
@@ -466,6 +494,16 @@ impl Catalogue {
 
     pub fn munitions(&self) -> impl Iterator<Item = &Munition> {
         self.munitions.values()
+    }
+
+    /// An importer munition row (not an engine munition; see `imported.rs`).
+    pub fn imported_munition(&self, id: &str) -> Option<&ImportedMunition> {
+        self.imported_munitions.get(id)
+    }
+
+    /// Every importer munition row, in id order.
+    pub fn imported_munitions(&self) -> impl Iterator<Item = &ImportedMunition> {
+        self.imported_munitions.values()
     }
 
     pub fn band(&self, id: &str) -> Option<&Band> {

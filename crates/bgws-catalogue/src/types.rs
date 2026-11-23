@@ -41,6 +41,9 @@ pub enum Provenance {
     Reference,
     /// From a dataset or document.
     Sourced,
+    /// From the asset-catalogue CSVs through the importer, figure by figure
+    /// where the row cites a source (`imported.rs`).
+    Imported,
 }
 
 /// Where one field's value came from, when better than the record's default.

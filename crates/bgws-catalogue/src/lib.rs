@@ -21,6 +21,7 @@
 pub mod archetypes;
 pub mod catalogue;
 pub mod derive;
+pub mod imported;
 pub mod json;
 pub mod munition;
 pub mod types;
@@ -29,6 +30,7 @@ pub mod validate;
 
 pub use archetypes::{archetype_for, archetype_of_snapshot, default_template_for_class, SnapshotHint, DEFAULT_TEMPLATE_ID, TS_ARCHETYPES, TS_PLATFORM_KEYS};
 pub use catalogue::{builtin_class_figures, Catalogue, BUILTIN_FILES};
+pub use imported::{EraEffect, ImportedMunition, PenBasis};
 pub use derive::{radar_power_for_range, radar_range_for, DeriveParams};
 pub use munition::{Carleton, FlightProfile, Guidance, Munition, MunitionKind, Obscurant, ObscurantKind, PenPoint, Seeker, TargetDomain};
 pub use types::*;

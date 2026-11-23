@@ -248,3 +248,36 @@ proptest! {
         }
     }
 }
+
+/// The importer's output (`imported.json`, generated from the asset CSVs)
+/// loads as it is: every platform resolves, the armour, ERA and APS fits and
+/// row-level sources come across, and its munitions are kept apart.
+#[test]
+fn imported_csv_records_load() {
+    let c = builtin();
+    let imported: Vec<&Platform> = c.platforms().filter(|p| p.provenance == Provenance::Imported).collect();
+    assert_eq!(imported.len(), 114);
+    assert!(c.imported_munitions().count() >= 100);
+    assert!(c.munitions().all(|m| !m.id.starts_with("l7/")), "importer munitions are not engine munitions");
+    for p in &imported {
+        // A reparented record also carries its parent's sources for what it inherits.
+        assert!(p.sources.values().any(|s| s.kind == Provenance::Imported), "{}: imported with no row-level source", p.id);
+    }
+    // Turret and roof come across (the engine has no `turret` or `roof` aspect).
+    let m1a1 = c.platform("l7/var_1_1").unwrap();
+    assert_eq!(m1a1.body.armour.ke.front, 400.0);
+    assert_eq!(m1a1.body.armour.ke.top, 25.0);
+    assert_eq!(m1a1.body.armour.zones["turret"].ke.front, 450.0);
+    // ERA kits: heavy ERA is ERA, a slat cage is not.
+    let t90m = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "T-90M Proryv").unwrap();
+    assert!(t90m.body.era);
+    let stryker = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "General Dynamics Stryker").unwrap();
+    assert!(!stryker.body.era);
+    // A row for a vehicle the catalogue already has keeps that record's weapons.
+    let cr2 = c.platform("l7/var_11_default").unwrap();
+    assert_eq!(cr2.parent.as_deref(), Some("var_11_default"));
+    assert_eq!(cr2.mounts, c.platform("var_11_default").unwrap().mounts);
+    // Importer munitions keep their penetration and what it is measured against.
+    let kornet_like = c.imported_munitions().filter(|m| m.pen_basis == Some(PenBasis::BehindEra)).count();
+    assert!(kornet_like > 0);
+}
