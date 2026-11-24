@@ -50,6 +50,100 @@ pub fn on_ground(sc: &bgws_scenario::v4::ScenarioV4, k: u64) -> bgws_scenario::v
     out
 }
 
+/// The scenario with the two sides' places exchanged on the same ground: every
+/// position (forces, objectives, obstacles) is reflected through the point
+/// midway between blue's and red's forces, so blue starts where red did and red
+/// where blue did, each layout turned round; bearings and each force's facing
+/// turn by 180°. The ground is the same map (generated ground and packs depend
+/// only on where a point is). Played against the original on the same ground,
+/// it separates the advantage of a place from the advantage of a side. Play
+/// both with `SimOptions::ground_half_m` set to the larger of their
+/// `bgws_sim::ground_half_extent`s: generated ground's grid scales with its
+/// extent, so the two are on one map only on one extent.
+pub fn sides_swapped(sc: &bgws_scenario::v4::ScenarioV4) -> anyhow::Result<bgws_scenario::v4::ScenarioV4> {
+    use serde_json::Value;
+    let mut v = serde_json::to_value(sc)?;
+    let centroid = |side: &str| -> Option<(f64, f64)> {
+        let pts: Vec<(f64, f64)> = v["forces"].as_array()?.iter().filter(|f| f["side"] == side).filter_map(|f| Some((f["position"]["lat"].as_f64()?, f["position"]["lon"].as_f64()?))).collect();
+        (!pts.is_empty()).then(|| (pts.iter().map(|p| p.0).sum::<f64>() / pts.len() as f64, pts.iter().map(|p| p.1).sum::<f64>() / pts.len() as f64))
+    };
+    let (b, r) = (centroid("blue").ok_or_else(|| anyhow::anyhow!("no blue forces"))?, centroid("red").ok_or_else(|| anyhow::anyhow!("no red forces"))?);
+    let (clat, clon) = ((b.0 + r.0) / 2.0, (b.1 + r.1) / 2.0);
+    fn walk(v: &mut Value, clat: f64, clon: f64) {
+        match v {
+            Value::Object(m) => {
+                if let (Some(la), Some(lo)) = (m.get("lat").and_then(Value::as_f64), m.get("lon").and_then(Value::as_f64)) {
+                    m.insert("lat".into(), Value::from(2.0 * clat - la));
+                    m.insert("lon".into(), Value::from(2.0 * clon - lo));
+                }
+                for (k, x) in m.iter_mut() {
+                    if k == "bearingDeg" {
+                        if let Some(d) = x.as_f64() {
+                            *x = Value::from((d + 180.0).rem_euclid(360.0));
+                        }
+                    } else {
+                        walk(x, clat, clon);
+                    }
+                }
+            }
+            Value::Array(a) => a.iter_mut().for_each(|x| walk(x, clat, clon)),
+            _ => {}
+        }
+    }
+    for (k, x) in v.as_object_mut().ok_or_else(|| anyhow::anyhow!("a scenario is an object"))?.iter_mut() {
+        if k != "theatre" {
+            walk(x, clat, clon);
+        }
+    }
+    // Each force faces the other way: its own heading, else its side's default (as the sim sets it), turned round.
+    for f in v["forces"].as_array_mut().into_iter().flatten() {
+        let default = match f["side"].as_str() {
+            Some("blue") => 0.0,
+            Some("red") => 180.0,
+            _ => 90.0,
+        };
+        let h = f.get("headingDeg").and_then(Value::as_f64).unwrap_or(default);
+        f["headingDeg"] = Value::from((h + 180.0).rem_euclid(360.0));
+    }
+    Ok(bgws_scenario::v4::ScenarioV4::from_value(v)?)
+}
+
+/// How a battle splits into the advantage of a place and of a side, per ground:
+/// with g = blue − red strength left, the original gives g = side + place
+/// (place: what blue's starting ground is worth), the swapped game gives
+/// g = side − place. So side = (g + g')/2 and place = (g − g')/2. Each entry
+/// is (ground seed, the original's batch, the swapped batch), same game seeds.
+pub fn side_swap_markdown(rows: &[(String, bgws_analysis::batch::Batch<bgws_analysis::report::RunOutcome>, bgws_analysis::batch::Batch<bgws_analysis::report::RunOutcome>)]) -> String {
+    use bgws_core::Side;
+    let gap = |b: &bgws_analysis::batch::Batch<bgws_analysis::report::RunOutcome>| {
+        let v: Vec<f64> = b.replicates.iter().filter_map(|r| Some(r.output.strength.get(&Side::Blue)? - r.output.strength.get(&Side::Red)?)).collect();
+        if v.is_empty() { f64::NAN } else { v.iter().sum::<f64>() / v.len() as f64 }
+    };
+    let mut md = String::from("\n## Sides swapped on the same ground\n\n| Ground | Blue − red | Swapped | Side advantage (blue) | Place advantage (blue's start) |\n|---|---|---|---|---|\n");
+    let (mut sides, mut places) = (Vec::new(), Vec::new());
+    for (g, a, b) in rows {
+        let (ga, gb) = (gap(a), gap(b));
+        let (side, place) = ((ga + gb) / 2.0, (ga - gb) / 2.0);
+        md.push_str(&format!("| {g} | {ga:+.3} | {gb:+.3} | {side:+.3} | {place:+.3} |\n"));
+        sides.push(side);
+        places.push(place);
+    }
+    let stats = |v: &[f64]| {
+        let k = v.len() as f64;
+        let m = v.iter().sum::<f64>() / k;
+        let sd = (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (k - 1.0).max(1.0)).sqrt();
+        let mag = v.iter().map(|x| x.abs()).sum::<f64>() / k;
+        (m, sd / k.sqrt(), mag)
+    };
+    let (sm, sse, smag) = stats(&sides);
+    let (pm, pse, pmag) = stats(&places);
+    md.push_str(&format!(
+        "\nSide advantage (blue): mean {sm:+.3} ± {sse:.3}, typical size {smag:.3}. Place advantage (blue's start): mean {pm:+.3} ± {pse:.3}, typical size {pmag:.3}, over {} grounds. ± is one standard error over grounds; typical size is the mean absolute value on one ground.\n",
+        rows.len()
+    ));
+    md
+}
+
 /// How a batch's result varies with the ground: per ground, the games, blue's
 /// and red's mean strength left and the share blue won; then the spread of
 /// the blue − red gap across the grounds and how many grounds each side came

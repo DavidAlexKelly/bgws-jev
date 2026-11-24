@@ -100,11 +100,28 @@ pub struct SimOptions {
     pub sight: Option<bgws_env::SightView>,
     /// The pack's terrain appreciation, in the scenario's frame.
     pub appreciation: Option<bgws_env::AppreciationView>,
+    /// Generated ground: its half-extent, m, at least this (else sized from the
+    /// forces, see [`ground_half_extent`]). The ground's grid scales with its
+    /// extent, so two scenarios on the same seed share a map only on the same
+    /// extent (the side-swap test plays both on the larger).
+    pub ground_half_m: Option<f64>,
+}
+
+/// The half-extent, m, of the ground a scenario is generated on: every
+/// position with a 3 km margin, at least 5 km.
+pub fn ground_half_extent(scenario: &ScenarioV4) -> f64 {
+    let frame = scenario.frame();
+    let mut half: f64 = 5_000.0;
+    for (_, g) in scenario.positions() {
+        let v = frame.geodetic_to_enu(g);
+        half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
+    }
+    half
 }
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None }
     }
 }
 
@@ -216,12 +233,7 @@ impl Sim {
         let registry = Registry::with_custom(&custom, &vocab, bgws_behaviour::load::LoadMode::Compatible).map_err(|e| LoadError::Templates(e.to_string()))?;
         let frame = scenario.frame();
         let origin = scenario.theatre.origin;
-        // Ground covering every position, with a margin.
-        let mut half: f64 = 5_000.0;
-        for (_, g) in scenario.positions() {
-            let v = frame.geodetic_to_enu(g);
-            half = half.max(v.e.abs().max(v.n.abs()) + 3_000.0);
-        }
+        let half = ground_half_extent(scenario).max(opts.ground_half_m.unwrap_or(0.0));
         let mut ground = if let Some(t) = opts.terrain.clone() {
             Ground::from_terrain(t, bgws_core::rng::fnv1a(scenario.theatre.ground_seed.as_bytes()), &figures)
         } else if opts.flat_ground || scenario.theatre.ground == "flat" {

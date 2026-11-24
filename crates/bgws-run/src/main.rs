@@ -361,6 +361,10 @@ enum Cmd {
         /// and report each ground's result and how far apart they are.
         #[arg(long, default_value_t = 1)]
         grounds: u64,
+        /// Also play each ground with the sides' places exchanged (`bgws_run::sides_swapped`)
+        /// and split the result into the advantage of a side and of its starting place.
+        #[arg(long)]
+        swap_sides: bool,
         /// Write the batch summary as JSON here.
         #[arg(long)]
         json: Option<PathBuf>,
@@ -1119,7 +1123,7 @@ fn main() -> Result<()> {
             let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
             eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
         }
-        Cmd::Batch { scenario, n, seed, minutes, flat, grounds, json } => {
+        Cmd::Batch { scenario, n, seed, minutes, flat, grounds, swap_sides, json } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let limit = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
             let figures = default_figures();
@@ -1149,6 +1153,21 @@ fn main() -> Result<()> {
             }
             if grounds > 1 {
                 md.push_str(&bgws_run::ground_spread_markdown(&by_ground));
+            }
+            if swap_sides {
+                let mut rows = Vec::new();
+                for (g, (seed_text, original)) in by_ground.iter().enumerate() {
+                    // Both games on one extent of ground, the larger they need: the
+                    // ground's grid scales with its extent, so only then is it one map.
+                    let scg = bgws_run::on_ground(&sc, g as u64);
+                    let sw = bgws_run::sides_swapped(&scg)?;
+                    let half = bgws_sim::ground_half_extent(&scg).max(bgws_sim::ground_half_extent(&sw));
+                    let opts = SimOptions { flat_ground: flat, ground_half_m: Some(half), ..Default::default() };
+                    let games = original.replicates.len();
+                    let run = |s: &bgws_scenario::v4::ScenarioV4| bgws_analysis::batch::run_batch(&experiments::scenario_run(s, limit, opts.clone()), &figures, bgws_analysis::batch::BatchConfig::new(games, Seed(seed)));
+                    rows.push((seed_text.clone(), run(&scg), run(&sw)));
+                }
+                md.push_str(&bgws_run::side_swap_markdown(&rows));
             }
             for side in bgws_core::Side::PLAYERS {
                 let m = bgws_analysis::report::strength_metric(side);

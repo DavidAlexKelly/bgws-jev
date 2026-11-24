@@ -41,7 +41,7 @@ pub mod view;
 pub mod world;
 
 pub use params::{all_figures, default_figures, Params};
-pub use sim::{AnswerError, CommandError, LoadError, Outcome, SeatKind, Sim, SimOptions, Snapshot, Step};
+pub use sim::{ground_half_extent, AnswerError, CommandError, LoadError, Outcome, SeatKind, Sim, SimOptions, Snapshot, Step};
 pub use view::{FrameEntity, FrameTrack, FrameView, Viewer};
 
 /// Send the per-system spans to a running Tracy profiler (§13, phase 0:
