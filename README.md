@@ -405,6 +405,34 @@ What it shows:
 Whether 0.1–0.2 is right is not yet checked against a source. Dupuy's
 terrain factors are the candidate.
 
+**Letting units choose their start does not remove it.** `--deploy` gives
+each land unit, before the game, the better position within
+`sim.deploy.search_m` (300 m) of where it was placed. It judges the spot as
+it does in play (`better_spot`: cover, height, less ground open to view).
+The same swap test with it on:
+
+| Scenario | Typical place advantage, placed | Deployed |
+|---|---|---|
+| symmetric control | 0.18 | 0.20 |
+| meeting engagement (skirmish) | 0.12 | 0.09 |
+| meeting engagement (generated) | 0.12 | 0.13 |
+| advance to contact | 0.10 | 0.07 |
+| combined arms | 0.12 | 0.13 |
+| catalogue armour duel | 0.13 | 0.21 |
+| generated company attack | 0.08 | 0.11 |
+
+On average the place advantage goes from 0.12 to 0.13, which is no change
+inside the dice (about ±0.05 each).
+
+So a start's advantage is not where on its point a unit stands. It is the
+ground at a larger scale: which side of the low ground a force is on, and how
+open its approach is. A few hundred metres of choice does not change that.
+
+Moving to cover also cost the armour duel's better side part of its edge
+(0.26 → 0.17). Choosing on cover alone can trade away fields of fire.
+
+`--deploy` stays off by default.
+
 ### Calibration backlog
 
 CI runs the vignettes with `--backlog attack-halt,naked-eye-detection`:
