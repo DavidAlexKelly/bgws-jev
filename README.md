@@ -47,6 +47,7 @@ target/release/bgws events game.duckdb --sql "SELECT kind, count(*) FROM events 
 target/release/bgws terrain packs/kaliningrad --bbox 20.35,54.65,20.60,54.76   # real ground for a box (see "Real ground")
 target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack of generated ground
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
+target/release/bgws batch skirmish-l7-armour-v1 -n 160 --grounds 8   # the same games over 8 generated grounds: how much the ground decides
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
 target/release/bgws vignettes --html workbench.html  # the workbench page: each vignette against band and baseline
@@ -179,6 +180,10 @@ difference with its standard error, per scenario and overall.
 `--keep-worst N` keeps the decider's N worst games in the lab, its side's
 decisions as moments to play out. Two scenarios are held out
 (`heldOut`), kept back for checking a tuned setting.
+`--vary-ground` plays each seed on its own generated ground (the decider's
+game and its baseline on the same one), so a difference does not rest on
+one map: on a single generated ground a scenario's winner can be the
+ground's doing (see "Results depend on the ground" below).
 
 First results (Jev 1.13, against the doctrine default): on the cases, 78%
 pass against the fallback's 52%, with 32 of 32 consistency checks held, but
@@ -342,6 +347,27 @@ to reach openrouter.ai.
 | M6 sustained offensive, 47 forces, 72 h | 90 s wall (×2,900) |
 | M7 littoral, 24 h / M8 joint strike, 24 h | 25 s / 20 s wall |
 | Skirmish batch, rules deciders | about 0.1 s per game |
+
+### Results depend on the ground
+
+A scenario on generated ground plays on one map, set by its
+`theatre.groundSeed`. The same forces on another seed's ground can fight a
+different battle. `bgws batch <scenario> --grounds G` plays the same game
+seeds on G grounds: the scenario's own and seeds `<its seed>~g1` to
+`~g(G−1)` (`bgws_run::on_ground`).
+
+It reports, for each ground, blue's and red's strength left and blue's wins.
+Then, over the grounds, the mean blue − red gap with its standard error, the
+spread between grounds, and how many grounds each side was ahead on.
+
+The imported armour duel (`skirmish-l7-armour-v1`, M1 Abrams against T-90M),
+over 8 grounds and 160 games:
+- the gap runs from −0.12 to +0.33, with a mean of +0.10 ± 0.06;
+- blue is ahead on 5 grounds and red on 3;
+- the spread between grounds (SD 0.17) is about three times the dice's
+  spread on one ground.
+
+The engagement suite takes `--vary-ground` for the same reason.
 
 ### Calibration backlog
 

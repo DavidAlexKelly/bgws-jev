@@ -1244,6 +1244,9 @@ struct SuiteReq {
     keep_worst: usize,
     #[serde(default)]
     all: bool,
+    /// Each seed on its own generated ground.
+    #[serde(default)]
+    vary_ground: bool,
 }
 
 /// Play the engagement suite with a decider (its worst games kept in the lab if asked).
@@ -1253,7 +1256,7 @@ async fn lab_suite(Json(r): Json<SuiteReq>) -> axum::response::Response {
         let entries: Vec<_> = bgws_run::suite::load_entries()?.into_iter().filter(|e| r.all || !e.held_out).collect();
         let (d, name) = bgws_run::lab::decider_for(r.deciders, &default_figures(), r.model, r.prose, ("http://127.0.0.1:8080", "local"))?;
         let seeds = if r.seeds.is_empty() { vec![1, 2, 3, 4] } else { r.seeds.into_iter().take(20).collect() };
-        let opts = bgws_run::suite::Options { keep_worst: (r.keep_worst > 0).then(|| (l.dir.clone(), r.keep_worst.min(20))) };
+        let opts = bgws_run::suite::Options { keep_worst: (r.keep_worst > 0).then(|| (l.dir.clone(), r.keep_worst.min(20))), vary_ground: r.vary_ground };
         let run = bgws_run::suite::run(&entries, &seeds, d, &name, &default_figures(), 4, &opts, &|_| {})?;
         bgws_run::suite::save(&l.dir, &run)?;
         Ok(run)

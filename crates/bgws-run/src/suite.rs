@@ -122,6 +122,9 @@ pub struct SuiteRun {
     /// Games kept in the lab (the decider's worst), for their decisions to be played out.
     #[serde(default)]
     pub kept: Vec<String>,
+    /// Each seed played on its own generated ground ([`Options::vary_ground`]).
+    #[serde(default)]
+    pub vary_ground: bool,
 }
 
 /// What to do besides measuring.
@@ -129,6 +132,10 @@ pub struct SuiteRun {
 pub struct Options {
     /// Keep the decider's worst games in this lab (their moments, to play out).
     pub keep_worst: Option<(PathBuf, usize)>,
+    /// Play each seed on its own generated ground (`crate::on_ground`, ground = seed),
+    /// the decider's game and its baseline on the same one, so a result does not
+    /// rest on one map. Scenarios on flat ground or a pack keep theirs.
+    pub vary_ground: bool,
 }
 
 /// Play a game to `minutes` with `router` and measure it for `side`.
@@ -250,6 +257,8 @@ pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, fig
         }
         scenarios.push((e.clone(), sc));
     }
+    // The ground a seed is played on: its own when grounds vary, else the scenario's.
+    let ground_for = |sc: &bgws_scenario::v4::ScenarioV4, k: u64| if opts.vary_ground { crate::on_ground(sc, k) } else { sc.clone() };
     let jobs: Vec<(usize, u64, Side)> = (0..scenarios.len()).flat_map(|i| seeds.iter().flat_map(move |&k| [Side::Blue, Side::Red].map(|s| (i, k, s)))).collect();
     // Baselines: one rules game per scenario and seed, measured for each side.
     let base: BTreeMap<BaseKey, Metrics> = (0..scenarios.len())
@@ -258,6 +267,7 @@ pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, fig
         .map(|(i, k)| -> Result<Vec<(BaseKey, Metrics)>> {
             let (e, sc) = &scenarios[i];
             let m = e.minutes.unwrap_or(sc.scope.duration_min);
+            let sc = &ground_for(sc, k);
             [Side::Blue, Side::Red].into_iter().map(|s| play(sc, k, m, figures, s, false, setup).map(|r| ((i, k, s), r.0))).collect::<Result<Vec<_>>>()
         })
         .collect::<Result<Vec<_>>>()?
@@ -271,7 +281,7 @@ pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, fig
             .map(|&(i, k, side)| -> Result<(Pair, bgws_scenario::record::GameRecord)> {
                 let (e, sc) = &scenarios[i];
                 let m = e.minutes.unwrap_or(sc.scope.duration_min);
-                let (dm, by, cost, ended, record) = play(sc, k, m, figures, side, true, setup)?;
+                let (dm, by, cost, ended, record) = play(&ground_for(sc, k), k, m, figures, side, true, setup)?;
                 let b = base[&(i, k, side)];
                 let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 progress(&format!("[{n}/{}] {} seed {k} {side}: result {:+.0} (baseline {:+.0}), exchange {:+.2} ({:+.2})", jobs.len(), e.scenario, dm.result, b.result, dm.exchange, b.exchange));
@@ -314,6 +324,7 @@ pub fn run_with(entries: &[Entry], seeds: &[u64], setup: &Setup, name: &str, fig
         kept,
         pairs,
         summaries,
+        vary_ground: opts.vary_ground,
     })
 }
 
@@ -321,10 +332,11 @@ impl SuiteRun {
     pub fn table(&self) -> String {
         let s = |x: &Stat| format!("{:+.2}±{:.2}", x.mean, x.se);
         let mut out = format!(
-            "{}: {} paired games over seeds {:?}, {:.0} s, ${:.4}{}.\n\n| scenario | pairs | better / worse | result Δ | exchange Δ | own loss Δ | enemy loss Δ | survival Δ |\n|---|---|---|---|---|---|---|---|\n",
+            "{}: {} paired games over seeds {:?}{}, {:.0} s, ${:.4}{}.\n\n| scenario | pairs | better / worse | result Δ | exchange Δ | own loss Δ | enemy loss Δ | survival Δ |\n|---|---|---|---|---|---|---|---|\n",
             self.decider,
             self.pairs.len(),
             self.seeds,
+            if self.vary_ground { ", each seed on its own generated ground" } else { "" },
             self.wall_s,
             self.cost_usd,
             self.answered_share.map(|a| format!("; {:.0}% of its questions answered by it (the rest its fallback)", a * 100.0)).unwrap_or_default()

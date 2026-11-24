@@ -144,7 +144,7 @@ async function suiteTab() {
     <div class="card"><div class="row">Play the suite with <select id="s-dec"><option>jev</option><option>claude</option><option>local</option><option>rules</option></select>
       model <input id="s-model" placeholder="as configured" size="20"> <label><input type="checkbox" id="s-prose"> also the words</label>
       seeds <input id="s-seeds" value="1,2,3,4" size="8"> keep the worst <input id="s-keep" type="number" value="4" style="width:50px"> games in the lab
-      <label><input type="checkbox" id="s-all"> with the held-out scenarios</label>
+      <label><input type="checkbox" id="s-all"> with the held-out scenarios</label> <label title="Each seed on its own generated ground, the decider's game and its baseline on the same one"><input type="checkbox" id="s-ground" checked> each seed on its own ground</label>
       <button class="go" id="s-go">Play</button></div>
       <p class="note">Scenarios (data/suite/suite.json): ${d.entries.map((e) => `${esc(e.scenario)}${e.heldOut ? " (held out)" : ""}`).join(" · ")}</p></div>
     ${d.runs.map(run).join("") || `<p class="dim">No runs yet.</p>`}`;
@@ -152,7 +152,7 @@ async function suiteTab() {
     e.target.disabled = true;
     status("playing the suite… (a minute or two)");
     try {
-      const r = await api("/api/lab/suite", { deciders: $("#s-dec").value, model: $("#s-model").value || null, prose: $("#s-prose").checked, seeds: $("#s-seeds").value.split(",").map((x) => +x.trim()).filter((x) => !isNaN(x)), keepWorst: +$("#s-keep").value, all: $("#s-all").checked });
+      const r = await api("/api/lab/suite", { deciders: $("#s-dec").value, model: $("#s-model").value || null, prose: $("#s-prose").checked, seeds: $("#s-seeds").value.split(",").map((x) => +x.trim()).filter((x) => !isNaN(x)), keepWorst: +$("#s-keep").value, all: $("#s-all").checked, varyGround: $("#s-ground").checked });
       status(`${r.decider}: result Δ ${r.summaries.at(-1).result.mean.toFixed(2)}`);
       await load();
       suiteTab();

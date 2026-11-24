@@ -84,3 +84,22 @@ fn the_imported_vehicle_scenarios_play() {
         assert!(shots.iter().any(|e| e.data.get("munition").and_then(Value::as_str).is_some_and(|m| m.starts_with("l7/"))), "{name}: no imported round fired");
     }
 }
+
+/// `on_ground`: ground 0 is the scenario's own; another k gives other ground
+/// (another seed, other cover where the forces stand); flat ground and theatre
+/// packs are left alone.
+#[test]
+fn on_ground_gives_other_generated_ground() {
+    let sc = ScenarioV4::from_json(&std::fs::read_to_string(bgws_run::scenario_file("skirmish-l7-armour-v1")).unwrap()).unwrap();
+    assert_eq!(bgws_run::on_ground(&sc, 0).theatre.ground_seed, sc.theatre.ground_seed);
+    let g3 = bgws_run::on_ground(&sc, 3);
+    assert_eq!(g3.theatre.ground_seed, format!("{}~g3", sc.theatre.ground_seed));
+    let cover = |s: &ScenarioV4| {
+        let sim = Sim::with_options(s, Seed(1), bgws_run::default_figures(), SimOptions::default()).unwrap();
+        (0..40).map(|i| format!("{:?}", sim.ctx.ground.land_cover(-2000.0 + 100.0 * i as f64, 0.0))).collect::<Vec<_>>()
+    };
+    assert_ne!(cover(&sc), cover(&g3), "a different ground seed gives different ground");
+    let mut flat = sc.clone();
+    flat.theatre.ground = "flat".into();
+    assert_eq!(bgws_run::on_ground(&flat, 3).theatre.ground_seed, flat.theatre.ground_seed);
+}

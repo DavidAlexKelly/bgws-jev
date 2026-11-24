@@ -160,6 +160,25 @@ fn the_suite_pairs_games_with_the_rules_baseline() {
     assert!(suite::load_entries().unwrap().len() >= 5, "the shipped suite");
 }
 
+/// With each seed on its own ground, the pairing still holds: the decider's
+/// game and its baseline share the ground, so the rules against the rules
+/// still differ by exactly zero, while the seeds' games are on other ground.
+#[test]
+fn the_suite_varies_the_ground_by_seed_and_keeps_pairs_on_one() {
+    use bgws_run::suite;
+    let entries = vec![suite::Entry { scenario: "skirmish-catalogue-armour-v1".into(), minutes: Some(30.0), note: String::new(), held_out: false }];
+    let (d, name) = bgws_run::lab::decider_for(DeciderChoice::Rules, &default_figures(), None, false, ("", "")).unwrap();
+    let opts = suite::Options { vary_ground: true, ..Default::default() };
+    let r = suite::run(&entries, &[1, 2], d, &name, &default_figures(), 2, &opts, &|_| {}).unwrap();
+    assert!(r.vary_ground && r.table().contains("its own generated ground"));
+    for p in &r.pairs {
+        assert_eq!((p.diff.result, p.diff.exchange, p.diff.own_loss, p.diff.survival), (0.0, 0.0, 0.0, 0.0), "{p:?}");
+    }
+    let fixed = suite::run(&entries, &[1, 2], bgws_run::lab::decider_for(DeciderChoice::Rules, &default_figures(), None, false, ("", "")).unwrap().0, &name, &default_figures(), 2, &suite::Options::default(), &|_| {}).unwrap();
+    let key = |r: &suite::SuiteRun| r.pairs.iter().map(|p| (p.baseline.own_loss * 1e6) as i64).collect::<Vec<_>>();
+    assert_ne!(key(&r), key(&fixed), "other ground should play differently");
+}
+
 /// The tuner's guardrails, without calling anyone: a rewrite that drops a
 /// placeholder, names something from the cases or quotes a range is
 /// refused; a general one passes; the held-out split is fixed; the

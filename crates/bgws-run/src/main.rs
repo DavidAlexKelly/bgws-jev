@@ -356,6 +356,11 @@ enum Cmd {
         minutes: Option<f64>,
         #[arg(long)]
         flat: bool,
+        /// Play the games over this many generated grounds (the scenario's own and
+        /// G − 1 others; `n` is split between them, the same game seeds on each),
+        /// and report each ground's result and how far apart they are.
+        #[arg(long, default_value_t = 1)]
+        grounds: u64,
         /// Write the batch summary as JSON here.
         #[arg(long)]
         json: Option<PathBuf>,
@@ -578,6 +583,10 @@ enum LabCmd {
         /// (the rules decide for every unit).
         #[arg(long)]
         planner_ab: bool,
+        /// Play each seed on its own generated ground (the decider's game and its
+        /// baseline on the same one), so the result does not rest on one map.
+        #[arg(long)]
+        vary_ground: bool,
     },
     /// Print the wording Jev is asked in (data/jev/wording.json, else the engine's own).
     Wording,
@@ -990,12 +999,12 @@ fn main() -> Result<()> {
                         eprintln!("\n{} questions in {:.0} s, ${:.4}; kept in {}. The template fallback scores {} pass, {} wrong.", items.len(), t0.elapsed().as_secs_f64(), run.cost_usd, p.display(), fb.pass, fb.wrong);
                     }
                 }
-                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst, planner_ab } => {
+                LabCmd::Suite { deciders, model, prose, seeds, scenarios, parallel, all, keep_worst, planner_ab, vary_ground } => {
                     let entries: Vec<bgws_run::suite::Entry> = match scenarios {
                         Some(list) => list.split(',').map(|s| bgws_run::suite::Entry { scenario: s.trim().to_string(), minutes: None, note: String::new(), held_out: false }).collect(),
                         None => bgws_run::suite::load_entries()?.into_iter().filter(|e| all || !e.held_out).collect(),
                     };
-                    let opts = bgws_run::suite::Options { keep_worst: (keep_worst > 0).then(|| (lab.dir.clone(), keep_worst)) };
+                    let opts = bgws_run::suite::Options { keep_worst: (keep_worst > 0).then(|| (lab.dir.clone(), keep_worst)), vary_ground };
                     let r = if planner_ab {
                         let f = default_figures();
                         let mut old = f.clone();
@@ -1110,13 +1119,25 @@ fn main() -> Result<()> {
             let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
             eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
         }
-        Cmd::Batch { scenario, n, seed, minutes, flat, json } => {
+        Cmd::Batch { scenario, n, seed, minutes, flat, grounds, json } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let limit = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
-            let exp = experiments::scenario_run(&sc, limit, SimOptions { flat_ground: flat, ..Default::default() });
             let figures = default_figures();
+            let grounds = grounds.max(1);
+            if grounds > 1 && (flat || !bgws_run::on_generated_ground(&sc)) {
+                bail!("--grounds needs a scenario on generated ground (this one is on flat ground or a theatre pack)");
+            }
+            let per = (n as u64).div_ceil(grounds) as usize;
             let started = Instant::now();
-            let batch = bgws_analysis::batch::run_batch(&exp, &figures, bgws_analysis::batch::BatchConfig::new(n, Seed(seed)));
+            // Each ground plays the same game seeds, so only the ground differs between them.
+            let mut by_ground = Vec::new();
+            for g in 0..grounds {
+                let scg = bgws_run::on_ground(&sc, g);
+                let exp = experiments::scenario_run(&scg, limit, SimOptions { flat_ground: flat, ..Default::default() });
+                by_ground.push((scg.theatre.ground_seed.clone(), bgws_analysis::batch::run_batch(&exp, &figures, bgws_analysis::batch::BatchConfig::new(if grounds > 1 { per } else { n }, Seed(seed)))));
+            }
+            let n = by_ground.iter().map(|(_, b)| b.replicates.len()).sum::<usize>();
+            let batch = bgws_analysis::batch::Batch { config: bgws_analysis::batch::BatchConfig::new(n, Seed(seed)), replicates: by_ground.iter().flat_map(|(_, b)| b.replicates.iter().cloned()).collect() };
             let wall = started.elapsed().as_secs_f64();
             let mut outcomes: std::collections::BTreeMap<String, usize> = Default::default();
             for r in &batch.replicates {
@@ -1125,6 +1146,9 @@ fn main() -> Result<()> {
             let mut md = format!("# Batch: {} × {n}\n\n{wall:.1} s wall ({:.2} s per game)\n\n| Outcome | Games |\n|---|---|\n", sc.name, wall / n as f64);
             for (k, v) in &outcomes {
                 md.push_str(&format!("| {k} | {v} |\n"));
+            }
+            if grounds > 1 {
+                md.push_str(&bgws_run::ground_spread_markdown(&by_ground));
             }
             for side in bgws_core::Side::PLAYERS {
                 let m = bgws_analysis::report::strength_metric(side);

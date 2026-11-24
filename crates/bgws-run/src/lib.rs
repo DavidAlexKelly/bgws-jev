@@ -29,6 +29,60 @@ pub fn data_dir() -> std::path::PathBuf {
     std::env::var_os("BGWS_DATA").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data"))
 }
 
+/// Whether a scenario plays on generated ground (not flat, not a theatre pack),
+/// so that another ground seed gives it other ground.
+pub fn on_generated_ground(sc: &bgws_scenario::v4::ScenarioV4) -> bool {
+    sc.theatre.pack.is_none() && sc.theatre.ground != "flat"
+}
+
+/// The scenario on its `k`-th generated ground: the same forces, orders and
+/// weather on other hills, woods and towns. Ground 0 is the scenario's own;
+/// ground k > 0 has the ground seed `<its seed>~g<k>`. A scenario on flat
+/// ground or a theatre pack is returned as it is. Results that hold on one
+/// ground can reverse on another (a 3-against-3 tank duel did), so a
+/// comparison should be played over several.
+pub fn on_ground(sc: &bgws_scenario::v4::ScenarioV4, k: u64) -> bgws_scenario::v4::ScenarioV4 {
+    let mut out = sc.clone();
+    if k > 0 && on_generated_ground(sc) {
+        let base = if sc.theatre.ground_seed.is_empty() { sc.name.clone() } else { sc.theatre.ground_seed.clone() };
+        out.theatre.ground_seed = format!("{base}~g{k}");
+    }
+    out
+}
+
+/// How a batch's result varies with the ground: per ground, the games, blue's
+/// and red's mean strength left and the share blue won; then the spread of
+/// the blue − red gap across the grounds and how many grounds each side came
+/// out ahead on. Each entry is (ground seed, that ground's batch).
+pub fn ground_spread_markdown(by_ground: &[(String, bgws_analysis::batch::Batch<bgws_analysis::report::RunOutcome>)]) -> String {
+    use bgws_core::Side;
+    let mean = |b: &bgws_analysis::batch::Batch<bgws_analysis::report::RunOutcome>, side: Side| {
+        let v: Vec<f64> = b.replicates.iter().filter_map(|r| r.output.strength.get(&side).copied()).collect();
+        if v.is_empty() { f64::NAN } else { v.iter().sum::<f64>() / v.len() as f64 }
+    };
+    let mut md = String::from("\n## By ground\n\n| Ground | Games | Blue left | Red left | Blue − red | Blue won |\n|---|---|---|---|---|---|\n");
+    let mut gaps = Vec::new();
+    for (g, b) in by_ground {
+        let (bl, rd) = (mean(b, Side::Blue), mean(b, Side::Red));
+        let won = b.replicates.iter().filter(|r| r.output.over.as_deref().is_some_and(|o| o.starts_with("blue wins"))).count();
+        md.push_str(&format!("| {g} | {} | {bl:.3} | {rd:.3} | {:+.3} | {won} |\n", b.replicates.len(), bl - rd));
+        gaps.push(bl - rd);
+    }
+    let k = gaps.len() as f64;
+    let m = gaps.iter().sum::<f64>() / k;
+    let sd = (gaps.iter().map(|g| (g - m).powi(2)).sum::<f64>() / (k - 1.0).max(1.0)).sqrt();
+    let (lo, hi) = gaps.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &g| (a.min(g), b.max(g)));
+    let ahead = gaps.iter().filter(|g| **g > 0.0).count();
+    md.push_str(&format!(
+        "\nBlue − red strength left over {} grounds: mean {m:+.3} ± {:.3} (standard error over grounds, the uncertainty that counts when the ground varies), SD between grounds {sd:.3}, range {lo:+.3} to {hi:+.3}. Blue ahead on {ahead}, red on {}.{}\n",
+        gaps.len(),
+        sd / k.sqrt(),
+        gaps.iter().filter(|g| **g < 0.0).count(),
+        if ahead > 0 && ahead < gaps.len() { " **The side ahead depends on the ground.**" } else { "" }
+    ));
+    md
+}
+
 /// A scenario by path, or by the name of a shipped one (`data/scenarios/<name>.json`).
 pub fn scenario_file(s: &str) -> std::path::PathBuf {
     let p = std::path::PathBuf::from(s);
