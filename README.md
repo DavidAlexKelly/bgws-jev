@@ -48,6 +48,7 @@ target/release/bgws terrain packs/kaliningrad --bbox 20.35,54.65,20.60,54.76   #
 target/release/bgws pack packs/baltic --name baltic --lat 54.2 --lon 18.6   # a theatre pack of generated ground
 target/release/bgws batch skirmish-symmetric-control-v1 -n 200 --flat
 target/release/bgws batch skirmish-l7-armour-v1 -n 160 --grounds 8   # the same games over 8 generated grounds: how much the ground decides
+target/release/bgws batch skirmish-symmetric-control-v1 -n 80 --grounds 8 --swap-sides   # and with the sides' places exchanged: side against place
 target/release/bgws vignettes --store data/regression   # vignettes against their bands and baselines
 target/release/bgws sensitivity shahed-raid --html sens.html   # Morris + Sobol, the research backlog
 target/release/bgws vignettes --html workbench.html  # the workbench page: each vignette against band and baseline
@@ -368,6 +369,41 @@ over 8 grounds and 160 games:
   spread on one ground.
 
 The engagement suite takes `--vary-ground` for the same reason.
+
+**Side or place?** `--swap-sides` plays each ground twice, with the same dice:
+as written, and with the two sides' places exchanged (`bgws_run::sides_swapped`:
+every position reflected through the point between the forces, facings turned
+round, both games on one extent of ground). With g = blue − red strength left,
+the original gives g = side + place and the swap g = side − place. The report
+gives both, per ground and on average.
+
+Over 8 grounds and 10 games each:
+
+| Scenario | Side advantage (blue) | Typical place advantage on one ground |
+|---|---|---|
+| symmetric control (identical forces) | −0.01 ± 0.03 | 0.18 |
+| meeting engagement (generated) | +0.00 ± 0.01 | 0.12 |
+| meeting engagement (skirmish) | +0.11 ± 0.08 | 0.12 |
+| advance to contact | +0.09 ± 0.05 | 0.10 |
+| combined arms | −0.09 ± 0.03 | 0.12 |
+| catalogue armour duel | +0.26 ± 0.03 | 0.13 |
+| generated company attack | +0.57 ± 0.02 | 0.08 |
+
+What it shows:
+- **It checks out:** the symmetric scenario's side advantage is zero.
+- **A start place is worth about 0.1–0.2 of strength on one ground.** It
+  averages to nothing over grounds: each side's start is better on some and
+  worse on others.
+- **In an even fight that is as big as, or bigger than, the difference
+  between the forces.** So on one map the start place often decides it. In
+  a lopsided fight the forces decide (0.26 and 0.57 against 0.08–0.13).
+- **Part of it is that forces are placed, not deployed:** their starts are
+  fixed points, wherever those fall on the map.
+- **Mind the noise:** with 10 games a ground, about 0.05 of each "typical"
+  figure is dice.
+
+Whether 0.1–0.2 is right is not yet checked against a source. Dupuy's
+terrain factors are the candidate.
 
 ### Calibration backlog
 
