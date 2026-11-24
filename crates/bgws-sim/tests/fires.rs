@@ -54,7 +54,7 @@ fn vignette(forces: &[F], obstacles: Value, domains: &[(&str, &str)], events: Va
 }
 
 fn sim(sc: &ScenarioV4, seed: u64) -> Sim {
-    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None }).unwrap()
+    Sim::with_options(sc, Seed(seed), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None, deploy: false }).unwrap()
 }
 
 fn entity(s: &Sim, name: &str) -> bevy_ecs::prelude::Entity {
@@ -377,7 +377,7 @@ fn a_column_on_a_road_does_not_drive_through_the_unit_ahead() {
     let gap_after = |road: bool| {
         let sc = vignette(&[("lead", "blue", "generic/engineerSection", 4, 60.0, 0.0), ("tail", "blue", "generic/convoyTruck", 4, 0.0, 0.0), ("red", "red", "generic/mbt", 4, 0.0, 30_000.0)], json!([]), &[], json!([]));
         let roads = road.then(|| vec![bgws_env::RoadLine::new(bgws_env::RoadClass::Primary, vec![(-2_000.0, 0.0), (8_000.0, 0.0)])]);
-        let mut s = Sim::with_options(&sc, Seed(1), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None }).unwrap();
+        let mut s = Sim::with_options(&sc, Seed(1), default_figures(), SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None, deploy: false }).unwrap();
         let (lead, tail) = (entity(&s, "lead"), entity(&s, "tail"));
         // Engineers in front (slower), trucks behind on a march.
         order_move(&mut s, "lead", vec![Enu::new(7_000.0, 0.0, 0.0)]);

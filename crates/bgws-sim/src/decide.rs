@@ -749,8 +749,43 @@ fn fire_position(s: &Sim, e: bevy_ecs::prelude::Entity) -> (Enu, bool) {
 }
 
 fn better_spot(s: &Sim, e: bevy_ecs::prelude::Entity) -> Enu {
+    better_spot_within(s, e, s.ctx.p.cover_search_m)
+}
+
+/// Before the game begins (`SimOptions::deploy`): each land unit takes the
+/// better position within `sim.deploy.search_m` of where it was placed, as it
+/// judges one in play ([`better_spot`]: cover, a little height, less of the
+/// ground open to view), so a start is a deployment and not a point that fell
+/// where it fell. Units in id order; each move is logged (`deploy`).
+pub(crate) fn deploy(s: &mut Sim) {
+    let r = s.ctx.p.deploy_search_m;
+    if r <= 0.0 {
+        return;
+    }
+    let moves: Vec<(bevy_ecs::prelude::Entity, Enu)> = s
+        .ctx
+        .order
+        .iter()
+        .copied()
+        .filter(|&e| s.world.get::<Ident>(e).is_some_and(|i| i.domain == Domain::Land) && s.world.get::<Kin>(e).is_some_and(|k| k.agl <= 5.0))
+        .map(|e| (e, better_spot_within(s, e, r)))
+        .collect();
+    for (e, to) in moves {
+        let from = s.world.get::<Kin>(e).expect("kin").pos;
+        let d = to.sub(from).horizontal();
+        if d < 1.0 {
+            continue;
+        }
+        let at = Enu::new(to.e, to.n, s.ctx.ground.height(to.e, to.n));
+        s.world.get_mut::<Kin>(e).expect("kin").pos = at;
+        let (id, side) = { let i = s.world.get::<Ident>(e).expect("ident"); (i.id, i.side) };
+        let name = crate::systems::name(s, id);
+        s.ctx.log.push(bgws_core::SimTime::ZERO, "deploy").entity(id).side(side).text(format!("{name} deploys {d:.0} m to a better position")).data(serde_json::json!({ "movedM": d }));
+    }
+}
+
+fn better_spot_within(s: &Sim, e: bevy_ecs::prelude::Entity, r: f64) -> Enu {
     let k = *s.world.get::<Kin>(e).expect("k");
-    let r = s.ctx.p.cover_search_m;
     let here_open = s.ctx.ground.exposure(k.pos.e, k.pos.n).map(|x| s.ctx.ground.appreciation_use[1] * x).unwrap_or(0.0);
     let mut best = (s.ctx.ground.micro(k.pos.e, k.pos.n).cover - here_open, k.pos);
     for ring in 1..=3 {

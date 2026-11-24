@@ -553,7 +553,7 @@ pub fn counter_battery_scene(base: &ScenarioV4) -> anyhow::Result<ScenarioV4> {
 /// it lost no vehicle in 40 minutes, else 0.
 pub fn counter_battery(scene: &ScenarioV4) -> impl Fn(&Figures, Seed) -> Value + Sync + '_ {
     move |f: &Figures, seed: Seed| {
-        let opts = SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None };
+        let opts = SimOptions { flat_ground: true, plan_at_start: false, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None, deploy: false };
         let mut sim = Sim::with_options(scene, seed, f.clone(), opts).ok()?;
         let gun = *sim.ctx.by_name.get("b-gun")?;
         loop {

@@ -105,6 +105,9 @@ pub struct SimOptions {
     /// extent, so two scenarios on the same seed share a map only on the same
     /// extent (the side-swap test plays both on the larger).
     pub ground_half_m: Option<f64>,
+    /// Deploy before the game begins: each land unit takes the better position
+    /// near where it was placed (`decide::deploy`, within `sim.deploy.search_m`).
+    pub deploy: bool,
 }
 
 /// The half-extent, m, of the ground a scenario is generated on: every
@@ -121,7 +124,7 @@ pub fn ground_half_extent(scenario: &ScenarioV4) -> f64 {
 
 impl Default for SimOptions {
     fn default() -> Self {
-        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None }
+        SimOptions { flat_ground: false, plan_at_start: true, weather: None, terrain: None, roads: None, rivers: None, rails: None, sight: None, appreciation: None, ground_half_m: None, deploy: false }
     }
 }
 
@@ -323,6 +326,9 @@ impl Sim {
             ctx.queue.schedule(SimTime::from_secs(ev.at), Priority::Scenario, Scheduled::ScriptEvent { index: i as u32 });
         }
         let mut sim = Sim { world, ctx };
+        if opts.deploy {
+            crate::decide::deploy(&mut sim);
+        }
         crate::world::setup(&mut sim);
         crate::dismount::setup(&mut sim);
         crate::smoke::setup(&mut sim);

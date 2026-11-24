@@ -365,6 +365,10 @@ enum Cmd {
         /// and split the result into the advantage of a side and of its starting place.
         #[arg(long)]
         swap_sides: bool,
+        /// Units deploy before the game begins: each land unit takes the better
+        /// position near where it was placed (within `sim.deploy.search_m`).
+        #[arg(long)]
+        deploy: bool,
         /// Write the batch summary as JSON here.
         #[arg(long)]
         json: Option<PathBuf>,
@@ -1123,7 +1127,7 @@ fn main() -> Result<()> {
             let meta = bgws_env::TheatrePack::write(&out, &name, &world, 128, bgws_env::Codec::Lz4).map_err(|e| anyhow!("{e:?}"))?;
             eprintln!("theatre pack `{}`: {} tiles at {} m in {}", meta.name, meta.tiles.len(), meta.cell, out.display());
         }
-        Cmd::Batch { scenario, n, seed, minutes, flat, grounds, swap_sides, json } => {
+        Cmd::Batch { scenario, n, seed, minutes, flat, grounds, swap_sides, deploy, json } => {
             let sc = load_scenario(&scenario_path(&scenario))?;
             let limit = SimTime::from_secs(minutes.unwrap_or(sc.scope.duration_min) * 60.0);
             let figures = default_figures();
@@ -1137,7 +1141,7 @@ fn main() -> Result<()> {
             let mut by_ground = Vec::new();
             for g in 0..grounds {
                 let scg = bgws_run::on_ground(&sc, g);
-                let exp = experiments::scenario_run(&scg, limit, SimOptions { flat_ground: flat, ..Default::default() });
+                let exp = experiments::scenario_run(&scg, limit, SimOptions { flat_ground: flat, deploy, ..Default::default() });
                 by_ground.push((scg.theatre.ground_seed.clone(), bgws_analysis::batch::run_batch(&exp, &figures, bgws_analysis::batch::BatchConfig::new(if grounds > 1 { per } else { n }, Seed(seed)))));
             }
             let n = by_ground.iter().map(|(_, b)| b.replicates.len()).sum::<usize>();
@@ -1162,7 +1166,7 @@ fn main() -> Result<()> {
                     let scg = bgws_run::on_ground(&sc, g as u64);
                     let sw = bgws_run::sides_swapped(&scg)?;
                     let half = bgws_sim::ground_half_extent(&scg).max(bgws_sim::ground_half_extent(&sw));
-                    let opts = SimOptions { flat_ground: flat, ground_half_m: Some(half), ..Default::default() };
+                    let opts = SimOptions { flat_ground: flat, ground_half_m: Some(half), deploy, ..Default::default() };
                     let games = original.replicates.len();
                     let run = |s: &bgws_scenario::v4::ScenarioV4| bgws_analysis::batch::run_batch(&experiments::scenario_run(s, limit, opts.clone()), &figures, bgws_analysis::batch::BatchConfig::new(games, Seed(seed)));
                     rows.push((seed_text.clone(), run(&scg), run(&sw)));

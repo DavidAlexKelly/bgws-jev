@@ -131,3 +131,30 @@ fn sides_swapped_exchanges_places_on_the_same_ground() {
         }
     }
 }
+
+/// Deployment (`SimOptions::deploy`): before the game begins each land unit
+/// takes a better position near where it was placed, no farther than
+/// `sim.deploy.search_m`, in at least as much cover; off, nothing moves.
+#[test]
+fn units_deploy_to_better_positions_near_their_starts() {
+    let sc = ScenarioV4::from_json(&std::fs::read_to_string(bgws_run::scenario_file("skirmish-symmetric-control-v1")).unwrap()).unwrap();
+    let f = bgws_run::default_figures();
+    let reach = f.get("sim.deploy.search_m");
+    let placed = Sim::with_options(&sc, Seed(1), f.clone(), SimOptions::default()).unwrap();
+    let mut deployed = Sim::with_options(&sc, Seed(1), f, SimOptions { deploy: true, ..Default::default() }).unwrap();
+    let pos = |s: &Sim| s.world.iter_entities().filter_map(|e| Some((e.get::<bgws_sim::components::Ident>()?.id, e.get::<bgws_sim::components::Kin>()?.pos))).collect::<std::collections::BTreeMap<_, _>>();
+    let (a, b) = (pos(&placed), pos(&deployed));
+    let mut moved = 0;
+    let (mut cover_a, mut cover_b) = (0.0, 0.0);
+    for (id, p) in &a {
+        let q = b[id];
+        let d = q.sub(*p).horizontal();
+        assert!(d <= reach + 1.0, "{id:?} moved {d:.0} m");
+        moved += (d > 1.0) as usize;
+        cover_a += placed.ctx.ground.micro(p.e, p.n).cover;
+        cover_b += deployed.ctx.ground.micro(q.e, q.n).cover;
+    }
+    assert!(moved > 0, "nobody deployed");
+    assert!(cover_b >= cover_a, "less cover after deploying: {cover_b:.2} < {cover_a:.2}");
+    assert!(deployed.drain_events().iter().any(|e| e.kind == "deploy"));
+}
