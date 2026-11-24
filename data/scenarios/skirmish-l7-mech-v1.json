@@ -1,0 +1,156 @@
+{
+  "format": "bgws.scenario",
+  "version": 4,
+  "name": "Imported mech — Bradley and Abrams against BMP-2 and T-72B3",
+  "description": "A mechanised fight: an M2 Bradley platoon (25 mm, TOW) with an M1 Abrams troop against a BMP-2 platoon (30 mm, Konkurs) with a T-72B3 troop (Kontakt-5 heavy ERA).",
+  "savedAt": "2026-11-23T00:00:00.000Z",
+  "seed": 788940951888873,
+  "seedText": "skirmish-l7-mech-v1",
+  "theatre": {
+    "origin": {
+      "lat": 54.2,
+      "lon": 18.6,
+      "h": 0.0
+    },
+    "bounds": {
+      "south": 54.150563407569905,
+      "west": 18.51563162684322,
+      "north": 54.249387537397794,
+      "east": 18.684368373156783
+    },
+    "ground": "generated",
+    "groundSeed": "catalogue-armour-v1-ground"
+  },
+  "scope": {
+    "type": "skirmish",
+    "durationMin": 90.0,
+    "area": {
+      "widthKm": 10.0,
+      "depthKm": 10.0
+    },
+    "echelons": {
+      "highest": "company",
+      "lowest": "platoon"
+    },
+    "domains": {
+      "land": "simulated",
+      "drones": "abstracted",
+      "fires": "abstracted",
+      "ew": "off",
+      "air": "off",
+      "airDefence": "off",
+      "naval": "off",
+      "space": "off",
+      "cyber": "off",
+      "logistics": "off",
+      "medical": "off"
+    },
+    "planners": [
+      "tactical"
+    ],
+    "detail": {
+      "aggregateAwayFromContact": false,
+      "jev": "all"
+    }
+  },
+  "startUtc": "2026-06-01T08:45:36Z",
+  "weather": {
+    "source": "preset",
+    "weather": "clear"
+  },
+  "environment": {},
+  "comms": "radio",
+  "forces": [
+    {
+      "id": "blue-1",
+      "label": "Blue 1 Platoon (M2 Bradley)",
+      "side": "blue",
+      "platform": "l7/var_5_default",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.19999991230765,
+        "lon": 18.595403076984915,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "blue-2",
+      "label": "Blue 2 Troop (M1)",
+      "side": "blue",
+      "platform": "l7/var_1_default",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.19999991230766,
+        "lon": 18.604596923015087,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "red-1",
+      "label": "Red 1 Platoon (BMP-2)",
+      "side": "red",
+      "platform": "l7/var_50_default",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.217967928880995,
+        "lon": 18.59540108166207,
+        "h": 0.0
+      },
+      "layer": "unit"
+    },
+    {
+      "id": "red-2",
+      "label": "Red 2 Troop (T-72B3)",
+      "side": "red",
+      "platform": "l7/var_22_1",
+      "count": 3,
+      "quality": "regular",
+      "position": {
+        "lat": 54.217967928880995,
+        "lon": 18.60459891833793,
+        "h": 0.0
+      },
+      "layer": "unit"
+    }
+  ],
+  "world": {},
+  "command": {
+    "sides": {
+      "blue": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      },
+      "red": {
+        "units": "rules",
+        "hqs": "rules",
+        "directive": ""
+      }
+    },
+    "model": "claude-sonnet-5-5"
+  },
+  "behaviours": {
+    "assign": {}
+  },
+  "emitters": {
+    "default": {
+      "blue": "free",
+      "red": "free"
+    }
+  },
+  "victory": [
+    {
+      "kind": "breakpoint",
+      "pct": 50.0
+    }
+  ],
+  "notes": [
+    "Every vehicle is imported from the asset CSVs (data/catalogue/imported.json): armour, ERA and active protection from the platform profile, weapons and rounds from the capability profile and the munition rows with a row-level source (data/catalogue/weapon-fits.json, tools/weapon_fits.py). Mount figures and rounds carried are [default] per weapon class.",
+    "The ground is the same generated ground as skirmish-catalogue-armour-v1 (its ground seed), so a difference from that duel comes from the vehicles. The two lines start 2 km apart. Results depend strongly on the ground: on another generated ground the armour duel's outcome reverses."
+  ]
+}

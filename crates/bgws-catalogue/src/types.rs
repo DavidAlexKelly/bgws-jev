@@ -41,6 +41,9 @@ pub enum Provenance {
     Reference,
     /// From a dataset or document.
     Sourced,
+    /// From the asset-catalogue CSVs through the importer, figure by figure
+    /// where the row cites a source (`imported.rs`).
+    Imported,
 }
 
 /// Where one field's value came from, when better than the record's default.
@@ -288,6 +291,17 @@ pub struct Armour {
     pub zones: BTreeMap<String, ZoneArmour>,
 }
 
+/// What a vehicle's ERA works against.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum EraKind {
+    /// Against long rods as well as shaped charges (the default: what `era` meant before kinds).
+    #[default]
+    Heavy,
+    /// Against shaped charges only.
+    Light,
+}
+
 /// An active protection system.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -337,6 +351,10 @@ pub struct Body {
     /// Explosive reactive armour fitted (only tandem warheads care).
     #[serde(default)]
     pub era: bool,
+    /// Heavy ERA (Kontakt-5, Relikt) degrades long rods as well as shaped
+    /// charges; light ERA (Kontakt-1) shaped charges only.
+    #[serde(default)]
+    pub era_kind: EraKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aps: Option<Aps>,
     /// Derived as one entry of `count` platforms when the record gives none.

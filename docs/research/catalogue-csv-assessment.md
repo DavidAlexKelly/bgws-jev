@@ -11,7 +11,105 @@
 >   119 munitions imported, 673 figures or rows rejected (93 munitions on the blanket README
 >   reference; most mass, engine and speed figures for want of a row-level source). The test
 >   (`csvImport.test.ts`) fails if a figure is imported without a source, or if the committed
->   files are out of date. No engine reads `imported.json` yet: it is staged for the Rust loader.
+>   files are out of date.
+> - **The Rust engine reads `imported.json`** (`crates/bgws-catalogue/src/imported.rs`), as
+>   generated, with no hand edits. Its 114 platforms load as `provenance: imported`:
+>   - armour `turret` becomes the turret zone, and `roof` becomes `top`;
+>   - `eraFit` and `apsFit` map to `era` and `aps` through named tables (an unknown kit is an
+>     error). Slat and bar cages, appliqué armour, Epsom and optional kits (BRAT,
+>     Trophy on the M1) are not ERA/APS;
+>   - `figures` becomes `sources`;
+>   - a row the catalogue already has from the L6 import (`l7/var_11_default` →
+>     `var_11_default`) uses that record as its parent, so it keeps that record's weapons.
+>
+>   The 119 munitions are kept as typed rows (`Catalogue::imported_munitions`), not engine
+>   munitions. Their `kind` is too coarse (`he` covers mortar bombs, glide bombs and cruise
+>   missiles), and they have no flight, guidance or range. The test
+>   `imported_csv_records_load` checks all of this.
+> - **Weapon fits.** `tools/weapon_fits.py` writes `data/catalogue/weapon-fits.json` from the
+>   capability CSV. 109 of the 114 imported platforms now carry their own weapons, not
+>   their generic parent's. The other 5 have no capability rows.
+>   - A T-90M fires 125 mm rounds, a HMMWV has only its .50 cal, and an Uran-9 is armed.
+>   - Each weapon name is matched to the munition CSV's weapon id through a table. An unknown
+>     name is an error.
+>   - Each sourced munition row of the weapon becomes an engine munition (33 so far). The row
+>     gives the name, penetration against range, tandem and top-attack flags, warhead and
+>     lethal radius. An engine template for the weapon class and round type gives guidance,
+>     flight, pk, CEP, targets, cost, family and DIS type ([default]). Speed and maximum range
+>     come from the capability row when it names that one weapon.
+>   - A gun's KE round is the one nearest the vehicle's `best_pen_mm_1000m`. The munition CSV
+>     lists every round of a calibre, not what each vehicle carries, so an older T-72 does
+>     not get 3BM60.
+>   - A weapon with no sourced round fires the engine's own round for its class (for example
+>     `ball762` for the Kord and PKT, `atgmTandem` for Konkurs and Ataka, `he155` for 152 mm
+>     guns). The source note says so.
+>   - Mount figures and rounds carried are [default] per weapon class (`CLASSES` in the tool).
+>   - It is loaded through a new `fits` catalogue section, which overlays a platform defined in
+>     another file. `null` removes a parent's rounds.
+>   - `python3 tools/weapon_fits.py --check` fails if the file is stale. The test
+>     `imported_platforms_have_their_own_weapon_fits` checks the result.
+>
+>   Not yet in the fits:
+>   - thermobaric, HE-frag tank and other rounds whose kind has no engine counterpart;
+>   - sensor-fuzed artillery (BONUS);
+>   - the 93 munition rows the importer rejected for their blanket source;
+>   - (`behind_era` figures: done, below.)
+> - **ERA, settled.**
+>   - **Rounds:** a round carries `penBasis` and `defeatsEra`, from the CSV's `pen_basis` and
+>     `era_effect`.
+>     - A figure measured behind ERA (3BK29, Spike-LR2, 9M123) is not cut by ERA again.
+>       Before, the engine took 6% off (`direct.era.ce_reduction` × `tandem_residual`).
+>     - A long rod made against heavy ERA (M829A3, 3BM60, DM73) is not degraded by heavy ERA.
+>       Before, it lost `direct.era.ke_reduction`, 20%.
+>     - `precursor_defeats_era` sets `tandem`.
+>     - `unstated` is read as RHA.
+>   - **Vehicles:** a vehicle carries `eraKind`. Kontakt-5, Relikt and Malachit are heavy, so
+>     they work against long rods too. Kontakt-1, the Rafael kit and ROMOR-A are light: they
+>     work against shaped charges only, and take `direct.era.light_ke_reduction` (0,
+>     [default]) off a long rod.
+>     - `heavy` is the default, so a record with only `era: true` behaves as before.
+>     - The hand-built T-72B3 and T-80BVM are marked heavy. The Challenger 2
+>       (`var_11_default`) is marked light, from the L7 row's ROMOR-A. That is the one change
+>       to an existing scenario's vehicle.
+>   - **Not changed:** the hand-built `kornet`, `javelin` and `atgmTow`. Their CSV rows
+>     (`m_9m133`, `m_javelin`, `m_tow2a`) state no basis, and most are grade D. The "1,200 mm
+>     behind ERA" for Kornet in the gaps list below is not what the row says.
+>   - **To check:** the CSV marks the 35 mm PMD343 APFSDS `defeats_era`. That is unusual for
+>     a 35 mm round.
+> - **In play, checked.**
+>   - **Gun ranges:** guns (tank guns, low-pressure guns, cannons) engage at the shorter of
+>     the capability CSV's `bgws_max_range_m` and their engine template's effective range.
+>     - The CSV gives a tank gun's maximum range, 4 km. As the engine's engagement range,
+>       that made imported tanks open fire at 3.9 km, outside the 2–3 km band.
+>     - Tank guns now engage at 3 km ([P27] "effective range 2–3 km"). Shorter CSV ranges
+>       are kept, such as the BMP-1's 2A28 at 1.3 km.
+>     - Missiles, artillery and mortars keep the CSV's range, which is their envelope.
+>   - **New vignette:** `tank-engagement-range-imported` plays the sourced tank-engagement
+>     benchmark on imported M1 Abrams against T-90M. Mean 2,896 m, in band. Its baseline is
+>     in `data/regression`.
+>   - **Smoke test:** `crates/bgws-run/tests/imported_vehicles.rs` puts all 109 fitted vehicles
+>     in one meeting engagement. It checks that they play, fire their own rounds (19 of the 33
+>     in 20 minutes) and knock things out.
+>   - **Shipped scenarios:** `skirmish-l7-armour-v1` (M1 Abrams against T-90M),
+>     `skirmish-l7-mech-v1` (Bradley and Abrams against BMP-2 and T-72B3) and
+>     `skirmish-l7-ifv-v1` (Puma and Lynx against BMP-3 and BMP-2M). They are on the same
+>     generated ground as `skirmish-catalogue-armour-v1`, so they compare with that duel.
+>     - That ground favours blue: the reference duel leaves blue 90% and red 54%.
+>     - On another generated ground the armour duel's result reverses. The ground matters
+>       more than the vehicles here.
+> - **Not imported, and why** (checked 23 November):
+>   - **Sea (236 rows) and air (169 rows) platforms:** no row has a row-level source.
+>     - `figure_source` is empty on every one.
+>     - `mass_source` is the table-wide "curated_equipment_table".
+>     - Protection is ungraded, apart from 8 air rows.
+>
+>     Under the importer's rule that a figure goes in only with a source for its row, only
+>     names would come across.
+>   - **Support assets (350):** all are class-default loadouts and timings, or "MF identity".
+>   - **Sections (20):** 17 cite only "published TO&E". 11 are already in `sourced.json` from
+>     the L6 import.
+>
+>   Each needs per-row sources first (see "How to improve the sources" below).
 > - **Quality columns**, from what the tables already say, no new source:
 >   - Platforms gain `is_towed` (8), `speed_road_kmh`, `speed_xc_kmh` (left empty: never
 >     invented), `speed_note`, and `mass_inherited` / `engine_inherited` (14 / 13 variants copy the

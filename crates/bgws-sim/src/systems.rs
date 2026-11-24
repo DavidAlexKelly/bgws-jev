@@ -960,6 +960,11 @@ pub(crate) fn name(s: &Sim, id: EntityId) -> String {
     s.world.get::<Ident>(s.ctx.entity(id)).map(|i| i.label.clone()).unwrap_or_else(|| id.to_string())
 }
 
+/// What the round's penetration figure already allows for against ERA.
+fn round_era(m: &bgws_catalogue::Munition) -> df::RoundEra {
+    df::RoundEra { behind_era: m.pen_basis == bgws_catalogue::PenBasis::BehindEra, defeats_era: m.defeats_era }
+}
+
 fn warhead_of(m: &bgws_catalogue::Munition) -> Warhead {
     use bgws_catalogue::MunitionKind as K;
     match m.kind {
@@ -1596,7 +1601,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
     let share = blast.map(|b| blast_share(&b, &budget, s.ctx.p.team_front_m, s.ctx.p.team_depth_m) * shield).unwrap_or(0.0);
     let mut ph_last = 0.0;
     let armour = armour_zones(&tplat);
-    let prot = Protection { era: tplat.body.era, aps: tplat.body.aps.is_some() };
+    let prot = Protection { era: tplat.body.era, era_light: tplat.body.era_kind == bgws_catalogue::EraKind::Light, aps: tplat.body.aps.is_some() };
     let pen = mun.penetration_at(range);
     // A guided missile is flown onto the target: its chance of arriving is
     // the guidance's, not a gun's dispersion over a long flight.
@@ -1645,7 +1650,7 @@ fn fire_volley(s: &mut Sim, e: Entity, id: EntityId, side: Side, fit: u32, _qual
             rng.gen::<f64>() < pk
         } else {
             let zone: Zone = df::zone_at(&pres, r.x_frac, r.y_frac, mun.top_attack);
-            let odds = df::strike_odds(warhead_of(mun), pen, zone, &armour, &prot, if mun.top_attack { 45.0 } else { 0.0 }, &p);
+            let odds = df::strike_odds(df::Round { warhead: warhead_of(mun), era: round_era(mun) }, pen, zone, &armour, &prot, if mun.top_attack { 45.0 } else { 0.0 }, &p);
             match df::roll_strike(&odds, &mut rng) {
                 StrikeOutcome::Penetrated(kt) => {
                     let mut h = s.world.get_mut::<Health>(te).expect("h");
@@ -1859,8 +1864,8 @@ pub(crate) fn external_detonation(s: &mut Sim, firer: Option<EntityId>, target: 
                             _ => Zone::Rear,
                         }
                     };
-                    let prot = Protection { era: tplat.body.era, aps: tplat.body.aps.is_some() };
-                    let odds = df::strike_odds(warhead_of(&mun), pen, zone, &armour_zones(&tplat), &prot, if mun.top_attack { 45.0 } else { 0.0 }, &p);
+                    let prot = Protection { era: tplat.body.era, era_light: tplat.body.era_kind == bgws_catalogue::EraKind::Light, aps: tplat.body.aps.is_some() };
+                    let odds = df::strike_odds(df::Round { warhead: warhead_of(&mun), era: round_era(&mun) }, pen, zone, &armour_zones(&tplat), &prot, if mun.top_attack { 45.0 } else { 0.0 }, &p);
                     match df::roll_strike(&odds, &mut rng) {
                         StrikeOutcome::Penetrated(kt) => {
                             let mut h = s.world.get_mut::<Health>(e).expect("h");

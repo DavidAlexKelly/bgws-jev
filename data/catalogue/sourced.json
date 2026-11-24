@@ -841,7 +841,8 @@
       }
      }
     },
-    "era": true
+    "era": true,
+    "eraKind": "light"
    },
    "mounts": [
     {
@@ -1050,7 +1051,8 @@
       "top": 20
      }
     },
-    "era": true
+    "era": true,
+    "eraKind": "heavy"
    },
    "mounts": [
     {
@@ -1103,7 +1105,8 @@
       "top": 20
      }
     },
-    "era": true
+    "era": true,
+    "eraKind": "heavy"
    },
    "mounts": [
     {

@@ -117,6 +117,7 @@ pub struct DirectFireParams {
     /// A long rod goes through a plate this much thicker than the depth it reaches in a thick block.
     pub ke_limit_ratio: f64,
     pub era_ke_reduction: f64,
+    pub era_light_ke_reduction: f64,
     pub era_ce_reduction: f64,
     pub era_tandem_residual: f64,
     pub aps_p_intercept: f64,
@@ -176,6 +177,7 @@ impl DirectFireParams {
             pen_spread: f.get("direct.pen_spread"),
             ke_limit_ratio: f.get("direct.ke_limit_ratio"),
             era_ke_reduction: f.get("direct.era.ke_reduction"),
+            era_light_ke_reduction: f.get("direct.era.light_ke_reduction"),
             era_ce_reduction: f.get("direct.era.ce_reduction"),
             era_tandem_residual: f.get("direct.era.tandem_residual"),
             aps_p_intercept: f.get("direct.aps.p_intercept"),
@@ -472,6 +474,30 @@ pub enum Warhead {
     TandemShapedCharge,
 }
 
+/// What a round's penetration figure already allows for against ERA.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct RoundEra {
+    /// The figure is measured behind ERA (a tandem warhead's published
+    /// figure): ERA is already in it and is not taken off again.
+    pub behind_era: bool,
+    /// A long rod made to defeat heavy ERA (segmented or long, fast rods:
+    /// M829A3, 3BM60, DM73): heavy ERA does not degrade it.
+    pub defeats_era: bool,
+}
+
+/// A round striking: its warhead, and what its penetration figure allows for against ERA.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Round {
+    pub warhead: Warhead,
+    pub era: RoundEra,
+}
+
+impl From<Warhead> for Round {
+    fn from(warhead: Warhead) -> Round {
+        Round { warhead, era: RoundEra::default() }
+    }
+}
+
 /// Penetration (mm RHAe) by range; KE beyond the table falls off per km.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PenetrationTable {
@@ -502,6 +528,10 @@ pub struct ArmourZones {
 pub struct Protection {
     /// ERA on the front and sides.
     pub era: bool,
+    /// The ERA is light (Kontakt-1 class: made against shaped charges), not
+    /// heavy (Kontakt-5, Relikt: also against long rods).
+    #[serde(default)]
+    pub era_light: bool,
     /// An active protection system (hard kill against missiles and rockets).
     pub aps: bool,
 }
@@ -546,15 +576,21 @@ pub enum StrikeOutcome {
 
 /// The odds of a strike on `zone` with a round of `penetration_mm`, arriving at
 /// `attack_elevation_deg` (for the APS elevation limit **[R4.2]**).
-pub fn strike_odds(warhead: Warhead, penetration_mm: f64, zone: Zone, armour: &ArmourZones, prot: &Protection, attack_elevation_deg: f64, p: &DirectFireParams) -> StrikeOdds {
+pub fn strike_odds(round: Round, penetration_mm: f64, zone: Zone, armour: &ArmourZones, prot: &Protection, attack_elevation_deg: f64, p: &DirectFireParams) -> StrikeOdds {
     let z = zone as usize;
+    let Round { warhead, era: round } = round;
     let ce = warhead != Warhead::Kinetic;
     let base = if ce { armour.ce_mm[z] } else { armour.ke_mm[z] };
     // ERA on front and side zones degrades the penetrator; a tandem precursor strips most of it.
+    // Light ERA barely touches a long rod; a rod made against heavy ERA is not
+    // degraded by it; a figure measured behind ERA has it in already.
     let era_applies = prot.era && !matches!(zone, Zone::Rear | Zone::Roof);
     let pen = if era_applies {
         let red = match warhead {
+            Warhead::Kinetic if prot.era_light => p.era_light_ke_reduction,
+            Warhead::Kinetic if round.defeats_era => 0.0,
             Warhead::Kinetic => p.era_ke_reduction,
+            _ if round.behind_era => 0.0,
             Warhead::ShapedCharge => p.era_ce_reduction,
             Warhead::TandemShapedCharge => p.era_ce_reduction * p.era_tandem_residual,
         };
@@ -663,6 +699,7 @@ pub fn figures() -> Vec<Figure> {
         figure!("direct.pen_spread", 0.12, "fraction", 0.03, 0.3, "default", Default, "softness of the penetration margin"),
         figure!("direct.ke_limit_ratio", 1.05, "1", 1.0, 1.15, "Mullin et al. 1995 (ADA296435) pp. 42-43, 53", Low, "a kinetic rod perforates armour up to this multiple of its semi-infinite depth (the catalogue's penetration figures): the limit thickness lies between the depth and the depth plus about two rod diameters (docs/sources/notes/mullin-1995-scale-model-penetration-finite-steel-targets.md)"),
         figure!("direct.era.ke_reduction", 0.2, "fraction", 0.0, 0.5, "default", Default, "heavy ERA against long rods"),
+        figure!("direct.era.light_ke_reduction", 0.0, "fraction", 0.0, 0.2, "default", Default, "light ERA (Kontakt-1 class) against long rods: made against shaped charges, negligible against APFSDS"),
         figure!("direct.era.ce_reduction", 0.6, "fraction", 0.2, 0.9, "default", Default, "ERA against single shaped charges"),
         figure!("direct.era.tandem_residual", 0.1, "fraction", 0.0, 0.5, "default", Default, "ERA effect left against a tandem warhead"),
         figure!("direct.aps.p_intercept", 0.8, "fraction", 0.3, 0.99, "default", Default, "APS hard-kill probability per missile/rocket"),
@@ -814,20 +851,28 @@ mod tests {
         assert!(table.at(3000.0, &p) < 680.0);
         let armour = ArmourZones { ke_mm: [600.0, 800.0, 80.0, 250.0, 40.0, 40.0], ce_mm: [900.0, 1100.0, 120.0, 350.0, 60.0, 60.0] };
         let none = Protection::default();
-        let front = strike_odds(Warhead::Kinetic, 680.0, Zone::HullFront, &armour, &none, 0.0, &p);
-        let turret = strike_odds(Warhead::Kinetic, 680.0, Zone::TurretFront, &armour, &none, 0.0, &p);
-        let side = strike_odds(Warhead::Kinetic, 680.0, Zone::HullSide, &armour, &none, 0.0, &p);
+        let front = strike_odds(Warhead::Kinetic.into(), 680.0, Zone::HullFront, &armour, &none, 0.0, &p);
+        let turret = strike_odds(Warhead::Kinetic.into(), 680.0, Zone::TurretFront, &armour, &none, 0.0, &p);
+        let side = strike_odds(Warhead::Kinetic.into(), 680.0, Zone::HullSide, &armour, &none, 0.0, &p);
         assert!(turret.p_penetrate < front.p_penetrate && front.p_penetrate < side.p_penetrate);
         assert!(side.kill.catastrophic > front.kill.catastrophic, "overmatch raises catastrophic kills");
-        let era = Protection { era: true, aps: false };
-        let atgm = strike_odds(Warhead::ShapedCharge, 400.0, Zone::HullSide, &armour, &era, 0.0, &p);
-        let tandem = strike_odds(Warhead::TandemShapedCharge, 400.0, Zone::HullSide, &armour, &era, 0.0, &p);
+        let era = Protection { era: true, era_light: false, aps: false };
+        let atgm = strike_odds(Warhead::ShapedCharge.into(), 400.0, Zone::HullSide, &armour, &era, 0.0, &p);
+        let tandem = strike_odds(Warhead::TandemShapedCharge.into(), 400.0, Zone::HullSide, &armour, &era, 0.0, &p);
         assert!(tandem.p_penetrate > atgm.p_penetrate);
-        let aps = Protection { era: false, aps: true };
-        let flat = strike_odds(Warhead::ShapedCharge, 800.0, Zone::Roof, &armour, &aps, 10.0, &p);
-        let dive = strike_odds(Warhead::ShapedCharge, 800.0, Zone::Roof, &armour, &aps, 80.0, &p);
+        // A figure measured behind ERA is not cut again; light ERA spares a long rod; a rod made against heavy ERA is spared by it.
+        let behind = RoundEra { behind_era: true, defeats_era: false };
+        assert_eq!(strike_odds(Round { warhead: Warhead::TandemShapedCharge, era: behind }, 400.0, Zone::HullSide, &armour, &era, 0.0, &p).penetration_mm, 400.0);
+        let rod = strike_odds(Warhead::Kinetic.into(), 680.0, Zone::HullFront, &armour, &era, 0.0, &p).penetration_mm;
+        let light = Protection { era_light: true, ..era };
+        let rod_light = strike_odds(Warhead::Kinetic.into(), 680.0, Zone::HullFront, &armour, &light, 0.0, &p).penetration_mm;
+        let modern = strike_odds(Round { warhead: Warhead::Kinetic, era: RoundEra { behind_era: false, defeats_era: true } }, 680.0, Zone::HullFront, &armour, &era, 0.0, &p).penetration_mm;
+        assert!(rod < rod_light && rod_light == modern, "{rod} {rod_light} {modern}");
+        let aps = Protection { era: false, era_light: false, aps: true };
+        let flat = strike_odds(Warhead::ShapedCharge.into(), 800.0, Zone::Roof, &armour, &aps, 10.0, &p);
+        let dive = strike_odds(Warhead::ShapedCharge.into(), 800.0, Zone::Roof, &armour, &aps, 80.0, &p);
         assert!(flat.p_intercept > 0.0 && dive.p_intercept == 0.0, "steep FPV is above the APS limit");
-        let ke = strike_odds(Warhead::Kinetic, 800.0, Zone::Roof, &armour, &aps, 0.0, &p);
+        let ke = strike_odds(Warhead::Kinetic.into(), 800.0, Zone::Roof, &armour, &aps, 0.0, &p);
         assert_eq!(ke.p_intercept, 0.0);
         // Zones from aspect.
         let broadside = presented_vehicle(&mbt(), std::f64::consts::FRAC_PI_2, VehiclePosture::Exposed, &p);

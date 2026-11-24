@@ -248,3 +248,116 @@ proptest! {
         }
     }
 }
+
+/// The importer's output (`imported.json`, generated from the asset CSVs)
+/// loads as it is: every platform resolves, the armour, ERA and APS fits and
+/// row-level sources come across, and its munitions are kept apart.
+#[test]
+fn imported_csv_records_load() {
+    let c = builtin();
+    let imported: Vec<&Platform> = c.platforms().filter(|p| p.provenance == Provenance::Imported).collect();
+    assert_eq!(imported.len(), 114);
+    assert!(c.imported_munitions().count() >= 100);
+    // Engine munitions with an importer id are built from that sourced row (weapon-fits.json).
+    for m in c.munitions().filter(|m| m.id.starts_with("l7/")) {
+        let row = c.imported_munition(&m.id).unwrap_or_else(|| panic!("{}: no sourced row", m.id));
+        assert_eq!(m.penetration, row.penetration, "{}", m.id);
+    }
+    for p in &imported {
+        // A reparented record also carries its parent's sources for what it inherits.
+        assert!(p.sources.values().any(|s| s.kind == Provenance::Imported), "{}: imported with no row-level source", p.id);
+    }
+    // Turret and roof come across (the engine has no `turret` or `roof` aspect).
+    let m1a1 = c.platform("l7/var_1_1").unwrap();
+    assert_eq!(m1a1.body.armour.ke.front, 400.0);
+    assert_eq!(m1a1.body.armour.ke.top, 25.0);
+    assert_eq!(m1a1.body.armour.zones["turret"].ke.front, 450.0);
+    // ERA kits: heavy ERA is ERA, a slat cage is not.
+    let t90m = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "T-90M Proryv").unwrap();
+    assert!(t90m.body.era);
+    assert_eq!(t90m.body.era_kind, EraKind::Heavy);
+    let stryker = c.platforms().find(|p| p.provenance == Provenance::Imported && p.name == "General Dynamics Stryker").unwrap();
+    assert!(!stryker.body.era);
+    // Light ERA (Kontakt-1, ROMOR-A) works against shaped charges only.
+    let cr2 = c.platform("l7/var_11_default").unwrap();
+    assert!(cr2.body.era && cr2.body.era_kind == EraKind::Light);
+    assert_eq!(c.platform("var_11_default").unwrap().body.era_kind, EraKind::Light);
+    assert_eq!(c.platform("var_22_1").unwrap().body.era_kind, EraKind::Heavy);
+    // A row for a vehicle the catalogue already has is parented on that record.
+    let cr2 = c.platform("l7/var_11_default").unwrap();
+    assert_eq!(cr2.parent.as_deref(), Some("var_11_default"));
+    // Importer munitions keep their penetration and what it is measured against.
+    let kornet_like = c.imported_munitions().filter(|m| m.pen_basis == Some(PenBasis::BehindEra)).count();
+    assert!(kornet_like > 0);
+}
+
+/// The imported platforms carry their own weapons (weapon-fits.json, from the
+/// capability CSV), not their generic parent's.
+#[test]
+fn imported_platforms_have_their_own_weapon_fits() {
+    let c = builtin();
+    let fires = |id: &str| -> Vec<String> { c.platform(id).unwrap().mounts.iter().flat_map(|m| m.munitions.clone()).collect() };
+    // T-90M: a 125 mm gun with 125 mm rounds, no 120 mm, no IFV cannon.
+    let t90m = fires("l7/var_161_1");
+    assert!(t90m.iter().any(|m| m == "l7/m_3bm46"), "{t90m:?}");
+    assert!(!t90m.iter().any(|m| m == "apfsds120" || m == "apfsds30"), "{t90m:?}");
+    // Up-armoured HMMWV: a .50 cal only, not the generic IFV's cannon and ATGM.
+    let hmmwv = c.platform("l7/var_115_default").unwrap();
+    assert_eq!(hmmwv.mounts.len(), 1);
+    assert_eq!(hmmwv.mounts[0].munitions, vec!["l7/m_m8_api".to_string()]);
+    assert!(!hmmwv.stores.ammo.contains_key("apfsds30"), "the parent's rounds are dropped");
+    // Uran-9: armed (its generic parent has no mounts).
+    assert!(!c.platform("l7/var_1134_default").unwrap().mounts.is_empty());
+    // Every fitted mount fires something the catalogue knows, and has rounds to fire.
+    let fits: serde_json::Value = serde_json::from_str(include_str!("../../../data/catalogue/weapon-fits.json")).unwrap();
+    let fitted = fits["fits"].as_object().unwrap();
+    assert!(fitted.len() >= 100, "{}", fitted.len());
+    for id in fitted.keys() {
+        let p = c.platform(id).unwrap();
+        for m in &p.mounts {
+            assert!(!m.munitions.is_empty(), "{}: mount {} fires nothing", p.id, m.id);
+            for mu in &m.munitions {
+                assert!(c.munition(mu).is_some(), "{}: unknown munition {mu}", p.id);
+                assert!(p.stores.ammo.get(mu).copied().unwrap_or(0.0) > 0.0, "{}: no {mu} carried", p.id);
+            }
+        }
+    }
+}
+
+/// A fit is laid over a platform from another file; `null` removes what the parent has.
+#[test]
+fn a_fit_overlays_a_record_and_null_removes_from_the_parent() {
+    let extra = r#"{
+        "platforms": [ { "id": "t/child", "parent": "generic/mbt", "name": "Child" } ],
+        "fits": { "t/child": { "mounts": [], "stores": { "ammo": { "apfsds120": null } } } }
+    }"#;
+    let c = Catalogue::from_sources(&sources_plus(extra)).unwrap();
+    let p = c.platform("t/child").unwrap();
+    assert!(p.mounts.is_empty());
+    assert!(!p.stores.ammo.contains_key("apfsds120"));
+    assert!(p.stores.ammo.contains_key("heat120"));
+    let bad = r#"{ "fits": { "t/nobody": { "mounts": [] } } }"#;
+    assert!(Catalogue::from_sources(&sources_plus(bad)).is_err());
+}
+
+/// Rounds say what their penetration figure allows for against ERA, so the
+/// engine neither takes ERA off a behind-ERA figure again nor lets heavy ERA
+/// degrade a rod made against it.
+#[test]
+fn rounds_carry_their_era_basis() {
+    let c = builtin();
+    let spike = c.munition("l7/m_spike_lr").unwrap();
+    assert_eq!(spike.pen_basis, PenBasis::BehindEra);
+    assert!(spike.tandem);
+    let m829a3 = c.munition("l7/m_m829a3").unwrap();
+    assert!(m829a3.defeats_era && m829a3.pen_basis == PenBasis::Rha);
+    // Every behind-ERA engine round comes from a row that says so.
+    for m in c.munitions().filter(|m| m.pen_basis == PenBasis::BehindEra) {
+        assert_eq!(c.imported_munition(&m.id).and_then(|r| r.pen_basis), Some(PenBasis::BehindEra), "{}", m.id);
+    }
+    // Hand-built rounds are unchanged: read as RHA, not made against ERA.
+    for id in ["kornet", "javelin", "apfsds125", "m829"] {
+        let m = c.munition(id).unwrap();
+        assert!(m.pen_basis == PenBasis::Rha && !m.defeats_era, "{id}");
+    }
+}

@@ -8,6 +8,14 @@
 //! `mounts`: kind → partial element), `munitions` (list) and `platforms`
 //! (list of partial records). Keys starting with `$` are comments and
 //! sources. Files are read in name order, so loading is deterministic.
+//! The importer's output (a file with a `summary` section) is adapted on the
+//! way in (`imported.rs`): its platforms to the engine's schema, its
+//! munitions kept apart as [`ImportedMunition`]s.
+//! A `fits` section (id → partial record) is laid over a platform defined in
+//! another file, after every file is read: objects merge, anything else
+//! replaces, and `null` stays (so it removes what a parent has). The weapon
+//! fits of the imported platforms (`weapon-fits.json`, from
+//! `tools/weapon_fits.py`) use it.
 //!
 //! **Resolution**, for each platform:
 //! 1. its class's defaults, with the class's own `$extends` chain under them
@@ -21,6 +29,7 @@
 //! 6. typed deserialisation into `Platform`.
 
 use crate::derive::{derive, DeriveParams};
+use crate::imported::{self, ImportedMunition};
 use crate::json::{deep_merge, get_str, strip_meta, walk_numbers};
 use crate::munition::Munition;
 use crate::types::{Band, Domain, Mount, Platform};
@@ -38,12 +47,14 @@ pub const BUILTIN_FILES: &[(&str, &str)] = &[
     ("classes.json", include_str!("../../../data/catalogue/classes.json")),
     ("command.json", include_str!("../../../data/catalogue/command.json")),
     ("drones.json", include_str!("../../../data/catalogue/drones.json")),
+    ("imported.json", include_str!("../../../data/catalogue/imported.json")),
     ("land.json", include_str!("../../../data/catalogue/land.json")),
     ("munitions.json", include_str!("../../../data/catalogue/munitions.json")),
     ("nodes.json", include_str!("../../../data/catalogue/nodes.json")),
     ("sea.json", include_str!("../../../data/catalogue/sea.json")),
     ("sourced.json", include_str!("../../../data/catalogue/sourced.json")),
     ("space.json", include_str!("../../../data/catalogue/space.json")),
+    ("weapon-fits.json", include_str!("../../../data/catalogue/weapon-fits.json")),
 ];
 
 /// The resolved catalogue.
@@ -54,6 +65,7 @@ pub struct Catalogue {
     munitions: BTreeMap<String, Munition>,
     bands: BTreeMap<String, Band>,
     classes: BTreeMap<String, Value>,
+    imported_munitions: BTreeMap<String, ImportedMunition>,
 }
 
 /// The raw sections gathered from every file.
@@ -64,6 +76,10 @@ struct Raw {
     kind_defaults: BTreeMap<String, BTreeMap<String, Value>>,
     munitions: Vec<(String, Value)>,
     platforms: BTreeMap<String, Value>,
+    /// The importer's munition rows (not engine munitions).
+    imported_munitions: Vec<(String, Value)>,
+    /// Overlays on platforms defined elsewhere (`fits` sections).
+    fits: BTreeMap<String, (String, Value)>,
 }
 
 const ELEMENT_LISTS: [(&str, &str); 4] = [("sensors", "kind"), ("emitters", "kind"), ("radios", "bearer"), ("mounts", "kind")];
@@ -73,6 +89,7 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
     let mut sorted: Vec<&(String, String)> = files.iter().collect();
     sorted.sort_by(|a, b| a.0.cmp(&b.0));
     let mut munition_ids = BTreeSet::new();
+    let mut imported_munition_ids = BTreeSet::new();
     let mut band_ids = BTreeSet::new();
     for (file, text) in sorted {
         let v: Value = match serde_json::from_str(text) {
@@ -86,8 +103,9 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
             errors.push(CatalogueError::Layout { file: file.clone(), message: "a catalogue file must be a JSON object".into() });
             continue;
         };
+        let import = imported::is_import_file(obj);
         for (section, body) in obj {
-            if section.starts_with('$') {
+            if section.starts_with('$') || (import && section == "summary") {
                 continue;
             }
             match section.as_str() {
@@ -104,6 +122,7 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         let what = &section[..section.len() - 1];
                         let fresh = match section.as_str() {
                             "bands" => band_ids.insert(id.to_owned()),
+                            "munitions" if import => imported_munition_ids.insert(id.to_owned()),
                             "munitions" => munition_ids.insert(id.to_owned()),
                             _ => !raw.platforms.contains_key(id),
                         };
@@ -113,7 +132,17 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         }
                         match section.as_str() {
                             "bands" => raw.bands.push((id.to_owned(), item.clone())),
+                            "munitions" if import => raw.imported_munitions.push((id.to_owned(), item.clone())),
                             "munitions" => raw.munitions.push((id.to_owned(), item.clone())),
+                            _ if import => {
+                                let mut item = item.clone();
+                                match imported::adapt_platform(&mut item) {
+                                    Ok(()) => {
+                                        raw.platforms.insert(id.to_owned(), item);
+                                    }
+                                    Err(message) => errors.push(CatalogueError::Shape { what: "imported platform".into(), id: id.into(), message }),
+                                }
+                            }
                             _ => {
                                 raw.platforms.insert(id.to_owned(), item.clone());
                             }
@@ -131,6 +160,22 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
                         }
                         if raw.classes.insert(id.clone(), c.clone()).is_some() {
                             errors.push(CatalogueError::Duplicate { what: "class".into(), id: id.clone() });
+                        }
+                    }
+                }
+                "fits" => {
+                    let Some(m) = body.as_object() else {
+                        errors.push(CatalogueError::Layout { file: file.clone(), message: "`fits` must be an object".into() });
+                        continue;
+                    };
+                    for (id, fit) in m {
+                        if id.starts_with('$') {
+                            continue;
+                        }
+                        if !fit.is_object() {
+                            errors.push(CatalogueError::Layout { file: file.clone(), message: format!("the fit for `{id}` must be an object") });
+                        } else if raw.fits.insert(id.clone(), (file.clone(), fit.clone())).is_some() {
+                            errors.push(CatalogueError::Duplicate { what: "fit".into(), id: id.clone() });
                         }
                     }
                 }
@@ -159,7 +204,36 @@ fn gather(files: &[(String, String)], errors: &mut Vec<CatalogueError>) -> Raw {
             }
         }
     }
+    for (id, (file, fit)) in &raw.fits {
+        match raw.platforms.get_mut(id) {
+            Some(rec) => overlay(rec, fit),
+            None => errors.push(CatalogueError::Layout { file: file.clone(), message: format!("a fit for `{id}`, which no file defines") }),
+        }
+    }
+    imported::reparent(&mut raw.platforms);
     raw
+}
+
+/// Lay `fit` over `rec`: objects merge, anything else replaces, and `null`
+/// is kept (so that it removes the key from the parent when the record is
+/// merged down its parent chain).
+fn overlay(rec: &mut Value, fit: &Value) {
+    match (rec, fit) {
+        (Value::Object(r), Value::Object(f)) => {
+            for (k, v) in f {
+                if k.starts_with('$') {
+                    continue;
+                }
+                match r.get_mut(k) {
+                    Some(existing) if existing.is_object() && v.is_object() => overlay(existing, v),
+                    _ => {
+                        r.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+        }
+        (r, f) => *r = f.clone(),
+    }
 }
 
 /// A class's own numbers as figures: `catalogue.class.<class>.<path>`.
@@ -378,6 +452,14 @@ impl Catalogue {
                 Err(e) => errors.push(CatalogueError::Shape { what: "munition".into(), id: id.clone(), message: e.to_string() }),
             }
         }
+        for (id, v) in &raw.imported_munitions {
+            match serde_json::from_value::<ImportedMunition>(strip_meta(v)) {
+                Ok(m) => {
+                    cat.imported_munitions.insert(id.clone(), m);
+                }
+                Err(e) => errors.push(CatalogueError::Shape { what: "imported munition".into(), id: id.clone(), message: e.to_string() }),
+            }
+        }
         for id in raw.classes.keys() {
             match resolve_class(id, &raw.classes, figures, &mut Vec::new()) {
                 Ok(v) => {
@@ -466,6 +548,16 @@ impl Catalogue {
 
     pub fn munitions(&self) -> impl Iterator<Item = &Munition> {
         self.munitions.values()
+    }
+
+    /// An importer munition row (not an engine munition; see `imported.rs`).
+    pub fn imported_munition(&self, id: &str) -> Option<&ImportedMunition> {
+        self.imported_munitions.get(id)
+    }
+
+    /// Every importer munition row, in id order.
+    pub fn imported_munitions(&self) -> impl Iterator<Item = &ImportedMunition> {
+        self.imported_munitions.values()
     }
 
     pub fn band(&self, id: &str) -> Option<&Band> {
